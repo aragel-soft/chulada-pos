@@ -23,3 +23,5 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+rusqlite = { version = "0.30", features = ["bundled"] } #La feature ["bundled"] sirve para que SQLite compile directamente en la app y no depende del usuario
+uuid = { version = "1.6", features = ["v4", "serde"] }
