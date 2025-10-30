@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core' 
+import { invoke } from '@tauri-apps/api/core';
+import { ENV } from '@/config/config';
 
 function App() {
   //La App llama a rust una vez ha terminado de cargar. 
@@ -17,6 +18,10 @@ function App() {
       </h1>
       <Button className="mt-4">Este es un botón de Shadcn</Button>
       <Button variant="destructive" className="mt-4 ml-2">Botón Destructivo</Button>
+
+      <p className="mt-4 text-sm text-gray-500">
+        Versión: {ENV.APP_VERSION}
+      </p>
     </div>
   )
 }

@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variables de entorno
+.env
+.env.local
+
+# Base de datos local
+*.db
+*.db-shm
+*.db-wal
