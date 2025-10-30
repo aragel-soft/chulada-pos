@@ -73,7 +73,7 @@ chulada-pos/
 **Aragel Software**
 
   - Aramis Jasso (Scrum Master / Developer)
-  - Miguel (Product Owner / Developer)
+  - Miguel López (Product Owner / Developer)
 
 ## 📄 Licencia
 
