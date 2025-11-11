@@ -11,6 +11,12 @@ export default function DashboardPage() {
     navigate('/login');
   };
 
+  // MALR: Temporal hasta hamburguer
+  const handleSettings = () => {
+    navigate('/settings');
+  };
+
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-4xl mx-auto">
@@ -41,6 +47,12 @@ export default function DashboardPage() {
             <div className="p-4 bg-slate-50 rounded-md">
               <p className="text-sm text-slate-600">ID de Usuario:</p>
               <p className="font-mono text-xs">{user?.id}</p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-md">
+              <Button onClick={handleSettings} variant="default">
+              Configuración
+              </Button>
             </div>
           </div>
         </div>
