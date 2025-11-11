@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+// Helper: Invocar comando Tauri con retry
+async function invokeTauriCommand(page: Page, command: string, args?: any, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await page.evaluate(async ({ cmd, params }) => {
+        // @ts-ignore
+        return await window.__TAURI__.core.invoke(cmd, params);
+      }, { cmd: command, params: args });
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await page.waitForTimeout(1000); // Esperar 1s antes de reintentar
+    }
+  }
+}
 
 test.describe('Login Flow', () => {
   test.beforeEach(async ({ page }) => {
