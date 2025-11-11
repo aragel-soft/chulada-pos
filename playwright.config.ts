@@ -1,12 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import dotenv from 'dotenv';
-import path from 'path'; 
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Cargar las variables de entorno de prueba
-dotenv.config({ path: path.resolve(__dirname, '.env.test') });
 
 /**
  * Configuración de Playwright para testing E2E con Tauri
@@ -14,24 +6,27 @@ dotenv.config({ path: path.resolve(__dirname, '.env.test') });
 export default defineConfig({
   testDir: './e2e',
   
+  // Global setup - espera a que Tauri esté 100% listo
+  globalSetup: './e2e/global-setup.ts',
+  
   // Timeout extendido para Tauri (la app tarda en iniciar)
   timeout: 30000,
   
   // Configuración de expect
   expect: {
-    timeout: 5000,
+    timeout: 10000, // Aumentado para comandos Tauri
   },
   
-  // Correr tests en paralelo
+  // CRÍTICO: No correr en paralelo con Tauri
   fullyParallel: false,
   
   // Fallar build si hay tests marcados como .only
   forbidOnly: !!process.env.CI,
   
   // Reintentos en CI
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 2 : 1,
   
-  // Workers
+  // Workers - Solo 1 para evitar múltiples instancias de Tauri
   workers: 1,
   
   // Reporter
@@ -55,6 +50,12 @@ export default defineConfig({
     
     // Video solo en fallos
     video: 'retain-on-failure',
+    
+    // Aumentar timeout de navegación
+    navigationTimeout: 15000,
+    
+    // Aumentar timeout de acciones
+    actionTimeout: 10000,
   },
 
   // Configuración de proyectos (browsers)
@@ -71,7 +72,7 @@ export default defineConfig({
     url: 'http://localhost:1420',
     timeout: 120000, // Tauri tarda en compilar la primera vez
     reuseExistingServer: !process.env.CI,
-    stdout: 'pipe', 
+    stdout: 'pipe',
     stderr: 'pipe',
   },
 });

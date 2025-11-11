@@ -44,6 +44,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
 
       if (response.success && response.user) {
         login(response.user);
+        console.log('Estado del store actualizado:', useAuthStore.getState());
         onSuccess?.();
       } else {
         setError(response.message);
@@ -75,14 +76,14 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         <div className="mt-8 space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
+              <Label htmlFor="username" className="text-base">Usuario</Label>
               <Input
                 id="username"
                 type="text"
                 autoComplete="username"
                 autoFocus
                 {...register('username')}
-                className={`rounded-lg ${
+                className={`rounded-xl ${
                   errors.username ? 'border-red-500' : ''
                 }`}
               />
@@ -92,14 +93,14 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password" className="text-base">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 {...register('password')}
                 onKeyDown={handleKeyDown}
-                className={`rounded-lg ${
+                className={`rounded-xl ${
                   errors.password ? 'border-red-500' : ''
                 }`}
               />
@@ -119,7 +120,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             type="button"
             onClick={handleSubmit(onSubmit)}
             disabled={!isValid || !isFormFilled || isLoading}
-            className="w-full rounded-lg bg-[#480489] hover:bg-[#480489]/90"
+            className="w-full rounded-xl bg-[#480489] hover:bg-[#480489]/90 text-base"
           >
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </Button>

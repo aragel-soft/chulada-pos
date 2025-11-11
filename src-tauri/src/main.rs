@@ -21,6 +21,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::auth::authenticate_user,
+            commands::auth::debug_database,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
