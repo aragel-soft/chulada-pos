@@ -100,14 +100,6 @@ pub async fn authenticate_user(
             role_name,
             role_display_name,
         )) => {
-            // Verificar si el usuario está activo
-            if is_active == 0 {
-                return Ok(AuthResponse {
-                    success: false,
-                    message: "Usuario desactivado. Contacta al administrador".to_string(),
-                    user: None,
-                });
-            }
 
             // Verificar contraseña
             let password_valid = verify_password(&password, &password_hash)?;
@@ -116,6 +108,15 @@ pub async fn authenticate_user(
                 return Ok(AuthResponse {
                     success: false,
                     message: "Usuario o contraseña incorrectos".to_string(),
+                    user: None,
+                });
+            }
+
+            // Verificar si el usuario está activo
+            if is_active == 0 {
+                return Ok(AuthResponse {
+                    success: false,
+                    message: "Usuario desactivado. Contacta al administrador".to_string(),
                     user: None,
                 });
             }
@@ -144,4 +145,33 @@ pub async fn authenticate_user(
         }
         Err(e) => Err(AuthError::Database(e)),
     }
+}
+
+#[tauri::command]
+pub fn debug_database(db: State<'_, Mutex<Connection>>) -> Result<String, AuthError> {
+    let conn = db.lock().unwrap();
+    
+    let mut output = String::new();
+    
+    // Contar roles
+    let roles_count: i32 = conn.query_row("SELECT COUNT(*) FROM roles", [], |row| row.get(0))?;
+    output.push_str(&format!("✅ Roles: {}\n", roles_count));
+    
+    // Contar usuarios
+    let users_count: i32 = conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
+    output.push_str(&format!("✅ Usuarios: {}\n", users_count));
+    
+    // Contar permisos
+    let perms_count: i32 = conn.query_row("SELECT COUNT(*) FROM permissions", [], |row| row.get(0))?;
+    output.push_str(&format!("✅ Permisos: {}\n", perms_count));
+    
+    // Verificar usuario admin
+    let admin_exists: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM users WHERE username = 'admin'", 
+        [], 
+        |row| row.get(0)
+    )?;
+    output.push_str(&format!("✅ Usuario admin existe: {}\n", admin_exists == 1));
+    
+    Ok(output)
 }
