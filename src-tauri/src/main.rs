@@ -1,15 +1,27 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+// Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-// 1. Importa tu módulo de comandos
 mod commands;
+mod database;
+
+use std::sync::Mutex;
+use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
-        // 2. Registra tu comando
+        .setup(|app| {
+            // Inicializar base de datos
+            let conn = database::init_database(app.handle())
+                .expect("Error al inicializar la base de datos");
+            
+            // Gestionar state de la conexión
+            app.manage(Mutex::new(conn));
+            
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
-            commands::database::init_database
+            commands::auth::authenticate_user,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Error al ejecutar la aplicación Tauri");
 }

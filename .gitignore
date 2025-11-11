@@ -26,8 +26,24 @@ dist-ssr
 # Variables de entorno
 .env
 .env.local
+.env.test
 
 # Base de datos local
 *.db
 *.db-shm
 *.db-wal
+
+# Testing artifacts
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Vitest
+coverage/
+
+# Screenshots y videos de tests
+**/screenshots/
+**/videos/
+**/__screenshots__/
