@@ -24,7 +24,15 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /* Testing */
+    "types": [
+      "node",
+      "@wdio/globals/types",
+      "@wdio/mocha-framework",
+      "@wdio/types",
+    ]
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
