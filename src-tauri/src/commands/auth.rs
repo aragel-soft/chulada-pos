@@ -8,6 +8,14 @@ use std::sync::Mutex;
 use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Permission {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub module: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -15,6 +23,8 @@ pub struct User {
     pub role_id: String,
     pub role_name: String,
     pub role_display_name: String,
+    pub permissions: Vec<Permission>,
+    pub modules: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -121,6 +131,42 @@ pub async fn authenticate_user(
                 });
             }
 
+            // Obtener permisos para el rol
+            let mut perms_stmt = conn.prepare(
+                "SELECT 
+                p.id, 
+                p.name, 
+                p.display_name,
+                p.module
+                FROM permissions p
+                INNER JOIN role_permissions rp ON p.id = rp.permission_id
+                WHERE rp.role_id = ?1",
+            )?;
+
+            let permissions_result: Result<Vec<Permission>, _> = perms_stmt
+                .query_map([&role_id], |row| {
+                    Ok(Permission {
+                        id: row.get::<_, String>(0)?,
+                        name: row.get::<_, String>(1)?,
+                        display_name: row.get::<_, String>(2)?,
+                        module: row.get::<_, String>(3)?,
+                    })
+                })?
+                .collect();
+
+            let permissions = match permissions_result {
+                Ok(perms) => perms,
+                Err(_) => {
+                    Vec::new() // Retorna vector vacío en caso de error
+                }
+            };
+
+            // Obtener módulos únicos de los permisos
+            let mut modules: Vec<String> = permissions.iter().map(|p| p.module.clone()).collect();
+            modules.sort_unstable();
+            modules.dedup();
+
+
             // Login exitoso
             Ok(AuthResponse {
                 success: true,
@@ -132,6 +178,8 @@ pub async fn authenticate_user(
                     role_id,
                     role_name,
                     role_display_name,
+                    permissions,
+                    modules,
                 }),
             })
         }

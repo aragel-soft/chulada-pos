@@ -15,6 +15,12 @@ export default function DashboardPage() {
   const handleSettings = () => {
     navigate('/settings');
   };
+  const handleInventory = () => {
+    navigate('/inventory');
+  };
+  const handleReports = () => {
+    navigate('/reports');
+  };
 
 
   return (
@@ -54,6 +60,19 @@ export default function DashboardPage() {
               Configuración
               </Button>
             </div>
+
+            <div className="p-4 bg-slate-50 rounded-md">
+              <Button onClick={handleInventory} variant="default">
+              Inventario
+              </Button>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-md">
+              <Button onClick={handleReports} variant="default">
+                Reportes
+              </Button>
+            </div>
+
           </div>
         </div>
       </div>

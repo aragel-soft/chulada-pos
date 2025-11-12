@@ -1,21 +1,45 @@
-// MALR: Importaciones
-import { useNavigate } from 'react-router-dom';
-// import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@/components/ui/button';
+// Importaciones
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UsersListPage } from '@/features/settings/components/UsersListPage';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
-export default function SettingsPage(){
+
+
+
+// Componentes de ejemplo
+const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Perfil</h2></div>;
+const BillingPage = () => <div className="p-4 rounded-lg border"><h2>Facturación</h2></div>;
+
+export default function SettingsPage() {
   const navigate = useNavigate();
-  
-  const handleDashboard = () => {
-    navigate('/dashboard');
-  };
   return (
     <>
-      <h1>Configuración</h1> 
-      <Button onClick={handleDashboard} variant="default"> Dashbord </Button>
-      <UsersListPage />
+    <Button onClick={() => navigate('/dashboard')} variant="default"> Dashboard </Button>
+    <div className="space-y-6 p-4">
+      <h1 className="text-3xl font-bold">Configuración</h1> 
+      
+      {/* Usamos defaultValue para la pestaña inicial */}
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList>
+          <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="profile">Perfil</TabsTrigger>
+          <TabsTrigger value="billing">Facturación</TabsTrigger>
+        </TabsList>
+        
+        {/* El contenido de cada pestaña va en un TabsContent */}
+        <TabsContent value="users" className="mt-4">
+          <UsersListPage />
+        </TabsContent>
+        <TabsContent value="profile" className="mt-4">
+          <ProfilePage />
+        </TabsContent>
+        <TabsContent value="billing" className="mt-4">
+          <BillingPage />
+        </TabsContent>
+      </Tabs>
+    </div>
     
     </>
-)
+  );
 }
