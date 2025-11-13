@@ -39,6 +39,7 @@ fn run_migrations(conn: &Connection) -> Result<()> {
     conn.execute_batch(include_str!("./migrations/003_insert_admin.sql"))?;
     #[cfg(debug_assertions)]
     conn.execute_batch(include_str!("./migrations/004_test_users.sql"))?;
+    conn.execute_batch(include_str!("./migrations/005_add_avatar_user.sql"))?;
     println!("DATABASE_READY");
     Ok(())
 }

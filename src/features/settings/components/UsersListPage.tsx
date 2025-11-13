@@ -1,6 +1,6 @@
-"use client"
-
+import { invoke } from "@tauri-apps/api/core"
 import * as React from "react"
+import { useUsersStore, UserView } from "@/stores/usersStore";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -23,6 +23,7 @@ import {
   Search,
   Trash,
   Pencil,
+  User,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -70,42 +71,13 @@ import {
 // --- Definición de Tipo y Datos de Muestra ---
 // (En una app real, esto vendría de tu comando Rust get_all_users)
 
-type UserRole = "admin" | "editor" | "viewer"
-type UserStatus = "activo" | "inactivo"
 
-export type User = {
-  id: string
-  avatarUrl?: string
-  nombreCompleto: string
-  username: string
-  rol: UserRole
-  estado: UserStatus
-}
-export type UserWithCreationDate = User & { fechaCreacion: Date }
+type UserStatus = "activo" | "inactivo";
 
-const mockData: UserWithCreationDate[] = [
-  { id: "u-001", avatarUrl: "https://github.com/shadcn.png", nombreCompleto: "Ana Torres", username: "atorres", rol: "admin", estado: "activo", fechaCreacion: new Date("2023-10-26T10:00:00Z") },
-  { id: "u-002", avatarUrl: "", nombreCompleto: "Carlos Gómez", username: "cgomez", rol: "editor", estado: "activo", fechaCreacion: new Date("2023-11-15T14:30:00Z") },
-  { id: "u-003", avatarUrl: "https://github.com/react.png", nombreCompleto: "David Ruiz", username: "druiz", rol: "viewer", estado: "inactivo", fechaCreacion: new Date("2023-09-01T08:00:00Z") },
-  { id: "u-004", avatarUrl: "", nombreCompleto: "Elena Soto", username: "esoto", rol: "viewer", estado: "activo", fechaCreacion: new Date("2024-01-20T18:45:00Z") },
-  { id: "u-005", nombreCompleto: "Felipe Neri", username: "fneri", rol: "editor", estado: "activo", fechaCreacion: new Date("2024-02-10T11:00:00Z") },
-  { id: "u-006", nombreCompleto: "Gabriela Paz", username: "gpaz", rol: "admin", estado: "activo", fechaCreacion: new Date("2023-05-20T09:00:00Z") },
-  { id: "u-007", nombreCompleto: "Hector Landa", username: "hlanda", rol: "viewer", estado: "inactivo", fechaCreacion: new Date("2024-03-05T16:20:00Z") },
-  { id: "u-008", nombreCompleto: "Inés Morales", username: "imorales", rol: "editor", estado: "activo", fechaCreacion: new Date("2023-12-30T22:00:00Z") },
-  { id: "u-009", nombreCompleto: "Juan Kuri", username: "jkuri", rol: "viewer", estado: "activo", fechaCreacion: new Date("2024-04-01T12:10:00Z") },
-  { id: "u-010", nombreCompleto: "Laura Mesta", username: "lmesta", rol: "viewer", estado: "activo", fechaCreacion: new Date("2024-03-28T07:30:00Z") },
-  { id: "u-011", nombreCompleto: "Marcos Días", username: "mdias", rol: "admin", estado: "inactivo", fechaCreacion: new Date("2023-08-11T13:00:00Z") },
-  { id: "u-012", nombreCompleto: "Nora Silva", username: "nsilva", rol: "editor", estado: "activo", fechaCreacion: new Date("2024-04-10T09:05:00Z") },
-  { id: "u-013", nombreCompleto: "Oscar Pardo", username: "opardo", rol: "viewer", estado: "activo", fechaCreacion: new Date("2024-01-05T20:00:00Z") },
-  { id: "u-014", nombreCompleto: "Patricia Vera", username: "pvera", rol: "admin", estado: "activo", fechaCreacion: new Date("2023-07-19T10:30:00Z") },
-  { id: "u-015", nombreCompleto: "Raúl Solís", username: "rsolis", rol: "editor", estado: "inactivo", fechaCreacion: new Date("2024-02-29T23:50:00Z") },
-  { id: "u-016", nombreCompleto: "Sofía Luna", username: "sluna", rol: "viewer", estado: "activo", fechaCreacion: new Date("2023-11-01T00:00:00Z") },
-  { id: "u-017", nombreCompleto: "Tomás Peña", username: "tpena", rol: "viewer", estado: "activo", fechaCreacion: new Date("2024-04-12T15:00:00Z") },
-];
 
 // --- Definición de Columnas (TanStack Table) ---
-
-export const columns: ColumnDef<UserWithCreationDate>[] = [
+export const columns: ColumnDef<UserView>[] = [
+  
   // Columna de Selección (Checkbox)
   {
     id: "select",
@@ -132,7 +104,7 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
 
   // Columna Nombre Completo (con Avatar)
   {
-    accessorKey: "nombreCompleto",
+    accessorKey: "full_name",
     header: ({ column }) => {
       return (
         <Button
@@ -153,12 +125,12 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8">
-          <AvatarImage src={row.original.avatarUrl} alt={row.original.nombreCompleto} />
+          <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
           <AvatarFallback>
-            {row.original.nombreCompleto.split(' ').map(n => n[0]).join('').toUpperCase()}
+            {row.original.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <span className="font-medium">{row.original.nombreCompleto}</span>
+        <span className="font-medium">{row.original.full_name}</span>
       </div>
     ),
   },
@@ -186,7 +158,7 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
 
   // Columna Rol
   {
-    accessorKey: "rol",
+    accessorKey: "role_name",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -203,13 +175,13 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="capitalize">{row.getValue("rol")}</div>
+      <div className="capitalize">{row.getValue("role_name")}</div>
     ),
   },
 
   // Columna Fecha de Creación (EXISTE PERO ESTARÁ OCULTA)
   {
-    accessorKey: "fechaCreacion",
+    accessorKey: "created_at",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -226,13 +198,13 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
       </Button>
     ),
     cell: ({ row }) => (
-      <div>{(row.getValue("fechaCreacion") as Date).toLocaleDateString()}</div>
+      <div>{(row.getValue("created_at") as string)}</div>
     ),
   },
 
   // Columna Estado (con Badges)
   {
-    accessorKey: "estado",
+    accessorKey: "is_active",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Estado
@@ -240,18 +212,17 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
       </Button>
     ),
     cell: ({ row }) => {
-    const estado = row.getValue("estado") as UserStatus
-    const isActivo = estado === "activo"
+    const estado = row.getValue("is_active") as boolean
 
     return (
       <Badge
         className={`capitalize min-w-[80px] justify-center ${
-          isActivo
+          estado
             ? "bg-green-600 text-white hover:bg-green-600/80" // <-- 2. Color Verde
             : "bg-destructive text-destructive-foreground hover:bg-destructive/80" // <-- 3. Color Rojo
         }`}
       >
-        {estado}
+        {estado ? "activo" : "inactivo"}
       </Badge>
       )
     },
@@ -260,13 +231,15 @@ export const columns: ColumnDef<UserWithCreationDate>[] = [
 
 // --- Componente Principal de la Página ---
 export function UsersListPage() {
-  const [data] = React.useState(() => [...mockData]) // Datos
-  
+  const { users, loading, error, fetchUsers } = useUsersStore();
+  const data = React.useMemo(() => users, [users]);
   // CAMBIO: El estado de ordenamiento sigue apuntando a fechaCreacion
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "fechaCreacion", desc: true },
+    { id: "created_at", desc: true },
   ])
-  
+  React.useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   
   // CAMBIO: Se oculta la columna 'fechaCreacion' por defecto
@@ -304,6 +277,22 @@ export function UsersListPage() {
   })
 
   const selectedRowsCount = Object.keys(rowSelection).length;
+ // 7. MANEJO DE CARGA Y ERROR
+  if (loading) {
+    return (
+      <div className="w-full p-8 text-center">
+        Cargando usuarios...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full p-8 text-center text-red-500">
+        <strong>Error al cargar:</strong> {error}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full p-4 md:p-8">
@@ -316,15 +305,15 @@ export function UsersListPage() {
         <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-            placeholder="Buscar por nombre o usuario..."
-            value={(table.getColumn("nombreCompleto")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => {
-              // Filtra en ambas columnas simultáneamente
-              table.getColumn("nombreCompleto")?.setFilterValue(event.target.value)
-              table.getColumn("username")?.setFilterValue(event.target.value)
-            }}
-            className="pl-10"
-          />
+              placeholder="Buscar por nombre o usuario..."
+              // Obtén el valor del filtro global
+              value={(table.getState().globalFilter as string) ?? ""}
+              // Establece el valor del filtro global
+              onChange={(event) => {
+                table.setGlobalFilter(event.target.value);
+              }}
+              className="pl-10"
+            />
         </div>
 
         {/* Botones de Acción */}
@@ -367,9 +356,9 @@ export function UsersListPage() {
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id === 'nombreCompleto' 
+                      {column.id === 'full_name' 
                         ? 'Nombre' 
-                        : column.id === 'fechaCreacion'
+                        : column.id === 'created_at'
                         ? 'Fecha de Creación'
                         : column.id}
                     </DropdownMenuCheckboxItem>
