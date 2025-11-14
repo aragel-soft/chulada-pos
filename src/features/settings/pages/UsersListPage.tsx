@@ -248,12 +248,25 @@ const generatePaginationRange = (
 export function UsersListPage() {
   const { users, loading, error, fetchUsers } = useUsersStore();
   const data = React.useMemo(() => users, [users]);
+  const initialLoadMeasured = React.useRef(false);
+// Estado para el <Select> que elegirá la columna
+  const [searchColumn, setSearchColumn] = React.useState("full_name");
+  // Estado local para el <Input> de búsqueda (controlado y rápido)
+  const [filterInput, setFilterInput] = React.useState('');
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
   ])
   React.useEffect(() => {
+    console.time("Carga inicial de usuarios");
     fetchUsers();
   }, [fetchUsers]);
+
+  React.useEffect(() => {
+    if (!loading && !initialLoadMeasured.current && data.length > 0) {
+      console.timeEnd("Carga inicial de usuarios");
+      initialLoadMeasured.current = true;
+    }
+  }, [loading, data]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     created_at: false,
@@ -284,6 +297,11 @@ export function UsersListPage() {
       pagination,
     },
   })
+
+  React.useEffect(() => {
+    console.timeEnd("Búsqueda/Filtrado");
+  }, [table.getFilteredRowModel().rows]);
+
   const { pageIndex, pageSize } = table.getState().pagination;
   const totalRows = table.getFilteredRowModel().rows.length;
   const pageRowCount = table.getRowModel().rows.length;
@@ -327,8 +345,9 @@ export function UsersListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre o usuario..."
-            value={(table.getState().globalFilter as string) ?? ""}
-            onChange={(event) => {
+            value={(table.getState().globalFilter as string) ?? ""} // <--- Esto cambia
+            onChange={(event) => { // <--- Esto cambia
+              console.time("Búsqueda/Filtrado");
               table.setGlobalFilter(event.target.value);
             }}
             className="pl-10"
