@@ -10,21 +10,19 @@ import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import InventoryPage from '@/pages/InventoryPage';
 import ReportsPage from '@/pages/ReportsPage';
-import SettingsPage from '@/pages/SettingsPage'; // Esta es la página layout con los Tabs y <Outlet />
+import SettingsPage from '@/pages/SettingsPage';
 
-// --- Tu Componente de Protección ---
+// --- Ruta Protegida ---
 import ProtectedRoute from './ProtectedRoute'; 
 
-// --- Sub-páginas de Configuración ---
-import { UsersListPage } from '@/features/settings/components/UsersListPage';
+// --- Settings
+import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 
-// --- Componentes de ejemplo para las otras secciones ---
+// --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
 const BillingPage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Facturación</h2><p>Aquí irían tus datos de facturación...</p></div>;
-// -----------------------------------------------------------
 
 
-// --- Definición del Router (Formato Objeto) ---
 const router = createBrowserRouter([
   // --- Ruta Pública ---
   {
@@ -58,48 +56,55 @@ const router = createBrowserRouter([
     ),
   },
   
-  // --- Ruta de Layout de Configuración (Protegida) ---
+  // --- Rutas Anidadas para Settings ---
   {
     path: "/settings",
     element: (
-      <ProtectedRoute module="users">
+      <ProtectedRoute module="settings:view">
         <SettingsPage /> 
       </ProtectedRoute>
     ),
     children: [
       {
-        path: "", // Si alguien va a "/settings"
-        element: <Navigate to="users" replace />, // Redirige a "/settings/users"
+        path: "", 
+        element: <Navigate to="profile" replace />, 
       },
       {
-        path: "users", // Corresponde a /settings/users
-        element: <UsersListPage />,
+        path: "users", // /settings/users
+        element: 
+          <ProtectedRoute module="users:view">
+            <UsersListPage />
+          </ProtectedRoute>
       },
       {
-        path: "profile", // Corresponde a /settings/profile
-        element: <ProfilePage />,
+        path: "profile", // /settings/profile
+        element: 
+          <ProtectedRoute module="profile:view">
+            <ProfilePage />
+          </ProtectedRoute>,
       },
       {
-        path: "billing", // Corresponde a /settings/billing
-        element: <BillingPage />,
+        path: "billing", // /settings/billing
+        element: 
+          <ProtectedRoute module="billing:view">
+            <BillingPage />
+          </ProtectedRoute>,
       },
     ]
   },
 
-  // --- Redirecciones (Al final) ---
+  // --- Redirecciones ---
   {
     path: "/", // Redirige la raíz a /login
     element: <Navigate to="/login" replace />,
   },
   {
-    path: "*", // Captura cualquier otra ruta (404) y redirige a /login
+    path: "*", // Cualquier ruta no definida redirige a /login
     element: <Navigate to="/login" replace />,
   }
 ]);
 
-
-// --- Componente AppRouter ---
 export default function AppRouter() {
-  // El componente ahora solo provee el router a la app
+  
   return <RouterProvider router={router} />;
 }

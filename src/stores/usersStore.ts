@@ -1,19 +1,16 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core'; // Asegúrate de usar 'core' si 'api' no funciona
+import { invoke } from '@tauri-apps/api/core';
 
-// 1. Define el tipo que COINCIDE EXACTAMENTE
-//    con tu struct de Rust (y tu tipo 'User' de React)
 export type UserView = {
   id: string;
   avatar_url?: string;
   full_name: string;
   username: string;
-  role_name: string; // Ajusta si tienes más roles
+  role_name: string; 
   is_active: boolean;
-  created_at: string; // La BD devuelve un string, no un objeto Date
+  created_at: string; 
 };
 
-// 2. Define el estado del store
 interface UsersState {
   users: UserView[];
   loading: boolean;
@@ -21,24 +18,21 @@ interface UsersState {
   fetchUsers: () => Promise<void>;
 }
 
-// 3. Crea el store
+
 export const useUsersStore = create<UsersState>((set) => ({
-  // Estado inicial
   users: [],
   loading: false,
   error: null,
 
-  // Acción para cargar los usuarios
   fetchUsers: async () => {
-    set({ loading: true, error: null }); // Empieza la carga
+    set({ loading: true, error: null }); 
     try {
-      // Llama a tu comando de Rust
       const users = await invoke<UserView[]>("get_users_list");
       
-      set({ users: users, loading: false }); // Éxito
+      set({ users: users, loading: false }); 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      set({ loading: false, error: errorMsg }); // Error
+      set({ loading: false, error: errorMsg }); 
     }
   },
 }));

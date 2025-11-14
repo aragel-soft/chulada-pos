@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::sync::Mutex; 
 use tauri::State;
 
-// 1. La struct de datos para el frontend (la hacemos 'pub' para que main.rs la vea)
+/// Estructura de datos que se envía al frontend con la información del usuario.
 #[derive(Serialize)]
 pub struct UserView {
     id: String,
@@ -16,19 +16,15 @@ pub struct UserView {
     
 }
 
-// 2. El comando. ¡Observa que NO es 'async'!
+/// Comando de Tauri para obtener la lista de usuarios activos.
+
 #[tauri::command]
 pub fn get_users_list(
-    // 3. ¡LA CLAVE! Obtenemos el Mutex<Connection> directamente del estado,
-    //    tal como lo registraste en main.rs. No se necesita 'AppState'.
+    // Obtiene la conexión a la base de datos desde el estado de Tauri.
     db_state: State<'_, Mutex<Connection>>,
 ) -> Result<Vec<UserView>, String> {
-    
-    // 4. Bloqueo síncrono. Esto está bien porque la función NO es async.
-    //    Tauri es lo suficientemente inteligente para correr esto en un hilo separado.
     let conn = db_state.lock().unwrap();
 
-    // 5. El SQL (exactamente como lo tenías)
     let sql = "
         SELECT 
             u.id, 
@@ -46,7 +42,6 @@ pub fn get_users_list(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
-    // 6. Mapeo
     let user_iter = stmt.query_map([], |row| {
         Ok(UserView {
             id: row.get(0)?,
@@ -60,7 +55,6 @@ pub fn get_users_list(
     })
     .map_err(|e| e.to_string())?;
 
-    // 7. Recolección
     let users = user_iter.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
 
     Ok(users)

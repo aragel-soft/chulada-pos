@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core"
 import * as React from "react"
 import { useUsersStore, UserView } from "@/stores/usersStore";
 import {
@@ -18,13 +17,10 @@ import {
   ArrowUp,
   ArrowUpDown,
   ChevronDown,
-  MoreHorizontal,
-  PlusCircle,
   Search,
   Trash,
   Pencil,
-  User,
-} from "lucide-react"
+} from "lucide-react" 
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,8 +29,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -55,11 +49,12 @@ import {
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination"
+} from "@/components/ui/pagination" 
 import {
   Select,
   SelectContent,
@@ -67,18 +62,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { PlusCircle } from "lucide-react";
 
-// --- Definición de Tipo y Datos de Muestra ---
-// (En una app real, esto vendría de tu comando Rust get_all_users)
-
-
-type UserStatus = "activo" | "inactivo";
-
-
-// --- Definición de Columnas (TanStack Table) ---
 export const columns: ColumnDef<UserView>[] = [
-  
-  // Columna de Selección (Checkbox)
   {
     id: "select",
     header: ({ table }) => (
@@ -101,8 +87,6 @@ export const columns: ColumnDef<UserView>[] = [
     enableSorting: false,
     enableHiding: false,
   },
-
-  // Columna Nombre Completo (con Avatar)
   {
     accessorKey: "full_name",
     header: ({ column }) => {
@@ -134,8 +118,6 @@ export const columns: ColumnDef<UserView>[] = [
       </div>
     ),
   },
-
-  // Columna Usuario (username)
   {
     accessorKey: "username",
     header: ({ column }) => (
@@ -155,8 +137,6 @@ export const columns: ColumnDef<UserView>[] = [
     ),
     cell: ({ row }) => <div className="lowercase">@{row.getValue("username")}</div>,
   },
-
-  // Columna Rol
   {
     accessorKey: "role_name",
     header: ({ column }) => (
@@ -178,8 +158,6 @@ export const columns: ColumnDef<UserView>[] = [
       <div className="capitalize">{row.getValue("role_name")}</div>
     ),
   },
-
-  // Columna Fecha de Creación (EXISTE PERO ESTARÁ OCULTA)
   {
     accessorKey: "created_at",
     header: ({ column }) => (
@@ -201,8 +179,6 @@ export const columns: ColumnDef<UserView>[] = [
       <div>{(row.getValue("created_at") as string)}</div>
     ),
   },
-
-  // Columna Estado (con Badges)
   {
     accessorKey: "is_active",
     header: ({ column }) => (
@@ -212,14 +188,14 @@ export const columns: ColumnDef<UserView>[] = [
       </Button>
     ),
     cell: ({ row }) => {
-    const estado = row.getValue("is_active") as boolean
+      const estado = row.getValue("is_active") as boolean
 
-    return (
+      return (
       <Badge
         className={`capitalize min-w-[80px] justify-center ${
           estado
-            ? "bg-green-600 text-white hover:bg-green-600/80" // <-- 2. Color Verde
-            : "bg-destructive text-destructive-foreground hover:bg-destructive/80" // <-- 3. Color Rojo
+            ? "bg-green-600 text-white hover:bg-green-600/80"
+            : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
         }`}
       >
         {estado ? "activo" : "inactivo"}
@@ -228,12 +204,50 @@ export const columns: ColumnDef<UserView>[] = [
     },
   },
 ]
+const generatePaginationRange = (
+  currentPage: number, 
+  totalPages: number,
+  siblingCount: number = 1 
+): (number | string)[] => {
 
-// --- Componente Principal de la Página ---
+  const totalPageNumbers = siblingCount + 5;
+
+  if (totalPages <= totalPageNumbers) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
+
+  const shouldShowLeftDots = leftSiblingIndex > 2;
+  const shouldShowRightDots = rightSiblingIndex < totalPages - 2;
+
+  const firstPageIndex = 1;
+  const lastPageIndex = totalPages;
+
+  if (!shouldShowLeftDots && shouldShowRightDots) {
+    let leftItemCount = 3 + 2 * siblingCount;
+    let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
+    return [...leftRange, "...", totalPages];
+  }
+
+  if (shouldShowLeftDots && !shouldShowRightDots) {
+    let rightItemCount = 3 + 2 * siblingCount;
+    let rightRange = Array.from({ length: rightItemCount }, (_, i) => totalPages - rightItemCount + i + 1);
+    return [firstPageIndex, "...", ...rightRange];
+  }
+
+  if (shouldShowLeftDots && shouldShowRightDots) {
+    let middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, i) => leftSiblingIndex + i);
+    return [firstPageIndex, "...", ...middleRange, "...", lastPageIndex];
+  }
+
+  return [];
+};
+
 export function UsersListPage() {
   const { users, loading, error, fetchUsers } = useUsersStore();
   const data = React.useMemo(() => users, [users]);
-  // CAMBIO: El estado de ordenamiento sigue apuntando a fechaCreacion
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
   ])
@@ -241,18 +255,13 @@ export function UsersListPage() {
     fetchUsers();
   }, [fetchUsers]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  
-  // CAMBIO: Se oculta la columna 'fechaCreacion' por defecto
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    fechaCreacion: false,
+    created_at: false,
   })
-  
   const [rowSelection, setRowSelection] = React.useState({})
-
-  // Estado de paginación
   const [pagination, setPagination] = React.useState({
-    pageIndex: 0, // Página 0 por defecto
-    pageSize: 16, // 16 usuarios por página (como en C.A.)
+    pageIndex: 0,
+    pageSize: 16,
   })
 
   const table = useReactTable({
@@ -275,9 +284,25 @@ export function UsersListPage() {
       pagination,
     },
   })
+  const { pageIndex, pageSize } = table.getState().pagination;
+  const totalRows = table.getFilteredRowModel().rows.length;
+  const pageRowCount = table.getRowModel().rows.length;
 
+  const firstRowIndex = pageIndex * pageSize + 1;
+  const lastRowIndex = firstRowIndex + pageRowCount - 1;
+
+  const paginationText =
+    totalRows === 0
+      ? "No se encontraron elementos."
+      : `${lastRowIndex} de ${totalRows} elementos`;
   const selectedRowsCount = Object.keys(rowSelection).length;
- // 7. MANEJO DE CARGA Y ERROR
+
+  const currentPage = table.getState().pagination.pageIndex + 1; 
+  const pageCount = table.getPageCount();
+
+  const paginationRange = React.useMemo(() => {
+    return generatePaginationRange(currentPage, pageCount);
+  }, [currentPage, pageCount]);
   if (loading) {
     return (
       <div className="w-full p-8 text-center">
@@ -296,31 +321,21 @@ export function UsersListPage() {
 
   return (
     <div className="w-full p-4 md:p-8">
-      {/* --- Barra de Herramientas (Toolbar) --- */}
-      {/* CAMBIO RESPONSIVO: Usamos flex-col y gap-4 por defecto, y md:flex-row para pantallas grandes */}
       <div className="flex flex-col md:flex-row items-center justify-between py-4 gap-4">
-        
-        {/* Barra de Búsqueda (Filtra por nombre o username) */}
-        {/* CAMBIO RESPONSIVO: w-full en móvil, md:max-w-sm en escritorio */}
+
         <div className="relative w-full md:max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre o usuario..."
-              // Obtén el valor del filtro global
-              value={(table.getState().globalFilter as string) ?? ""}
-              // Establece el valor del filtro global
-              onChange={(event) => {
-                table.setGlobalFilter(event.target.value);
-              }}
-              className="pl-10"
-            />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o usuario..."
+            value={(table.getState().globalFilter as string) ?? ""}
+            onChange={(event) => {
+              table.setGlobalFilter(event.target.value);
+            }}
+            className="pl-10"
+          />
         </div>
 
-        {/* Botones de Acción */}
-        {/* CAMBIO RESPONSIVO: flex-col-reverse en móvil (para poner "Agregar" arriba) y sm:flex-row */}
-        {/* w-full en móvil para que los botones se estiren, md:w-auto en escritorio */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          {/* Botones de acción contextuales */}
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={selectedRowsCount !== 1} className="flex-1 sm:flex-none">
               <Pencil className="mr-2 h-4 w-4" />
@@ -332,10 +347,8 @@ export function UsersListPage() {
             </Button>
           </div>
 
-          {/* CAMBIO RESPONSIVO: Ocultamos el separador en móvil (flex-col) */}
           <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
 
-          {/* Botón de Filtros (Columnas) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="ml-auto">
@@ -356,31 +369,32 @@ export function UsersListPage() {
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id === 'full_name' 
-                        ? 'Nombre' 
+                      {column.id === 'full_name'
+                        ? 'Nombre'
                         : column.id === 'created_at'
-                        ? 'Fecha de Creación'
-                        : column.id}
+                          ? 'Fecha de Creación'
+                          : column.id === 'is_active'
+                            ? 'Estado'
+                            : column.id === 'username'
+                              ? 'Usuario'
+                              : column.id === 'role_name'
+                                ? 'Rol'
+                                : column.id
+                      }
                     </DropdownMenuCheckboxItem>
                   )
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Botón Agregar Usuario */}
-          <Button>
+          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 ">
             <PlusCircle className="mr-2 h-4 w-4" />
             Agregar Usuario
           </Button>
         </div>
       </div>
 
-      {/* --- Tabla de Datos --- */}
-      {/* CAMBIO RESPONSIVO: Este es el cambio MÁS IMPORTANTE. */}
-      {/* 1. Un 'div' exterior con 'overflow-x-auto' para permitir el scroll horizontal SÓLO en este bloque. */}
       <div className="w-full overflow-x-auto">
-        {/* 2. Un 'min-w-[768px]' (o el que necesites) al contenedor de la tabla para forzarla a mantener su ancho. */}
-        <div className="rounded-md border min-w-[768px]"> 
+        <div className="rounded-md border min-w-[768px]">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -391,9 +405,9 @@ export function UsersListPage() {
                         {header.isPlaceholder
                           ? null
                           : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
                       </TableHead>
                     )
                   })}
@@ -418,14 +432,13 @@ export function UsersListPage() {
                   </TableRow>
                 ))
               ) : (
-                // Estado si no hay resultados (para búsqueda)
                 <TableRow>
                   <TableCell
                     colSpan={columns.length}
                     className="h-24 text-center"
                   >
                     No se encontraron usuarios con ese criterio.
-                  </TableCell>
+              </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -433,86 +446,72 @@ export function UsersListPage() {
         </div>
       </div>
 
-      {/* --- Paginación --- */}
-      {/* CAMBIO RESPONSIVO: flex-col y gap-6 por defecto, md:flex-row en escritorio */}
       <div className="flex flex-col md:flex-row items-center justify-between space-x-2 py-4 gap-6 md:gap-0">
 
-        {/* Info de filas seleccionadas */}
-        {/* CAMBIO RESPONSIVO: Texto centrado en móvil y a la izquierda en escritorio */}
-        <div className="flex-1 text-sm text-muted-foreground text-center md:text-left">
-          {table.getFilteredSelectedRowModel().rows.length} de{" "}
-          {table.getFilteredRowModel().rows.length} fila(s) seleccionadas.
+        <div className="flex items-center space-x-2">
+          <p className="text-sm font-medium">Filas por página</p>
+          <Select
+            value={`${table.getState().pagination.pageSize}`}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value))
+            }}
+          >
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue placeholder={table.getState().pagination.pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top">
+              {[16, 24, 48, 96].map((pageSize) => (
+                <SelectItem key={pageSize} value={`${pageSize}`}>
+                  {pageSize}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* CAMBIO RESPONSIVO: flex-col en móvil (apilado), sm:flex-row en tablet+ */}
+        <div className="flex-1 text-sm text-muted-foreground text-center md:text-left">
+          {paginationText}
+        </div>
+
         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-0 sm:space-x-6 lg:space-x-8">
-          {/* Selector de Items por Página */}
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Filas por página</p>
-            <Select
-              value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value))
-              }}
-            >
-              <SelectTrigger className="h-8 w-[70px]">
-                <SelectValue placeholder={table.getState().pagination.pageSize} />
-              </SelectTrigger>
-              <SelectContent side="top">
-                {[16, 24, 48, 96].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
-                    {pageSize}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  className="cursor-pointer"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                />
+              </PaginationItem>
 
-          {/* Contador de Páginas (Ej: 1-16 de 168) */}
-          <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Página {table.getState().pagination.pageIndex + 1} de{" "}
-            {table.getPageCount()}
-          </div>
+              {paginationRange.map((page, index) => {
+                if (typeof page === "string") {
+                  return <PaginationEllipsis key={`dots-${index}`} />;
+                }
 
-          {/* Botones de Paginación */}
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Primera página</span>
-              {"<<"}
-            </Button>
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Página anterior</span>
-              {"<"}
-            </Button>
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Página siguiente</span>
-              {">"}
-            </Button>
-            <Button
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Última página</span>
-              {">>"}
-            </Button>
-          </div>
+                const pageNumber = page as number;
+                return (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink
+                      className="cursor-pointer"
+                      onClick={() => table.setPageIndex(pageNumber - 1)}
+                      isActive={currentPage === pageNumber}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  className="cursor-pointer"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     </div>

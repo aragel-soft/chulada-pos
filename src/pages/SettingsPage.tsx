@@ -1,66 +1,103 @@
-// Importaciones
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/stores/authStore';
+import { cn } from '@/lib/utils'; 
 
-// --- ¡Ya no se importan ni definen aquí! ---
-// import { TabsContent } from "@/components/ui/tabs";
-// import { UsersListPage } from '@/features/settings/components/UsersListPage';
-// const ProfilePage = ...
-// const BillingPage = ...
-// --- Esas páginas ahora las maneja AppRouter.tsx ---
+const settingTabs = [
+  {
+    value: 'profile',
+    label: 'Perfil',
+    permission: 'profile:view',
+  },{
+    value: 'users',
+    label: 'Usuarios',
+    permission: 'users:view',
+  },
+  {
+    value: 'billing',
+    label: 'Facturación',
+    permission: 'billing:view',
+  },
+];
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { can } = useAuthStore();
 
-  // Obtenemos la pestaña actual desde la URL.
-  // Ej: "/settings/users" -> "users"
-  // El router ya maneja el default si la ruta es solo "/settings"
+  const availableTabs = settingTabs.filter(tab => can(tab.permission));
   const currentTab = location.pathname.split('/')[2];
 
-  // Esta función se llama cuando haces clic en una pestaña
   const onTabChange = (value: string) => {
-    // 'value' será "users", "profile", "billing", etc.
     navigate(`/settings/${value}`);
   };
 
   return (
-    // Quitamos el Fragment <> y usamos el div como contenedor principal
     <div className="space-y-6 p-4">
-      
-      {/* Encabezado con título y botón */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Configuración</h1> 
-        <Button onClick={() => navigate('/dashboard')} variant="default"> 
-          Ir a Dashboard 
+        <h1 className="text-3xl font-bold">Configuración</h1>
+        <Button 
+          onClick={() => navigate('/dashboard')} 
+          variant="default" 
+          className="rounded-xl bg-[#480489] hover:bg-[#480489]/90 text-base"
+        >
+          Ir a Dashboard
         </Button>
       </div>
-      
-      {/* Componente TABS controlado por el Router.
-        - 'value' se basa en la URL actual (currentTab).
-        - 'onValueChange' actualiza la URL (navega).
-      */}
+
       <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
-        <TabsList>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="billing">Facturación</TabsTrigger>
-          {/* Añade más secciones aquí y en AppRouter.tsx */}
+        
+        <TabsList 
+            className="
+                w-full 
+                justify-start 
+                rounded-none 
+                bg-transparent 
+                p-0 
+                relative 
+                after:content-[''] 
+                after:absolute 
+                after:bottom-0 
+                after:left-0 
+                after:w-full 
+                after:h-[1px] 
+                after:bg-gray-200 
+                dark:after:bg-gray-700
+            "
+        >
+          {availableTabs.map((tab) => (
+            <TabsTrigger 
+              key={tab.value} 
+              value={tab.value}
+              className={cn(
+                  "relative",
+                  "rounded-none",
+                  "bg-transparent",
+                  "px-4 pb-1 pt-2", 
+                  "text-muted-foreground",
+                  "shadow-none",
+                  "border-b-4 border-transparent", 
+                  "transition-colors duration-200",
+                  
+                  "data-[state=active]:border-[#480489]",
+                 "data-[state=active]:text-[#480489]",
+                  "data-[state=active]:font-bold",
+                  "data-[state=active]:shadow-none",
+
+                  "hover:text-[#818181]",
+                  "hover:border-[#818181]"
+              )}
+            >
+              {tab.label}
+           </TabsTrigger>
+          ))}
         </TabsList>
-        {/* ¡Ya no usamos TabsContent! 
-          El <Outlet /> de abajo se encargará de renderizar
-          el contenido de la pestaña/ruta activa.
-        */}
       </Tabs>
 
-      {/* <Outlet /> es el marcador donde se renderizará el componente hijo 
-          (UsersListPage, ProfilePage, etc.) según la ruta definida en AppRouter.
-      */}
       <div className="mt-4">
-        <Outlet />
+        <Outlet /> 
       </div>
-
     </div>
   );
 }

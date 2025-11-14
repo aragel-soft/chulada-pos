@@ -36,27 +36,45 @@ PaginationItem.displayName = "PaginationItem"
 
 type PaginationLinkProps = {
   isActive?: boolean
+  disabled?: boolean 
 } & Pick<ButtonProps, "size"> &
   React.ComponentProps<"a">
 
 const PaginationLink = ({
   className,
   isActive,
+  disabled, 
   size = "icon",
+  onClick,
   ...props
-}: PaginationLinkProps) => (
-  <a
-    aria-current={isActive ? "page" : undefined}
-    className={cn(
-      buttonVariants({
-        variant: isActive ? "outline" : "ghost",
-        size,
-      }),
-      className
-    )}
-    {...props}
-  />
-)
+}: PaginationLinkProps) => {
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
+    if (onClick) {
+      onClick(e);
+    }
+  };
+
+  return (
+    <a
+      aria-current={isActive ? "page" : undefined}
+      aria-disabled={disabled} 
+      className={cn(
+        buttonVariants({
+          variant: isActive ? "outline" : "ghost",
+          size,
+        }),
+        disabled && "pointer-events-none opacity-50",
+        className
+      )}
+      onClick={handleClick}
+      {...props}
+    />
+  )
+}
 PaginationLink.displayName = "PaginationLink"
 
 const PaginationPrevious = ({
@@ -67,10 +85,10 @@ const PaginationPrevious = ({
     aria-label="Go to previous page"
     size="default"
     className={cn("gap-1 pl-2.5", className)}
-    {...props}
+    {...props} 
   >
     <ChevronLeft className="h-4 w-4" />
-    <span>Previous</span>
+    <span>Anterior</span>
   </PaginationLink>
 )
 PaginationPrevious.displayName = "PaginationPrevious"
@@ -83,9 +101,9 @@ const PaginationNext = ({
     aria-label="Go to next page"
     size="default"
     className={cn("gap-1 pr-2.5", className)}
-    {...props}
+    {...props} 
   >
-    <span>Next</span>
+    <span>Siguente</span>
     <ChevronRight className="h-4 w-4" />
   </PaginationLink>
 )

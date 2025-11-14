@@ -16,7 +16,7 @@ export default function ProtectedRoute({ children, module }: ProtectedRouteProps
     return <Navigate to="/login" state={{ from: location }} replace />;
   } 
   
-  const modules = useAuthStore((state) => state.user?.modules || []);
+  const modules = useAuthStore((state) => state.user?.permissions || []);
   
   const permissionDenied = module !== 'dashboard' && !modules.includes(module);
 
