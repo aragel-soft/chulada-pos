@@ -1,39 +1,22 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, Result}; // <-- 1. CAMBIO AQUÍ
 use std::fs;
-use std::env;
-use std::path::{Path, PathBuf};
+// use std::env; // <-- 2. ELIMINADO
+use std::path::Path; // <-- 3. CAMBIO AQUÍ
 use tauri::Manager;
 use std::collections::HashSet;
 use std::error::Error;
 
-/// Función principal de inicialización de la BD.
-pub fn init_database(app_handle: &tauri::AppHandle) -> std::result::Result<Connection, Box<dyn Error>> {
-    // Determina la ruta de la base de datos. Usa una variable de entorno para pruebas.
-    let db_path = match env::var("TAURI_DATABASE_PATH") {
-        Ok(path) => {
-            let p = PathBuf::from(path);
-            if let Some(parent) = p.parent() {
-                fs::create_dir_all(parent)
-                    .expect("No se pudo crear el directorio para la BD de pruebas");
-            }
-            p
-        },
-        Err(_) => {
-            let app_dir = app_handle
-                .path()
-                .app_data_dir()
-                .expect("No se pudo obtener el directorio de datos");
-            
-            fs::create_dir_all(&app_dir).expect("No se pudo crear el directorio de datos");
-            
-            app_dir.join("database.db")
-        }
-    };
-
-    println!("Iniciando base de datos en: {:?}", db_path); 
+pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection> {
     
-    let mut conn = Connection::open(db_path)?;
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("No se pudo obtener el directorio de datos");
+            
+    fs::create_dir_all(&app_dir).expect("No se pudo crear el directorio de datos");
     
+    let db_path = app_dir.join("database.db");
+    let conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     //Es necesario comentar la ejecución automática de migraciones para evitar problemas en las pruebas.
     // run_migrations(&mut conn)?; 

@@ -12,7 +12,7 @@ async function invokeTauriCommand(command, args, retries = 3) {
   }
 }
 
-describe('HU-AUTH-001: Login de usuario en Desktop', () => {
+describe('HU-POS-009: Desktop User Login', () => {
 
   beforeEach(async () => {
     await browser.pause(2000);
@@ -24,14 +24,20 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
       const dashboardTitle = await $('h1').getText();
       
       // Si estamos en dashboard, hacer logout
-      if (dashboardTitle.includes('Dashboard') || dashboardTitle.includes('Inicio')) {
+      if (dashboardTitle.includes('Dashboard')) {
         console.log('⚠️  Sesión activa detectada. Haciendo logout...');
         
         // Buscar botón de logout
         try {
           const logoutButton = await $('button*=Cerrar Sesión');
           await logoutButton.click();
-          await browser.pause(1000);
+          await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
+
+          const confirmButton = await $('button*=Cerrar sesión');
+          await confirmButton.click();
+
+          await $('#username').waitForExist({ timeout: 5000 });
+          console.log('Logout successful. Proceeding to login test.');
         } catch (e) {
           console.warn('No se pudo hacer logout automático');
         }
@@ -44,7 +50,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 1: Formulario visible ---
-  it('debe mostrar el formulario de login al cargar', async () => {
+  it('should display the login form on load', async () => {
     // Verificar que los campos existen y son visibles
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
@@ -59,7 +65,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 2: Habilitar botón ---
-  it('debe habilitar el botón cuando ambos campos están llenos', async () => {
+  it('should enable the button when both fields are filled', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -86,7 +92,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 3: Login exitoso ---
-  it('debe hacer login exitosamente con credenciales correctas', async () => {
+  it('should login successfully with correct credentials', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -115,7 +121,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 4: Credenciales incorrectas ---
-  it('debe mostrar error con credenciales incorrectas', async () => {
+  it('should show an error with incorrect credentials', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -136,7 +142,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 5: Usuario inexistente ---
-  it('debe mostrar error para usuario inexistente', async () => {
+  it('should show an error for a non-existent user', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -153,7 +159,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 6: Usuario inactivo ---
-  it('debe mostrar error para usuario desactivado', async () => {
+  it('should show an error for an inactive user', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -170,7 +176,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 7: Submit con Enter ---
-  it('debe enviar formulario al presionar Enter en password', async () => {
+  it('should submit the form on Enter key press in password field', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
 
@@ -193,7 +199,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 8: Performance ---
-  it('debe validar que el login toma menos de 500ms', async () => {
+  it('should validate login performance is under 2000ms', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
     const submitButton = await $('button*=Iniciar Sesión');
@@ -219,7 +225,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 9: Validación de username corto ---
-  it('debe mostrar error de validación para username corto', async () => {
+  it('should show a validation error for a short username', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
 
@@ -238,7 +244,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 10: Validación de password corto ---
-  it('debe mostrar error de validación para password corto', async () => {
+  it('should show a validation error for a short password', async () => {
     const usernameInput = await $('#username');
     const passwordInput = await $('#password');
 
@@ -258,7 +264,7 @@ describe('HU-AUTH-001: Login de usuario en Desktop', () => {
   });
 
   // --- Test 11: Focus inicial ---
-  it('debe enfocar el campo username al cargar', async () => {
+  it('should focus the username field on load', async () => {
     const usernameInput = await $('#username');
     
     // Dar tiempo para que se establezca el autofocus
