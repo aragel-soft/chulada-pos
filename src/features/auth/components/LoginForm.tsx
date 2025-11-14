@@ -44,7 +44,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
 
       if (response.success && response.user) {
         login(response.user);
-        console.log('Estado del store actualizado:', useAuthStore.getState());
         onSuccess?.();
       } else {
         setError(response.message);
