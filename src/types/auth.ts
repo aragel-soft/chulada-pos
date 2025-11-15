@@ -5,6 +5,8 @@ export interface User {
   role_id: string;
   role_name: string;
   role_display_name: string;
+  avatar_url?: string;
+  permissions: string[];
 }
 
 export interface AuthResponse {

@@ -7,7 +7,15 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 
-#[derive(Debug, Serialize, Deserialize)]
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct Permission {
+//     pub id: String,
+//     pub name: String,
+//     pub display_name: String,
+//     pub module: String,
+// }
+
+#[derive(Debug,  Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -15,6 +23,9 @@ pub struct User {
     pub role_id: String,
     pub role_name: String,
     pub role_display_name: String,
+    pub avatar_url: Option<String>,
+    pub permissions: Vec<String>,
+    // pub modules: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,7 +81,8 @@ pub async fn authenticate_user(
             u.role_id,
             u.is_active,
             r.name as role_name,
-            r.display_name as role_display_name
+            r.display_name as role_display_name,
+            u.avatar_url
          FROM users u
          INNER JOIN roles r ON u.role_id = r.id
          WHERE u.username = ?1 AND u.deleted_at IS NULL",
@@ -86,6 +98,7 @@ pub async fn authenticate_user(
             row.get::<_, i32>(5)?,    // is_active
             row.get::<_, String>(6)?, // role_name
             row.get::<_, String>(7)?, // role_display_name
+            row.get::<_, Option<String>>(8)?, // avatar_url
         ))
     });
 
@@ -99,6 +112,7 @@ pub async fn authenticate_user(
             is_active,
             role_name,
             role_display_name,
+            avatar_url,
         )) => {
 
             // Verificar contraseña
@@ -121,6 +135,34 @@ pub async fn authenticate_user(
                 });
             }
 
+            // Obtener permisos para el rol
+            let mut perms_stmt = conn.prepare(
+                "SELECT 
+                p.name 
+                FROM permissions p
+                INNER JOIN role_permissions rp ON p.id = rp.permission_id
+                WHERE rp.role_id = ?1",
+            )?;
+            let permissions_result: Result<Vec<String>, _> = perms_stmt
+                .query_map([&role_id], |row| {
+                    Ok(row.get::<_, String>(0)?)
+                })?
+                .collect();
+
+
+            let permissions = match permissions_result {
+                Ok(perms) => perms,
+                Err(_) => {
+                    Vec::new() // Retorna vector vacío en caso de error
+                }
+            };
+
+            // // Obtener módulos únicos de los permisos
+            // let mut modules: Vec<String> = permissions.iter().map(|p| p.module.clone()).collect();
+            // modules.sort_unstable();
+            // modules.dedup();
+
+
             // Login exitoso
             Ok(AuthResponse {
                 success: true,
@@ -132,6 +174,9 @@ pub async fn authenticate_user(
                     role_id,
                     role_name,
                     role_display_name,
+                    avatar_url: avatar_url,
+                    permissions,
+                    // modules,
                 }),
             })
         }
