@@ -1,6 +1,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAuthStore, User } from './authStore';
+import { useAuthStore } from './authStore';
+import { User } from '@/types/auth'; 
 
 const mockUser: User = {
   id: 'a136e2cb-b241-40c8-8adc-a6596b30d793',
@@ -9,6 +10,8 @@ const mockUser: User = {
   role_id: '1b5bea86-2ddf-4f1f-bc0a-a1a4293f55ca',
   role_name: 'admin',
   role_display_name: 'Administrador',
+  avatar_url: undefined,
+  permissions: ['admin']
 };
 
 describe('authStore (Zustand)', () => {

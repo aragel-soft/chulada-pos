@@ -249,10 +249,7 @@ export function UsersListPage() {
   const { users, loading, error, fetchUsers } = useUsersStore();
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
-// Estado para el <Select> que elegirá la columna
-  const [searchColumn, setSearchColumn] = React.useState("full_name");
-  // Estado local para el <Input> de búsqueda (controlado y rápido)
-  const [filterInput, setFilterInput] = React.useState('');
+
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
   ])
@@ -345,10 +342,10 @@ export function UsersListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre o usuario..."
-            value={(table.getState().globalFilter as string) ?? ""} // <--- Esto cambia
-            onChange={(event) => { // <--- Esto cambia
+            value={(table.getColumn("full_name")?.getFilterValue() as string) ?? ""}
+            onChange={(event) => {
               console.time("Búsqueda/Filtrado");
-              table.setGlobalFilter(event.target.value);
+              table.getColumn("full_name")?.setFilterValue(event.target.value)
             }}
             className="pl-10"
           />

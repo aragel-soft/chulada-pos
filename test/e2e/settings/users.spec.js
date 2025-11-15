@@ -40,10 +40,10 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
         try {
           const logoutButton = await $('button*=Cerrar Sesión');
           await logoutButton.click();
-        //   await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
+          await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
 
-        //   const confirmButton = await $('button*=Cerrar sesión');
-        //   await confirmButton.click();
+          const confirmButton = await $('button*=Cerrar sesión');
+          await confirmButton.click();
 
           await $('#username').waitForExist({ timeout: 5000 });
           console.log('Logout successful. Proceeding to login test.');
