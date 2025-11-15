@@ -1,7 +1,7 @@
-use rusqlite::{Connection, Result}; // <-- 1. CAMBIO AQUÍ
+use rusqlite::{Connection, Result};
 use std::fs;
-// use std::env; // <-- 2. ELIMINADO
-use std::path::Path; // <-- 3. CAMBIO AQUÍ
+
+use std::path::Path;
 use tauri::Manager;
 use std::collections::HashSet;
 use std::error::Error;
