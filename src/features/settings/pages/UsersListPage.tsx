@@ -20,6 +20,7 @@ import {
   Search,
   Trash,
   Pencil,
+  PlusCircle
 } from "lucide-react" 
 
 import { Badge } from "@/components/ui/badge"
@@ -62,7 +63,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { PlusCircle } from "lucide-react";
+import { CreateUserDialog } from "../components/CreateUserDialog";
 
 export const columns: ColumnDef<UserView>[] = [
   {
@@ -249,6 +250,7 @@ export function UsersListPage() {
   const { users, loading, error, fetchUsers } = useUsersStore();
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
+   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
@@ -402,9 +404,10 @@ export function UsersListPage() {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 ">
+          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Agregar Usuario
+            
           </Button>
         </div>
       </div>
@@ -530,6 +533,12 @@ export function UsersListPage() {
           </Pagination>
         </div>
       </div>
+      <CreateUserDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
     </div>
+
+    
   )
 }

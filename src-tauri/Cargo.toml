@@ -27,6 +27,7 @@ rusqlite = { version = "0.30", features = ["bundled"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 argon2 = { version = "0.5", features = ["std"] }
 thiserror = "1.0"
+chrono = "0.4.42"
 
 [dev-dependencies]
 tauri-driver = "0.1"
