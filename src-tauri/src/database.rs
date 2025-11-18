@@ -19,7 +19,8 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection> {
     let conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     //Es necesario comentar la ejecución automática de migraciones para evitar problemas en las pruebas.
-    // run_migrations(&mut conn)?; 
+    println!("Base de datos inicializada en {:?}", app_dir.join("database.db"));
+    //run_migrations(&mut conn)?; 
     
     Ok(conn)
 }
