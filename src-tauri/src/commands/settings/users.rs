@@ -24,8 +24,15 @@ pub struct UserView {
 #[tauri::command]
 pub fn get_users_list(
     db_state: State<'_, Mutex<Connection>>,
+    app_handle: tauri::AppHandle, // ← NUEVO parámetro
 ) -> Result<Vec<UserView>, String> {
     let conn = db_state.lock().unwrap();
+
+    // Obtener el directorio de datos de la app
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("No se pudo obtener el directorio de datos");
 
     let sql = "
         SELECT 
@@ -46,11 +53,22 @@ pub fn get_users_list(
 
     let user_iter = stmt
         .query_map([], |row| {
+            let avatar_relative: Option<String> = row.get(3)?;
+            
+            // Convertir la ruta relativa a absoluta si existe
+            let avatar_full_path = avatar_relative.map(|relative_path| {
+                app_dir
+                    .join(&relative_path)
+                    .to_str()
+                    .unwrap_or("")
+                    .to_string()
+            });
+
             Ok(UserView {
                 id: row.get(0)?,
                 username: row.get(1)?,
                 full_name: row.get(2)?,
-                avatar_url: row.get(3)?,
+                avatar_url: avatar_full_path, // ← Ahora es ruta completa
                 created_at: row.get(4)?,
                 role_name: row.get(5)?,
                 is_active: row.get(6)?,

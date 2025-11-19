@@ -3,7 +3,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Eye, EyeOff, Upload, X } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, 
+  // useQueryClient 
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import {
@@ -33,7 +35,14 @@ import { Button } from '@/components/ui/button';
 
 import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
 import type { CreateUserPayload } from '@/lib/api/users';
+// CreateUserDialog.tsx
+import { useUsersStore } from '@/stores/usersStore';
 
+
+  
+  // ... resto del código ...
+
+  
 const createUserSchema = z.object({
   full_name: z.string().min(1, 'El nombre completo es requerido'),
   username: z
@@ -66,8 +75,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   const [isDragging, setIsDragging] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { addUser } = useUsersStore();
 
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
 
   const form = useForm({
     resolver: zodResolver(createUserSchema),
@@ -94,7 +104,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     mutationFn: async (data: CreateUserForm) => {
       let avatarUrl: string | undefined;
 
-      // Guardar avatar si existe
       if (avatarFile) {
         const arrayBuffer = await avatarFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
@@ -112,9 +121,20 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
       return await createUser(payload);
     },
-    onSuccess: () => {
+    onSuccess: (newUser) => {
       toast.success('Usuario creado correctamente');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      
+      // Agregar al store directamente (más rápido que refetch)
+      addUser({
+        id: newUser.id,
+        username: newUser.username,
+        full_name: newUser.full_name,
+        role_name: '', // Necesitarás obtener esto del rol seleccionado
+        is_active: newUser.is_active,
+        avatar_url: newUser.avatar_url,
+        created_at: newUser.created_at,
+      });
+      
       handleClose();
     },
     onError: (error: any) => {
@@ -128,6 +148,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       }
     },
   });
+  
 
   const handleClose = () => {
     form.reset();

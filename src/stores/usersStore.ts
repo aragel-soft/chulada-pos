@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 export type UserView = {
   id: string;
@@ -16,8 +17,8 @@ interface UsersState {
   loading: boolean;
   error: string | null;
   fetchUsers: () => Promise<void>;
+  addUser: (user: UserView) => void; // ← NUEVO: para agregar usuario después de crear
 }
-
 
 export const useUsersStore = create<UsersState>((set) => ({
   users: [],
@@ -29,10 +30,28 @@ export const useUsersStore = create<UsersState>((set) => ({
     try {
       const users = await invoke<UserView[]>("get_users_list");
       
-      set({ users: users, loading: false }); 
+      // Convertir las rutas de avatares a URLs válidas
+      const usersWithConvertedAvatars = users.map(user => ({
+        ...user,
+        avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
+      }));
+      
+      set({ users: usersWithConvertedAvatars, loading: false }); 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       set({ loading: false, error: errorMsg }); 
     }
+  },
+
+  addUser: (user: UserView) => {
+    set((state) => ({
+      users: [
+        {
+          ...user,
+          avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
+        },
+        ...state.users
+      ]
+    }));
   },
 }));
