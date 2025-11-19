@@ -1,5 +1,8 @@
 import * as React from "react"
-import { useUsersStore, UserView } from "@/stores/usersStore";
+import { useQuery } from "@tanstack/react-query";
+import { getUsersList } from "@/lib/api/users";
+import type { User } from "@/types/users";
+import { convertFileSrc } from '@tauri-apps/api/core';
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -21,7 +24,7 @@ import {
   Trash,
   Pencil,
   PlusCircle
-} from "lucide-react" 
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,7 +58,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination" 
+} from "@/components/ui/pagination"
 import {
   Select,
   SelectContent,
@@ -65,7 +68,14 @@ import {
 } from "@/components/ui/select"
 import { CreateUserDialog } from "../components/CreateUserDialog";
 
-export const columns: ColumnDef<UserView>[] = [
+const processUsers = (users: User[]): User[] => {
+  return users.map(user => ({
+    ...user,
+    avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
+  }));
+};
+
+export const columns: ColumnDef<User>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -112,7 +122,7 @@ export const columns: ColumnDef<UserView>[] = [
         <Avatar className="h-8 w-8">
           <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
           <AvatarFallback>
-            {row.original.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+            {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <span className="font-medium">{row.original.full_name}</span>
@@ -192,23 +202,22 @@ export const columns: ColumnDef<UserView>[] = [
       const estado = row.getValue("is_active") as boolean
 
       return (
-      <Badge
-        className={`capitalize min-w-[80px] justify-center ${
-          estado
+        <Badge
+          className={`capitalize min-w-[80px] justify-center ${estado
             ? "bg-green-600 text-white hover:bg-green-600/80"
             : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
-        }`}
-      >
-        {estado ? "activo" : "inactivo"}
-      </Badge>
+            }`}
+        >
+          {estado ? "activo" : "inactivo"}
+        </Badge>
       )
     },
   },
 ]
 const generatePaginationRange = (
-  currentPage: number, 
+  currentPage: number,
   totalPages: number,
-  siblingCount: number = 1 
+  siblingCount: number = 1
 ): (number | string)[] => {
 
   const totalPageNumbers = siblingCount + 5;
@@ -247,18 +256,21 @@ const generatePaginationRange = (
 };
 
 export function UsersListPage() {
-  const { users, loading, error, fetchUsers } = useUsersStore();
+  const { data: users = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const data = await getUsersList();
+      return processUsers(data);
+    },
+  });
+
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
-   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
   ])
-  React.useEffect(() => {
-    console.time("Carga inicial de usuarios");
-    fetchUsers();
-  }, [fetchUsers]);
 
   React.useEffect(() => {
     if (!loading && !initialLoadMeasured.current && data.length > 0) {
@@ -314,12 +326,13 @@ export function UsersListPage() {
       : `${lastRowIndex} de ${totalRows} elementos`;
   const selectedRowsCount = Object.keys(rowSelection).length;
 
-  const currentPage = table.getState().pagination.pageIndex + 1; 
+  const currentPage = table.getState().pagination.pageIndex + 1;
   const pageCount = table.getPageCount();
 
   const paginationRange = React.useMemo(() => {
     return generatePaginationRange(currentPage, pageCount);
   }, [currentPage, pageCount]);
+
   if (loading) {
     return (
       <div className="w-full p-8 text-center">
@@ -331,7 +344,7 @@ export function UsersListPage() {
   if (error) {
     return (
       <div className="w-full p-8 text-center text-red-500">
-        <strong>Error al cargar:</strong> {error}
+        <strong>Error al cargar:</strong> {(error as Error).message}
       </div>
     );
   }
@@ -407,7 +420,7 @@ export function UsersListPage() {
           <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Agregar Usuario
-            
+
           </Button>
         </div>
       </div>
@@ -457,7 +470,7 @@ export function UsersListPage() {
                     className="h-24 text-center"
                   >
                     No se encontraron usuarios con ese criterio.
-              </TableCell>
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -535,10 +548,15 @@ export function UsersListPage() {
       </div>
       <CreateUserDialog
         open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            refetch();
+          }
+        }}
       />
     </div>
 
-    
+
   )
 }

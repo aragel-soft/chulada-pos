@@ -2,10 +2,8 @@ import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Eye, EyeOff, Upload, X } from 'lucide-react';
-import { useQuery, useMutation, 
-  // useQueryClient 
-} from '@tanstack/react-query';
+import { Upload, X, Eye, EyeOff } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import {
@@ -34,15 +32,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 
 import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
-import type { CreateUserPayload } from '@/lib/api/users';
-// CreateUserDialog.tsx
-import { useUsersStore } from '@/stores/usersStore';
+import type { CreateUserPayload } from '@/types/users';
 
-
-  
-  // ... resto del código ...
-
-  
 const createUserSchema = z.object({
   full_name: z.string().min(1, 'El nombre completo es requerido'),
   username: z
@@ -51,7 +42,7 @@ const createUserSchema = z.object({
     .regex(/^[a-z0-9_]+$/, 'Solo letras minúsculas, números y guion bajo'),
   password: z.string().min(4, 'Contraseña debe tener al menos 4 caracteres'),
   confirm_password: z.string(),
-  role_id: z.string().min(1, 'El rol es requerido'), // Asegúrate de que el rol sea requerido
+  role_id: z.string().min(1, 'El rol es requerido'),
   is_active: z.boolean().optional().default(true),
   avatar_url: z.string().optional(),
 }).refine((data) => data.password === data.confirm_password, {
@@ -67,20 +58,18 @@ interface CreateUserDialogProps {
 }
 
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { addUser } = useUsersStore();
-
-  // const queryClient = useQueryClient();
 
   const form = useForm({
     resolver: zodResolver(createUserSchema),
+    mode: 'onChange',
     defaultValues: {
       full_name: '',
       username: '',
@@ -92,14 +81,12 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     },
   });
 
-  // Query para obtener roles
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ['roles'],
     queryFn: getAllRoles,
     enabled: open,
   });
 
-  // Mutation para crear usuario
   const createUserMutation = useMutation({
     mutationFn: async (data: CreateUserForm) => {
       let avatarUrl: string | undefined;
@@ -119,22 +106,15 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         avatar_url: avatarUrl,
       };
 
-      return await createUser(payload);
+      const newUser = await createUser(payload);
+      // Ensure avatar_url is present if we have it locally but backend didn't return it
+      if (avatarUrl && !newUser.avatar_url) {
+        return { ...newUser, avatar_url: avatarUrl };
+      }
+      return newUser;
     },
-    onSuccess: (newUser) => {
+    onSuccess: () => {
       toast.success('Usuario creado correctamente');
-      
-      // Agregar al store directamente (más rápido que refetch)
-      addUser({
-        id: newUser.id,
-        username: newUser.username,
-        full_name: newUser.full_name,
-        role_name: '', // Necesitarás obtener esto del rol seleccionado
-        is_active: newUser.is_active,
-        avatar_url: newUser.avatar_url,
-        created_at: newUser.created_at,
-      });
-      
       handleClose();
     },
     onError: (error: any) => {
@@ -148,13 +128,14 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       }
     },
   });
-  
 
   const handleClose = () => {
     form.reset();
     setAvatarPreview(null);
     setAvatarFile(null);
     setImagePosition({ x: 50, y: 50 });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     onOpenChange(false);
   };
 
@@ -165,7 +146,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
-        setImagePosition({ x: 50, y: 50 }); // Reset position
+        setImagePosition({ x: 50, y: 50 });
       };
       reader.readAsDataURL(file);
     }
@@ -177,7 +158,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     setImagePosition({ x: 50, y: 50 });
   };
 
-  // Manejo del centrado de imagen
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     setIsDragging(true);
@@ -189,9 +169,10 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
-    
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    // Inverted controls
+    const x = 100 - ((e.clientX - rect.left) / rect.width) * 100;
+    const y = 100 - ((e.clientY - rect.top) / rect.height) * 100;
 
     setImagePosition({
       x: Math.max(0, Math.min(100, x)),
@@ -204,7 +185,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   };
 
   const onSubmit = async (data: z.infer<typeof createUserSchema>) => {
-    // Validar username disponible
     const isAvailable = await checkUsernameAvailable(data.username);
     if (!isAvailable) {
       form.setError('username', {
@@ -219,14 +199,21 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
+        <style>
+          {`
+            input::-ms-reveal,
+            input::-ms-clear {
+              display: none;
+            }
+          `}
+        </style>
         <DialogHeader>
           <DialogTitle>Agregar Usuario</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Avatar */}
             <div className="flex flex-col items-center gap-3">
               {!avatarPreview ? (
                 <label className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
@@ -274,7 +261,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             </div>
 
-            {/* Nombre completo */}
             <FormField
               control={form.control}
               name="full_name"
@@ -289,7 +275,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Usuario */}
             <FormField
               control={form.control}
               name="username"
@@ -313,7 +298,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Contraseña */}
             <FormField
               control={form.control}
               name="password"
@@ -323,21 +307,30 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                   <FormControl>
                     <div className="relative">
                       <Input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="off"
                         {...field}
+                        onChange={(e) => {
+                          field.onChange(e.target.value.replace(/\s/g, ''));
+                          // Trigger validation for confirm_password when password changes
+                          if (form.getValues('confirm_password')) {
+                            form.trigger('confirm_password');
+                          }
+                        }}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                       >
                         {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
+                          <EyeOff className="h-4 w-4 text-gray-500" />
                         ) : (
-                          <Eye className="w-4 h-4" />
+                          <Eye className="h-4 w-4 text-gray-500" />
                         )}
-                      </button>
+                      </Button>
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -345,7 +338,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Confirmar contraseña */}
             <FormField
               control={form.control}
               name="confirm_password"
@@ -355,21 +347,26 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                   <FormControl>
                     <div className="relative">
                       <Input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        placeholder="••••"
+                        type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="off"
                         {...field}
+                        onChange={(e) => {
+                          field.onChange(e.target.value.replace(/\s/g, ''));
+                        }}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                       >
                         {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
+                          <EyeOff className="h-4 w-4 text-gray-500" />
                         ) : (
-                          <Eye className="w-4 h-4" />
+                          <Eye className="h-4 w-4 text-gray-500" />
                         )}
-                      </button>
+                      </Button>
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -377,7 +374,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Rol */}
             <FormField
               control={form.control}
               name="role_id"
@@ -407,7 +403,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Estado */}
             <FormField
               control={form.control}
               name="is_active"
@@ -429,7 +424,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               )}
             />
 
-            {/* Botones */}
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
