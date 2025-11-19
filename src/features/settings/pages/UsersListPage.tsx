@@ -417,10 +417,9 @@ export function UsersListPage() {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)}>
+          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="user-menu-trigger">
             <PlusCircle className="mr-2 h-4 w-4" />
             Agregar Usuario
-
           </Button>
         </div>
       </div>

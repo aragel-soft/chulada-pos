@@ -33,24 +33,7 @@ import { Button } from '@/components/ui/button';
 
 import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
 import type { CreateUserPayload } from '@/types/users';
-
-const createUserSchema = z.object({
-  full_name: z.string().min(1, 'El nombre completo es requerido'),
-  username: z
-    .string()
-    .min(1, 'El usuario es requerido')
-    .regex(/^[a-z0-9_]+$/, 'Solo letras minúsculas, números y guion bajo'),
-  password: z.string().min(4, 'Contraseña debe tener al menos 4 caracteres'),
-  confirm_password: z.string(),
-  role_id: z.string().min(1, 'El rol es requerido'),
-  is_active: z.boolean().optional().default(true),
-  avatar_url: z.string().optional(),
-}).refine((data) => data.password === data.confirm_password, {
-  message: 'Las contraseñas no coinciden',
-  path: ['confirm_password'],
-});
-
-type CreateUserForm = z.output<typeof createUserSchema>;
+import { createUserSchema, type CreateUserForm } from '@/features/settings/schemas/createUserSchema';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -67,8 +50,8 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const form = useForm({
-    resolver: zodResolver(createUserSchema),
+  const form = useForm<CreateUserForm>({
+    resolver: zodResolver(createUserSchema) as any,
     mode: 'onChange',
     defaultValues: {
       full_name: '',
@@ -268,7 +251,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 <FormItem>
                   <FormLabel>Nombre completo *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Juan Pérez" {...field} />
+                    <Input placeholder="Juan Pérez" {...field} data-testid="input-fullname" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -285,6 +268,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     <Input
                       placeholder="juanperez"
                       {...field}
+                      data-testid="input-username"
                       onChange={(e) => {
                         const value = e.target.value
                           .toLowerCase()
@@ -310,6 +294,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                         type={showPassword ? "text" : "password"}
                         autoComplete="off"
                         {...field}
+                        data-testid="input-password"
                         onChange={(e) => {
                           field.onChange(e.target.value.replace(/\s/g, ''));
                           // Trigger validation for confirm_password when password changes
@@ -350,6 +335,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                         type={showConfirmPassword ? "text" : "password"}
                         autoComplete="off"
                         {...field}
+                        data-testid="input-confirm-password"
                         onChange={(e) => {
                           field.onChange(e.target.value.replace(/\s/g, ''));
                         }}
@@ -386,7 +372,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     disabled={rolesLoading}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger data-testid="select-role">
                         <SelectValue placeholder="Selecciona un rol" />
                       </SelectTrigger>
                     </FormControl>
@@ -418,6 +404,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      data-testid="switch-active"
                     />
                   </FormControl>
                 </FormItem>
@@ -435,8 +422,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               </Button>
               <Button
                 type="submit"
-                disabled={!form.formState.isValid || createUserMutation.isPending}
+                disabled={createUserMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700"
+                data-testid="btn-save-user"
               >
                 {createUserMutation.isPending ? 'Guardando...' : 'Guardar'}
               </Button>
