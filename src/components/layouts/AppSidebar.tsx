@@ -42,7 +42,7 @@ const mainNavItems: NavItem[] = [
     title: 'Clientes',
     icon: Users,
     path: '/customers',
-    //permission: 'customers:view',
+    permission: 'customers:view',
   },
   {
     title: 'Reportes',

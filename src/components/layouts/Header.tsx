@@ -31,13 +31,13 @@ export function Header() {
 
   const handleLogout = () => {
     try {
-      console.time('Logout Process');
+      //console.time('Logout Process');
       logout();
     } catch (error) {
       console.error('Error al limpiar el store durante el logout:', error);
     } finally {
       navigate('/login');
-      console.timeEnd('Logout Process');
+      //console.timeEnd('Logout Process');
     }
   };
 

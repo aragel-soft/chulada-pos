@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection};
 use std::fs;
 
 use std::path::Path;
@@ -6,8 +6,7 @@ use tauri::Manager;
 use std::collections::HashSet;
 use std::error::Error;
 
-pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection> {
-    
+pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dyn Error>> {
     let app_dir = app_handle
         .path()
         .app_data_dir()
@@ -16,11 +15,11 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection> {
     fs::create_dir_all(&app_dir).expect("No se pudo crear el directorio de datos");
     
     let db_path = app_dir.join("database.db");
-    let conn = Connection::open(db_path)?;
+    let mut conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     //Es necesario comentar la ejecución automática de migraciones para evitar problemas en las pruebas.
     println!("Base de datos inicializada en {:?}", app_dir.join("database.db"));
-    //run_migrations(&mut conn)?; 
+    run_migrations(&mut conn)?; 
     
     Ok(conn)
 }
