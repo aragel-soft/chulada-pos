@@ -1,14 +1,13 @@
-use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
-use tauri::{State, Manager};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use tauri::{Manager, State};
 use uuid::Uuid;
 
-/// Estructura de datos que se envía al frontend con la información del usuario.
 #[derive(Serialize)]
 pub struct UserView {
     id: String,
@@ -20,15 +19,13 @@ pub struct UserView {
     is_active: bool,
 }
 
-/// Comando de Tauri para obtener la lista de usuarios activos.
 #[tauri::command]
 pub fn get_users_list(
     db_state: State<'_, Mutex<Connection>>,
-    app_handle: tauri::AppHandle, // ← NUEVO parámetro
+    app_handle: tauri::AppHandle,
 ) -> Result<Vec<UserView>, String> {
     let conn = db_state.lock().unwrap();
 
-    // Obtener el directorio de datos de la app
     let app_dir = app_handle
         .path()
         .app_data_dir()
@@ -54,8 +51,7 @@ pub fn get_users_list(
     let user_iter = stmt
         .query_map([], |row| {
             let avatar_relative: Option<String> = row.get(3)?;
-            
-            // Convertir la ruta relativa a absoluta si existe
+
             let avatar_full_path = avatar_relative.map(|relative_path| {
                 app_dir
                     .join(&relative_path)
@@ -68,7 +64,7 @@ pub fn get_users_list(
                 id: row.get(0)?,
                 username: row.get(1)?,
                 full_name: row.get(2)?,
-                avatar_url: avatar_full_path, // ← Ahora es ruta completa
+                avatar_url: avatar_full_path,
                 created_at: row.get(4)?,
                 role_name: row.get(5)?,
                 is_active: row.get(6)?,
@@ -82,10 +78,6 @@ pub fn get_users_list(
 
     Ok(users)
 }
-
-// ============================================================================
-// NUEVAS FUNCIONES PARA CREAR USUARIOS
-// ============================================================================
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateUserPayload {
@@ -127,31 +119,25 @@ pub struct Role {
     pub display_name: String,
 }
 
-/// Comando para crear un nuevo usuario
 #[tauri::command]
 pub async fn create_user(
     db: State<'_, Mutex<Connection>>,
     payload: CreateUserPayload,
 ) -> Result<User, String> {
-    let conn = db.lock().map_err(|e| {
-        CreateUserError {
-            code: "DB_LOCK_ERROR".to_string(),
-            message: format!("Error al acceder a la base de datos: {}", e),
-        }
+    let conn = db.lock().map_err(|e| CreateUserError {
+        code: "DB_LOCK_ERROR".to_string(),
+        message: format!("Error al acceder a la base de datos: {}", e),
     })?;
 
-    // Validar que el username no exista
     let exists: bool = conn
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND deleted_at IS NULL)",
             [&payload.username],
             |row| row.get(0),
         )
-        .map_err(|e| {
-            CreateUserError {
-                code: "DB_QUERY_ERROR".to_string(),
-                message: format!("Error al verificar usuario: {}", e),
-            }
+        .map_err(|e| CreateUserError {
+            code: "DB_QUERY_ERROR".to_string(),
+            message: format!("Error al verificar usuario: {}", e),
         })?;
 
     if exists {
@@ -162,20 +148,16 @@ pub async fn create_user(
         .into());
     }
 
-    // Hashear contraseña con Argon2
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(payload.password.as_bytes(), &salt)
-        .map_err(|e| {
-            CreateUserError {
-                code: "HASH_ERROR".to_string(),
-                message: format!("Error al hashear contraseña: {}", e),
-            }
+        .map_err(|e| CreateUserError {
+            code: "HASH_ERROR".to_string(),
+            message: format!("Error al hashear contraseña: {}", e),
         })?
         .to_string();
 
-    // Crear usuario
     let user_id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -211,7 +193,6 @@ pub async fn create_user(
     })
 }
 
-/// Comando para verificar si un username está disponible
 #[tauri::command]
 pub async fn check_username_available(
     db: State<'_, Mutex<Connection>>,
@@ -232,7 +213,6 @@ pub async fn check_username_available(
     Ok(!exists)
 }
 
-/// Comando para obtener todos los roles activos
 #[tauri::command]
 pub async fn get_all_roles(db: State<'_, Mutex<Connection>>) -> Result<Vec<Role>, String> {
     let conn = db
@@ -258,8 +238,6 @@ pub async fn get_all_roles(db: State<'_, Mutex<Connection>>) -> Result<Vec<Role>
     Ok(roles)
 }
 
-/// Comando para guardar avatar localmente
-/// Comando para guardar avatar localmente
 #[tauri::command]
 pub async fn save_avatar(
     app_handle: tauri::AppHandle,
@@ -268,29 +246,21 @@ pub async fn save_avatar(
 ) -> Result<String, String> {
     use std::fs;
 
-    // Obtener directorio de datos de la app (usando el mismo método que tu init_database)
     let app_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("No se pudo obtener directorio de datos: {}", e))?;
 
     let avatars_dir = app_dir.join("avatars");
-    
-    // Crear directorio de avatares si no existe
+
     fs::create_dir_all(&avatars_dir)
         .map_err(|e| format!("Error al crear directorio de avatares: {}", e))?;
 
-    // Generar nombre único con timestamp para evitar colisiones
     let timestamp = chrono::Utc::now().timestamp();
     let file_name = format!("{}_{}.jpg", username, timestamp);
     let file_path = avatars_dir.join(&file_name);
 
-    // Guardar archivo
-    fs::write(&file_path, file_data)
-        .map_err(|e| format!("Error al guardar avatar: {}", e))?;
+    fs::write(&file_path, file_data).map_err(|e| format!("Error al guardar avatar: {}", e))?;
 
-    println!("Avatar guardado en: {:?}", file_path);
-
-    // Retornar path relativo
     Ok(format!("avatars/{}", file_name))
 }

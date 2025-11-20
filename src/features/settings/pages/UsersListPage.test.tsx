@@ -70,7 +70,7 @@ describe("UsersListPage Sorting", () => {
     (getUsersList as any).mockResolvedValue(mockUsers);
   });
 
-  it("debe ordenar los usuarios por nombre en orden ascendente al hacer clic en la cabecera 'Nombre'", async () => {
+  it("should sort users by name in ascending order when clicking the 'Name' header button", async () => {
     renderWithClient(<UsersListPage />);
 
     // Wait for data to load
@@ -95,7 +95,7 @@ describe("UsersListPage Sorting", () => {
     expect(rows[3]).toHaveTextContent("Zelda Smith");
   });
 
-  it("debe ordenar los usuarios por nombre en orden descendente al hacer clic dos veces", async () => {
+  it("should sort users by name in descending order when clicking the 'Name' header button twice", async () => {
     renderWithClient(<UsersListPage />);
 
     await waitFor(() => expect(screen.getByText("Adam Jones")).toBeInTheDocument());
@@ -112,7 +112,7 @@ describe("UsersListPage Sorting", () => {
     expect(rows[3]).toHaveTextContent("Adam Jones");
   });
 
-  it("debe ordenar los usuarios por rol en orden ascendente", async () => {
+  it("should sort users by role in ascending order when clicking the 'Role' header button", async () => {
     renderWithClient(<UsersListPage />);
 
     await waitFor(() => expect(screen.getByText("Adam Jones")).toBeInTheDocument());

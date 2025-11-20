@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { useAuthStore } from "@/stores/authStore";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -267,6 +268,7 @@ export function UsersListPage() {
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const { can } = useAuthStore();
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
@@ -279,6 +281,7 @@ export function UsersListPage() {
     }
   }, [loading, data]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = React.useState("")
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     created_at: false,
   })
@@ -293,6 +296,7 @@ export function UsersListPage() {
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -303,6 +307,7 @@ export function UsersListPage() {
     state: {
       sorting,
       columnFilters,
+      globalFilter,
       columnVisibility,
       rowSelection,
       pagination,
@@ -357,10 +362,10 @@ export function UsersListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre o usuario..."
-            value={(table.getColumn("full_name")?.getFilterValue() as string) ?? ""}
+            value={globalFilter ?? ""}
             onChange={(event) => {
               console.time("Búsqueda/Filtrado");
-              table.getColumn("full_name")?.setFilterValue(event.target.value)
+              setGlobalFilter(event.target.value)
             }}
             className="pl-10"
           />
@@ -417,10 +422,12 @@ export function UsersListPage() {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="user-menu-trigger">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Agregar Usuario
-          </Button>
+          {can('users:create') && (
+            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="user-menu-trigger">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Agregar Usuario
+            </Button>
+          )}
         </div>
       </div>
 

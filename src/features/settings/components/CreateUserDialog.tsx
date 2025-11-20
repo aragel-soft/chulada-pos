@@ -89,7 +89,10 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         avatar_url: avatarUrl,
       };
 
+      console.time("Creación de usuario");
       const newUser = await createUser(payload);
+      console.timeEnd("Creación de usuario");
+
       // Ensure avatar_url is present if we have it locally but backend didn't return it
       if (avatarUrl && !newUser.avatar_url) {
         return { ...newUser, avatar_url: avatarUrl };
@@ -168,7 +171,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   };
 
   const onSubmit = async (data: z.infer<typeof createUserSchema>) => {
+    console.time("Validación de usuario");
     const isAvailable = await checkUsernameAvailable(data.username);
+    console.timeEnd("Validación de usuario");
     if (!isAvailable) {
       form.setError('username', {
         type: 'manual',
