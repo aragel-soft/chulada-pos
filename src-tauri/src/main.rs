@@ -22,6 +22,11 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::auth::authenticate_user,
             commands::auth::debug_database,
+            // Settings - Users
+            commands::settings::users::check_username_available,
+            commands::settings::users::create_user,
+            commands::settings::users::get_all_roles,
+            commands::settings::users::save_avatar,
             commands::settings::users::get_users_list,
         ])
         .run(tauri::generate_context!())
