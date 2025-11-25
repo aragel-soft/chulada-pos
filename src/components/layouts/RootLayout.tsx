@@ -9,7 +9,20 @@ export function RootLayout() {
   const isSidebarOpen = useLayoutStore((state) => state.isSidebarOpen);
   const setSidebarOpen = useLayoutStore((state) => state.setSidebarOpen);
 
-  useEffect(() => {}, [isSidebarOpen]);
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setSidebarOpen]);
 
   return (
     <SidebarProvider open={isSidebarOpen} onOpenChange={setSidebarOpen}>

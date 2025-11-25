@@ -113,13 +113,14 @@ describe('useLayoutStore', () => {
       expect(parsed.state.isSidebarOpen).toBe(false);
     });
 
-    it('should restore state from localStorage on mount', () => {
+    it('should restore state from localStorage on mount', async () => {
       // Simular estado guardado en localStorage
       const savedState = {
         state: { isSidebarOpen: false },
         version: 0,
       };
       localStorage.setItem('layout-storage', JSON.stringify(savedState));
+      await useLayoutStore.persist.rehydrate();
       
       // Crear nueva instancia del hook
       const { result } = renderHook(() => useLayoutStore());

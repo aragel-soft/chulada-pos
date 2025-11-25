@@ -1,7 +1,7 @@
 import { Menu, Bell, ChevronDown, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { useLayoutStore } from '@/stores/layoutStore';
+import { useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +26,7 @@ export function Header() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const toggleSidebar = useLayoutStore((state) => state.toggleSidebar);
+  const { toggleSidebar } = useSidebar();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleLogout = () => {
@@ -55,8 +55,9 @@ export function Header() {
             size="icon"
             onClick={toggleSidebar}
             className="lg:flex"
+            data-testid="sidebar-trigger"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="!h-5 !w-5 text-gray-600" />
           </Button>
 
           <button
@@ -66,7 +67,12 @@ export function Header() {
             <img 
               src="/logo.svg" 
               alt="ChuladaPOS" 
-              className="h-12"
+              className="h-12 hidden min-[480px]:block"
+            />
+            <img 
+              src="/logo-icon.svg" 
+              alt="ChuladaPOS" 
+              className="h-12 block min-[480px]:hidden"
             />
           </button>
         </div>
@@ -74,10 +80,12 @@ export function Header() {
         {/* Right Section: Bell + User Dropdown */}
         <div className="flex items-center gap-3">
           {/* Notification Bell */}
-          <Button variant="outline" size="icon" className="relative rounded-full border-gray-200 h-10 w-10 hover:bg-gray-100">
-            <Bell className="h-6 w-6" />
-            {/* Badge de notificaciones */}
-            {/* <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" /> */}
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="rounded-full w-11 h-11 border-gray-200 hover:bg-gray-100 shadow-none"
+          >
+            <Bell className="!h-5 !w-5 text-gray-600" /> 
           </Button>
 
           {/* User Dropdown */}
@@ -85,7 +93,9 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="outline" 
-                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 hover:bg-gray-100"              >
+                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 hover:bg-gray-100"              
+                data-testid="user-menu-trigger"
+              >
                 <UserAvatar
                   fullName={user?.full_name || 'Usuario'}
                   avatarUrl={user?.avatar_url}
