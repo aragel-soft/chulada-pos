@@ -60,7 +60,7 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
  
 
   // --- Test 1: ver listado como admin ---
-  it('hacer login como admin, ver listado de usuarios y filtrandolo', async () => {
+  it('Make login as admin, view users list and filter it', async () => {
    await login('admin', '1234');
     const url = await browser.getUrl();
     expect(url).toContain('/dashboard');
@@ -115,12 +115,12 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
   });
 
   // --- Test 2: no debe ver el listado como manager ---
-  it('hacer login como manager y validar que no puede ver la lista de usuarios', async () => {
+  it('make login as manager and validate that it cannot see the users list', async () => {
     await login('manager', '1234');
     const url = await browser.getUrl();
     expect(url).toContain('/dashboard');
 
-    // Navegar a la sección de usuarios
+    // Navigate to the settings section
     const settingsMenu = await $('button*=Configuración');
     await settingsMenu.click();
  
