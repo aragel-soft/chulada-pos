@@ -1,3 +1,5 @@
+import { expect } from '@wdio/globals';
+
 describe('POS- 11 Create User Flow', () => {
   async function loginAsAdmin() {
     const usernameInput = await $('#username');
@@ -14,9 +16,12 @@ describe('POS- 11 Create User Flow', () => {
     await loginAsAdmin();
 
     // Navigate to Users page
-    await $('button*=Configuración').click();
+    const settingsLink = await $('[data-testid="nav-item-settings"]');
+    await settingsLink.waitForClickable();
+    await settingsLink.click();
+
     const usersTab = await $('button=Usuarios');
-    await usersTab.waitForClickable();
+    await usersTab.waitForClickable({ timeout: 3000 });
     await usersTab.click();
 
     // Wait for table to load
@@ -25,7 +30,7 @@ describe('POS- 11 Create User Flow', () => {
 
   it('should create a new user successfully', async () => {
     // Open dialog
-    await $('[data-testid="user-menu-trigger"]').click();
+    await $('[data-testid="open-create-user-dialog"]').click();
     await $('div[role="dialog"]').waitForDisplayed();
 
     const uniqueUsername = `testuser_${Date.now()}`;
@@ -63,7 +68,7 @@ describe('POS- 11 Create User Flow', () => {
 
   it('should show error for duplicate username', async () => {
     // Open dialog
-    await $('[data-testid="user-menu-trigger"]').click();
+    await $('[data-testid="open-create-user-dialog"]').click();
     await $('div[role="dialog"]').waitForDisplayed();
 
     // Use an existing username (assuming 'admin' exists)
@@ -95,7 +100,7 @@ describe('POS- 11 Create User Flow', () => {
 
   it('should show error for password mismatch', async () => {
     // Open dialog
-    await $('[data-testid="user-menu-trigger"]').click();
+    await $('[data-testid="open-create-user-dialog"]').click();
     await $('div[role="dialog"]').waitForDisplayed();
 
     await $('[data-testid="input-fullname"]').setValue('Mismatch User');

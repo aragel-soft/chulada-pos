@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface UserAvatarProps {
@@ -17,11 +20,36 @@ function getInitials(name: string): string {
 }
 
 export function UserAvatar({ fullName, avatarUrl, className }: UserAvatarProps) {
+  const [src, setSrc] = useState<string | undefined>(undefined);
   const initials = getInitials(fullName);
+
+  useEffect(() => {
+    const resolveAvatarUrl = async () => {
+      if (!avatarUrl) {
+        setSrc(undefined);
+        return;
+      }
+
+      try {
+        let finalPath = avatarUrl;
+        if (!avatarUrl.includes(':') && !avatarUrl.startsWith('/')) {
+           const appData = await appDataDir();
+           finalPath = await join(appData, avatarUrl);
+        }
+        
+        setSrc(convertFileSrc(finalPath));
+      } catch (error) {
+        console.error('Error resolving avatar path:', error);
+        setSrc(undefined);
+      }
+    };
+
+    resolveAvatarUrl();
+  }, [avatarUrl]);
   
   return (
     <Avatar className={className}>
-      {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
+      {src && <AvatarImage src={src} alt={fullName} />}
       <AvatarFallback className="bg-purple-600 text-white font-semibold">
         {initials}
       </AvatarFallback>

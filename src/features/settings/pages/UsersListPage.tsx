@@ -424,7 +424,7 @@ export function UsersListPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           {can('users:create') && (
-            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="user-menu-trigger">
+            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="open-create-user-dialog">
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar Usuario
             </Button>
