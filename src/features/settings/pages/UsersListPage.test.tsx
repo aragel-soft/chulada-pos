@@ -1,16 +1,25 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UsersListPage } from "./UsersListPage";
-import { useUsersStore, UserView } from "@/stores/usersStore";
+import { getUsersList } from "@/lib/api/users";
+import type { User } from "@/types/users";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Mock del store de Zustand
-vi.mock("@/stores/usersStore");
+// Mock API
+vi.mock("@/lib/api/users", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/users")>();
+  return {
+    ...actual,
+    getUsersList: vi.fn(),
+  };
+});
 
-const mockUsers: UserView[] = [
+const mockUsers: User[] = [
   {
     id: "3",
     full_name: "Charlie Brown",
     username: "charlie",
+    role_id: "cashier_id",
     role_name: "cashier",
     created_at: "2023-01-02T10:00:00Z",
     is_active: true,
@@ -20,6 +29,7 @@ const mockUsers: UserView[] = [
     id: "1",
     full_name: "Zelda Smith",
     username: "zelda",
+    role_id: "admin_id",
     role_name: "admin",
     created_at: "2023-01-01T10:00:00Z",
     is_active: true,
@@ -29,6 +39,7 @@ const mockUsers: UserView[] = [
     id: "2",
     full_name: "Adam Jones",
     username: "adam",
+    role_id: "manager_id",
     role_name: "manager",
     created_at: "2023-01-03T10:00:00Z",
     is_active: false,
@@ -36,24 +47,39 @@ const mockUsers: UserView[] = [
   },
 ];
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
+const renderWithClient = (ui: React.ReactElement) => {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>
+  );
+};
+
 describe("UsersListPage Sorting", () => {
 
   beforeEach(() => {
-    // Proporcionamos una implementación mockeada para el hook
-    (useUsersStore as any).mockReturnValue({
-      users: mockUsers,
-      loading: false,
-      error: null,
-      fetchUsers: vi.fn(),
-    });
+    vi.clearAllMocks();
+    (getUsersList as any).mockResolvedValue(mockUsers);
   });
 
-  it("debe ordenar los usuarios por nombre en orden ascendente al hacer clic en la cabecera 'Nombre'", async () => {
-    render(<UsersListPage />);
+  it("should sort users by name in ascending order when clicking the 'Name' header button", async () => {
+    renderWithClient(<UsersListPage />);
+
+    // Wait for data to load
+    await waitFor(() => expect(screen.getByText("Adam Jones")).toBeInTheDocument());
 
     // 1. Verificar el orden inicial (por defecto es por fecha de creación descendente)
     let rows = await screen.findAllByRole("row");
-    // El orden inicial debe ser Adam (más reciente), Charlie, Zelda (más antiguo)
+    // Header row is 0. Data rows start at 1.
+    // Initial sort: Created At Desc -> Adam (Jan 3), Charlie (Jan 2), Zelda (Jan 1)
     expect(rows[1]).toHaveTextContent("Adam Jones");
     expect(rows[2]).toHaveTextContent("Charlie Brown");
     expect(rows[3]).toHaveTextContent("Zelda Smith");
@@ -69,8 +95,10 @@ describe("UsersListPage Sorting", () => {
     expect(rows[3]).toHaveTextContent("Zelda Smith");
   });
 
-  it("debe ordenar los usuarios por nombre en orden descendente al hacer clic dos veces", async () => {
-    render(<UsersListPage />);
+  it("should sort users by name in descending order when clicking the 'Name' header button twice", async () => {
+    renderWithClient(<UsersListPage />);
+
+    await waitFor(() => expect(screen.getByText("Adam Jones")).toBeInTheDocument());
 
     // 1. Hacemos clic dos veces para ordenar descendentemente
     const nameHeaderButton = screen.getByRole("button", { name: /Nombre/i });
@@ -84,8 +112,10 @@ describe("UsersListPage Sorting", () => {
     expect(rows[3]).toHaveTextContent("Adam Jones");
   });
 
-  it("debe ordenar los usuarios por rol en orden ascendente", async () => {
-    render(<UsersListPage />);
+  it("should sort users by role in ascending order when clicking the 'Role' header button", async () => {
+    renderWithClient(<UsersListPage />);
+
+    await waitFor(() => expect(screen.getByText("Adam Jones")).toBeInTheDocument());
 
     // 1. Hacemos clic en la cabecera de "Rol"
     const roleHeaderButton = screen.getByRole("button", { name: /Rol/i });

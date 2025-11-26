@@ -26,7 +26,8 @@ export default function SettingsPage() {
   const { can } = useAuthStore();
 
   const availableTabs = settingTabs.filter(tab => can(tab.permission));
-  const currentTab = location.pathname.split('/')[2];
+  // Fix: Ensure currentTab has a fallback to avoid uncontrolled/controlled warning
+  const currentTab = location.pathname.split('/')[2] || availableTabs[0]?.value || '';
 
   const onTabChange = (value: string) => {
     navigate(`/settings/${value}`);
