@@ -22,7 +22,7 @@ async function loginAsAdmin() {
   }
 }
 
-describe('HU-POS-009: User Logout', () => {
+describe('User Logout', () => {
   beforeEach(async () => {
     await browser.url('http://tauri.localhost/login');
     await $('#username').waitForExist({ timeout: 5000 });
@@ -35,8 +35,12 @@ describe('HU-POS-009: User Logout', () => {
 
   // --- Test 1: Cancel Logout ---
   it('should cancel logout and remain on dashboard', async () => {
-    const logoutTrigger = await $('button*=Cerrar Sesión');
-    await logoutTrigger.click();
+    const userMenuBtn = await $('[data-testid="user-menu-trigger"]');
+    await userMenuBtn.click();
+
+    const logoutOption = await $('div=Cerrar Sesión'); 
+    await logoutOption.waitForClickable();
+    await logoutOption.click();
 
     const cancelButton = await $('button*=Cancelar');
     await cancelButton.waitForDisplayed({ timeout: 2000 });
@@ -53,8 +57,12 @@ describe('HU-POS-009: User Logout', () => {
 
   // --- Test 2: Successfull Logout ---
   it('should logout successfully and redirect to /login', async () => {
-    const logoutTrigger = await $('button*=Cerrar Sesión');
-    await logoutTrigger.click();
+    const userMenuBtn = await $('[data-testid="user-menu-trigger"]');
+    await userMenuBtn.click();
+
+    const logoutOption = await $('div=Cerrar Sesión'); 
+    await logoutOption.waitForClickable();
+    await logoutOption.click();
 
     await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
     await browser.pause(200); 
@@ -70,8 +78,13 @@ describe('HU-POS-009: User Logout', () => {
 
   // --- Test 3: Protect Route Post-Logout ---
   it('should prevent access to protected routes after logout', async () => {
-    const logoutTrigger = await $('button*=Cerrar Sesión');
-    await logoutTrigger.click();
+    const userMenuBtn = await $('[data-testid="user-menu-trigger"]');
+    await userMenuBtn.click();
+
+    const logoutOption = await $('div=Cerrar Sesión'); 
+    await logoutOption.waitForClickable();
+    await logoutOption.click();
+
     await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
     const confirmButton = await $('button*=Cerrar sesión');
     await confirmButton.click();

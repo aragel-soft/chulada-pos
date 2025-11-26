@@ -10,22 +10,21 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, module }: ProtectedRouteProps) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  } 
-  
-  const modules = useAuthStore((state) => state.user?.permissions || []);
-  
+  const modules = user?.permissions || [];
   const permissionDenied = module !== 'dashboard' && !modules.includes(module);
 
   useEffect(() => {
-    
     if (permissionDenied) {
       toast.error("No tienes permisos para acceder a esta sección");
     }
   }, [permissionDenied, location.pathname]); 
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  } 
 
   if (permissionDenied) {
     return <Navigate to="/dashboard" replace />;
