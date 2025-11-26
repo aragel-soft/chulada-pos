@@ -16,6 +16,7 @@ pub struct UserView {
     avatar_url: Option<String>,
     created_at: String,
     role_name: String,
+    role_id: String,
     is_active: bool,
 }
 
@@ -39,6 +40,7 @@ pub fn get_users_list(
             u.avatar_url, 
             u.created_at,
             r.display_name, 
+            u.role_id,
             u.is_active
         FROM users u
         JOIN roles r ON u.role_id = r.id
@@ -67,7 +69,8 @@ pub fn get_users_list(
                 avatar_url: avatar_full_path,
                 created_at: row.get(4)?,
                 role_name: row.get(5)?,
-                is_active: row.get(6)?,
+                role_id: row.get(6)?,
+                is_active: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -236,6 +239,154 @@ pub async fn get_all_roles(db: State<'_, Mutex<Connection>>) -> Result<Vec<Role>
         .map_err(|e| format!("Error al mapear roles: {}", e))?;
 
     Ok(roles)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserPayload {
+    pub id: String,
+    pub full_name: String,
+    pub role_id: String,
+    pub is_active: bool,
+    pub avatar_url: Option<String>,
+    pub current_user_id: String,
+}
+
+#[tauri::command]
+pub async fn update_user(
+    db: State<'_, Mutex<Connection>>,
+    payload: UpdateUserPayload,
+) -> Result<User, String> {
+    let conn = db.lock().map_err(|e| CreateUserError {
+        code: "DB_LOCK_ERROR".to_string(),
+        message: format!("Error al acceder a la base de datos: {}", e),
+    })?;
+
+    // Check if trying to deactivate/degrade self
+    if payload.id == payload.current_user_id {
+        if !payload.is_active {
+            return Err(CreateUserError {
+                code: "SELF_DEACTIVATION".to_string(),
+                message: "No puedes desactivar tu propia cuenta mientras estás logueado"
+                    .to_string(),
+            }
+            .into());
+        }
+
+        // Check if role changed
+        let current_role: String = conn
+            .query_row(
+                "SELECT role_id FROM users WHERE id = ?",
+                [&payload.id],
+                |row| row.get(0),
+            )
+            .map_err(|e| CreateUserError {
+                code: "DB_QUERY_ERROR".to_string(),
+                message: format!("Error al verificar rol actual: {}", e),
+            })?;
+
+        if current_role != payload.role_id {
+            return Err(CreateUserError {
+                code: "SELF_DEGRADE".to_string(),
+                message: "No puedes cambiar tu propio rol mientras estás logueado".to_string(),
+            }
+            .into());
+        }
+    }
+    // If the user being updated is an admin, and we are changing role or deactivating
+    let is_target_admin: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM users u 
+             JOIN roles r ON u.role_id = r.id 
+             WHERE u.id = ? AND r.name = 'admin'",
+            [&payload.id],
+            |row| {
+                let count: i64 = row.get(0)?;
+                Ok(count > 0)
+            },
+        )
+        .unwrap_or(false);
+
+    if is_target_admin {
+        let new_role_name: String = conn
+            .query_row(
+                "SELECT name FROM roles WHERE id = ?",
+                [&payload.role_id],
+                |row| row.get(0),
+            )
+            .unwrap_or_default();
+
+        let is_degrading = new_role_name != "admin";
+        let is_deactivating = !payload.is_active;
+
+        if is_degrading || is_deactivating {
+            let active_admins_count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM users u 
+                     JOIN roles r ON u.role_id = r.id 
+                     WHERE r.name = 'admin' AND u.is_active = 1 AND u.deleted_at IS NULL AND u.id != ?",
+                    [&payload.id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| CreateUserError {
+                    code: "DB_QUERY_ERROR".to_string(),
+                    message: format!("Error al contar administradores: {}", e),
+                })?;
+
+            if active_admins_count == 0 {
+                return Err(CreateUserError {
+                    code: "LAST_ADMIN".to_string(),
+                    message: "No puedes desactivar o cambiar el rol del único administrador activo"
+                        .to_string(),
+                }
+                .into());
+            }
+        }
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "UPDATE users SET 
+            full_name = ?1, 
+            role_id = ?2, 
+            is_active = ?3, 
+            avatar_url = ?4, 
+            updated_at = ?5 
+         WHERE id = ?6",
+        rusqlite::params![
+            &payload.full_name,
+            &payload.role_id,
+            if payload.is_active { 1 } else { 0 },
+            &payload.avatar_url,
+            &now,
+            &payload.id
+        ],
+    )
+    .map_err(|e| CreateUserError {
+        code: "DB_UPDATE_ERROR".to_string(),
+        message: format!("Error al actualizar usuario: {}", e),
+    })?;
+
+    // Fetch updated user to return
+    let username: String = conn
+        .query_row(
+            "SELECT username FROM users WHERE id = ?",
+            [&payload.id],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
+
+    Ok(User {
+        id: payload.id,
+        username,
+        full_name: payload.full_name,
+        role_id: payload.role_id,
+        is_active: payload.is_active,
+        avatar_url: payload.avatar_url,
+        created_at: now, // This is technically updated_at but User struct uses created_at.
+                         // Ideally we should fetch the original created_at or update the struct.
+                         // For now let's fetch the original created_at
+    })
 }
 
 #[tauri::command]

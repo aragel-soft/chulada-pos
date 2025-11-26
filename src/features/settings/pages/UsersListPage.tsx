@@ -68,13 +68,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CreateUserDialog } from "../components/CreateUserDialog";
+import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
 
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
     created_at: format(new Date(user.created_at), 'yyyy-MM-dd HH:mm'),
-    avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
+    avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined,
   }));
 };
 
@@ -123,7 +124,10 @@ export const columns: ColumnDef<User>[] = [
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8">
-          <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
+          <AvatarImage 
+            src={row.original.avatar_url } 
+            alt={row.original.full_name} 
+          />
           <AvatarFallback>
             {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
           </AvatarFallback>
@@ -269,7 +273,9 @@ export function UsersListPage() {
 
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
   const { can } = useAuthStore();
 
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -295,6 +301,8 @@ export function UsersListPage() {
   const table = useReactTable({
     data,
     columns,
+    getRowId: (row) => row.id,
+    autoResetPageIndex: false, 
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -316,7 +324,6 @@ export function UsersListPage() {
   })
 
   React.useEffect(() => {
-    // console.timeEnd("Búsqueda/Filtrado");
   }, [table.getFilteredRowModel().rows]);
 
   const { pageIndex, pageSize } = table.getState().pagination;
@@ -374,7 +381,20 @@ export function UsersListPage() {
 
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={selectedRowsCount !== 1} className="flex-1 sm:flex-none">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              disabled={selectedRowsCount !== 1} 
+              className="flex-1 sm:flex-none"
+              onClick={() => {
+                const selectedRowIndex = Object.keys(rowSelection)[0];
+                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
+                if (selectedRow) {
+                  setSelectedUser(selectedRow.original);
+                  setIsEditDialogOpen(true);
+                }
+              }}
+            >
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </Button>
@@ -424,7 +444,7 @@ export function UsersListPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           {can('users:create') && (
-            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="user-menu-trigger">
+            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsCreateDialogOpen(true)} data-testid="user-menu-trigger">
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar Usuario
             </Button>
@@ -553,17 +573,28 @@ export function UsersListPage() {
           </Pagination>
         </div>
       </div>
+      {/* Modal de Crear */}
       <CreateUserDialog
-        open={isDialogOpen}
+        open={isCreateDialogOpen}
         onOpenChange={(open) => {
-          setIsDialogOpen(open);
+          setIsCreateDialogOpen(open);
           if (!open) {
             refetch();
           }
         }}
       />
+      {/* Modal de Editar */}
+      <EditUserDialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            refetch();
+          }
+        }}
+        user={selectedUser}
+        currentUserId={useAuthStore.getState().user?.id || ''}
+      />
     </div>
-
-
   )
 }
