@@ -68,10 +68,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CreateUserDialog } from "../components/CreateUserDialog";
+import { format } from "date-fns";
 
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
+    created_at: format(new Date(user.created_at), 'yyyy-MM-dd HH:mm'),
     avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
   }));
 };
@@ -276,7 +278,6 @@ export function UsersListPage() {
 
   React.useEffect(() => {
     if (!loading && !initialLoadMeasured.current && data.length > 0) {
-      console.timeEnd("Carga inicial de usuarios");
       initialLoadMeasured.current = true;
     }
   }, [loading, data]);
@@ -315,7 +316,7 @@ export function UsersListPage() {
   })
 
   React.useEffect(() => {
-    console.timeEnd("Búsqueda/Filtrado");
+    // console.timeEnd("Búsqueda/Filtrado");
   }, [table.getFilteredRowModel().rows]);
 
   const { pageIndex, pageSize } = table.getState().pagination;
