@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -198,6 +199,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         </style>
         <DialogHeader>
           <DialogTitle>Agregar Usuario</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulario para crear un nuevo usuario
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -254,7 +258,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="full_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre completo *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Nombre completo <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input placeholder="Juan Pérez" {...field} data-testid="input-fullname" />
                   </FormControl>
@@ -268,7 +274,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Usuario *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Usuario <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       placeholder="juanperez"
@@ -292,7 +300,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Contraseña <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -333,7 +343,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="confirm_password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirmar contraseña *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Confirmar contraseña <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -370,7 +382,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="role_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rol *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Rol <span className="text-destructive">*</span>
+                  </FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
