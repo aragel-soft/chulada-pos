@@ -5,10 +5,14 @@ import {
   Navigate 
 } from 'react-router-dom';
 
+// --- Layouts ---
+import { RootLayout } from '@/components/layouts/RootLayout';
+
 // --- Tus Páginas Principales ---
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import InventoryPage from '@/pages/InventoryPage';
+import CustomersPage from '@/pages/CustomersPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 
@@ -30,73 +34,90 @@ const router = createBrowserRouter([
     element: <LoginPage />,
   },
 
-  // --- Rutas Protegidas ---
+    // --- Rutas Protegidas con Layout ---
   {
-    path: "/dashboard",
+    path: "/",
     element: (
       <ProtectedRoute module="dashboard">
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/inventory",
-    element: (
-      <ProtectedRoute module="inventory">
-        <InventoryPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/reports",
-    element: (
-      <ProtectedRoute module="reports">
-        <ReportsPage />
-      </ProtectedRoute>
-    ),
-  },
-  
-  // --- Rutas Anidadas para Settings ---
-  {
-    path: "/settings",
-    element: (
-      <ProtectedRoute module="settings:view">
-        <SettingsPage /> 
+        <RootLayout />
       </ProtectedRoute>
     ),
     children: [
       {
-        path: "", 
-        element: <Navigate to="profile" replace />, 
+        path: "dashboard",
+        element: <DashboardPage />,
       },
       {
-        path: "users", // /settings/users
-        element: 
-          <ProtectedRoute module="users:view">
-            <UsersListPage />
+        path: "inventory",
+        element: (
+          <ProtectedRoute module="inventory:view">
+            <InventoryPage />
           </ProtectedRoute>
+        ),
+      },
+            {
+        path: "customers",
+        element: (
+          <ProtectedRoute module="customers:view">
+            <CustomersPage />
+          </ProtectedRoute>
+        ),
       },
       {
-        path: "profile", // /settings/profile
-        element: 
-          <ProtectedRoute module="profile:view">
-            <ProfilePage />
-          </ProtectedRoute>,
+        path: "reports",
+        element: (
+          <ProtectedRoute module="reports:view">
+            <ReportsPage />
+          </ProtectedRoute>
+        ),
       },
+      
+      // --- Rutas Anidadas para Settings ---
       {
-        path: "billing", // /settings/billing
-        element: 
-          <ProtectedRoute module="billing:view">
-            <BillingPage />
-          </ProtectedRoute>,
+        path: "settings",
+        element: (
+          <ProtectedRoute module="settings:view">
+            <SettingsPage /> 
+          </ProtectedRoute>
+        ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="profile" replace />, 
+          },
+          {
+            path: "users",
+            element: (
+              <ProtectedRoute module="users:view">
+                <UsersListPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "profile",
+            element: (
+              <ProtectedRoute module="profile:view">
+                <ProfilePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "billing",
+            element: (
+              <ProtectedRoute module="billing:view">
+                <BillingPage />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
-    ]
-  },
 
-  // --- Redirecciones ---
-  {
-    path: "/", // Redirige la raíz a /login
-    element: <Navigate to="/login" replace />,
+      // Redirect root to dashboard
+      {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+    ],
   },
   {
     path: "*", // Cualquier ruta no definida redirige a /login

@@ -12,7 +12,7 @@ async function invokeTauriCommand(command, args, retries = 3) {
   }
 }
 
-describe('HU-POS-009: Desktop User Login', () => {
+describe('Desktop User Login', () => {
 
   beforeEach(async () => {
     await browser.pause(2000);
@@ -29,11 +29,16 @@ describe('HU-POS-009: Desktop User Login', () => {
         
         // Buscar botón de logout
         try {
-          const logoutButton = await $('button*=Cerrar Sesión');
-          await logoutButton.click();
-          await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
+          const userMenuBtn = await $('[data-testid="user-menu-trigger"]');
+          await userMenuBtn.click();
 
-          const confirmButton = await $('button*=Cerrar sesión');
+          const logoutOption = await $('div=Cerrar Sesión'); 
+          await logoutOption.waitForClickable();
+          await logoutOption.click();
+
+          await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
+          const confirmButton = await $('button=Cerrar sesión'); 
+          await confirmButton.waitForClickable();
           await confirmButton.click();
 
           await $('#username').waitForExist({ timeout: 5000 });

@@ -1,6 +1,5 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils'; 
 
@@ -38,13 +37,6 @@ export default function SettingsPage() {
     <div className="space-y-6 p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Configuración</h1>
-        <Button 
-          onClick={() => navigate('/dashboard')} 
-          variant="default" 
-          className="rounded-xl bg-[#480489] hover:bg-[#480489]/90 text-base"
-        >
-          Ir a Dashboard
-        </Button>
       </div>
 
       <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">

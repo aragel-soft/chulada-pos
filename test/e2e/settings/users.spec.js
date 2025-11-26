@@ -38,8 +38,13 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
         
         // Buscar botón de logout
         try {
-          const logoutButton = await $('button*=Cerrar Sesión');
-          await logoutButton.click();
+          const userMenuBtn = await $('[data-testid="user-menu-trigger"]');
+          await userMenuBtn.click();
+
+          const logoutOption = await $('div=Cerrar Sesión'); 
+          await logoutOption.waitForClickable();
+          await logoutOption.click();
+
           await $('button*=Cancelar').waitForDisplayed({ timeout: 2000 });
 
           const confirmButton = await $('button*=Cerrar sesión');
@@ -66,8 +71,9 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
     expect(url).toContain('/dashboard');
 
     // Navegar a la sección de usuarios
-    const settingsMenu = await $('button*=Configuración');
-    await settingsMenu.click();
+    const settingsLink = await $('[data-testid="nav-item-settings"]');
+    await settingsLink.waitForClickable();
+    await settingsLink.click();
 
     // Hacer clic en la pestaña "Usuarios" dentro de la página de configuración
     const usersTab = await $('button=Usuarios');
@@ -77,8 +83,6 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
     // Verificar que la URL sea la correcta después de la navegación
     const usersUrl = await browser.getUrl();
     expect(usersUrl).toContain('/settings/users');
-
-    
 
     // 1. Verificar que la tabla de usuarios esté visible y contenga datos
     const userTable = await $('table');
@@ -107,11 +111,12 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
     }
 
     // navegar de vuelta al dashboard
-    const dashboardMenu = await $('button*=Dashboard');
-    await dashboardMenu.click();
+    const dashboardLink = await $('[data-testid="nav-item-dashboard"]');
+    await dashboardLink.waitForClickable();
+    await dashboardLink.click();
+
     const dashboardUrl = await browser.getUrl();
     expect(dashboardUrl).toContain('/dashboard');
-    
   });
 
   // --- Test 2: no debe ver el listado como manager ---
@@ -120,10 +125,11 @@ describe('HU-POS-10: Cargar carga de usuarios', () => {
     const url = await browser.getUrl();
     expect(url).toContain('/dashboard');
 
-    // Navigate to the settings section
-    const settingsMenu = await $('button*=Configuración');
-    await settingsMenu.click();
- 
+    // Navegar a la sección de usuarios
+    const settingsLink = await $('[data-testid="nav-item-settings"]');
+    await settingsLink.waitForClickable();
+    await settingsLink.click();
+
     // Verificar que la URL sea la correcta después de la navegación
     const usersUrl = await browser.getUrl();
     expect(usersUrl).toContain('/settings');

@@ -12,7 +12,7 @@ export const config = {
   host: '127.0.0.1',
   port: 4444,
   
-  specs: ['./test/e2e/**/*.spec.js'], // ← AJUSTA: tu carpeta de tests
+  specs: ['./test/e2e/**/*.spec.js'],
   
   maxInstances: 1,
   
@@ -20,7 +20,7 @@ export const config = {
     {
       maxInstances: 1,
       'tauri:options': {
-        application: './src-tauri/target/debug/chulada-pos.exe', // ← AJUSTA: nombre de tu app
+        application: './src-tauri/target/debug/chulada-pos.exe', 
       },
     },
   ],
@@ -38,7 +38,7 @@ export const config = {
     console.log('🔨 Compilando aplicación Tauri...');
     spawnSync(
       'npm',
-      ['run', 'tauri', 'build', '--', '--debug'], // ← QUITÉ --no-bundle (causa problemas en Windows)
+      ['run', 'tauri', 'build', '--', '--debug'],
       {
         cwd: path.resolve(__dirname),
         stdio: 'inherit',
@@ -49,7 +49,7 @@ export const config = {
   
   beforeSession: () => {
     console.log('🚗 Iniciando tauri-driver...');
-    const driverPath = path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver.exe'); // ← AGREGUÉ .exe para Windows
+    const driverPath = path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver.exe');
     
     tauriDriver = spawn(driverPath, [], { 
       stdio: [null, process.stdout, process.stderr] 
