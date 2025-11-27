@@ -253,6 +253,7 @@ pub struct UpdateUserPayload {
 
 #[tauri::command]
 pub async fn update_user(
+    app_handle: tauri::AppHandle,
     db: State<'_, Mutex<Connection>>,
     payload: UpdateUserPayload,
 ) -> Result<User, String> {
@@ -343,6 +344,40 @@ pub async fn update_user(
         }
     }
 
+    // Handle avatar logic
+    let current_avatar_url: Option<String> = conn
+        .query_row(
+            "SELECT avatar_url FROM users WHERE id = ?",
+            [&payload.id],
+            |row| row.get(0),
+        )
+        .unwrap_or(None);
+
+    let (new_avatar_for_db, should_delete_old) = match &payload.avatar_url {
+        Some(new_url) => {
+            if std::path::Path::new(new_url).is_absolute() {
+                (current_avatar_url.clone(), false)
+            } else {
+                let is_different = match &current_avatar_url {
+                    Some(old) => old != new_url,
+                    None => true,
+                };
+                (Some(new_url.clone()), is_different)
+            }
+        }
+        None => (None, true),
+    };
+
+    if should_delete_old {
+        if let Some(old_relative) = &current_avatar_url {
+            // Try to delete the old file
+            if let Ok(app_dir) = app_handle.path().app_data_dir() {
+                let old_path = app_dir.join(old_relative);
+                let _ = std::fs::remove_file(old_path);
+            }
+        }
+    }
+
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
@@ -357,7 +392,7 @@ pub async fn update_user(
             &payload.full_name,
             &payload.role_id,
             if payload.is_active { 1 } else { 0 },
-            &payload.avatar_url,
+            &new_avatar_for_db,
             &now,
             &payload.id
         ],
@@ -382,10 +417,8 @@ pub async fn update_user(
         full_name: payload.full_name,
         role_id: payload.role_id,
         is_active: payload.is_active,
-        avatar_url: payload.avatar_url,
-        created_at: now, // This is technically updated_at but User struct uses created_at.
-                         // Ideally we should fetch the original created_at or update the struct.
-                         // For now let's fetch the original created_at
+        avatar_url: new_avatar_for_db, 
+        created_at: now, 
     })
 }
 

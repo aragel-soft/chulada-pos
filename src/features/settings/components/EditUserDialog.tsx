@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -136,7 +137,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
       handleClose();
     },
     onError: (error: any) => {
-        toast.error(error.message || 'Error al actualizar usuario');
+        toast.error('Error al actualizar usuario');
     },
   });
 
@@ -206,6 +207,9 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
       <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Usuario</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulario para editar un usuario
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -262,7 +266,9 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
               name="full_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre completo *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Nombre completo <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input placeholder="Juan Pérez" {...field} data-testid="input-fullname" />
                   </FormControl>
