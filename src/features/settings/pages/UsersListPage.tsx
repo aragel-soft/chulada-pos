@@ -37,7 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+import { DebouncedInput } from "@/components/ui/debounced-input"
 import {
   Table,
   TableBody,
@@ -294,6 +294,7 @@ export function UsersListPage() {
   }, [loading, data]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const isFilteringRef = React.useRef(false);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     created_at: false,
   })
@@ -329,6 +330,10 @@ export function UsersListPage() {
   })
 
   React.useEffect(() => {
+    if (isFilteringRef.current) {
+      console.timeEnd("Búsqueda/Filtrado");
+      isFilteringRef.current = false;
+    }  
   }, [table.getFilteredRowModel().rows]);
 
   const handleDeleteClick = () => {
@@ -380,12 +385,13 @@ export function UsersListPage() {
 
         <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <DebouncedInput
             placeholder="Buscar por nombre o usuario..."
             value={globalFilter ?? ""}
-            onChange={(event) => {
-              console.time("Búsqueda/Filtrado");
-              setGlobalFilter(event.target.value)
+            onChange={(value) => {
+              isFilteringRef.current = true;
+              console.time("Búsqueda/Filtrado"); 
+              setGlobalFilter(String(value));
             }}
             className="pl-10"
           />
