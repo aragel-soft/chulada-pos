@@ -76,7 +76,6 @@ const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
     created_at: format(new Date(user.created_at), 'yyyy-MM-dd HH:mm'),
-    avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined,
   }));
 };
 
@@ -190,7 +189,7 @@ export function UsersListPage() {
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
+              <AvatarImage src={row.original.avatar_url ? convertFileSrc(row.original.avatar_url) : undefined} alt={row.original.full_name} />
               <AvatarFallback>
                 {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
               </AvatarFallback>
@@ -399,7 +398,7 @@ export function UsersListPage() {
 
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-2">
-            <Button 
+            {can('users:edit') && <Button 
               variant="outline" 
               size="sm" 
               disabled={selectedRowsCount !== 1} 
@@ -415,7 +414,7 @@ export function UsersListPage() {
             >
               <Pencil className="mr-2 h-4 w-4" />
               Editar
-            </Button>
+            </Button>}
             {can('users:delete') && (
               <Button 
                 variant="destructive" 
@@ -629,7 +628,7 @@ export function UsersListPage() {
           }
         }}
         user={selectedUser}
-        currentUserId={useAuthStore.getState().user?.id || ''}
+        currentUserId={useAuthStore.getState()?.user?.id || ''}
       />
     </div>
   )

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createUserSchema } from './createUserSchema';
+import { createUserSchema } from './userSchema';
 
 describe('createUserSchema', () => {
   it('should validate a correct user payload', () => {
@@ -36,7 +36,7 @@ describe('createUserSchema', () => {
   it('should fail if username contains invalid characters', () => {
     const invalidUser = {
       full_name: 'John Doe',
-      username: 'John Doe', // Spaces and uppercase not allowed
+      username: 'John Doe', 
       password: 'password123',
       confirm_password: 'password123',
       role_id: 'role-123',

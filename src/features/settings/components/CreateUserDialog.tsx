@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Upload, X, Eye, EyeOff } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -34,7 +33,7 @@ import { Button } from '@/components/ui/button';
 
 import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
 import type { CreateUserPayload } from '@/types/users';
-import { createUserSchema, type CreateUserForm } from '@/features/settings/schemas/createUserSchema';
+import {createUserSchema, type CreateUserForm} from '@/features/settings/schemas/userSchema';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -94,7 +93,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       const newUser = await createUser(payload);
       console.timeEnd("Creación de usuario");
 
-      // Ensure avatar_url is present if we have it locally but backend didn't return it
       if (avatarUrl && !newUser.avatar_url) {
         return { ...newUser, avatar_url: avatarUrl };
       }
@@ -171,7 +169,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     setIsDragging(false);
   };
 
-  const onSubmit = async (data: z.infer<typeof createUserSchema>) => {
+  const onSubmit = async (data: CreateUserForm) => {
     console.time("Validación de usuario");
     const isAvailable = await checkUsernameAvailable(data.username);
     console.timeEnd("Validación de usuario");
@@ -312,7 +310,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                         data-testid="input-password"
                         onChange={(e) => {
                           field.onChange(e.target.value.replace(/\s/g, ''));
-                          // Trigger validation for confirm_password when password changes
                           if (form.getValues('confirm_password')) {
                             form.trigger('confirm_password');
                           }

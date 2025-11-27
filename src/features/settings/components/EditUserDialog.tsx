@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Upload, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 import {
   Dialog,
@@ -35,17 +35,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 import { getAllRoles, saveAvatar, updateUser } from '@/lib/api/users';
 import type { User, UpdateUserPayload } from '@/types/users';
+import {editUserSchema, type EditUserForm } from '../schemas/userSchema';
 
-// Schema for editing - password is optional
-const editUserSchema = z.object({
-  full_name: z.string().min(1, 'El nombre completo es requerido'),
-  username: z.string(), // Read only
-  role_id: z.string().min(1, 'El rol es requerido'),
-  is_active: z.boolean(),
-  avatar_url: z.string().optional(),
-});
-
-type EditUserForm = z.infer<typeof editUserSchema>;
 
 interface EditUserDialogProps {
   open: boolean;
@@ -103,17 +94,15 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
     mutationFn: async (data: EditUserForm) => {
       if (!user) throw new Error("No user selected");
 
-      let avatarUrl = user.avatar_url; // Default to existing
-
-      // If new file, upload it
+      let avatarUrl = user.avatar_url; 
+      
       if (avatarFile) {
         const arrayBuffer = await avatarFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
         avatarUrl = await saveAvatar(Array.from(uint8Array), data.username);
       } 
-      // If preview is null but we had an avatar, it means it was removed
       else if (!avatarPreview && user.avatar_url) {
-        avatarUrl = undefined; // Or handle deletion if backend supports it explicitly
+        avatarUrl = undefined; 
       }
 
       const payload: UpdateUserPayload = {
@@ -137,7 +126,24 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
       handleClose();
     },
     onError: (error: any) => {
-        toast.error('Error al actualizar usuario');
+      if (error.code === "SELF_DEGRADE") {
+        toast.error("No se puede Actualizar", {
+          description: error.message,
+          duration: 5000,
+        });
+      } else if (error.code === "SELF_DEACTIVATION") {
+        toast.error("Acción no permitida", {
+          description: error.message,
+        });
+      } else if (error.code === "LAST_ADMIN") {
+        toast.error("Acción no permitida", {
+          description: error.message,
+        });
+      } else {
+        toast.error("Error al actualizar", {
+          description: error.message || "Ocurrió un error inesperado.",
+        });
+      }
     },
   });
 
@@ -157,7 +163,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
         setImagePosition({ x: 50, y: 50 });
-        form.setValue('avatar_url', 'changed', { shouldDirty: true }); // Mark as dirty
+        form.setValue('avatar_url', 'changed', { shouldDirty: true }); 
       };
       reader.readAsDataURL(file);
     }
@@ -167,7 +173,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
     setAvatarPreview(null);
     setAvatarFile(null);
     setImagePosition({ x: 50, y: 50 });
-    form.setValue('avatar_url', '', { shouldDirty: true }); // Mark as dirty
+    form.setValue('avatar_url', '', { shouldDirty: true });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -238,7 +244,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
                   >
                     <img
                       ref={imageRef}
-                      src={avatarPreview}
+                      src={convertFileSrc(avatarPreview)}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                       style={{
@@ -251,6 +257,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
                     type="button"
                     onClick={handleRemoveAvatar}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    data-testid="btn-remove-avatar"
                   >
                     <X className="w-4 h-4" />
                   </button>
