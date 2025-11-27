@@ -264,3 +264,101 @@ pub async fn save_avatar(
 
     Ok(format!("avatars/{}", file_name))
 }
+
+#[derive(Debug, Serialize)]
+pub struct DeleteUserError {
+    pub code: String,
+    pub message: String,
+}
+
+impl From<DeleteUserError> for String {
+    fn from(err: DeleteUserError) -> String {
+        serde_json::to_string(&err).unwrap_or_else(|_| err.message)
+    }
+}
+
+#[tauri::command]
+pub async fn delete_users(
+    db: State<'_, Mutex<Connection>>,
+    user_ids: Vec<String>,
+    current_user_id: String,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| DeleteUserError {
+        code: "DB_LOCK_ERROR".to_string(),
+        message: format!("Error al acceder a la base de datos: {}", e),
+    })?;
+
+    let tx = conn.transaction().map_err(|e| DeleteUserError {
+        code: "DB_TRANSACTION_ERROR".to_string(),
+        message: format!("Error al iniciar transacción: {}", e),
+    })?;
+
+    if user_ids.contains(&current_user_id) {
+        return Err(DeleteUserError {
+            code: "SELF_DELETION".to_string(),
+            message: "No puedes eliminar tu propia cuenta de usuario.".to_string(),
+        }
+        .into());
+    }
+
+    let total_admins: i64 = tx
+        .query_row(
+            "SELECT COUNT(*) 
+             FROM users u 
+             JOIN roles r ON u.role_id = r.id 
+             WHERE r.name = 'admin' AND u.deleted_at IS NULL AND u.is_active = 1",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| DeleteUserError {
+            code: "DB_QUERY_ERROR".to_string(),
+            message: format!("Error al contar administradores: {}", e),
+        })?;
+
+    let placeholders = std::iter::repeat("?").take(user_ids.len()).collect::<Vec<_>>().join(",");
+    let sql_admins_in_list = format!(
+        "SELECT COUNT(*) 
+         FROM users u 
+         JOIN roles r ON u.role_id = r.id 
+         WHERE r.name = 'admin' AND u.id IN ({})",
+        placeholders
+    );
+
+    let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    for id in &user_ids {
+        params.push(id);
+    }
+
+    let admins_to_delete: i64 = tx
+        .query_row(&sql_admins_in_list, rusqlite::params_from_iter(params.iter()), |row| row.get(0))
+        .map_err(|e| DeleteUserError {
+            code: "DB_QUERY_ERROR".to_string(),
+            message: format!("Error al verificar admins seleccionados: {}", e),
+        })?;
+
+    if total_admins - admins_to_delete <= 0 {
+        return Err(DeleteUserError {
+            code: "LAST_ADMIN_PROTECTION".to_string(),
+            message: "La operación no puede completarse porque dejaría al sistema sin administradores activos.".to_string(),
+        }
+        .into());
+    }
+
+    let sql_delete = format!(
+        "UPDATE users SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})",
+        placeholders
+    );
+
+    tx.execute(&sql_delete, rusqlite::params_from_iter(params.iter()))
+        .map_err(|e| DeleteUserError {
+            code: "DB_UPDATE_ERROR".to_string(),
+            message: format!("Error al eliminar usuarios: {}", e),
+        })?;
+
+    tx.commit().map_err(|e| DeleteUserError {
+        code: "DB_COMMIT_ERROR".to_string(),
+        message: format!("Error al confirmar cambios: {}", e),
+    })?;
+
+    Ok(())
+}
