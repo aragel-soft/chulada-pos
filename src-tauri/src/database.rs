@@ -15,9 +15,9 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
     fs::create_dir_all(&app_dir).expect("No se pudo crear el directorio de datos");
     
     let db_path = app_dir.join("database.db");
-    let mut conn = Connection::open(db_path)?;
+    //let mut conn = Connection::open(db_path)?;
+    let conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-    println!("Base de datos inicializada en {:?}", app_dir.join("database.db"));
     //Es necesario comentar la ejecución automática de migraciones para evitar problemas en las pruebas.
     println!("Base de datos inicializada en {:?}", app_dir.join("database.db"));
     //run_migrations(&mut conn)?; 

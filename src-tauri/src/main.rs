@@ -29,6 +29,7 @@ fn main() {
             commands::settings::users::save_avatar,
             commands::settings::users::get_users_list,
             commands::settings::users::update_user,
+            commands::settings::users::delete_users,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

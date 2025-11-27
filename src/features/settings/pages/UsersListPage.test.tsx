@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UsersListPage } from "./UsersListPage";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
+import { useAuthStore } from "@/stores/authStore"; 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Mock API
@@ -13,6 +14,25 @@ vi.mock("@/lib/api/users", async (importOriginal) => {
     getUsersList: vi.fn(),
   };
 });
+
+vi.mock("@/stores/authStore");
+
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (src: string) => src,
+}));
+
+vi.mock("../components/DeleteUsersDialog", () => ({
+  DeleteUsersDialog: ({ open, onOpenChange, users, onSuccess }: any) => {
+    if (!open) return null;
+    return (
+      <div data-testid="delete-dialog-mock">
+        <p>Usuarios a borrar: {users.length}</p>
+        <button onClick={onSuccess}>Confirmar Mock</button>
+        <button onClick={() => onOpenChange(false)}>Cancelar Mock</button>
+      </div>
+    );
+  },
+}));
 
 const mockUsers: User[] = [
   {
@@ -68,6 +88,11 @@ describe("UsersListPage Sorting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (getUsersList as any).mockResolvedValue(mockUsers);
+
+    (useAuthStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: "1", permissions: [] }, 
+      can: () => false, 
+    });
   });
 
   it("should sort users by name in ascending order when clicking the 'Name' header button", async () => {
@@ -126,5 +151,50 @@ describe("UsersListPage Sorting", () => {
     expect(rows[1]).toHaveTextContent("Zelda Smith"); // admin
     expect(rows[2]).toHaveTextContent("Charlie Brown"); // cashier
     expect(rows[3]).toHaveTextContent("Adam Jones"); // manager
+  });
+});
+
+describe("UsersListPage Integration (Delete)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getUsersList as any).mockResolvedValue(mockUsers);
+    
+    (useAuthStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: "1", permissions: ["users:read", "users:delete"] },
+      can: (perm: string) => ["users:read", "users:delete"].includes(perm),
+    });
+  });
+
+  it("should have the delete button initially disabled", async () => {
+    renderWithClient(<UsersListPage />);
+    await waitFor(() => screen.getByText("Zelda Smith"));
+
+    const deleteButton = screen.getByText(/Eliminar/i).closest("button");
+    expect(deleteButton).toBeDisabled();
+  });
+
+  it("should enable delete button when selecting a user (other than current)", async () => {
+    renderWithClient(<UsersListPage />);
+    await waitFor(() => screen.getByText("Charlie Brown"));
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[2]); 
+
+    const deleteButton = screen.getByText(/Eliminar \(1\)/i).closest("button");
+    expect(deleteButton).not.toBeDisabled();
+  });
+
+  it("should open the dialog when delete button is clicked", async () => {
+    renderWithClient(<UsersListPage />);
+    await waitFor(() => screen.getByText("Charlie Brown"));
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[2]);
+
+    const deleteButton = screen.getByText(/Eliminar/i);
+    fireEvent.click(deleteButton);
+
+    expect(screen.getByTestId("delete-dialog-mock")).toBeInTheDocument();
+    expect(screen.getByText("Usuarios a borrar: 1")).toBeInTheDocument();
   });
 });

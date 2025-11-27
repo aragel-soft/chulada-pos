@@ -1,5 +1,3 @@
-import { expect } from '@wdio/globals';
-
 describe('POS- 11 Create User Flow', () => {
   async function loginAsAdmin() {
     const usernameInput = await $('#username');

@@ -36,8 +36,22 @@ export async function updateUser(payload: UpdateUserPayload): Promise<User> {
   } catch (error) {
     try {
       const errorObj = JSON.parse(error as string);
-      throw errorObj;
+      throw errorObj as CreateUserError;
     } catch {
+      throw { code: 'UNKNOWN_ERROR', message: String(error) };
+    }
+  }
+}
+export async function deleteUsers(userIds: string[], currentUserId: string): Promise<void> {
+  try {
+    await invoke('delete_users', { userIds, currentUserId });
+  } catch (error) {
+    try {
+      const errorObj = JSON.parse(error as string);
+      throw errorObj;
+    
+    } catch (e) {
+      if ((e as any).code) throw e;
       throw { code: 'UNKNOWN_ERROR', message: String(error) };
     }
   }
