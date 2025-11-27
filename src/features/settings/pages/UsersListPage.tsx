@@ -68,6 +68,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CreateUserDialog } from "../components/CreateUserDialog";
+import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
 import { format } from "date-fns";
 
 const processUsers = (users: User[]): User[] => {
@@ -78,145 +79,6 @@ const processUsers = (users: User[]): User[] => {
   }));
 };
 
-export const columns: ColumnDef<User>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Seleccionar todas"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Seleccionar fila"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "full_name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Nombre
-          {column.getIsSorted() === "asc" ? (
-            <ArrowUp className="ml-2 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ArrowDown className="ml-2 h-4 w-4" />
-          ) : (
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          )}
-        </Button>
-      )
-    },
-    cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
-          <AvatarFallback>
-            {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <span className="font-medium">{row.original.full_name}</span>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "username",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Usuario
-        {column.getIsSorted() === "asc" ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ArrowDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => <div className="lowercase">@{row.getValue("username")}</div>,
-  },
-  {
-    accessorKey: "role_name",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Rol
-        {column.getIsSorted() === "asc" ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ArrowDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="capitalize">{row.getValue("role_name")}</div>
-    ),
-  },
-  {
-    accessorKey: "created_at",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Fecha de Creación
-        {column.getIsSorted() === "asc" ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
-        ) : column.getIsSorted() === "desc" ? (
-          <ArrowDown className="ml-2 h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        )}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div>{(row.getValue("created_at") as string)}</div>
-    ),
-  },
-  {
-    accessorKey: "is_active",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Estado
-        {column.getIsSorted() === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : column.getIsSorted() === "desc" ? <ArrowDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const estado = row.getValue("is_active") as boolean
-
-      return (
-        <Badge
-          className={`capitalize min-w-[80px] justify-center ${estado
-            ? "bg-green-600 text-white hover:bg-green-600/80"
-            : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
-            }`}
-        >
-          {estado ? "activo" : "inactivo"}
-        </Badge>
-      )
-    },
-  },
-]
 const generatePaginationRange = (
   currentPage: number,
   totalPages: number,
@@ -266,15 +128,161 @@ export function UsersListPage() {
       return processUsers(data);
     },
   });
+  const { user: currentUser, can } = useAuthStore();
 
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const { can } = useAuthStore();
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
   ])
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [usersToDelete, setUsersToDelete] = React.useState<User[]>([]);
+
+  const columns = React.useMemo<ColumnDef<User>[]>(
+    () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Seleccionar todas"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Seleccionar fila"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "full_name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Nombre
+              {column.getIsSorted() === "asc" ? (
+                <ArrowUp className="ml-2 h-4 w-4" />
+              ) : column.getIsSorted() === "desc" ? (
+                <ArrowDown className="ml-2 h-4 w-4" />
+              ) : (
+                <ArrowUpDown className="ml-2 h-4 w-4" />
+              )}
+            </Button>
+          )
+        },
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
+              <AvatarFallback>
+                {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="font-medium">{row.original.full_name}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "username",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Usuario
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: ({ row }) => <div className="lowercase">@{row.getValue("username")}</div>,
+      },
+      {
+        accessorKey: "role_name",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Rol
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <div className="capitalize">{row.getValue("role_name")}</div>
+        ),
+      },
+      {
+        accessorKey: "created_at",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Fecha de Creación
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <div>{(row.getValue("created_at") as string)}</div>
+        ),
+      },
+      {
+        accessorKey: "is_active",
+        header: ({ column }) => (
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+            Estado
+            {column.getIsSorted() === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : column.getIsSorted() === "desc" ? <ArrowDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />}
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const estado = row.getValue("is_active") as boolean
+
+          return (
+            <Badge
+              className={`capitalize min-w-[80px] justify-center ${estado
+                ? "bg-green-600 text-white hover:bg-green-600/80"
+                : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
+                }`}
+            >
+              {estado ? "activo" : "inactivo"}
+            </Badge>
+          )
+        },
+      },
+    ], 
+    [currentUser?.id]
+  );
 
   React.useEffect(() => {
     if (!loading && !initialLoadMeasured.current && data.length > 0) {
@@ -318,6 +326,13 @@ export function UsersListPage() {
   React.useEffect(() => {
     // console.timeEnd("Búsqueda/Filtrado");
   }, [table.getFilteredRowModel().rows]);
+
+  const handleDeleteClick = () => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const users = selectedRows.map((row) => row.original);
+    setUsersToDelete(users);
+    setDeleteDialogOpen(true);
+  };
 
   const { pageIndex, pageSize } = table.getState().pagination;
   const totalRows = table.getFilteredRowModel().rows.length;
@@ -378,10 +393,18 @@ export function UsersListPage() {
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </Button>
-            <Button variant="destructive" size="sm" disabled={selectedRowsCount === 0} className="flex-1 sm:flex-none">
-              <Trash className="mr-2 h-4 w-4" />
-              Eliminar ({selectedRowsCount})
-            </Button>
+            {can('users:delete') && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                disabled={selectedRowsCount === 0} 
+                className="flex-1 sm:flex-none"
+                onClick={handleDeleteClick}
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Eliminar ({selectedRowsCount})
+              </Button>
+            )}
           </div>
 
           <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
@@ -560,6 +583,16 @@ export function UsersListPage() {
           if (!open) {
             refetch();
           }
+        }}
+      />
+
+      <DeleteUsersDialog 
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        users={usersToDelete}
+        onSuccess={() => {
+          setRowSelection({});
+          refetch();
         }}
       />
     </div>
