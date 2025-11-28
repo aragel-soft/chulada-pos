@@ -10,7 +10,7 @@ export const createUserSchema = z.object({
     .min(3, 'El usuario debe tener al menos 3 caracteres')
     .regex(/^[a-z0-9_]+$/, 'Solo letras minúsculas, números y guion bajo'),
   password: z.string().min(4, 'Contraseña debe tener al menos 4 caracteres'),
-  confirm_password: z.string(),
+  confirm_password: z.string().min(4, 'Contraseña debe tener al menos 4 caracteres'),
   role_id: z.string().min(1, 'El rol es requerido'),
   is_active: z.boolean().optional().default(true),
   avatar_url: z.string().optional(),

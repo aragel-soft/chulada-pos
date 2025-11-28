@@ -438,7 +438,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               </Button>
               <Button
                 type="submit"
-                disabled={createUserMutation.isPending}
+                disabled={!form.formState.isValid || !form.formState.isDirty || createUserMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700"
                 data-testid="btn-save-user"
               >

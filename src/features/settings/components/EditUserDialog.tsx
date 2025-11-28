@@ -115,9 +115,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
         current_user_id: currentUserId,
       };
 
-      console.time("Actualización de usuario");
       const updatedUser = await updateUser(payload);
-      console.timeEnd("Actualización de usuario");
 
       return updatedUser;
     },
@@ -308,7 +306,9 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
               name="role_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rol *</FormLabel>
+                  <FormLabel className="!text-current">
+                    Rol <span className="text-destructive">*</span>
+                  </FormLabel>
                    <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -392,7 +392,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
               </Button>
               <Button
                 type="submit"
-                disabled={updateUserMutation.isPending || !form.formState.isDirty}
+                disabled={!form.formState.isValid || !form.formState.isDirty || updateUserMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700"
                 data-testid="btn-save-user"
               >
