@@ -397,37 +397,7 @@ export function UsersListPage() {
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-2">
-            {can('users:edit') && <Button 
-              variant="outline" 
-              size="sm" 
-              disabled={selectedRowsCount !== 1} 
-              className="flex-1 sm:flex-none"
-              onClick={() => {
-                const selectedRowIndex = Object.keys(rowSelection)[0];
-                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
-                if (selectedRow) {
-                  setSelectedUser(selectedRow.original);
-                  setIsEditDialogOpen(true);
-                }
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </Button>}
-            {can('users:delete') && (
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                disabled={selectedRowsCount === 0} 
-                className="flex-1 sm:flex-none"
-                onClick={handleDeleteClick}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({selectedRowsCount})
-              </Button>
-            )}
-          </div>
+          
 
           <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
 
@@ -474,6 +444,37 @@ export function UsersListPage() {
               Agregar Usuario
             </Button>
           )}
+          <div className="flex items-center gap-2">
+            {can('users:edit') && <Button 
+              variant="default" 
+              size="sm"
+              disabled={selectedRowsCount !== 1} 
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
+              onClick={() => {
+                const selectedRowIndex = Object.keys(rowSelection)[0];
+                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
+                if (selectedRow) {
+                  setSelectedUser(selectedRow.original);
+                  setIsEditDialogOpen(true);
+                }
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>}
+            {can('users:delete') && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                disabled={selectedRowsCount === 0} 
+                className="flex-1 sm:flex-none"
+                onClick={handleDeleteClick}
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Eliminar ({selectedRowsCount})
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -625,6 +626,8 @@ export function UsersListPage() {
           setIsEditDialogOpen(open);
           if (!open) {
             refetch();
+            setSelectedUser(null);
+            setRowSelection({});
           }
         }}
         user={selectedUser}

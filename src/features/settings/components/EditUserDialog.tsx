@@ -242,7 +242,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
                   >
                     <img
                       ref={imageRef}
-                      src={convertFileSrc(avatarPreview)}
+                      src={avatarFile ? URL.createObjectURL(avatarFile) : convertFileSrc(avatarPreview)}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                       style={{
