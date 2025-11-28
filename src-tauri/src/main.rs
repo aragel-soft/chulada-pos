@@ -13,10 +13,10 @@ fn main() {
             // Inicializar base de datos
             let conn = database::init_database(app.handle())
                 .expect("Error al inicializar la base de datos");
-            
+
             // Gestionar state de la conexión
             app.manage(Mutex::new(conn));
-            
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -28,6 +28,7 @@ fn main() {
             commands::settings::users::get_all_roles,
             commands::settings::users::save_avatar,
             commands::settings::users::get_users_list,
+            commands::settings::users::update_user,
             commands::settings::users::delete_users,
         ])
         .run(tauri::generate_context!())

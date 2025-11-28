@@ -28,3 +28,13 @@ export interface CreateUserError {
   code: string;
   message: string;
 }
+
+export interface UpdateUserPayload {
+  id: string;
+  full_name: string;
+  role_id: string;
+  is_active: boolean;
+  avatar_url?: string;
+  current_user_id: string;
+  username: string; 
+}

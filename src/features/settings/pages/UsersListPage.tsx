@@ -69,13 +69,13 @@ import {
 } from "@/components/ui/select"
 import { CreateUserDialog } from "../components/CreateUserDialog";
 import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
+import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
 
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
     created_at: format(new Date(user.created_at), 'yyyy-MM-dd HH:mm'),
-    avatar_url: user.avatar_url ? convertFileSrc(user.avatar_url) : undefined
   }));
 };
 
@@ -132,7 +132,9 @@ export function UsersListPage() {
 
   const data = React.useMemo(() => users, [users]);
   const initialLoadMeasured = React.useRef(false);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true },
@@ -187,7 +189,7 @@ export function UsersListPage() {
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={row.original.avatar_url} alt={row.original.full_name} />
+              <AvatarImage src={row.original.avatar_url ? convertFileSrc(row.original.avatar_url) : undefined} alt={row.original.full_name} />
               <AvatarFallback>
                 {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
               </AvatarFallback>
@@ -304,6 +306,8 @@ export function UsersListPage() {
   const table = useReactTable({
     data,
     columns,
+    getRowId: (row) => row.id,
+    autoResetPageIndex: false, 
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -393,24 +397,7 @@ export function UsersListPage() {
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={selectedRowsCount !== 1} className="flex-1 sm:flex-none">
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </Button>
-            {can('users:delete') && (
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                disabled={selectedRowsCount === 0} 
-                className="flex-1 sm:flex-none"
-                onClick={handleDeleteClick}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({selectedRowsCount})
-              </Button>
-            )}
-          </div>
+          
 
           <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
 
@@ -452,11 +439,42 @@ export function UsersListPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           {can('users:create') && (
-            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsDialogOpen(true)} data-testid="open-create-user-dialog">
+            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar Usuario
             </Button>
           )}
+          <div className="flex items-center gap-2">
+            {can('users:edit') && <Button 
+              variant="default" 
+              size="sm"
+              disabled={selectedRowsCount !== 1} 
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
+              onClick={() => {
+                const selectedRowIndex = Object.keys(rowSelection)[0];
+                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
+                if (selectedRow) {
+                  setSelectedUser(selectedRow.original);
+                  setIsEditDialogOpen(true);
+                }
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>}
+            {can('users:delete') && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                disabled={selectedRowsCount === 0} 
+                className="flex-1 sm:flex-none"
+                onClick={handleDeleteClick}
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Eliminar ({selectedRowsCount})
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -581,10 +599,11 @@ export function UsersListPage() {
           </Pagination>
         </div>
       </div>
+      {/* Modal de Crear */}
       <CreateUserDialog
-        open={isDialogOpen}
+        open={isCreateDialogOpen}
         onOpenChange={(open) => {
-          setIsDialogOpen(open);
+          setIsCreateDialogOpen(open);
           if (!open) {
             refetch();
           }
@@ -600,8 +619,20 @@ export function UsersListPage() {
           refetch();
         }}
       />
+      {/* Modal de Editar */}
+      <EditUserDialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            refetch();
+            setSelectedUser(null);
+            setRowSelection({});
+          }
+        }}
+        user={selectedUser}
+        currentUserId={useAuthStore.getState()?.user?.id || ''}
+      />
     </div>
-
-
   )
 }

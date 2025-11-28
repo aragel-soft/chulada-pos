@@ -1,16 +1,17 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Eye, EyeOff } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -30,39 +31,58 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
-import type { CreateUserPayload } from '@/types/users';
-import {createUserSchema, type CreateUserForm} from '@/features/settings/schemas/userSchema';
+import { getAllRoles, saveAvatar, updateUser } from '@/lib/api/users';
+import type { User, UpdateUserPayload } from '@/types/users';
+import {editUserSchema, type EditUserForm } from '../schemas/userSchema';
 
-interface CreateUserDialogProps {
+
+interface EditUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  user: User | null;
+  currentUserId: string;
 }
 
-export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
+export function EditUserDialog({ open, onOpenChange, user, currentUserId }: EditUserDialogProps) {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const form = useForm<CreateUserForm>({
-    resolver: zodResolver(createUserSchema) as any,
+  const form = useForm<EditUserForm>({
+    resolver: zodResolver(editUserSchema),
     mode: 'onChange',
     defaultValues: {
       full_name: '',
       username: '',
-      password: '',
-      confirm_password: '',
       role_id: '',
       is_active: true,
       avatar_url: undefined,
     },
   });
+
+  // Reset form when user changes
+  useEffect(() => {
+    if (user && open) {
+      form.reset({
+        full_name: user.full_name,
+        username: user.username,
+        role_id: user.role_id,
+        is_active: user.is_active,
+        avatar_url: user.avatar_url || undefined,
+      });
+      if (user.avatar_url) {
+        setAvatarPreview(user.avatar_url);
+      } else {
+        setAvatarPreview(null);
+      }
+      setAvatarFile(null);
+    }
+  }, [user, open, form]);
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ['roles'],
@@ -70,46 +90,57 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     enabled: open,
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: async (data: CreateUserForm) => {
-      let avatarUrl: string | undefined;
+  const updateUserMutation = useMutation({
+    mutationFn: async (data: EditUserForm) => {
+      if (!user) throw new Error("No user selected");
 
+      let avatarUrl = user.avatar_url; 
+      
       if (avatarFile) {
         const arrayBuffer = await avatarFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
         avatarUrl = await saveAvatar(Array.from(uint8Array), data.username);
+      } 
+      else if (!avatarPreview && user.avatar_url) {
+        avatarUrl = undefined; 
       }
 
-      const payload: CreateUserPayload = {
-        username: data.username,
-        password: data.password,
+      const payload: UpdateUserPayload = {
+        id: user.id,
+        username: data.username, // Not used for update but kept for consistency
         full_name: data.full_name,
         role_id: data.role_id,
         is_active: data.is_active,
         avatar_url: avatarUrl,
+        current_user_id: currentUserId,
       };
 
-      console.time("Creación de usuario");
-      const newUser = await createUser(payload);
-      console.timeEnd("Creación de usuario");
+      const updatedUser = await updateUser(payload);
 
-      if (avatarUrl && !newUser.avatar_url) {
-        return { ...newUser, avatar_url: avatarUrl };
-      }
-      return newUser;
+      return updatedUser;
     },
     onSuccess: () => {
-      toast.success('Usuario creado correctamente');
+      toast.success('Usuario actualizado correctamente');
       handleClose();
     },
     onError: (error: any) => {
-      if (error.code === 'USERNAME_EXISTS') {
-        form.setError('username', {
-          type: 'manual',
-          message: error.message,
+      if (error.code === "SELF_DEGRADE") {
+        toast.error("No se puede Actualizar", {
+          description: error.message,
+          duration: 5000,
+        });
+      } else if (error.code === "SELF_DEACTIVATION") {
+        toast.error("Acción no permitida", {
+          description: error.message,
+        });
+      } else if (error.code === "LAST_ADMIN") {
+        toast.error("Acción no permitida", {
+          description: error.message,
         });
       } else {
-        toast.error(error.message || 'Error al crear usuario. Intenta de nuevo');
+        toast.error("Error al actualizar", {
+          description: error.message || "Ocurrió un error inesperado.",
+        });
       }
     },
   });
@@ -119,8 +150,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     setAvatarPreview(null);
     setAvatarFile(null);
     setImagePosition({ x: 50, y: 50 });
-    setShowPassword(false);
-    setShowConfirmPassword(false);
     onOpenChange(false);
   };
 
@@ -132,6 +161,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
         setImagePosition({ x: 50, y: 50 });
+        form.setValue('avatar_url', 'changed', { shouldDirty: true }); 
       };
       reader.readAsDataURL(file);
     }
@@ -141,6 +171,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     setAvatarPreview(null);
     setAvatarFile(null);
     setImagePosition({ x: 50, y: 50 });
+    form.setValue('avatar_url', '', { shouldDirty: true });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -169,36 +200,19 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     setIsDragging(false);
   };
 
-  const onSubmit = async (data: CreateUserForm) => {
-    console.time("Validación de usuario");
-    const isAvailable = await checkUsernameAvailable(data.username);
-    console.timeEnd("Validación de usuario");
-    if (!isAvailable) {
-      form.setError('username', {
-        type: 'manual',
-        message: 'El usuario ya existe. Elige otro nombre de usuario',
-      });
-      return;
-    }
-
-    createUserMutation.mutate(data);
+  const onSubmit = (data: EditUserForm) => {
+    updateUserMutation.mutate(data);
   };
+
+  const isSelf = user?.id === currentUserId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
-        <style>
-          {`
-            input::-ms-reveal,
-            input::-ms-clear {
-              display: none;
-            }
-          `}
-        </style>
         <DialogHeader>
-          <DialogTitle>Agregar Usuario</DialogTitle>
+          <DialogTitle>Editar Usuario</DialogTitle>
           <DialogDescription className="sr-only">
-            Formulario para crear un nuevo usuario
+            Formulario para editar un usuario
           </DialogDescription>
         </DialogHeader>
 
@@ -228,7 +242,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                   >
                     <img
                       ref={imageRef}
-                      src={avatarPreview}
+                      src={avatarFile ? URL.createObjectURL(avatarFile) : convertFileSrc(avatarPreview)}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                       style={{
@@ -241,6 +255,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     type="button"
                     onClick={handleRemoveAvatar}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    data-testid="btn-remove-avatar"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -272,102 +287,14 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="!text-current">
-                    Usuario <span className="text-destructive">*</span>
-                  </FormLabel>
+                  <FormLabel>Usuario</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="juanperez"
                       {...field}
+                      disabled
+                      className="bg-gray-100 text-gray-500"
                       data-testid="input-username"
-                      onChange={(e) => {
-                        const value = e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9_]/g, '');
-                        field.onChange(value);
-                      }}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="!text-current">
-                    Contraseña <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="off"
-                        {...field}
-                        data-testid="input-password"
-                        onChange={(e) => {
-                          field.onChange(e.target.value.replace(/\s/g, ''));
-                          if (form.getValues('confirm_password')) {
-                            form.trigger('confirm_password');
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-500" />
-                        )}
-                      </Button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="confirm_password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="!text-current">
-                    Confirmar contraseña <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showConfirmPassword ? "text" : "password"}
-                        autoComplete="off"
-                        {...field}
-                        data-testid="input-confirm-password"
-                        onChange={(e) => {
-                          field.onChange(e.target.value.replace(/\s/g, ''));
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-500" />
-                        )}
-                      </Button>
-                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -382,24 +309,37 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                   <FormLabel className="!text-current">
                     Rol <span className="text-destructive">*</span>
                   </FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={rolesLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-role">
-                        <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.display_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                   <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={rolesLoading || isSelf}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-role">
+                              <SelectValue placeholder="Selecciona un rol" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                {role.display_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        </div>
+                      </TooltipTrigger>
+                      {isSelf && (
+                        <TooltipContent>
+                          <p>No puedes cambiar tu propio rol</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                   <FormMessage />
                 </FormItem>
               )}
@@ -417,11 +357,25 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                     </div>
                   </div>
                   <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="switch-active"
-                    />
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              disabled={isSelf}
+                              data-testid="switch-active"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        {isSelf && (
+                          <TooltipContent>
+                            <p>No puedes desactivar tu propia cuenta</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                   </FormControl>
                 </FormItem>
               )}
@@ -432,17 +386,17 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 type="button"
                 variant="outline"
                 onClick={handleClose}
-                disabled={createUserMutation.isPending}
+                disabled={updateUserMutation.isPending}
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={!form.formState.isValid || !form.formState.isDirty || createUserMutation.isPending}
+                disabled={!form.formState.isValid || !form.formState.isDirty || updateUserMutation.isPending}
                 className="bg-purple-600 hover:bg-purple-700"
                 data-testid="btn-save-user"
               >
-                {createUserMutation.isPending ? 'Guardando...' : 'Guardar'}
+                {updateUserMutation.isPending ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>
           </form>
