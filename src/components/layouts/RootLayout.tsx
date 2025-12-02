@@ -13,8 +13,6 @@ export function RootLayout() {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
         setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
       }
     };
 
