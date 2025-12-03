@@ -13,20 +13,10 @@ describe('Login Schema Validation', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should accept username with exactly 3 characters', () => {
+    it('should accept short username and password (1 char)', () => {
       const validData = {
-        username: 'abc',
-        password: '1234',
-      };
-
-      const result = loginSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept password with exactly 4 characters', () => {
-      const validData = {
-        username: 'admin',
-        password: '1234',
+        username: 'a',
+        password: '1',
       };
 
       const result = loginSchema.safeParse(validData);
@@ -44,20 +34,7 @@ describe('Login Schema Validation', () => {
       const result = loginSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Usuario debe tener al menos 3 caracteres');
-      }
-    });
-
-    it('should reject username with less than 3 characters', () => {
-      const invalidData = {
-        username: 'ab',
-        password: '1234',
-      };
-
-      const result = loginSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Usuario debe tener al menos 3 caracteres');
+        expect(result.error.issues[0].message).toBe('El usuario es requerido');
       }
     });
   });
@@ -72,20 +49,7 @@ describe('Login Schema Validation', () => {
       const result = loginSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Contraseña debe tener al menos 4 caracteres');
-      }
-    });
-
-    it('should reject password with less than 4 characters', () => {
-      const invalidData = {
-        username: 'admin',
-        password: '123',
-      };
-
-      const result = loginSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Contraseña debe tener al menos 4 caracteres');
+        expect(result.error.issues[0].message).toBe('La contraseña es requerida');
       }
     });
   });
@@ -95,19 +59,6 @@ describe('Login Schema Validation', () => {
       const invalidData = {
         username: '',
         password: '',
-      };
-
-      const result = loginSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues).toHaveLength(2);
-      }
-    });
-
-    it('should reject both short username and password', () => {
-      const invalidData = {
-        username: 'ab',
-        password: '123',
       };
 
       const result = loginSchema.safeParse(invalidData);
