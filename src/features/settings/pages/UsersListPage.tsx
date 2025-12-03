@@ -34,12 +34,11 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DebouncedInput } from "@/components/ui/debounced-input"
 import {
-  Table,
+  // Table, // FIX: No importamos Table para evitar el wrapper con overflow
   TableBody,
   TableCell,
   TableHead,
@@ -71,6 +70,7 @@ import { CreateUserDialog } from "../components/CreateUserDialog";
 import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
 import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
+import { DataTableLayout } from "@/components/layouts/DataTableLayout";
 
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
@@ -84,7 +84,6 @@ const generatePaginationRange = (
   totalPages: number,
   siblingCount: number = 1
 ): (number | string)[] => {
-
   const totalPageNumbers = siblingCount + 5;
 
   if (totalPages <= totalPageNumbers) {
@@ -174,6 +173,7 @@ export function UsersListPage() {
             <Button
               variant="ghost"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="px-0 hover:bg-transparent"
             >
               Nombre
               {column.getIsSorted() === "asc" ? (
@@ -204,6 +204,7 @@ export function UsersListPage() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="px-0 hover:bg-transparent"
           >
             Usuario
             {column.getIsSorted() === "asc" ? (
@@ -223,6 +224,7 @@ export function UsersListPage() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="px-0 hover:bg-transparent"
           >
             Rol
             {column.getIsSorted() === "asc" ? (
@@ -244,6 +246,7 @@ export function UsersListPage() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="px-0 hover:bg-transparent"
           >
             Fecha de Creación
             {column.getIsSorted() === "asc" ? (
@@ -262,7 +265,7 @@ export function UsersListPage() {
       {
         accessorKey: "is_active",
         header: ({ column }) => (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="px-0 hover:bg-transparent">
             Estado
             {column.getIsSorted() === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : column.getIsSorted() === "desc" ? <ArrowDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />}
           </Button>
@@ -282,7 +285,7 @@ export function UsersListPage() {
           )
         },
       },
-    ], 
+    ],
     [currentUser?.id]
   );
 
@@ -307,7 +310,7 @@ export function UsersListPage() {
     data,
     columns,
     getRowId: (row) => row.id,
-    autoResetPageIndex: false, 
+    autoResetPageIndex: false,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -332,7 +335,7 @@ export function UsersListPage() {
     if (isFilteringRef.current) {
       console.timeEnd("Búsqueda/Filtrado");
       isFilteringRef.current = false;
-    }  
+    }
   }, [table.getFilteredRowModel().rows]);
 
   const handleDeleteClick = () => {
@@ -362,6 +365,22 @@ export function UsersListPage() {
     return generatePaginationRange(currentPage, pageCount);
   }, [currentPage, pageCount]);
 
+  const getPageButtonClass = (page: number | string, currentPage: number) => {
+    if (page === currentPage) return "flex";
+
+    if (page === "...") return "hidden sm:flex";
+
+    const pageNum = Number(page);
+    if (
+      pageNum === 1 || 
+      pageNum === pageCount || 
+      Math.abs(pageNum - currentPage) <= 1
+    ) {
+      return "hidden sm:flex";
+    }
+    return "hidden md:flex";
+  };
+
   if (loading) {
     return (
       <div className="w-full p-8 text-center">
@@ -379,114 +398,170 @@ export function UsersListPage() {
   }
 
   return (
-    <div className="w-full p-4 md:p-8">
-      <div className="flex flex-col md:flex-row items-center justify-between py-4 gap-4">
-
-        <div className="relative w-full md:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <DebouncedInput
-            placeholder="Buscar por nombre o usuario..."
-            value={globalFilter ?? ""}
-            onChange={(value) => {
-              isFilteringRef.current = true;
-              console.time("Búsqueda/Filtrado"); 
-              setGlobalFilter(String(value));
-            }}
-            className="pl-10"
-          />
-        </div>
-
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          
-
-          <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
-                Filtros <ChevronDown className="ml-2 h-4 w-4" />
+    <>
+      <DataTableLayout
+        actions={
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {can('users:create') && (
+              <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap" onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Agregar Usuario</span>
+                <span className="sm:hidden">Nuevo</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id === 'full_name'
-                        ? 'Nombre'
-                        : column.id === 'created_at'
-                          ? 'Fecha de Creación'
-                          : column.id === 'is_active'
-                            ? 'Estado'
-                            : column.id === 'username'
-                              ? 'Usuario'
-                              : column.id === 'role_name'
-                                ? 'Rol'
-                                : column.id
-                      }
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {can('users:create') && (
-            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar Usuario
-            </Button>
-          )}
-          <div className="flex items-center gap-2">
-            {can('users:edit') && <Button 
-              variant="default" 
+            )}
+            {can('users:edit') && <Button
+              variant="default"
               size="sm"
-              disabled={selectedRowsCount !== 1} 
+              disabled={selectedRowsCount !== 1}
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              onClick={() => {
-                const selectedRowIndex = Object.keys(rowSelection)[0];
-                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
-                if (selectedRow) {
-                  setSelectedUser(selectedRow.original);
-                  setIsEditDialogOpen(true);
-                }
+              onClick={() => { 
+                const selected = table.getFilteredSelectedRowModel().rows[0].original;
+                setSelectedUser(selected);
+                setIsEditDialogOpen(true);
               }}
             >
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </Button>}
             {can('users:delete') && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 size="sm"
-                disabled={selectedRowsCount === 0} 
-                className="flex-1 sm:flex-none"
+                disabled={selectedRowsCount === 0}
                 onClick={handleDeleteClick}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({selectedRowsCount})
+                Eliminar
               </Button>
             )}
           </div>
-        </div>
-      </div>
+        }
+        filters={
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+            <div className="relative w-full sm:max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <DebouncedInput
+                placeholder="Buscar..."
+                value={globalFilter ?? ""}
+                onChange={(value) => {
+                  isFilteringRef.current = true;
+                  console.time("Búsqueda/Filtrado");
+                  setGlobalFilter(String(value));
+                }}
+                className="pl-10 h-9 w-full"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-9 w-full sm:w-auto">
+                  Filtros <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
+        pagination={
+          <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium whitespace-nowrap">Filas por pág.</p>
+                <Select
+                  value={`${table.getState().pagination.pageSize}`}
+                  onValueChange={(value) => {
+                    table.setPageSize(Number(value))
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue placeholder={table.getState().pagination.pageSize} />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    {[16, 24, 48, 96].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {paginationText}
+              </div>
+            </div>
 
-      <div className="w-full overflow-x-auto">
-        <div className="rounded-md border min-w-[768px]">
-          <Table>
-            <TableHeader>
+            <div className="flex items-center justify-center">
+              <Pagination>
+                <PaginationContent>
+                  {/* Botón Anterior: Siempre visible */}
+                  <PaginationItem>
+                    <PaginationPrevious
+                      className="cursor-pointer"
+                      onClick={() => table.previousPage()}
+                    />
+                  </PaginationItem>
+
+                  {/* Números de página: Ocultos en móvil (hidden), visibles en escritorio (sm:block) */}
+                  {paginationRange.map((page, index) => {
+                    if (typeof page === "string") {
+                      return (
+                        <PaginationItem key={`dots-${index}`} className="hidden sm:block">
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+
+                    const pageNumber = page as number;
+                    return (
+                      <PaginationItem key={pageNumber} className="hidden sm:block">
+                        <PaginationLink
+                          className="cursor-pointer"
+                          onClick={() => table.setPageIndex(pageNumber - 1)}
+                          isActive={currentPage === pageNumber}
+                        >
+                          {pageNumber}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+
+                  {/* Botón Siguiente: Siempre visible */}
+                  <PaginationItem>
+                    <PaginationNext
+                      className="cursor-pointer"
+                      onClick={() => table.nextPage()}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </div>
+        }
+      >
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} className="px-4 py-2 whitespace-nowrap h-10 bg-background">
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -499,6 +574,7 @@ export function UsersListPage() {
                 </TableRow>
               ))}
             </TableHeader>
+
             <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
@@ -507,7 +583,7 @@ export function UsersListPage() {
                     data-state={row.getIsSelected() && "selected"}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell key={cell.id} className="px-4 py-2">
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()
@@ -527,78 +603,10 @@ export function UsersListPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
-        </div>
-      </div>
+          </table>
+        {/* </div> */}
+      </DataTableLayout>
 
-      <div className="flex flex-col md:flex-row items-center justify-between space-x-2 py-4 gap-6 md:gap-0">
-
-        <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Filas por página</p>
-          <Select
-            value={`${table.getState().pagination.pageSize}`}
-            onValueChange={(value) => {
-              table.setPageSize(Number(value))
-            }}
-          >
-            <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {[16, 24, 48, 96].map((pageSize) => (
-                <SelectItem key={pageSize} value={`${pageSize}`}>
-                  {pageSize}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex-1 text-sm text-muted-foreground text-center md:text-left">
-          {paginationText}
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-0 sm:space-x-6 lg:space-x-8">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  className="cursor-pointer"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                />
-              </PaginationItem>
-
-              {paginationRange.map((page, index) => {
-                if (typeof page === "string") {
-                  return <PaginationEllipsis key={`dots-${index}`} />;
-                }
-
-                const pageNumber = page as number;
-                return (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      className="cursor-pointer"
-                      onClick={() => table.setPageIndex(pageNumber - 1)}
-                      isActive={currentPage === pageNumber}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-
-              <PaginationItem>
-                <PaginationNext
-                  className="cursor-pointer"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
       {/* Modal de Crear */}
       <CreateUserDialog
         open={isCreateDialogOpen}
@@ -610,7 +618,7 @@ export function UsersListPage() {
         }}
       />
 
-      <DeleteUsersDialog 
+      <DeleteUsersDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         users={usersToDelete}
@@ -633,6 +641,6 @@ export function UsersListPage() {
         user={selectedUser}
         currentUserId={useAuthStore.getState()?.user?.id || ''}
       />
-    </div>
+    </>
   )
 }

@@ -30,12 +30,8 @@ export function RootLayout() {
         
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="h-18 min-h-[48px] w-full" /> 
-          <SidebarInset className="flex-1 overflow-y-auto">
-            <main className="flex-1">
-              <div className="p-6">
-                <Outlet />
-              </div>
-            </main>
+          <SidebarInset className="flex-1 overflow-hidden">
+            <Outlet />
           </SidebarInset>
         </div>
       </div>
