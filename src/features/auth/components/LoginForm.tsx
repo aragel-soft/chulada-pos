@@ -62,6 +62,18 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     }
   };
 
+  const { onChange: onUsernameChange, ...usernameRegister } = register('username');
+  const { onChange: onPasswordChange, ...passwordRegister } = register('password');
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>, 
+    rhfChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  ) => {
+    const cleanValue = e.target.value.replace(/\s/g, '');
+    e.target.value = cleanValue;
+    rhfChange(e);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-full max-w-md space-y-8 p-8 bg-white rounded-lg shadow-lg">
@@ -81,7 +93,8 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
                 type="text"
                 autoComplete="username"
                 autoFocus
-                {...register('username')}
+                {...usernameRegister}
+                onChange={(e) => handleInputChange(e, onUsernameChange)}
                 className={`rounded-xl ${
                   errors.username ? 'border-red-500' : ''
                 }`}
@@ -97,7 +110,8 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                {...register('password')}
+                {...passwordRegister}
+                onChange={(e) => handleInputChange(e, onPasswordChange)}
                 onKeyDown={handleKeyDown}
                 className={`rounded-xl ${
                   errors.password ? 'border-red-500' : ''
