@@ -14,3 +14,9 @@ export const getPermissions = async (): Promise<Permission[]> => {
 export const getRolePermissions = async (): Promise<RolePermission[]> => {
   return await invoke("get_role_permissions");
 };
+
+export const updateRolePermissions = async (
+  rolePermissions: RolePermission[]
+): Promise<void> => {
+  return await invoke("update_role_permissions", { rolePermissions });
+};
