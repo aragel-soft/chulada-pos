@@ -60,27 +60,22 @@ export function DataTablePagination<TData>({
   table,
 }: DataTablePaginationProps<TData>) {
   const totalRows = table.getFilteredRowModel().rows.length;
-  const pageRowCount = table.getRowModel().rows.length;
-
+  const pageSize = table.getState().pagination.pageSize;
   const currentPage = table.getState().pagination.pageIndex + 1;
   const pageCount = table.getPageCount();
 
-  const firstRowIndex = currentPage * pageRowCount + 1;
-  const lastRowIndex = firstRowIndex + pageRowCount - 1;
+  const firstRowIndex = totalRows === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastRowIndex = Math.min(currentPage * pageSize, totalRows);
+  
   const paginationText =
       totalRows === 0
         ? "No se encontraron elementos."
-        : `${lastRowIndex} de ${totalRows} elementos`;
-    const selectedRowsCount = table.getFilteredSelectedRowModel().rows.length;
-  
-   
-  
-    const paginationRange = useMemo(() => {
-      return generatePaginationRange(currentPage, pageCount);
-    }, [currentPage, pageCount]);
-  
+        : `${firstRowIndex}-${lastRowIndex} de ${totalRows} elementos`;
 
-  
+  const paginationRange = useMemo(() => {
+    return generatePaginationRange(currentPage, pageCount);
+  }, [currentPage, pageCount]);
+
   return (
      <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
                  <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
@@ -115,7 +110,7 @@ export function DataTablePagination<TData>({
                        {/* Botón Anterior: Siempre visible */}
                        <PaginationItem>
                          <PaginationPrevious
-                           className="cursor-pointer"
+                           className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
                            onClick={() => table.previousPage()}
                          />
                        </PaginationItem>
@@ -147,7 +142,7 @@ export function DataTablePagination<TData>({
                        {/* Botón Siguiente: Siempre visible */}
                        <PaginationItem>
                          <PaginationNext
-                           className="cursor-pointer"
+                           className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
                            onClick={() => table.nextPage()}
                          />
                        </PaginationItem>

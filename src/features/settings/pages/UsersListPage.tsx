@@ -1,5 +1,5 @@
 // Importaciones
-import {useState, useEffect, useMemo } from "react";
+import {useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
