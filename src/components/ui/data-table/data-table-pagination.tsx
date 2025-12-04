@@ -1,4 +1,4 @@
-// src/components/ui/data-table/data-table-pagination.tsx
+// importaciones
 import { Table } from "@tanstack/react-table"
 import { useMemo } from "react"
 import {

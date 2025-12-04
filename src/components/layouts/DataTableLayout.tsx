@@ -15,7 +15,7 @@ export function DataTableLayout({
 }: DataTableLayoutProps) {
   return (
     <div className="flex flex-col h-full w-full bg-background overflow-hidden">
-      {/* 1. Encabezado Fijo Responsivo */}
+      {/* Encabezado Fijo Responsivo */}
       <div className="flex-none p-4 border-b space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           {filters && <div className="w-full md:w-auto flex items-center space-x-6">{filters}</div>}
@@ -25,13 +25,12 @@ export function DataTableLayout({
         </div>
       </div>
 
-      {/* 2. Área de Tabla (Scrollable) */}
-      {/* Este div es el que hace el scroll. El Header Sticky buscará este contenedor. */}
+      {/* Área de Tabla (Scrollable) */}
       <div className="flex-1 overflow-auto relative bg-background">
           {children} 
       </div>
 
-      {/* 3. Paginación (Fija abajo) */}
+      {/* Paginación (Fija abajo) */}
       {pagination && (
         <div className="flex-none border-t bg-background pt-2 pb-0 z-20 relative">
            {pagination}

@@ -5,7 +5,7 @@ import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAuthStore } from "@/stores/authStore";
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef, RowSelectionState } from "@tanstack/react-table"
 import {
   Pencil,
   PlusCircle,
@@ -58,7 +58,7 @@ export function UsersListPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [usersToDelete, setUsersToDelete] = useState<User[]>([]);
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   // Columnas de la tabla
   const columns = useMemo<ColumnDef<User>[]>(

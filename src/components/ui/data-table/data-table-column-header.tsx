@@ -1,4 +1,4 @@
-// src/components/ui/data-table/data-table-column-header.tsx
+// Importaciones
 import { Column } from "@tanstack/react-table"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"

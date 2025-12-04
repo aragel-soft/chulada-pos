@@ -1,4 +1,4 @@
-// src/components/ui/data-table/data-table.tsx
+// Importaciones
 import * as React from "react"
 import {
   ColumnDef,
@@ -11,7 +11,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  Table
+  Table,
+  OnChangeFn,
+  RowSelectionState
 } from "@tanstack/react-table"
 import { Search, ChevronDown } from "lucide-react"
 
@@ -19,7 +21,7 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DebouncedInput } from "@/components/ui/debounced-input"
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DataTableLayout } from "@/components/layouts/DataTableLayout" // Tu layout actual
+import { DataTableLayout } from "@/components/layouts/DataTableLayout"
 import { DataTablePagination } from "./data-table-pagination"
 
 interface DataTableProps<TData, TValue> {
@@ -32,8 +34,8 @@ interface DataTableProps<TData, TValue> {
   initialColumnVisibility?: VisibilityState
   initialPageSize?: number
   columnTitles?: Record<string, string>
-  rowSelection?: Record<string, boolean>
-  onRowSelectionChange?: (rowSelection: Record<string, boolean>) => void
+  rowSelection?: RowSelectionState
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>
 }
 
 export function DataTable<TData, TValue>({
@@ -53,7 +55,7 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility)
-  const [internalRowSelection, setInternalRowSelection] = React.useState({})
+  const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: initialPageSize,
