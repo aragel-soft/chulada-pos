@@ -1,77 +1,34 @@
-import * as React from "react"
+// Importaciones
+import {useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAuthStore } from "@/stores/authStore";
+import { ColumnDef } from "@tanstack/react-table"
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronDown,
-  Search,
-  Trash,
   Pencil,
-  PlusCircle
+  PlusCircle,
+  Trash,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { DebouncedInput } from "@/components/ui/debounced-input"
-import {
-  // Table, // FIX: No importamos Table para evitar el wrapper con overflow
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import { CreateUserDialog } from "../components/CreateUserDialog";
 import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
 import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
-import { DataTableLayout } from "@/components/layouts/DataTableLayout";
+import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 
+// Funcion para convertir la fecha
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
@@ -79,47 +36,9 @@ const processUsers = (users: User[]): User[] => {
   }));
 };
 
-const generatePaginationRange = (
-  currentPage: number,
-  totalPages: number,
-  siblingCount: number = 1
-): (number | string)[] => {
-  const totalPageNumbers = siblingCount + 5;
-
-  if (totalPages <= totalPageNumbers) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
-  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
-
-  const shouldShowLeftDots = leftSiblingIndex > 2;
-  const shouldShowRightDots = rightSiblingIndex < totalPages - 2;
-
-  const firstPageIndex = 1;
-  const lastPageIndex = totalPages;
-
-  if (!shouldShowLeftDots && shouldShowRightDots) {
-    let leftItemCount = 3 + 2 * siblingCount;
-    let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
-    return [...leftRange, "...", totalPages];
-  }
-
-  if (shouldShowLeftDots && !shouldShowRightDots) {
-    let rightItemCount = 3 + 2 * siblingCount;
-    let rightRange = Array.from({ length: rightItemCount }, (_, i) => totalPages - rightItemCount + i + 1);
-    return [firstPageIndex, "...", ...rightRange];
-  }
-
-  if (shouldShowLeftDots && shouldShowRightDots) {
-    let middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, i) => leftSiblingIndex + i);
-    return [firstPageIndex, "...", ...middleRange, "...", lastPageIndex];
-  }
-
-  return [];
-};
-
+// Componente principal
 export function UsersListPage() {
+  // Hooks de React Query
   const { data: users = [], isLoading: loading, error, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
@@ -127,22 +46,22 @@ export function UsersListPage() {
       return processUsers(data);
     },
   });
+  
+  // Hooks de Zustand
   const { user: currentUser, can } = useAuthStore();
 
-  const data = React.useMemo(() => users, [users]);
-  const initialLoadMeasured = React.useRef(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+  // Hooks de React
+  const data = useMemo(() => users, [users]);
 
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "created_at", desc: true },
-  ])
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [usersToDelete, setUsersToDelete] = useState<User[]>([]);
+  const [rowSelection, setRowSelection] = useState({});
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [usersToDelete, setUsersToDelete] = React.useState<User[]>([]);
-
-  const columns = React.useMemo<ColumnDef<User>[]>(
+  // Columnas de la tabla
+  const columns = useMemo<ColumnDef<User>[]>(
     () => [
       {
         id: "select",
@@ -168,24 +87,9 @@ export function UsersListPage() {
       },
       {
         accessorKey: "full_name",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="px-0 hover:bg-transparent"
-            >
-              Nombre
-              {column.getIsSorted() === "asc" ? (
-                <ArrowUp className="ml-2 h-4 w-4" />
-              ) : column.getIsSorted() === "desc" ? (
-                <ArrowDown className="ml-2 h-4 w-4" />
-              ) : (
-                <ArrowUpDown className="ml-2 h-4 w-4" />
-              )}
-            </Button>
-          )
-        },
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nombre" />
+        ),
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
@@ -201,40 +105,14 @@ export function UsersListPage() {
       {
         accessorKey: "username",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="px-0 hover:bg-transparent"
-          >
-            Usuario
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Usuario" />
         ),
         cell: ({ row }) => <div className="lowercase">@{row.getValue("username")}</div>,
       },
       {
         accessorKey: "role_name",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="px-0 hover:bg-transparent"
-          >
-            Rol
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Rol" />
         ),
         cell: ({ row }) => (
           <div className="capitalize">{row.getValue("role_name")}</div>
@@ -243,20 +121,7 @@ export function UsersListPage() {
       {
         accessorKey: "created_at",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="px-0 hover:bg-transparent"
-          >
-            Fecha de Creación
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Fecha de Creación" />
         ),
         cell: ({ row }) => (
           <div>{(row.getValue("created_at") as string)}</div>
@@ -265,10 +130,7 @@ export function UsersListPage() {
       {
         accessorKey: "is_active",
         header: ({ column }) => (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="px-0 hover:bg-transparent">
-            Estado
-            {column.getIsSorted() === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : column.getIsSorted() === "desc" ? <ArrowDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />}
-          </Button>
+          <DataTableColumnHeader column={column} title="Estado" />
         ),
         cell: ({ row }) => {
           const estado = row.getValue("is_active") as boolean
@@ -289,105 +151,12 @@ export function UsersListPage() {
     [currentUser?.id]
   );
 
-  React.useEffect(() => {
-    if (!loading && !initialLoadMeasured.current && data.length > 0) {
-      initialLoadMeasured.current = true;
-    }
-  }, [loading, data]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
-  const isFilteringRef = React.useRef(false);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    created_at: false,
-  })
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 16,
-  })
-
-  const table = useReactTable({
-    data,
-    columns,
-    getRowId: (row) => row.id,
-    autoResetPageIndex: false,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
-    state: {
-      sorting,
-      columnFilters,
-      globalFilter,
-      columnVisibility,
-      rowSelection,
-      pagination,
-    },
-  })
-
-  React.useEffect(() => {
-    if (isFilteringRef.current) {
-      console.timeEnd("Búsqueda/Filtrado");
-      isFilteringRef.current = false;
-    }
-  }, [table.getFilteredRowModel().rows]);
-
-  const handleDeleteClick = () => {
-    const selectedRows = table.getFilteredSelectedRowModel().rows;
+  // Funcion para eliminar usuarios
+  const handleDeleteClick = (selectedRows: any[]) => {
     const users = selectedRows.map((row) => row.original);
     setUsersToDelete(users);
     setDeleteDialogOpen(true);
   };
-
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const totalRows = table.getFilteredRowModel().rows.length;
-  const pageRowCount = table.getRowModel().rows.length;
-
-  const firstRowIndex = pageIndex * pageSize + 1;
-  const lastRowIndex = firstRowIndex + pageRowCount - 1;
-
-  const paginationText =
-    totalRows === 0
-      ? "No se encontraron elementos."
-      : `${lastRowIndex} de ${totalRows} elementos`;
-  const selectedRowsCount = Object.keys(rowSelection).length;
-
-  const currentPage = table.getState().pagination.pageIndex + 1;
-  const pageCount = table.getPageCount();
-
-  const paginationRange = React.useMemo(() => {
-    return generatePaginationRange(currentPage, pageCount);
-  }, [currentPage, pageCount]);
-
-  const getPageButtonClass = (page: number | string, currentPage: number) => {
-    if (page === currentPage) return "flex";
-
-    if (page === "...") return "hidden sm:flex";
-
-    const pageNum = Number(page);
-    if (
-      pageNum === 1 || 
-      pageNum === pageCount || 
-      Math.abs(pageNum - currentPage) <= 1
-    ) {
-      return "hidden sm:flex";
-    }
-    return "hidden md:flex";
-  };
-
-  if (loading) {
-    return (
-      <div className="w-full p-8 text-center">
-        Cargando usuarios...
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -397,10 +166,25 @@ export function UsersListPage() {
     );
   }
 
+  // Renderizado
   return (
     <>
-      <DataTableLayout
-        actions={
+      <DataTable
+        columns={columns}
+        data={data}
+        isLoading={loading}
+        initialSorting={[{ id: "created_at", desc: true }]}
+        initialColumnVisibility={{ created_at: false }}
+        columnTitles={{
+          full_name: "Nombre",
+          username: "Usuario",
+          role_name: "Rol",
+          created_at: "Fecha de Creación",
+          is_active: "Estado"
+        }}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        actions={(table) => (
           <div className="flex items-center gap-2 w-full md:w-auto">
             {can('users:create') && (
               <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap" onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
@@ -412,7 +196,7 @@ export function UsersListPage() {
             {can('users:edit') && <Button
               variant="default"
               size="sm"
-              disabled={selectedRowsCount !== 1}
+              disabled={table.getFilteredSelectedRowModel().rows.length !== 1}
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
               onClick={() => { 
                 const selected = table.getFilteredSelectedRowModel().rows[0].original;
@@ -427,185 +211,16 @@ export function UsersListPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                disabled={selectedRowsCount === 0}
-                onClick={handleDeleteClick}
+                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                onClick={() => handleDeleteClick(table.getFilteredSelectedRowModel().rows)}
               >
                 <Trash className="mr-2 h-4 w-4" />
                 Eliminar
               </Button>
             )}
           </div>
-        }
-        filters={
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-            <div className="relative w-full sm:max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <DebouncedInput
-                placeholder="Buscar..."
-                value={globalFilter ?? ""}
-                onChange={(value) => {
-                  isFilteringRef.current = true;
-                  console.time("Búsqueda/Filtrado");
-                  setGlobalFilter(String(value));
-                }}
-                className="pl-10 h-9 w-full"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 w-full sm:w-auto">
-                  Filtros <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-        pagination={
-          <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
-            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium whitespace-nowrap">Filas por pág.</p>
-                <Select
-                  value={`${table.getState().pagination.pageSize}`}
-                  onValueChange={(value) => {
-                    table.setPageSize(Number(value))
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue placeholder={table.getState().pagination.pageSize} />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    {[16, 24, 48, 96].map((pageSize) => (
-                      <SelectItem key={pageSize} value={`${pageSize}`}>
-                        {pageSize}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {paginationText}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center">
-              <Pagination>
-                <PaginationContent>
-                  {/* Botón Anterior: Siempre visible */}
-                  <PaginationItem>
-                    <PaginationPrevious
-                      className="cursor-pointer"
-                      onClick={() => table.previousPage()}
-                    />
-                  </PaginationItem>
-
-                  {/* Números de página: Ocultos en móvil (hidden), visibles en escritorio (sm:block) */}
-                  {paginationRange.map((page, index) => {
-                    if (typeof page === "string") {
-                      return (
-                        <PaginationItem key={`dots-${index}`} className="hidden sm:block">
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      );
-                    }
-
-                    const pageNumber = page as number;
-                    return (
-                      <PaginationItem key={pageNumber} className="hidden sm:block">
-                        <PaginationLink
-                          className="cursor-pointer"
-                          onClick={() => table.setPageIndex(pageNumber - 1)}
-                          isActive={currentPage === pageNumber}
-                        >
-                          {pageNumber}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-
-                  {/* Botón Siguiente: Siempre visible */}
-                  <PaginationItem>
-                    <PaginationNext
-                      className="cursor-pointer"
-                      onClick={() => table.nextPage()}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          </div>
-        }
-      >
-          <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="px-4 py-2 whitespace-nowrap h-10 bg-background">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-4 py-2">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    No se encontraron usuarios con ese criterio.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </table>
-        {/* </div> */}
-      </DataTableLayout>
+        )}
+      />
 
       {/* Modal de Crear */}
       <CreateUserDialog
@@ -614,19 +229,11 @@ export function UsersListPage() {
           setIsCreateDialogOpen(open);
           if (!open) {
             refetch();
+            setRowSelection({});
           }
         }}
       />
 
-      <DeleteUsersDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        users={usersToDelete}
-        onSuccess={() => {
-          setRowSelection({});
-          refetch();
-        }}
-      />
       {/* Modal de Editar */}
       <EditUserDialog
         open={isEditDialogOpen}
@@ -641,6 +248,19 @@ export function UsersListPage() {
         user={selectedUser}
         currentUserId={useAuthStore.getState()?.user?.id || ''}
       />
+
+      {/* Modal de Eliminar */}
+      <DeleteUsersDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        users={usersToDelete}
+        onSuccess={() => {
+          refetch();
+          setRowSelection({});
+        }}
+        
+      />
+      
     </>
   )
 }
