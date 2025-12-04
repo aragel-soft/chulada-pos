@@ -13,7 +13,8 @@ import {
   useReactTable,
   Table,
   OnChangeFn,
-  RowSelectionState
+  RowSelectionState,
+  PaginationState,
 } from "@tanstack/react-table"
 import { Search, ChevronDown } from "lucide-react"
 
@@ -36,6 +37,14 @@ interface DataTableProps<TData, TValue> {
   columnTitles?: Record<string, string>
   rowSelection?: RowSelectionState
   onRowSelectionChange?: OnChangeFn<RowSelectionState>
+
+  rowCount?: number; 
+  manualPagination?: boolean;
+  manualFiltering?: boolean;
+  pagination?: PaginationState;
+  onPaginationChange?: OnChangeFn<PaginationState>;
+  globalFilter?: string;
+  onGlobalFilterChange?: OnChangeFn<string>;
 }
 
 export function DataTable<TData, TValue>({
@@ -50,11 +59,20 @@ export function DataTable<TData, TValue>({
   columnTitles = {},
   rowSelection: externalRowSelection,
   onRowSelectionChange: externalOnRowSelectionChange,
+
+  rowCount,
+  manualPagination = false,
+  manualFiltering = false,
+  pagination: externalPagination,
+  onPaginationChange: externalOnPaginationChange,
+  globalFilter: externalGlobalFilter,
+  onGlobalFilterChange: externalOnGlobalFilterChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility)
+  const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
   const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -67,6 +85,9 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
+    rowCount,
+    manualPagination,
+    manualFiltering,
     state: { sorting, columnFilters, globalFilter, columnVisibility, rowSelection, pagination },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -75,9 +96,9 @@ export function DataTable<TData, TValue>({
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
   })
 
   if (isLoading) return <div className="p-8 text-center">Cargando...</div>

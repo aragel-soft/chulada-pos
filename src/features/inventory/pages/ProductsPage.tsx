@@ -1,11 +1,9 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import { useState, useMemo, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core"; 
+import { ColumnDef, RowSelectionState, PaginationState } from "@tanstack/react-table";
 import { 
   PlusCircle, 
-  Pencil, 
   Trash, 
-  MoreHorizontal,
   Barcode
 } from "lucide-react";
 
@@ -15,17 +13,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-
 import { useAuthStore } from "@/stores/authStore";
-import { getProducts } from "@/lib/api/inventory/products";
-import { Product } from "@/types/inventory";
+
+interface Product {
+  id: string;
+  code: string;
+  barcode: string | null;
+  name: string;
+  category_name: string | null;
+  retail_price: number;
+  wholesale_price: number;
+  stock: number;
+  min_stock: number;
+  image_url: string | null;
+  is_active: boolean;
+}
+
+interface PaginatedResponse {
+  data: Product[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
 
 // Helper de formato moneda
 const formatCurrency = (amount: number) => {
@@ -37,17 +47,48 @@ const formatCurrency = (amount: number) => {
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
-  
-  // React Query para traer datos (Simulamos fetch all para paginación cliente)
-  const { data: response, isLoading, refetch } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => {
-      return await getProducts({ page: 1, pageSize: 1000 });
-    },
+  const [data, setData] = useState<Product[]>([]);
+  const [totalRows, setTotalRows] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
   });
 
-  const products = useMemo(() => response?.data || [], [response]);
+  const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await invoke<PaginatedResponse>("get_products", {
+        page: pagination.pageIndex + 1, // Rust espera base-1
+        pageSize: pagination.pageSize,
+        search: globalFilter || null,
+      });
+
+      setData(response.data);
+      setTotalRows(response.total);
+    } catch (error) {
+      console.error("Error cargando productos:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        fetchProducts();
+    }, 300);
+    return () => clearTimeout(timer);
+    
+  }, [pagination.pageIndex, pagination.pageSize, globalFilter]);
+
+  const handleGlobalFilterChange = (value: string) => {
+     setGlobalFilter(value);
+     setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }
 
   // Columnas
   const columns = useMemo<ColumnDef<Product>[]>(
@@ -149,33 +190,6 @@ export default function ProductsPage() {
           </Badge>
         ),
       },
-      {
-        id: "actions",
-        cell: ({ row }) => {
-          const product = row.original;
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menú</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(product.code)}>
-                  Copiar Código
-                </DropdownMenuItem>
-                {can('products:edit') && (
-                   <DropdownMenuItem onClick={() => console.log("Editar", product)}>
-                     <Pencil className="mr-2 h-4 w-4" /> Editar
-                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        },
-      },
     ],
     [can]
   );
@@ -183,7 +197,7 @@ export default function ProductsPage() {
   return (
     <DataTable
       columns={columns}
-      data={products}
+      data={data}
       isLoading={isLoading}
       searchPlaceholder="Buscar por nombre o código..."
       initialSorting={[{ id: "name", desc: false }]}
@@ -195,6 +209,13 @@ export default function ProductsPage() {
         stock: "Existencia",
         is_active: "Estado"
       }}
+      manualPagination={true}
+      manualFiltering={true}
+      rowCount={totalRows}
+      pagination={pagination}
+      onPaginationChange={setPagination}
+      globalFilter={globalFilter}
+      onGlobalFilterChange={(val) => handleGlobalFilterChange(String(val))}
       rowSelection={rowSelection}
       onRowSelectionChange={setRowSelection}
       actions={(table) => (

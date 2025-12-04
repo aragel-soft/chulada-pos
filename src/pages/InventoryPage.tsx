@@ -17,7 +17,6 @@ export default function InventoryPage() {
   const { can } = useAuthStore();
 
   const availableTabs = inventoryTabs.filter(tab => can(tab.permission));
-  // Fix: Fallback para evitar errores si entras a /inventory directo
   const currentTab = location.pathname.split('/')[2] || availableTabs[0]?.value || '';
 
   const onTabChange = (value: string) => {
