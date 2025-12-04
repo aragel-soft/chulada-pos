@@ -1,4 +1,4 @@
-import * as React from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { User } from "@/types/users";
 import { deleteUsers } from "@/lib/api/users";
@@ -28,7 +28,7 @@ export function DeleteUsersDialog({
   users,
   onSuccess,
 }: DeleteUsersDialogProps) {
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { user: currentUser } = useAuthStore();
 
   const handleConfirm = async () => {
