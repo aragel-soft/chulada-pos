@@ -1,77 +1,34 @@
-import * as React from "react"
+// Importaciones
+import {useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAuthStore } from "@/stores/authStore";
+import { ColumnDef, RowSelectionState } from "@tanstack/react-table"
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronDown,
-  Search,
-  Trash,
   Pencil,
-  PlusCircle
+  PlusCircle,
+  Trash,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { DebouncedInput } from "@/components/ui/debounced-input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import { CreateUserDialog } from "../components/CreateUserDialog";
 import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
 import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
+import { DataTable } from "@/components/ui/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 
+// Funcion para convertir la fecha
 const processUsers = (users: User[]): User[] => {
   return users.map(user => ({
     ...user,
@@ -79,48 +36,9 @@ const processUsers = (users: User[]): User[] => {
   }));
 };
 
-const generatePaginationRange = (
-  currentPage: number,
-  totalPages: number,
-  siblingCount: number = 1
-): (number | string)[] => {
-
-  const totalPageNumbers = siblingCount + 5;
-
-  if (totalPages <= totalPageNumbers) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
-  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
-
-  const shouldShowLeftDots = leftSiblingIndex > 2;
-  const shouldShowRightDots = rightSiblingIndex < totalPages - 2;
-
-  const firstPageIndex = 1;
-  const lastPageIndex = totalPages;
-
-  if (!shouldShowLeftDots && shouldShowRightDots) {
-    let leftItemCount = 3 + 2 * siblingCount;
-    let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
-    return [...leftRange, "...", totalPages];
-  }
-
-  if (shouldShowLeftDots && !shouldShowRightDots) {
-    let rightItemCount = 3 + 2 * siblingCount;
-    let rightRange = Array.from({ length: rightItemCount }, (_, i) => totalPages - rightItemCount + i + 1);
-    return [firstPageIndex, "...", ...rightRange];
-  }
-
-  if (shouldShowLeftDots && shouldShowRightDots) {
-    let middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, i) => leftSiblingIndex + i);
-    return [firstPageIndex, "...", ...middleRange, "...", lastPageIndex];
-  }
-
-  return [];
-};
-
+// Componente principal
 export function UsersListPage() {
+  // Hooks de React Query
   const { data: users = [], isLoading: loading, error, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
@@ -128,22 +46,22 @@ export function UsersListPage() {
       return processUsers(data);
     },
   });
+  
+  // Hooks de Zustand
   const { user: currentUser, can } = useAuthStore();
 
-  const data = React.useMemo(() => users, [users]);
-  const initialLoadMeasured = React.useRef(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+  // Hooks de React
+  const data = useMemo(() => users, [users]);
 
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "created_at", desc: true },
-  ])
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [usersToDelete, setUsersToDelete] = useState<User[]>([]);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [usersToDelete, setUsersToDelete] = React.useState<User[]>([]);
-
-  const columns = React.useMemo<ColumnDef<User>[]>(
+  // Columnas de la tabla
+  const columns = useMemo<ColumnDef<User>[]>(
     () => [
       {
         id: "select",
@@ -169,23 +87,9 @@ export function UsersListPage() {
       },
       {
         accessorKey: "full_name",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-              Nombre
-              {column.getIsSorted() === "asc" ? (
-                <ArrowUp className="ml-2 h-4 w-4" />
-              ) : column.getIsSorted() === "desc" ? (
-                <ArrowDown className="ml-2 h-4 w-4" />
-              ) : (
-                <ArrowUpDown className="ml-2 h-4 w-4" />
-              )}
-            </Button>
-          )
-        },
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nombre" />
+        ),
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
@@ -201,38 +105,14 @@ export function UsersListPage() {
       {
         accessorKey: "username",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Usuario
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Usuario" />
         ),
         cell: ({ row }) => <div className="lowercase">@{row.getValue("username")}</div>,
       },
       {
         accessorKey: "role_name",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Rol
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Rol" />
         ),
         cell: ({ row }) => (
           <div className="capitalize">{row.getValue("role_name")}</div>
@@ -241,19 +121,7 @@ export function UsersListPage() {
       {
         accessorKey: "created_at",
         header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Fecha de Creación
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            )}
-          </Button>
+          <DataTableColumnHeader column={column} title="Fecha de Creación" />
         ),
         cell: ({ row }) => (
           <div>{(row.getValue("created_at") as string)}</div>
@@ -262,10 +130,7 @@ export function UsersListPage() {
       {
         accessorKey: "is_active",
         header: ({ column }) => (
-          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-            Estado
-            {column.getIsSorted() === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : column.getIsSorted() === "desc" ? <ArrowDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />}
-          </Button>
+          <DataTableColumnHeader column={column} title="Estado" />
         ),
         cell: ({ row }) => {
           const estado = row.getValue("is_active") as boolean
@@ -282,93 +147,16 @@ export function UsersListPage() {
           )
         },
       },
-    ], 
+    ],
     [currentUser?.id]
   );
 
-  React.useEffect(() => {
-    if (!loading && !initialLoadMeasured.current && data.length > 0) {
-      initialLoadMeasured.current = true;
-    }
-  }, [loading, data]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
-  const isFilteringRef = React.useRef(false);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    created_at: false,
-  })
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 16,
-  })
-
-  const table = useReactTable({
-    data,
-    columns,
-    getRowId: (row) => row.id,
-    autoResetPageIndex: false, 
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
-    state: {
-      sorting,
-      columnFilters,
-      globalFilter,
-      columnVisibility,
-      rowSelection,
-      pagination,
-    },
-  })
-
-  React.useEffect(() => {
-    if (isFilteringRef.current) {
-      console.timeEnd("Búsqueda/Filtrado");
-      isFilteringRef.current = false;
-    }  
-  }, [table.getFilteredRowModel().rows]);
-
-  const handleDeleteClick = () => {
-    const selectedRows = table.getFilteredSelectedRowModel().rows;
+  // Funcion para eliminar usuarios
+  const handleDeleteClick = (selectedRows: any[]) => {
     const users = selectedRows.map((row) => row.original);
     setUsersToDelete(users);
     setDeleteDialogOpen(true);
   };
-
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const totalRows = table.getFilteredRowModel().rows.length;
-  const pageRowCount = table.getRowModel().rows.length;
-
-  const firstRowIndex = pageIndex * pageSize + 1;
-  const lastRowIndex = firstRowIndex + pageRowCount - 1;
-
-  const paginationText =
-    totalRows === 0
-      ? "No se encontraron elementos."
-      : `${lastRowIndex} de ${totalRows} elementos`;
-  const selectedRowsCount = Object.keys(rowSelection).length;
-
-  const currentPage = table.getState().pagination.pageIndex + 1;
-  const pageCount = table.getPageCount();
-
-  const paginationRange = React.useMemo(() => {
-    return generatePaginationRange(currentPage, pageCount);
-  }, [currentPage, pageCount]);
-
-  if (loading) {
-    return (
-      <div className="w-full p-8 text-center">
-        Cargando usuarios...
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -378,247 +166,72 @@ export function UsersListPage() {
     );
   }
 
+  // Renderizado
   return (
-    <div className="w-full p-4 md:p-8">
-      <div className="flex flex-col md:flex-row items-center justify-between py-4 gap-4">
-
-        <div className="relative w-full md:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <DebouncedInput
-            placeholder="Buscar por nombre o usuario..."
-            value={globalFilter ?? ""}
-            onChange={(value) => {
-              isFilteringRef.current = true;
-              console.time("Búsqueda/Filtrado"); 
-              setGlobalFilter(String(value));
-            }}
-            className="pl-10"
-          />
-        </div>
-
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          
-
-          <DropdownMenuSeparator className="h-6 mx-2 hidden sm:block" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
-                Filtros <ChevronDown className="ml-2 h-4 w-4" />
+    <>
+      <DataTable
+        columns={columns}
+        data={data}
+        isLoading={loading}
+        initialSorting={[{ id: "created_at", desc: true }]}
+        initialColumnVisibility={{ created_at: false }}
+        columnTitles={{
+          full_name: "Nombre",
+          username: "Usuario",
+          role_name: "Rol",
+          created_at: "Fecha de Creación",
+          is_active: "Estado"
+        }}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        actions={(table) => (
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {can('users:create') && (
+              <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap" onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Agregar Usuario</span>
+                <span className="sm:hidden">Nuevo</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id === 'full_name'
-                        ? 'Nombre'
-                        : column.id === 'created_at'
-                          ? 'Fecha de Creación'
-                          : column.id === 'is_active'
-                            ? 'Estado'
-                            : column.id === 'username'
-                              ? 'Usuario'
-                              : column.id === 'role_name'
-                                ? 'Rol'
-                                : column.id
-                      }
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {can('users:create') && (
-            <Button className="rounded-l bg-[#480489] hover:bg-[#480489]/90 " onClick={() => setIsCreateDialogOpen(true)} data-testid="open-create-user-dialog">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar Usuario
-            </Button>
-          )}
-          <div className="flex items-center gap-2">
-            {can('users:edit') && <Button 
-              variant="default" 
+            )}
+            {can('users:edit') && <Button
+              variant="default"
               size="sm"
-              disabled={selectedRowsCount !== 1} 
+              disabled={table.getFilteredSelectedRowModel().rows.length !== 1}
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              onClick={() => {
-                const selectedRowIndex = Object.keys(rowSelection)[0];
-                const selectedRow = table.getRowModel().rowsById[selectedRowIndex];
-                if (selectedRow) {
-                  setSelectedUser(selectedRow.original);
-                  setIsEditDialogOpen(true);
-                }
+              onClick={() => { 
+                const selected = table.getFilteredSelectedRowModel().rows[0].original;
+                setSelectedUser(selected);
+                setIsEditDialogOpen(true);
               }}
             >
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </Button>}
             {can('users:delete') && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 size="sm"
-                disabled={selectedRowsCount === 0} 
-                className="flex-1 sm:flex-none"
-                onClick={handleDeleteClick}
+                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                onClick={() => handleDeleteClick(table.getFilteredSelectedRowModel().rows)}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({selectedRowsCount})
+                Eliminar {table.getFilteredSelectedRowModel().rows.length > 0 && `(${table.getFilteredSelectedRowModel().rows.length})`}
               </Button>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="w-full overflow-x-auto">
-        <div className="rounded-md border min-w-[768px]">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    No se encontraron usuarios con ese criterio.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row items-center justify-between space-x-2 py-4 gap-6 md:gap-0">
-
-        <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Filas por página</p>
-          <Select
-            value={`${table.getState().pagination.pageSize}`}
-            onValueChange={(value) => {
-              table.setPageSize(Number(value))
-            }}
-          >
-            <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {[16, 24, 48, 96].map((pageSize) => (
-                <SelectItem key={pageSize} value={`${pageSize}`}>
-                  {pageSize}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex-1 text-sm text-muted-foreground text-center md:text-left">
-          {paginationText}
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-0 sm:space-x-6 lg:space-x-8">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  className="cursor-pointer"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                />
-              </PaginationItem>
-
-              {paginationRange.map((page, index) => {
-                if (typeof page === "string") {
-                  return <PaginationEllipsis key={`dots-${index}`} />;
-                }
-
-                const pageNumber = page as number;
-                return (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      className="cursor-pointer"
-                      onClick={() => table.setPageIndex(pageNumber - 1)}
-                      isActive={currentPage === pageNumber}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-
-              <PaginationItem>
-                <PaginationNext
-                  className="cursor-pointer"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
-      {/* Modal de Crear */}
+        )}
+      />
       <CreateUserDialog
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
           if (!open) {
             refetch();
+            setRowSelection({});
           }
         }}
       />
 
-      <DeleteUsersDialog 
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        users={usersToDelete}
-        onSuccess={() => {
-          setRowSelection({});
-          refetch();
-        }}
-      />
       {/* Modal de Editar */}
       <EditUserDialog
         open={isEditDialogOpen}
@@ -633,6 +246,19 @@ export function UsersListPage() {
         user={selectedUser}
         currentUserId={useAuthStore.getState()?.user?.id || ''}
       />
-    </div>
+
+      {/* Modal de Eliminar */}
+      <DeleteUsersDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        users={usersToDelete}
+        onSuccess={() => {
+          refetch();
+          setRowSelection({});
+        }}
+        
+      />
+      
+    </>
   )
 }
