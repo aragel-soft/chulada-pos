@@ -21,6 +21,7 @@ import ProtectedRoute from './ProtectedRoute';
 
 // --- Settings
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
+import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -90,6 +91,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute module="users:view">
                 <UsersListPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "permissions",
+            element: (
+              <ProtectedRoute module="permissions:view">
+                <PermissionsMatrixPage />
               </ProtectedRoute>
             ),
           },
