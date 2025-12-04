@@ -18,6 +18,11 @@ const settingTabs = [
     label: 'Facturación',
     permission: 'billing:view',
   },
+  {
+    value: 'permissions',
+    label: 'Permisos',
+    permission: 'permissions:view',
+  },
 ];
 
 export default function SettingsPage() {

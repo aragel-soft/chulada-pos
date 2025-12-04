@@ -30,6 +30,9 @@ fn main() {
             commands::settings::users::get_users_list,
             commands::settings::users::update_user,
             commands::settings::users::delete_users,
+            // Settings - Permissions
+            commands::settings::permissions::get_all_permissions,
+            commands::settings::permissions::get_role_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

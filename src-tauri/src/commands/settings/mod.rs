@@ -1,2 +1,3 @@
 // Commands related to user settings
-pub mod users; 
+pub mod permissions;
+pub mod users;
