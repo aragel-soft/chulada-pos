@@ -1,5 +1,5 @@
 // Importaciones
-import * as React from "react"
+import {ReactNode, useState} from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -28,7 +28,7 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   isLoading?: boolean
-  actions?: React.ReactNode | ((table: Table<TData>) => React.ReactNode)
+  actions?: ReactNode | ((table: Table<TData>) => ReactNode)
   searchPlaceholder?: string
   initialSorting?: SortingState
   initialColumnVisibility?: VisibilityState
@@ -51,12 +51,12 @@ export function DataTable<TData, TValue>({
   rowSelection: externalRowSelection,
   onRowSelectionChange: externalOnRowSelectionChange,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>(initialSorting)
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility)
-  const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
-  const [pagination, setPagination] = React.useState({
+  const [sorting, setSorting] = useState<SortingState>(initialSorting)
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = useState("")
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility)
+  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
+  const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: initialPageSize,
   })
