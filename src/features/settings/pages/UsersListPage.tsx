@@ -215,14 +215,12 @@ export function UsersListPage() {
                 onClick={() => handleDeleteClick(table.getFilteredSelectedRowModel().rows)}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Eliminar
+                Eliminar {table.getFilteredSelectedRowModel().rows.length > 0 && `(${table.getFilteredSelectedRowModel().rows.length})`}
               </Button>
             )}
           </div>
         )}
       />
-
-      {/* Modal de Crear */}
       <CreateUserDialog
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
