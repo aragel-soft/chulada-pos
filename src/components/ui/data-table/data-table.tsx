@@ -45,6 +45,9 @@ interface DataTableProps<TData, TValue> {
   onPaginationChange?: OnChangeFn<PaginationState>;
   globalFilter?: string;
   onGlobalFilterChange?: OnChangeFn<string>;
+  manualSorting?: boolean;
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
 }
 
 export function DataTable<TData, TValue>({
@@ -67,20 +70,29 @@ export function DataTable<TData, TValue>({
   onPaginationChange: externalOnPaginationChange,
   globalFilter: externalGlobalFilter,
   onGlobalFilterChange: externalOnGlobalFilterChange,
+  manualSorting = false,
+  sorting: externalSorting,
+  onSortingChange: externalOnSortingChange,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>(initialSorting)
+  const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState("")
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility)
   const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
-  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
-  const [pagination, setPagination] = useState({
+  const [internalPagination, setInternalPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: initialPageSize,
   })
+  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
 
+  const sorting = externalSorting ?? internalSorting 
+  const globalFilter = externalGlobalFilter ?? internalGlobalFilter
+  const pagination = externalPagination ?? internalPagination
   const rowSelection = externalRowSelection ?? internalRowSelection
-  const setRowSelection = externalOnRowSelectionChange ?? setInternalRowSelection
+
+  const onSortingChange = externalOnSortingChange ?? setInternalSorting 
+  const onGlobalFilterChange = externalOnGlobalFilterChange ?? setInternalGlobalFilter
+  const onPaginationChange = externalOnPaginationChange ?? setInternalPagination
+  const onRowSelectionChange = externalOnRowSelectionChange ?? setInternalRowSelection
 
   const table = useReactTable({
     data,
@@ -88,16 +100,17 @@ export function DataTable<TData, TValue>({
     rowCount,
     manualPagination,
     manualFiltering,
+    manualSorting,
     state: { sorting, columnFilters, globalFilter, columnVisibility, rowSelection, pagination },
-    onSortingChange: setSorting,
+    onSortingChange,
     onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
+    onRowSelectionChange,
+    onPaginationChange,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
   })
 
@@ -107,13 +120,13 @@ export function DataTable<TData, TValue>({
     <DataTableLayout
       actions={typeof actions === 'function' ? actions(table) : actions}
       filters={
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-          <div className="relative w-full sm:max-w-sm">
+        <div className="flex flex-col sm:flex-row  gap-4 w-full">
+          <div className="relative flex-1 min-w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <DebouncedInput
               placeholder={searchPlaceholder}
               value={globalFilter ?? ""}
-              onChange={(value) => setGlobalFilter(String(value))}
+              onChange={(value) => onGlobalFilterChange(String(value))}
               className="pl-10 h-9 w-full"
             />
           </div>

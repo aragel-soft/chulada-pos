@@ -34,6 +34,8 @@ pub fn get_products(
   page: i64,
   page_size: i64,
   search: Option<String>,
+  sort_by: Option<String>,
+  sort_order: Option<String>,
 ) -> Result<PaginatedResponse<ProductView>, String> {
   let conn = db_state.lock().unwrap();
 
@@ -60,6 +62,19 @@ pub fn get_products(
   }
   .map_err(|e| format!("Error contando productos: {}", e))?;
 
+  let order_column = match sort_by.as_deref() {
+    Some("code") => "p.code",
+    Some("retail_price") => "p.retail_price",
+    Some("stock") => "stock",
+    Some("is_active") => "p.is_active",
+    _ => "p.name",
+  };
+
+  let order_direction = match sort_order.as_deref() {
+    Some("desc") => "DESC",
+    _ => "ASC",
+  };
+
   // TODO: Cambiar 'store-main' por un store_id dinámico
   let base_sql = "
     SELECT 
@@ -81,9 +96,9 @@ pub fn get_products(
   ";
 
   let final_sql = if has_search {
-    format!("{} AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1) ORDER BY p.name LIMIT ?2 OFFSET ?3", base_sql)
+    format!("{} AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
   } else {
-    format!("{} ORDER BY p.name LIMIT ?1 OFFSET ?2", base_sql)
+    format!("{} ORDER BY {} {} LIMIT ?1 OFFSET ?2", base_sql, order_column, order_direction)
   };
 
   let limit = page_size;

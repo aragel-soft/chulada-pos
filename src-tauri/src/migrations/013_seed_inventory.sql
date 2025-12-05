@@ -72,7 +72,8 @@ INSERT INTO products (id, code, name, category_id, retail_price, wholesale_price
 -- PRODUCTOS DESCONTINUADOS / INACTIVOS (CASO DE BORDE)
 ('p046', 'DESC-01', 'Gel Glitter Corporal 90s (Descontinuado)', 'cat-maquillaje', 10.00, 5.00, 0),
 ('p047', 'DESC-02', 'Tinte Fantasía Verde Neón (Lote Vencido)', 'cat-tintes', 20.00, 10.00, 0),
-('p048', 'DESC-03', 'Esmalte Bissú Tono "Navidad 2020"', 'cat-unas', 15.00, 10.00, 0),
+('p048', 'DESC-03', 'Esmalte Bissú Tono "Otoño 2020"', 'cat-unas', 15.00, 10.00, 0),
+('p049', 'DESC-04', 'Esmalte Bissú Tono "Navidad 2020"', 'cat-unas', 15.00, 10.00, 0),
 
 ('p050', 'TINT-700', 'Tinte Hidracolor 7.0 Rubio Medio', 'cat-tintes', 52.00, 40.00, 1),
 ('p051', 'TINT-711', 'Tinte Hidracolor 7.11 Rubio Medio Cenizo Intenso', 'cat-tintes', 52.00, 40.00, 1),

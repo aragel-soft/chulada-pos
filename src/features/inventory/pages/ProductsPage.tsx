@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { ColumnDef, RowSelectionState, PaginationState } from "@tanstack/react-table";
+import { ColumnDef, RowSelectionState, PaginationState, SortingState } from "@tanstack/react-table";
 import { 
   PlusCircle, 
   Pencil,
@@ -16,7 +16,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 
-// Helper de formato moneda
+// TODO: Mover a utils
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -32,19 +32,27 @@ export default function ProductsPage() {
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 20,
+    pageSize: 16,
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false } 
+  ]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
+      const sortField = sorting.length > 0 ? sorting[0].id : "name";
+      const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
+
       const response = await getProducts({
         page: pagination.pageIndex + 1, 
         pageSize: pagination.pageSize,
         search: globalFilter || undefined,
+        sortBy: sortField,
+        sortOrder: sortOrder
       });
       setData(response.data);
       setTotalRows(response.total);
@@ -60,7 +68,7 @@ export default function ProductsPage() {
       fetchProducts();
     }, 300);
     return () => clearTimeout(timer);
-  }, [pagination.pageIndex, pagination.pageSize, globalFilter]);
+  }, [pagination.pageIndex, pagination.pageSize, globalFilter, sorting]);
 
   const handleGlobalFilterChange = (value: string) => {
     setGlobalFilter(value);
@@ -110,6 +118,7 @@ export default function ProductsPage() {
         header: "",
         cell: ({ row }) => (
           <div className="flex items-center justify-center">
+             {/* TODO:  Modificar el componente por un nombre más genérico */}
              <UserAvatar 
                fullName={row.original.name} 
                avatarUrl={row.original.image_url} 
@@ -199,6 +208,9 @@ export default function ProductsPage() {
       }}
       manualPagination={true}
       manualFiltering={true}
+      manualSorting={true}
+      sorting={sorting}
+      onSortingChange={setSorting}
       rowCount={totalRows}
       pagination={pagination}
       onPaginationChange={setPagination}
