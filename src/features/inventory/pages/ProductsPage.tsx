@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core"; 
 import { ColumnDef, RowSelectionState, PaginationState } from "@tanstack/react-table";
 import { 
   PlusCircle, 
+  Pencil,
   Trash, 
   Barcode
 } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,28 +13,8 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { useAuthStore } from "@/stores/authStore";
-
-interface Product {
-  id: string;
-  code: string;
-  barcode: string | null;
-  name: string;
-  category_name: string | null;
-  retail_price: number;
-  wholesale_price: number;
-  stock: number;
-  min_stock: number;
-  image_url: string | null;
-  is_active: boolean;
-}
-
-interface PaginatedResponse {
-  data: Product[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
+import { Product } from "@/types/inventory";
+import { getProducts } from "@/lib/api/inventory/products";
 
 // Helper de formato moneda
 const formatCurrency = (amount: number) => {
@@ -62,12 +41,11 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const response = await invoke<PaginatedResponse>("get_products", {
-        page: pagination.pageIndex + 1, // Rust espera base-1
+      const response = await getProducts({
+        page: pagination.pageIndex + 1, 
         pageSize: pagination.pageSize,
-        search: globalFilter || null,
+        search: globalFilter || undefined,
       });
-
       setData(response.data);
       setTotalRows(response.total);
     } catch (error) {
@@ -79,15 +57,14 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        fetchProducts();
+      fetchProducts();
     }, 300);
     return () => clearTimeout(timer);
-    
   }, [pagination.pageIndex, pagination.pageSize, globalFilter]);
 
   const handleGlobalFilterChange = (value: string) => {
-     setGlobalFilter(value);
-     setPagination(prev => ({ ...prev, pageIndex: 0 }));
+    setGlobalFilter(value);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
   }
 
   // Columnas
@@ -113,19 +90,6 @@ export default function ProductsPage() {
         enableHiding: false,
       },
       {
-        accessorKey: "image_url",
-        header: "Img",
-        cell: ({ row }) => (
-          <div className="flex items-center justify-center">
-             <UserAvatar 
-               fullName={row.original.name} 
-               avatarUrl={row.original.image_url} 
-               className="h-9 w-9 rounded-md border" 
-             />
-          </div>
-        ),
-      },
-      {
         accessorKey: "code",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Código" />,
         cell: ({ row }) => (
@@ -138,6 +102,19 @@ export default function ProductsPage() {
                 <Barcode className="h-3 w-3" /> {row.original.barcode}
                </span>
             )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "image_url",
+        header: "",
+        cell: ({ row }) => (
+          <div className="flex items-center justify-center">
+             <UserAvatar 
+               fullName={row.original.name} 
+               avatarUrl={row.original.image_url} 
+               className="h-9 w-9 rounded-md border" 
+             />
           </div>
         ),
       },
@@ -157,7 +134,7 @@ export default function ProductsPage() {
       },
       {
         accessorKey: "retail_price",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="P. Público" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Precio" />,
         cell: ({ row }) => (
           <div className="font-medium">
             {formatCurrency(row.getValue("retail_price"))}
@@ -166,7 +143,7 @@ export default function ProductsPage() {
       },
       {
         accessorKey: "stock",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Stock" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Existencia" />,
         cell: ({ row }) => {
           const stock = row.original.stock;
           const minStock = row.original.min_stock;
@@ -183,12 +160,23 @@ export default function ProductsPage() {
       },
       {
         accessorKey: "is_active",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
-        cell: ({ row }) => (
-          <Badge variant={row.original.is_active ? "default" : "secondary"} className="text-[10px]">
-            {row.original.is_active ? "Activo" : "Inactivo"}
-          </Badge>
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Estado" />
         ),
+        cell: ({ row }) => {
+          const estado = row.getValue("is_active") as boolean
+
+          return (
+            <Badge
+              className={`capitalize min-w-[80px] justify-center ${estado
+                ? "bg-green-600 text-white hover:bg-green-600/80"
+                : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
+                }`}
+            >
+              {estado ? "activo" : "inactivo"}
+            </Badge>
+          )
+        },
       },
     ],
     [can]
@@ -226,14 +214,23 @@ export default function ProductsPage() {
               onClick={() => console.log("Abrir modal crear")}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Nuevo Producto</span>
+              <span className="hidden sm:inline">Agregar</span>
+            </Button>
+          )}
+
+          {can('products:edit') && (
+            <Button 
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
+              onClick={() => console.log("Abrir modal crear")}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Modificar</span>
             </Button>
           )}
           
           {can('products:delete') && (
             <Button
               variant="destructive"
-              size="sm"
               disabled={table.getFilteredSelectedRowModel().rows.length === 0}
               onClick={() => console.log("Eliminar seleccionados")}
             >
