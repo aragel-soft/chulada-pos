@@ -53,7 +53,6 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  isLoading,
   actions,
   searchPlaceholder = "Buscar...",
   initialSorting = [],
@@ -113,8 +112,6 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
   })
-
-  if (isLoading) return <div className="p-8 text-center">Cargando...</div>
 
   return (
     <DataTableLayout

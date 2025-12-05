@@ -64,10 +64,7 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchProducts();
-    }, 300);
-    return () => clearTimeout(timer);
+    fetchProducts();
   }, [pagination.pageIndex, pagination.pageSize, globalFilter, sorting]);
 
   const handleGlobalFilterChange = (value: string) => {
@@ -122,7 +119,7 @@ export default function ProductsPage() {
              <UserAvatar 
                fullName={row.original.name} 
                avatarUrl={row.original.image_url} 
-               className="h-9 w-9 rounded-md border" 
+               className="h-9 w-9" 
              />
           </div>
         ),
@@ -131,12 +128,12 @@ export default function ProductsPage() {
         accessorKey: "name",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Producto" />,
         cell: ({ row }) => (
-          <div className="flex flex-col max-w-[300px]">
+          <div className="flex flex-col max-w-[400px]">
             <span className="truncate font-medium" title={row.original.name}>
-                {row.original.name}
+              {row.original.name}
             </span>
             <span className="text-xs text-muted-foreground">
-                {row.original.category_name || "Sin Categoría"}
+              {row.original.category_name || "Sin Categoría"}
             </span>
           </div>
         ),
