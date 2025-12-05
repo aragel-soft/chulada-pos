@@ -75,7 +75,7 @@ pub fn get_products(
     _ => "ASC",
   };
 
-  // TODO: Cambiar 'store-main' por un store_id dinámico
+  // TODO: Cambiar 'store-main' por un store_id dinámico cuando existan varias sucursales
   let base_sql = "
     SELECT 
       p.id, 

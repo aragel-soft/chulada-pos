@@ -9,20 +9,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import { AppAvatar } from "@/components/ui/app-avatar";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
-
-// TODO: Mover a utils
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-  }).format(amount);
-};
+import { formatCurrency } from "@/lib/utils";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
@@ -115,11 +108,11 @@ export default function ProductsPage() {
         header: "",
         cell: ({ row }) => (
           <div className="flex items-center justify-center">
-             {/* TODO:  Modificar el componente por un nombre más genérico */}
-             <UserAvatar 
-               fullName={row.original.name} 
-               avatarUrl={row.original.image_url} 
+             <AppAvatar 
+               name={row.original.name} 
+               path={row.original.image_url} 
                className="h-9 w-9" 
+               variant="muted"
              />
           </div>
         ),

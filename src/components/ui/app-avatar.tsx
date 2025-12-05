@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from '@/lib/utils';
 
-interface UserAvatarProps {
-  fullName: string;
-  avatarUrl?: string | null;
+interface AppAvatarProps {
+  name: string;
+  path?: string | null;
   className?: string;
+  variant?: 'default' | 'muted' | 'outline';
 }
 
 function getInitials(name: string): string {
@@ -19,22 +21,22 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function UserAvatar({ fullName, avatarUrl, className }: UserAvatarProps) {
+export function AppAvatar({ name, path, className, variant = 'default' }: AppAvatarProps) {
   const [src, setSrc] = useState<string | undefined>(undefined);
-  const initials = getInitials(fullName);
+  const initials = getInitials(name);
 
   useEffect(() => {
     const resolveAvatarUrl = async () => {
-      if (!avatarUrl) {
+      if (!path) {
         setSrc(undefined);
         return;
       }
 
       try {
-        let finalPath = avatarUrl;
-        if (!avatarUrl.includes(':') && !avatarUrl.startsWith('/')) {
+        let finalPath = path;
+        if (!path.includes(':') && !path.startsWith('/')) {
            const appData = await appDataDir();
-           finalPath = await join(appData, avatarUrl);
+           finalPath = await join(appData, path);
         }
         
         setSrc(convertFileSrc(finalPath));
@@ -45,12 +47,18 @@ export function UserAvatar({ fullName, avatarUrl, className }: UserAvatarProps) 
     };
 
     resolveAvatarUrl();
-  }, [avatarUrl]);
+  }, [path]);
+
+  const variantStyles = {
+    default: "bg-purple-600 text-white", 
+    muted: "bg-muted text-muted-foreground border",
+    outline: "bg-transparent border border-input text-foreground",
+  };
   
   return (
     <Avatar className={className}>
-      {src && <AvatarImage src={src} alt={fullName} />}
-      <AvatarFallback className="bg-purple-600 text-white font-semibold">
+      {src && <AvatarImage src={src} alt={name}/>}
+      <AvatarFallback className={cn("font-semibold", variantStyles[variant])}>
         {initials}
       </AvatarFallback>
     </Avatar>
