@@ -36,6 +36,7 @@ import { productSchema, ProductFormValues } from "@/features/inventory/schemas/p
 import { createProduct, saveProductImage } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { CreateProductPayload } from "@/types/inventory";
+import { Label } from "@/components/ui/label";
 
 interface CreateProductDialogProps {
   open: boolean;
@@ -157,7 +158,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* --- Columna Izquierda: Imagen --- */}
               <div className="flex flex-col gap-3">
-                <FormLabel>Imagen del Producto</FormLabel>
+                <Label>Imagen del Producto</Label>
                 
                 {!imagePreview ? (
                   <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
