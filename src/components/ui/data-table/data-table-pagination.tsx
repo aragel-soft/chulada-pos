@@ -59,7 +59,7 @@ const generatePaginationRange = (
 export function DataTablePagination<TData>({
   table,
 }: DataTablePaginationProps<TData>) {
-  const totalRows = table.getFilteredRowModel().rows.length;
+  const totalRows = table.getRowCount();
   const pageSize = table.getState().pagination.pageSize;
   const currentPage = table.getState().pagination.pageIndex + 1;
   const pageCount = table.getPageCount();

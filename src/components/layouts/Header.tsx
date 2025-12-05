@@ -2,7 +2,7 @@ import { Menu, Bell, ChevronDown, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useSidebar } from "@/components/ui/sidebar";
-import { UserAvatar } from '@/components/ui/user-avatar';
+import { AppAvatar } from '@/components/ui/app-avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -96,9 +96,9 @@ export function Header() {
                 className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 hover:bg-gray-100"              
                 data-testid="user-menu-trigger"
               >
-                <UserAvatar
-                  fullName={user?.full_name || 'Usuario'}
-                  avatarUrl={user?.avatar_url}
+                <AppAvatar
+                  name={user?.full_name || 'Usuario'}
+                  path={user?.avatar_url}
                   className="h-8 w-8"
                 />
                 <span className="hidden md:block font-medium">

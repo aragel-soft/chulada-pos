@@ -15,6 +15,7 @@ import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
+import ProductsPage from '@/features/inventory/pages/ProductsPage';
 
 // --- Ruta Protegida ---
 import ProtectedRoute from './ProtectedRoute'; 
@@ -55,8 +56,22 @@ const router = createBrowserRouter([
             <InventoryPage />
           </ProtectedRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="products" replace />, 
+          },
+          {
+            path: "products",
+            element: (
+              <ProtectedRoute module="products:view">
+                <ProductsPage />
+              </ProtectedRoute>
+            ),
+          },
+        ]
       },
-            {
+      {
         path: "customers",
         element: (
           <ProtectedRoute module="customers:view">
