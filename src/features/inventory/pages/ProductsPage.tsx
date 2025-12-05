@@ -16,13 +16,14 @@ import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
+import { CreateProductDialog } from "../components/CreateProductDialog";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
   const [data, setData] = useState<Product[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 16,
@@ -182,6 +183,7 @@ export default function ProductsPage() {
   );
 
   return (
+    <>
     <DataTable
       columns={columns}
       data={data}
@@ -212,8 +214,8 @@ export default function ProductsPage() {
         <div className="flex items-center gap-2 w-full md:w-auto">
           {can('products:create') && (
             <Button 
-              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              onClick={() => console.log("Abrir modal crear")}
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              onClick={() => setIsCreateDialogOpen(true)}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Agregar</span>
@@ -243,5 +245,16 @@ export default function ProductsPage() {
         </div>
       )}
     />
+  <CreateProductDialog 
+    open={isCreateDialogOpen} 
+    onOpenChange={(open) => {
+      setIsCreateDialogOpen(open);
+      if (!open) {
+        fetchProducts();
+        setRowSelection({});
+      }
+    }}
+      />
+  </>
   );
 }
