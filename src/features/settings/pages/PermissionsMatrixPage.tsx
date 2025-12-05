@@ -84,8 +84,11 @@ const MODULE_ICONS: Record<string, React.ElementType> = {
 
 // Componente principal
 export function PermissionsMatrixPage() {
+  // Queries
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuthStore();
+
+  // Auth
+  const { user: currentUser, can } = useAuthStore();
 
   // Estados
   const [globalFilter, setGlobalFilter] = useState("");
@@ -176,11 +179,9 @@ export function PermissionsMatrixPage() {
       return result;
   }, [permissions, globalFilter, moduleFilters]);
 
-    // Ordenar roles: Admin -> Manager -> Cashier -> Otros
-  const sortedRoles = useMemo(() => {
-    const priority = ["admin", "manager", "cashier"]; // Usamos role_name o display_name si es consistente
-    // Mejor usar IDs si son fijos, pero el usuario mencionó nombres.
-    // Asumiré que los nombres internos son 'admin', 'manager', 'cashier' basado en la imagen.
+    // Ordenar roles
+    const sortedRoles = useMemo(() => {
+    const priority = ["admin", "manager", "cashier"]; 
     
     return [...roles].sort((a, b) => {
         const indexA = priority.indexOf(a.name);
@@ -234,7 +235,7 @@ export function PermissionsMatrixPage() {
       }
     });
 
-    // Check for removed permissions
+    // Revisar por eliminaciones
     rolePermissions.forEach((rp) => {
       const existsInLocal = localRolePermissions.some(
         (localRp) =>
@@ -291,19 +292,27 @@ export function PermissionsMatrixPage() {
             .get(role.id)
             ?.has(permissionId);
           
-          // Logic for disabling checkboxes
+          // Revisar por cambios pendientes
+          const isAdded = !rolePermissions.some(rp => rp.role_id === role.id && rp.permission_id === permissionId) && hasPermission;
+          const isRemoved = rolePermissions.some(rp => rp.role_id === role.id && rp.permission_id === permissionId) && !hasPermission;
+
+          // Lógica para deshabilitar checkboxes
           const isAdmin = role.id === ADMIN_ROLE_ID;
           const isSelf = currentUser?.role_id === role.id;
           const isDisabled = isAdmin || isSelf;
 
           return (
-            <div className="flex justify-center">
+            <div className="flex justify-center items-center h-full w-full">
               <Checkbox
                 checked={hasPermission || false}
                 onCheckedChange={() =>
                   handleCheckboxChange(role.id, permissionId)
                 }
                 disabled={isDisabled}
+                className={cn(
+                    isAdded && "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600",
+                    isRemoved && "border-red-500 bg-red-50"
+                )}
               />
             </div>
           );
@@ -312,7 +321,7 @@ export function PermissionsMatrixPage() {
     );
 
     return [...baseColumns, ...roleColumns];
-  }, [sortedRoles, rolePermissionsMap, columnHelper, currentUser]);
+  }, [sortedRoles, rolePermissionsMap, columnHelper, currentUser, rolePermissions]);
 
   // Tabla
   const table = useReactTable({
@@ -334,124 +343,127 @@ export function PermissionsMatrixPage() {
   return (
     <DataTableLayout
         filters={
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
-                <div className="relative flex-1 min-w-[300px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <DebouncedInput
-                        placeholder="Buscar permisos..."
-                        value={globalFilter}
-                        onChange={(value) => setGlobalFilter(String(value))}
-                        className="pl-10 h-10 w-full text-base"
-                    />
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-10 border-dashed"
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Módulos
+          <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <div className="relative flex-1 min-w-[300px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <DebouncedInput
+                      placeholder="Buscar permisos..."
+                      value={globalFilter}
+                      onChange={(value) => setGlobalFilter(String(value))}
+                      className="pl-10 h-10 w-full text-base"
+                  />
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 border-dashed"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Módulos
+                    {moduleFilters.length > 0 && (
+                      <>
+                        <Separator orientation="vertical" className="mx-2 h-4" />
+                        <Badge
+                          variant="secondary"
+                          className="rounded-sm px-1 font-normal lg:hidden"
+                        >
+                          {moduleFilters.length}
+                        </Badge>
+                        <div className="hidden space-x-1 lg:flex">
+                          {moduleFilters.length > 2 ? (
+                            <Badge
+                              variant="secondary"
+                              className="rounded-sm px-1 font-normal"
+                            >
+                              {moduleFilters.length} seleccionados
+                            </Badge>
+                          ) : (
+                            Object.entries(MODULE_NAMES)
+                              .filter(([key]) => moduleFilters.includes(key))
+                              .map(([key, label]) => (
+                                <Badge
+                                  key={key}
+                                  variant="secondary"
+                                  className="rounded-sm px-1 font-normal"
+                                >
+                                  {label}
+                                </Badge>
+                              ))
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Módulos" />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+                      <CommandGroup>
+                        {Object.entries(MODULE_NAMES).map(([key, label]) => {
+                          const isSelected = moduleFilters.includes(key);
+                          const Icon = MODULE_ICONS[key];
+                          return (
+                            <CommandItem
+                              key={key}
+                              onSelect={() => {
+                                if (isSelected) {
+                                  setModuleFilters(moduleFilters.filter((f) => f !== key));
+                                } else {
+                                  setModuleFilters([...moduleFilters, key]);
+                                }
+                              }}
+                            >
+                              <div
+                                className={cn(
+                                  "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                  isSelected
+                                    ? "bg-primary text-primary-foreground"
+                                    : "opacity-50 [&_svg]:invisible"
+                                )}
+                              >
+                                <Check className={cn("h-4 w-4")} />
+                              </div>
+                              {Icon && (
+                                <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span>{label}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
                       {moduleFilters.length > 0 && (
                         <>
-                          <Separator orientation="vertical" className="mx-2 h-4" />
-                          <Badge
-                            variant="secondary"
-                            className="rounded-sm px-1 font-normal lg:hidden"
-                          >
-                            {moduleFilters.length}
-                          </Badge>
-                          <div className="hidden space-x-1 lg:flex">
-                            {moduleFilters.length > 2 ? (
-                              <Badge
-                                variant="secondary"
-                                className="rounded-sm px-1 font-normal"
-                              >
-                                {moduleFilters.length} seleccionados
-                              </Badge>
-                            ) : (
-                              Object.entries(MODULE_NAMES)
-                                .filter(([key]) => moduleFilters.includes(key))
-                                .map(([key, label]) => (
-                                  <Badge
-                                    key={key}
-                                    variant="secondary"
-                                    className="rounded-sm px-1 font-normal"
-                                  >
-                                    {label}
-                                  </Badge>
-                                ))
-                            )}
-                          </div>
+                          <CommandSeparator />
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => setModuleFilters([])}
+                              className="justify-center text-center"
+                            >
+                              Limpiar filtros
+                            </CommandItem>
+                          </CommandGroup>
                         </>
                       )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Módulos" />
-                      <CommandList>
-                        <CommandEmpty>No se encontraron resultados.</CommandEmpty>
-                        <CommandGroup>
-                          {Object.entries(MODULE_NAMES).map(([key, label]) => {
-                            const isSelected = moduleFilters.includes(key);
-                            const Icon = MODULE_ICONS[key];
-                            return (
-                              <CommandItem
-                                key={key}
-                                onSelect={() => {
-                                  if (isSelected) {
-                                    setModuleFilters(moduleFilters.filter((f) => f !== key));
-                                  } else {
-                                    setModuleFilters([...moduleFilters, key]);
-                                  }
-                                }}
-                              >
-                                <div
-                                  className={cn(
-                                    "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                                    isSelected
-                                      ? "bg-primary text-primary-foreground"
-                                      : "opacity-50 [&_svg]:invisible"
-                                  )}
-                                >
-                                  <Check className={cn("h-4 w-4")} />
-                                </div>
-                                {Icon && (
-                                  <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                                )}
-                                <span>{label}</span>
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                        {moduleFilters.length > 0 && (
-                          <>
-                            <CommandSeparator />
-                            <CommandGroup>
-                              <CommandItem
-                                onSelect={() => setModuleFilters([])}
-                                className="justify-center text-center"
-                              >
-                                Limpiar filtros
-                              </CommandItem>
-                            </CommandGroup>
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {isDirty && (
-            <Button onClick={() => setIsModalOpen(true)} className="gap-2">
-              <Save className="h-4 w-4" />
-              Guardar Cambios
-            </Button>
-          )}
-
-            </div>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+          </div>
         }
+        actions = {can('permissions:edit') && (
+          <Button 
+          onClick={() => setIsModalOpen(true)} 
+          className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+          disabled={!isDirty}
+          >
+            <Save className="h-4 w-4" />
+            Guardar Cambios
+          </Button>
+        )}
     >
       <table className="w-full caption-bottom text-sm text-left">
         <thead className="sticky top-0 z-20 bg-background shadow-sm">

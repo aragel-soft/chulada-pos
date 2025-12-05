@@ -11,6 +11,7 @@ pub struct Permission {
     pub display_name: String,
     pub description: Option<String>,
     pub module: String,
+    pub sequence: i32,
 }
 
 #[tauri::command]
@@ -23,7 +24,7 @@ pub async fn get_all_permissions(
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, display_name, description, module FROM permissions ORDER BY module ASC, name ASC",
+            "SELECT id, name, display_name, description, module, sequence FROM permissions ORDER BY module ASC, sequence ASC",
         )
         .map_err(|e| format!("Error al preparar query: {}", e))?;
 
@@ -35,6 +36,7 @@ pub async fn get_all_permissions(
                 display_name: row.get(2)?,
                 description: row.get(3)?,
                 module: row.get(4)?,
+                sequence: row.get(5)?,
             })
         })
         .map_err(|e| format!("Error al ejecutar query: {}", e))?
@@ -89,11 +91,9 @@ pub async fn update_role_permissions(
         .transaction()
         .map_err(|e| format!("Error al iniciar transacción: {}", e))?;
 
-    // 1. Delete all existing role permissions
     tx.execute("DELETE FROM role_permissions", [])
         .map_err(|e| format!("Error al limpiar permisos: {}", e))?;
 
-    // 2. Insert new permissions
     {
         let mut stmt = tx
             .prepare("INSERT INTO role_permissions (id, role_id, permission_id) VALUES (?, ?, ?)")

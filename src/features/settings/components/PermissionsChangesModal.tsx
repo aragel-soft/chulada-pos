@@ -1,3 +1,4 @@
+// Importaciones
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,12 +14,14 @@ import { Role } from "@/types/users";
 import { Permission } from "@/types/permission";
 import { Check, X } from "lucide-react";
 
+// Interfaz para los cambios de permisos
 interface PermissionChange {
   roleId: string;
   permissionId: string;
   type: "added" | "removed";
 }
 
+// Interfaz para las propiedades del modal
 interface PermissionsChangesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +32,7 @@ interface PermissionsChangesModalProps {
   isSaving: boolean;
 }
 
+// Componente principal
 export function PermissionsChangesModal({
   open,
   onOpenChange,
@@ -38,7 +42,7 @@ export function PermissionsChangesModal({
   onConfirm,
   isSaving,
 }: PermissionsChangesModalProps) {
-  // Group changes by role
+  // Agrupar los cambios por rol
   const changesByRole = changes.reduce((acc, change) => {
     if (!acc[change.roleId]) {
       acc[change.roleId] = [];
@@ -47,9 +51,11 @@ export function PermissionsChangesModal({
     return acc;
   }, {} as Record<string, PermissionChange[]>);
 
+  // Función para obtener el nombre del rol
   const getRoleName = (roleId: string) =>
     roles.find((r) => r.id === roleId)?.display_name || "Rol Desconocido";
 
+  // Función para obtener el nombre del permiso
   const getPermissionName = (permissionId: string) =>
     permissions.find((p) => p.id === permissionId)?.display_name ||
     "Permiso Desconocido";

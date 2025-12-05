@@ -4,6 +4,7 @@ export interface Permission {
   display_name: string;
   description: string | null;
   module: string;
+  sequence: number;
 }
 
 export interface RolePermission {
