@@ -110,7 +110,7 @@ export function PermissionsChangesModal({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isSaving}>
+          <AlertDialogAction onClick={onConfirm} disabled={isSaving} className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap">
             {isSaving ? "Guardando..." : "Confirmar Guardado"}
           </AlertDialogAction>
         </AlertDialogFooter>
