@@ -132,12 +132,34 @@ export default function ProductsPage() {
           </div>
         ),
       },
+      ...(can('products:purchase_price') ? [{
+        accessorKey: "purchase_price",
+        header: ({ column }: { column: any }) => (
+          <div className="w-full text-right">
+            <DataTableColumnHeader column={column} title="Costo Compra" />
+          </div>
+        ),
+        cell: ({ row }: { row: any }) => (
+          <div className="font-medium">
+            {formatCurrency(row.getValue("purchase_price") || 0)}
+          </div>
+        ),
+      }] : []),
       {
         accessorKey: "retail_price",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Precio" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="P. Menudeo" />,
         cell: ({ row }) => (
           <div className="font-medium">
             {formatCurrency(row.getValue("retail_price"))}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "wholesale_price",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="P. Mayoreo" />,
+        cell: ({ row }) => (
+          <div className="font-medium">
+            {formatCurrency(row.getValue("wholesale_price"))}
           </div>
         ),
       },

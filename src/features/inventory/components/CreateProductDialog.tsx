@@ -4,13 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores/authStore";
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -47,6 +47,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const queryClient = useQueryClient();
+  const { can } = useAuthStore();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
@@ -146,10 +147,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Registrar Nuevo Producto</DialogTitle>
-          <DialogDescription>
-            Ingresa los detalles del producto para añadirlo al catálogo.
-          </DialogDescription>
+          <DialogTitle>Agregar Producto</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -305,24 +303,25 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="purchase_price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Costo de Compra</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                        <Input type="number" step="0.50" className="pl-7" {...field} />
-                      </div>
-                    </FormControl>
-                    <FormDescription>Opcional</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {can('products:purchase_price') && (
+                <FormField
+                  control={form.control}
+                  name="purchase_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Costo de Compra</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <Input type="number" step="0.50" className="pl-7" {...field} />
+                        </div>
+                      </FormControl>
+                      <FormDescription>Opcional</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             {/* --- Inventario --- */}

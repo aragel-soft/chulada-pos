@@ -1,7 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
@@ -15,6 +14,7 @@ pub struct ProductView {
   category_name: Option<String>,
   retail_price: f64,
   wholesale_price: f64,
+  purchase_price: f64,
   stock: i64,
   min_stock: i64,
   image_url: Option<String>,
@@ -130,6 +130,7 @@ pub fn get_products(
       c.name as category_name, 
       p.retail_price, 
       p.wholesale_price, 
+      p.purchase_price,
       COALESCE(si.stock, 0) as stock, 
       COALESCE(si.minimum_stock, 0) as min_stock,
       p.image_url, 
@@ -184,7 +185,7 @@ fn map_product_row(
   row: &rusqlite::Row,
   app_dir: &std::path::Path,
 ) -> rusqlite::Result<ProductView> {
-  let raw_image: Option<String> = row.get(9)?;
+  let raw_image: Option<String> = row.get(10)?;
 
   let resolved_image = raw_image.map(|path| {
     if path.starts_with("http") {
@@ -202,10 +203,11 @@ fn map_product_row(
     category_name: row.get(4)?,
     retail_price: row.get(5)?,
     wholesale_price: row.get(6)?,
-    stock: row.get(7)?,
-    min_stock: row.get(8)?,
+    purchase_price: row.get(7)?,
+    stock: row.get(8)?,
+    min_stock: row.get(9)?,
     image_url: resolved_image,
-    is_active: row.get(10)?,
+    is_active: row.get(11)?,
   })
 }
 

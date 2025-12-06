@@ -5,7 +5,7 @@ export const productSchema = z.object({
   barcode: z.string().optional(),
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   description: z.string().optional(),
-  category_id: z.string().min(1, "Selecciona una categoría").uuid("ID de categoría inválido"),
+  category_id: z.string().min(1, "Selecciona una categoría"),
   
   retail_price: z.coerce.
     number()
