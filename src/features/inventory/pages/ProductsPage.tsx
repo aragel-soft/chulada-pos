@@ -108,7 +108,7 @@ export default function ProductsPage() {
         accessorKey: "image_url",
         header: "",
         cell: ({ row }) => (
-          <div className="flex items-center justify-center">
+          <div key={row.original.id} className="flex items-center justify-center">
              <AppAvatar 
                name={row.original.name} 
                path={row.original.image_url} 
@@ -126,9 +126,18 @@ export default function ProductsPage() {
             <span className="truncate font-medium" title={row.original.name}>
               {row.original.name}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {row.original.category_name || "Sin Categoría"}
-            </span>
+           <div className="flex">
+            <Badge 
+              variant="outline" 
+              className="text-[10px] px-2 py-0 h-5 font-medium border-0"
+              style={{ 
+                backgroundColor: (row.original.category_color || '#64748b') + '20', // Opacidad 20% hex
+                color: row.original.category_color || '#64748b'
+              }}
+            >
+              {row.original.category_name || "General"}
+            </Badge>
+          </div>
           </div>
         ),
       },

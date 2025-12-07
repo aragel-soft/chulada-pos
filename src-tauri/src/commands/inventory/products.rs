@@ -12,6 +12,7 @@ pub struct ProductView {
   barcode: Option<String>,
   name: String,
   category_name: Option<String>,
+  category_color: Option<String>,
   retail_price: f64,
   wholesale_price: f64,
   purchase_price: f64,
@@ -128,6 +129,7 @@ pub fn get_products(
       p.barcode, 
       p.name, 
       c.name as category_name, 
+      c.color as category_color,
       p.retail_price, 
       p.wholesale_price, 
       p.purchase_price,
@@ -185,7 +187,7 @@ fn map_product_row(
   row: &rusqlite::Row,
   app_dir: &std::path::Path,
 ) -> rusqlite::Result<ProductView> {
-  let raw_image: Option<String> = row.get(10)?;
+  let raw_image: Option<String> = row.get(11)?;
 
   let resolved_image = raw_image.map(|path| {
     if path.starts_with("http") {
@@ -201,13 +203,14 @@ fn map_product_row(
     barcode: row.get(2)?,
     name: row.get(3)?,
     category_name: row.get(4)?,
-    retail_price: row.get(5)?,
-    wholesale_price: row.get(6)?,
-    purchase_price: row.get(7)?,
-    stock: row.get(8)?,
-    min_stock: row.get(9)?,
+    category_color: row.get(5)?,
+    retail_price: row.get(6)?,
+    wholesale_price: row.get(7)?,
+    purchase_price: row.get(8)?,
+    stock: row.get(9)?,
+    min_stock: row.get(10)?,
     image_url: resolved_image,
-    is_active: row.get(11)?,
+    is_active: row.get(12)?,
   })
 }
 

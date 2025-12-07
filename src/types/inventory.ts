@@ -6,6 +6,7 @@ export interface Product {
   description?: string;
   category_id: string;
   category_name?: string;
+  category_color?: string;
   retail_price: number;
   wholesale_price: number;
   purchase_price?: number;
@@ -41,5 +42,6 @@ export interface PaginatedResponse<T> {
 export interface Category {
   id: string;
   name: string;
+  color?: string;
 }
 

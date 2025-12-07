@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, PackagePlus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
-
 import {
   Dialog,
   DialogContent,
@@ -19,7 +18,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,12 +29,12 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-
 import { productSchema, ProductFormValues } from "@/features/inventory/schemas/productSchema";
 import { createProduct, saveProductImage } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { CreateProductPayload } from "@/types/inventory";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 interface CreateProductDialogProps {
   open: boolean;
@@ -147,15 +145,32 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agregar Producto</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <PackagePlus className="h-5 w-5 text-primary" />
+            Agregar Producto
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="!text-foreground">Nombre del Producto <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre descriptivo del producto" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
               {/* --- Columna Izquierda: Imagen --- */}
-              <div className="flex flex-col gap-3">
+              <div className="md:col-span-2 flex flex-col gap-3">
                 <Label>Imagen del Producto</Label>
                 
                 {!imagePreview ? (
@@ -192,13 +207,13 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
               </div>
 
               {/* --- Columna Derecha: Datos Principales --- */}
-              <div className="space-y-4">
+              <div className="md:col-span-3 space-y-5">
                 <FormField
                   control={form.control}
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código Interno <span className="text-destructive">*</span></FormLabel>
+                      <FormLabel className="!text-foreground">Código Interno <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input placeholder="Ej: TINT-001" {...field} />
                       </FormControl>
@@ -226,7 +241,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                   name="category_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Categoría <span className="text-destructive">*</span></FormLabel>
+                      <FormLabel className="!text-foreground">Categoría <span className="text-destructive">*</span></FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
@@ -240,7 +255,16 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                         <SelectContent>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id}>
-                              {cat.name}
+                              <Badge 
+                                variant="outline" 
+                                className="font-normal border-0 px-2"
+                                style={{ 
+                                  backgroundColor: (cat.color || '#64748b') + '20', // Fondo 20% opacidad
+                                  color: cat.color || '#64748b', // Texto del color real
+                                }}
+                              >
+                                {cat.name}
+                              </Badge>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -252,20 +276,6 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
               </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre del Producto <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre descriptivo del producto" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <Separator />
 
             {/* --- Precios --- */}
@@ -275,10 +285,10 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                 name="retail_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Precio Menudeo <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel className="!text-foreground">Precio Menudeo <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
                         <Input type="number" step="0.50" className="pl-7" {...field} />
                       </div>
                     </FormControl>
@@ -292,10 +302,10 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                 name="wholesale_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Precio Mayoreo <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel className="!text-foreground">Precio Mayoreo <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
                         <Input type="number" step="0.50" className="pl-7" {...field} />
                       </div>
                     </FormControl>
@@ -312,11 +322,10 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                       <FormLabel>Costo de Compra</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
                           <Input type="number" step="0.50" className="pl-7" {...field} />
                         </div>
                       </FormControl>
-                      <FormDescription>Opcional</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -324,17 +333,21 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
               )}
             </div>
 
+            <Separator />
+
             {/* --- Inventario --- */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg">
-                <div className="col-span-2 text-sm font-medium text-muted-foreground">Inventario Inicial</div>
+            <div className="grid grid-cols-2 gap-8 p-6 bg-muted/30 rounded-xl border border-border/50">
+              <div className="col-span-2 flex items-center gap-1">
+                <span className="text-sm font-semibold text-foreground">Inventario Inicial</span>
+              </div>
               <FormField
                 control={form.control}
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Existencias</FormLabel>
+                    <FormLabel className="!text-foreground">Existencias</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" className="bg-background" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -346,9 +359,9 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                 name="min_stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mínimo</FormLabel>
+                    <FormLabel className="!text-foreground">Stock Mínimo</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" className="bg-background" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -360,7 +373,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
               <Button type="button" variant="outline" onClick={handleClose} disabled={createMutation.isPending}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending} className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap">
                 {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Guardar Producto
               </Button>
