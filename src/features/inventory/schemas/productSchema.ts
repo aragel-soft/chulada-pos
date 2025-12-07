@@ -29,8 +29,8 @@ export const productSchema = z.object({
     
   min_stock: z.coerce
     .number()
-    .int()
-    .min(0)
+    .int("El stock mínimo debe ser un número entero")
+    .min(0, "El stock mínimo no puede ser negativo")
     .default(5),
     
   image_url: z.string().optional(), 
