@@ -299,7 +299,8 @@ export function PermissionsMatrixPage() {
           // Lógica para deshabilitar checkboxes
           const isAdmin = role.id === ADMIN_ROLE_ID;
           const isSelf = currentUser?.role_id === role.id;
-          const isDisabled = isAdmin || isSelf;
+          const currentUserHasPermission = can(info.row.original.name);
+          const isDisabled = isAdmin || isSelf || !currentUserHasPermission;
 
           return (
             <div className="flex justify-center items-center h-full w-full">
@@ -321,7 +322,7 @@ export function PermissionsMatrixPage() {
     );
 
     return [...baseColumns, ...roleColumns];
-  }, [sortedRoles, rolePermissionsMap, columnHelper, currentUser, rolePermissions]);
+  }, [sortedRoles, rolePermissionsMap, columnHelper, currentUser, rolePermissions, can]);
 
   // Tabla
   const table = useReactTable({
