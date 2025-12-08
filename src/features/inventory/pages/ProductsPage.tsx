@@ -16,13 +16,14 @@ import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
+import { CreateProductDialog } from "../components/CreateProductDialog";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
   const [data, setData] = useState<Product[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 16,
@@ -107,7 +108,7 @@ export default function ProductsPage() {
         accessorKey: "image_url",
         header: "",
         cell: ({ row }) => (
-          <div className="flex items-center justify-center">
+          <div key={row.original.id} className="flex items-center justify-center">
              <AppAvatar 
                name={row.original.name} 
                path={row.original.image_url} 
@@ -125,18 +126,49 @@ export default function ProductsPage() {
             <span className="truncate font-medium" title={row.original.name}>
               {row.original.name}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {row.original.category_name || "Sin Categoría"}
-            </span>
+           <div className="flex">
+            <Badge 
+              variant="outline" 
+              className="text-[10px] px-2 py-0 h-5 font-medium border-0"
+              style={{ 
+                backgroundColor: (row.original.category_color || '#64748b') + '20', // Opacidad 20% hex
+                color: row.original.category_color || '#64748b'
+              }}
+            >
+              {row.original.category_name || "General"}
+            </Badge>
+          </div>
+          </div>
+        ),
+      },
+      ...(can('products:purchase_price') ? [{
+        accessorKey: "purchase_price",
+        header: ({ column }: { column: any }) => (
+          <div className="w-full text-right">
+            <DataTableColumnHeader column={column} title="Costo Compra" />
+          </div>
+        ),
+        cell: ({ row }: { row: any }) => (
+          <div className="font-medium">
+            {formatCurrency(row.getValue("purchase_price") || 0)}
+          </div>
+        ),
+      }] : []),
+      {
+        accessorKey: "retail_price",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="P. Menudeo" />,
+        cell: ({ row }) => (
+          <div className="font-medium">
+            {formatCurrency(row.getValue("retail_price"))}
           </div>
         ),
       },
       {
-        accessorKey: "retail_price",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Precio" />,
+        accessorKey: "wholesale_price",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="P. Mayoreo" />,
         cell: ({ row }) => (
           <div className="font-medium">
-            {formatCurrency(row.getValue("retail_price"))}
+            {formatCurrency(row.getValue("wholesale_price"))}
           </div>
         ),
       },
@@ -182,6 +214,7 @@ export default function ProductsPage() {
   );
 
   return (
+    <>
     <DataTable
       columns={columns}
       data={data}
@@ -212,8 +245,8 @@ export default function ProductsPage() {
         <div className="flex items-center gap-2 w-full md:w-auto">
           {can('products:create') && (
             <Button 
-              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              onClick={() => console.log("Abrir modal crear")}
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              onClick={() => setIsCreateDialogOpen(true)}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Agregar</span>
@@ -243,5 +276,16 @@ export default function ProductsPage() {
         </div>
       )}
     />
+  <CreateProductDialog 
+    open={isCreateDialogOpen} 
+    onOpenChange={(open) => {
+      setIsCreateDialogOpen(open);
+      if (!open) {
+        fetchProducts();
+        setRowSelection({});
+      }
+    }}
+      />
+  </>
   );
 }
