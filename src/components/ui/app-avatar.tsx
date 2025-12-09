@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { appDataDir, join } from '@tauri-apps/api/path';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
+import { useAppImage } from '@/hooks/use-app-image';
 
 interface AppAvatarProps {
   name: string;
@@ -22,32 +20,9 @@ function getInitials(name: string): string {
 }
 
 export function AppAvatar({ name, path, className, variant = 'default' }: AppAvatarProps) {
-  const [src, setSrc] = useState<string | undefined>(undefined);
+  const src = useAppImage(path);
   const initials = getInitials(name);
 
-  useEffect(() => {
-    const resolveAvatarUrl = async () => {
-      if (!path) {
-        setSrc(undefined);
-        return;
-      }
-
-      try {
-        let finalPath = path;
-        if (!path.includes(':') && !path.startsWith('/')) {
-           const appData = await appDataDir();
-           finalPath = await join(appData, path);
-        }
-        
-        setSrc(convertFileSrc(finalPath));
-      } catch (error) {
-        console.error('Error resolving avatar path:', error);
-        setSrc(undefined);
-      }
-    };
-
-    resolveAvatarUrl();
-  }, [path]);
 
   const variantStyles = {
     default: "bg-purple-600 text-white", 
