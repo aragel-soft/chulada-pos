@@ -4,6 +4,7 @@ use std::fs;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
+use std::collections::HashSet;
 
 #[derive(Serialize)]
 pub struct ProductView {
@@ -33,44 +34,69 @@ pub struct PaginatedResponse<T> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateProductPayload {
-    pub code: String,
-    pub barcode: Option<String>,
-    pub name: String,
-    pub description: Option<String>,
-    pub category_id: String,
-    pub retail_price: f64,
-    pub wholesale_price: f64,
-    pub purchase_price: Option<f64>,
-    pub unit_of_measure: Option<String>,
-    pub image_url: Option<String>,
-    pub stock: Option<i64>,
-    pub min_stock: Option<i64>,
+  pub code: String,
+  pub barcode: Option<String>,
+  pub name: String,
+  pub description: Option<String>,
+  pub category_id: String,
+  pub retail_price: f64,
+  pub wholesale_price: f64,
+  pub purchase_price: Option<f64>,
+  pub unit_of_measure: Option<String>,
+  pub image_url: Option<String>,
+  pub stock: Option<i64>,
+  pub min_stock: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Product {
-    pub id: String,
-    pub code: String,
-    pub barcode: Option<String>,
-    pub name: String,
-    pub category_id: String,
-    pub retail_price: f64,
-    pub wholesale_price: f64,
-    pub image_url: Option<String>,
-    pub is_active: bool,
-    pub current_stock: i64, 
+  pub id: String,
+  pub code: String,
+  pub barcode: Option<String>,
+  pub name: String,
+  pub category_id: String,
+  pub retail_price: f64,
+  pub wholesale_price: f64,
+  pub image_url: Option<String>,
+  pub is_active: bool,
+  pub current_stock: i64, 
 }
 
 #[derive(Debug, Serialize)]
 pub struct InventoryError {
-    pub code: String,
-    pub message: String,
+  pub code: String,
+  pub message: String,
 }
 
 impl From<InventoryError> for String {
-    fn from(err: InventoryError) -> String {
-        serde_json::to_string(&err).unwrap_or_else(|_| err.message)
-    }
+  fn from(err: InventoryError) -> String {
+    serde_json::to_string(&err).unwrap_or_else(|_| err.message)
+  }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ImageAction {
+  Keep,
+  Remove,
+  Replace,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateProductPayload {
+  pub id: String,
+  pub code: String,
+  pub barcode: Option<String>,
+  pub name: String,
+  pub description: Option<String>,
+  pub category_id: String,
+  pub retail_price: f64,
+  pub wholesale_price: f64,
+  pub purchase_price: Option<f64>,
+  pub is_active: bool,
+  pub min_stock: Option<i64>,
+  pub tags: Vec<String>,
+  pub image_action: ImageAction,
+  pub new_image_bytes: Option<Vec<u8>>, 
 }
 
 #[tauri::command]
@@ -370,4 +396,185 @@ pub async fn create_product(
     is_active: true,
     current_stock: initial_stock,
   })
+}
+
+#[tauri::command]
+pub async fn update_product(
+  app_handle: AppHandle,
+  db: State<'_, Mutex<Connection>>,
+  payload: UpdateProductPayload,
+) -> Result<Product, String> {
+  if payload.wholesale_price > payload.retail_price {
+    return Err(InventoryError {
+      code: "INVALID_PRICE".to_string(),
+      message: "El precio de mayoreo no puede ser mayor al de menudeo".to_string(),
+    }.into());
+  }
+
+  let mut conn = db.lock().map_err(|e| e.to_string())?;
+
+  let current_code: String = conn.query_row(
+    "SELECT code FROM products WHERE id = ?",
+    [&payload.id],
+    |row| row.get(0),
+  ).map_err(|_| "Producto no encontrado".to_string())?;
+
+  if current_code != payload.code {
+    let has_sales = check_product_has_sales(&conn, &payload.id)
+      .map_err(|e| e.to_string())?;
+        
+    if has_sales {
+      return Err(InventoryError {
+        code: "BLOCKED_BY_HISTORY".to_string(),
+        message: "No se puede modificar el código interno porque el producto tiene ventas registradas.".to_string(),
+      }.into());
+    }
+
+    let exists: bool = conn.query_row(
+      "SELECT EXISTS(SELECT 1 FROM products WHERE code = ? AND id != ? AND deleted_at IS NULL)",
+      [&payload.code, &payload.id],
+      |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    if exists {
+      return Err(InventoryError {
+        code: "CODE_EXISTS".to_string(),
+        message: format!("El código '{}' ya está en uso por otro producto", payload.code),
+      }.into());
+    }
+  }
+
+  let app_dir = app_handle.path().app_data_dir().unwrap();
+  let images_dir = app_dir.join("images").join("products");
+    
+  let current_image_path: Option<String> = conn.query_row(
+    "SELECT image_url FROM products WHERE id = ?",
+    [&payload.id],
+    |row| row.get(0),
+  ).unwrap_or(None);
+
+  let (new_fs_path, new_db_path) = match payload.image_action {
+    ImageAction::Replace => {
+      if let Some(bytes) = &payload.new_image_bytes {
+        if !images_dir.exists() {
+          fs::create_dir_all(&images_dir).map_err(|e| e.to_string())?;
+        }
+        let uuid_name = Uuid::new_v4().to_string(); 
+        let filename = format!("{}.jpg", uuid_name);
+        let fs_path = images_dir.join(&filename);
+        let db_path = format!("images/products/{}", filename);
+        (Some((fs_path, bytes.clone())), Some(db_path))
+      } else {
+        return Err("Se solicitó reemplazo de imagen pero no se enviaron bytes".to_string());
+      }
+    },
+    ImageAction::Remove => (None, None),
+    ImageAction::Keep => (None, current_image_path.clone()), 
+  };
+
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  {
+    let mut stmt = tx.prepare(
+      "UPDATE products SET 
+        code = ?1, barcode = ?2, name = ?3, description = ?4, 
+        category_id = ?5, retail_price = ?6, wholesale_price = ?7, 
+        purchase_price = ?8, image_url = ?9, is_active = ?10
+      WHERE id = ?11"
+    ).map_err(|e| e.to_string())?;
+
+    stmt.execute(rusqlite::params![
+      payload.code,
+      payload.barcode,
+      payload.name,
+      payload.description,
+      payload.category_id,
+      payload.retail_price,
+      payload.wholesale_price,
+      payload.purchase_price.unwrap_or(0.0),
+      new_db_path,
+      payload.is_active,
+      payload.id
+    ]).map_err(|e| format!("Error actualizando producto: {}", e))?;
+
+    if let Some(min_stock) = payload.min_stock {
+      tx.execute(
+        "UPDATE store_inventory SET minimum_stock = ?2 WHERE product_id = ?3",
+        rusqlite::params![min_stock, payload.id],
+      ).map_err(|e| format!("Error actualizando inventario: {}", e))?;
+    }
+
+    let mut tag_ids = Vec::new();
+    let mut stmt_get_tag = tx.prepare("SELECT id FROM tags WHERE name = ?").unwrap();
+    let mut stmt_ins_tag = tx.prepare("INSERT INTO tags (id, name) VALUES (?, ?)").unwrap();
+
+    for tag_name in payload.tags {
+      let existing_id: Option<String> = stmt_get_tag.query_row([&tag_name], |row| row.get(0)).ok();
+        
+      let final_id = match existing_id {
+        Some(id) => id,
+        None => {
+          let new_id = Uuid::new_v4().to_string();
+          stmt_ins_tag.execute(rusqlite::params![&new_id, &tag_name])
+            .map_err(|e| format!("Error creando tag '{}': {}", tag_name, e))?;
+          new_id
+        }
+      };
+      tag_ids.push(final_id);
+    }
+
+    tx.execute("DELETE FROM product_tags WHERE product_id = ?", [&payload.id])
+      .map_err(|e| format!("Error limpiando tags anteriores: {}", e))?;
+
+    let mut stmt_link = tx.prepare("INSERT INTO product_tags (id, product_id, tag_id) VALUES (?, ?, ?)").unwrap();
+    let unique_tag_ids: HashSet<_> = tag_ids.into_iter().collect();
+        
+    for tag_id in unique_tag_ids {
+      stmt_link.execute(rusqlite::params![Uuid::new_v4().to_string(), payload.id, tag_id])
+        .map_err(|e| format!("Error vinculando tag: {}", e))?;
+    }
+  }
+
+  if let Some((path, bytes)) = new_fs_path {
+    if let Err(e) = fs::write(&path, bytes) {
+      return Err(format!("Fallo I/O Crítico: No se pudo guardar la imagen. Revertiendo cambios. Error: {}", e));
+    }
+  }
+
+  tx.commit().map_err(|e| e.to_string())?;
+
+  if matches!(payload.image_action, ImageAction::Replace | ImageAction::Remove) {
+    if let Some(old_path_str) = current_image_path {
+      if !old_path_str.starts_with("http") {
+        let full_old_path = app_dir.join(old_path_str);
+        let _ = fs::remove_file(full_old_path); 
+      }
+    }
+  }
+
+  let current_stock: i64 = conn.query_row(
+      "SELECT stock FROM store_inventory WHERE product_id = ?",
+      [&payload.id],
+      |row| row.get(0)
+  ).unwrap_or(0);
+  let final_full_image_url = new_db_path.map(|p| app_dir.join(p).to_string_lossy().to_string());
+
+  Ok(Product {
+    id: payload.id,
+    code: payload.code,
+    barcode: payload.barcode,
+    name: payload.name,
+    category_id: payload.category_id,
+    retail_price: payload.retail_price,
+    wholesale_price: payload.wholesale_price,
+    image_url: final_full_image_url,
+    is_active: payload.is_active,
+    current_stock,
+  })
+}
+
+// TODO: Tarea Backlog - Implementar consulta real a tabla 'sale_items' cuando exista el módulo de ventas.
+fn check_product_has_sales(_conn: &Connection, _product_id: &str) -> Result<bool, rusqlite::Error> {
+  // Por ahora, asumimos que no hay ventas para permitir la edición
+  Ok(false)
 }

@@ -38,7 +38,8 @@ fn main() {
             commands::inventory::products::get_products,
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,
-            commands::inventory::categories::get_all_categories
+            commands::inventory::products::update_product,
+            commands::inventory::categories::get_all_categories,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
