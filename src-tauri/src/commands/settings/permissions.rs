@@ -91,30 +91,40 @@ pub async fn get_role_permissions(
 #[tauri::command]
 pub async fn update_role_permissions(
     db: State<'_, Mutex<Connection>>,
-    role_permissions: Vec<RolePermission>,
+    added_permissions: Vec<RolePermission>,
+    removed_permissions: Vec<RolePermission>,
     user_id: String,
 ) -> Result<(), String> {
-    // Filtrar cambios al Admin Role
-    let target_permissions: HashSet<RolePermission> = role_permissions
-        .into_iter()
+    // Filtra las modificaciones al ADMIN_ROLE_ID
+    let added: Vec<&RolePermission> = added_permissions
+        .iter()
         .filter(|rp| rp.role_id != ADMIN_ROLE_ID)
         .collect();
 
-    if target_permissions.is_empty() {
+    let removed: Vec<&RolePermission> = removed_permissions
+        .iter()
+        .filter(|rp| rp.role_id != ADMIN_ROLE_ID)
+        .collect();
+
+    if added.is_empty() && removed.is_empty() {
         return Ok(());
     }
 
-    let affected_roles: HashSet<String> = target_permissions
-        .iter()
-        .map(|rp| rp.role_id.clone())
-        .collect();
+    // Recolecta todos los roles afectados para la verificación de modificación propia
+    let mut affected_roles: HashSet<String> = HashSet::new();
+    for rp in &added {
+        affected_roles.insert(rp.role_id.clone());
+    }
+    for rp in &removed {
+        affected_roles.insert(rp.role_id.clone());
+    }
 
     let mut conn = db.lock().map_err(|e| format!("Error DB Lock: {}", e))?;
-
     let tx = conn
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
 
+    // Checar si el usuario intenta modificar su propio rol
     let user_role_id: String = tx
         .query_row("SELECT role_id FROM users WHERE id = ?", [user_id], |row| {
             row.get(0)
@@ -131,32 +141,19 @@ pub async fn update_role_permissions(
         }
     }
 
-    let current_permissions = fetch_current_permissions(&tx, &affected_roles)
-        .map_err(|e| format!("Error leyendo permisos actuales: {}", e))?;
-
-    // Calcular Delta (Diff)
-    let to_insert: Vec<&RolePermission> = target_permissions
-        .difference(&current_permissions)
-        .collect();
-
-    let to_delete: Vec<&RolePermission> = current_permissions
-        .difference(&target_permissions)
-        .collect();
-
-    // Validación de Seguridad (Privilege Escalation)
-    if !to_insert.is_empty() {
-        validate_privileges(&tx, &user_role_id, &to_insert)?;
+    // Valida los privilegios de los permisos agregados
+    if !added.is_empty() {
+        validate_privileges(&tx, &user_role_id, &added)?;
     }
 
-    // Ejecutar Cambios
-    if !to_delete.is_empty() {
-        delete_permissions(&tx, &to_delete)
+    // Ejecuta los cambios
+    if !removed.is_empty() {
+        delete_permissions(&tx, &removed)
             .map_err(|e| format!("Error eliminando permisos: {}", e))?;
     }
 
-    if !to_insert.is_empty() {
-        insert_permissions(&tx, &to_insert)
-            .map_err(|e| format!("Error insertando permisos: {}", e))?;
+    if !added.is_empty() {
+        insert_permissions(&tx, &added).map_err(|e| format!("Error insertando permisos: {}", e))?;
     }
 
     tx.commit()
@@ -166,38 +163,6 @@ pub async fn update_role_permissions(
 }
 
 // --- Helper Functions ---
-
-fn fetch_current_permissions(
-    tx: &Transaction,
-    roles: &HashSet<String>,
-) -> SqlResult<HashSet<RolePermission>> {
-    if roles.is_empty() {
-        return Ok(HashSet::new());
-    }
-
-    let placeholders = vec!["?"; roles.len()].join(",");
-    let query = format!(
-        "SELECT role_id, permission_id FROM role_permissions WHERE role_id IN ({})",
-        placeholders
-    );
-
-    let params_vec: Vec<&dyn rusqlite::ToSql> =
-        roles.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
-
-    let mut stmt = tx.prepare(&query)?;
-    let rows = stmt.query_map(params_vec.as_slice(), |row| {
-        Ok(RolePermission {
-            role_id: row.get(0)?,
-            permission_id: row.get(1)?,
-        })
-    })?;
-
-    let mut result = HashSet::new();
-    for row in rows {
-        result.insert(row?);
-    }
-    Ok(result)
-}
 
 fn validate_privileges(
     tx: &Transaction,

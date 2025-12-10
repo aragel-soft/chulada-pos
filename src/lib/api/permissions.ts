@@ -16,14 +16,20 @@ export const getRolePermissions = async (): Promise<RolePermission[]> => {
 };
 
 export const updateRolePermissions = async ({
-  rolePermissions,
+  added,
+  removed,
   userId,
 }: {
-  rolePermissions: RolePermission[];
+  added: RolePermission[];
+  removed: RolePermission[];
   userId: string;
 }): Promise<void> => {
   try {
-    return await invoke("update_role_permissions", { rolePermissions, userId });
+    return await invoke("update_role_permissions", {
+      addedPermissions: added,
+      removedPermissions: removed,
+      userId,
+    });
   } catch (error) {
     const errorMessage = String(error);
     const jsonMatch = errorMessage.match(/\[.*\]/s);
@@ -31,11 +37,14 @@ export const updateRolePermissions = async ({
     if (jsonMatch) {
       try {
         const parsedErrors = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(parsedErrors) && parsedErrors.length > 0 && parsedErrors[0].code) {
+        if (
+          Array.isArray(parsedErrors) &&
+          parsedErrors.length > 0 &&
+          parsedErrors[0].code
+        ) {
           throw { isStructured: true, errors: parsedErrors };
         }
-      } catch (e) {
-      }
+      } catch (e) { }
     }
 
     throw new Error(errorMessage);

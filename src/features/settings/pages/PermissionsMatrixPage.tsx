@@ -117,11 +117,30 @@ export function PermissionsMatrixPage() {
 
   // Mutación para guardar cambios
   const updateMutation = useMutation({
-    mutationFn: (data: RolePermission[]) =>
-      updateRolePermissions({
-        rolePermissions: data,
+    mutationFn: () => {
+      const added: RolePermission[] = [];
+      const removed: RolePermission[] = [];
+
+      changes.forEach((change) => {
+        if (change.type === "added") {
+          added.push({
+            role_id: change.roleId,
+            permission_id: change.permissionId,
+          });
+        } else {
+          removed.push({
+            role_id: change.roleId,
+            permission_id: change.permissionId,
+          });
+        }
+      });
+
+      return updateRolePermissions({
+        added,
+        removed,
         userId: currentUser?.id || "",
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Permisos actualizados correctamente");
       queryClient.invalidateQueries({ queryKey: ["rolePermissions"] });
@@ -556,7 +575,7 @@ export function PermissionsMatrixPage() {
         changes={changes}
         roles={roles}
         permissions={permissions}
-        onConfirm={() => updateMutation.mutate(localRolePermissions)}
+        onConfirm={() => updateMutation.mutate()}
         isSaving={updateMutation.isPending}
       />
     </DataTableLayout>
