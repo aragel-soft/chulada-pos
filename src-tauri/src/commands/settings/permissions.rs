@@ -104,7 +104,6 @@ pub async fn update_role_permissions(
         return Ok(());
     }
 
-    // Identificar roles afectados para limitar el scope de la consulta
     let affected_roles: HashSet<String> = target_permissions
         .iter()
         .map(|rp| rp.role_id.clone())
@@ -116,7 +115,22 @@ pub async fn update_role_permissions(
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
 
-    // Obtener estado actual de los roles afectados
+    let user_role_id: String = tx
+        .query_row("SELECT role_id FROM users WHERE id = ?", [user_id], |row| {
+            row.get(0)
+        })
+        .map_err(|e| format!("Usuario no encontrado: {}", e))?;
+
+    if user_role_id != ADMIN_ROLE_ID {
+        if affected_roles.contains(&user_role_id) {
+            let errors = vec![PermissionUpdateError {
+                code: "SELF_MODIFICATION".to_string(),
+                message: "No puedes modificar los permisos de tu propio rol.".to_string(),
+            }];
+            return Err(serde_json::to_string(&errors).unwrap_or_default());
+        }
+    }
+
     let current_permissions = fetch_current_permissions(&tx, &affected_roles)
         .map_err(|e| format!("Error leyendo permisos actuales: {}", e))?;
 
@@ -125,14 +139,13 @@ pub async fn update_role_permissions(
         .difference(&current_permissions)
         .collect();
 
-    // To Delete: En DB pero no en Payload
     let to_delete: Vec<&RolePermission> = current_permissions
         .difference(&target_permissions)
         .collect();
 
-    // Validación de Seguridad
+    // Validación de Seguridad (Privilege Escalation)
     if !to_insert.is_empty() {
-        validate_privileges(&tx, &user_id, &to_insert)?;
+        validate_privileges(&tx, &user_role_id, &to_insert)?;
     }
 
     // Ejecutar Cambios
@@ -188,36 +201,26 @@ fn fetch_current_permissions(
 
 fn validate_privileges(
     tx: &Transaction,
-    user_id: &str,
+    user_role_id: &str,
     to_insert: &[&RolePermission],
 ) -> Result<(), String> {
-    let user_role_id: String = tx
-        .query_row("SELECT role_id FROM users WHERE id = ?", [user_id], |row| {
-            row.get(0)
-        })
-        .map_err(|e| format!("Usuario no encontrado: {}", e))?;
-
-    // Si es Admin
     if user_role_id == ADMIN_ROLE_ID {
         return Ok(());
     }
 
-    // Obtener permisos del usuario
     let mut stmt = tx
         .prepare("SELECT permission_id FROM role_permissions WHERE role_id = ?")
         .map_err(|e| format!("Error SQL: {}", e))?;
 
     let user_perms: HashSet<String> = stmt
-        .query_map([&user_role_id], |row| row.get(0))
+        .query_map([user_role_id], |row| row.get(0))
         .map_err(|e| format!("Error SQL: {}", e))?
         .collect::<Result<HashSet<_>, _>>()
         .map_err(|e| format!("Error SQL: {}", e))?;
 
-    // C. Verificar cada permiso nuevo
     let mut errors = Vec::new();
-    let mut perm_names_cache: HashMap<String, String> = HashMap::new(); // Cache on demand o pre-load?
+    let mut perm_names_cache: HashMap<String, String> = HashMap::new();
 
-    // Primero identificamos qué IDs fallan
     let mut missing_ids = HashSet::new();
     for rp in to_insert {
         if !user_perms.contains(&rp.permission_id) {
@@ -229,7 +232,6 @@ fn validate_privileges(
         return Ok(());
     }
 
-    // Si hay fallos, buscamos sus nombres para el error
     let placeholders = vec!["?"; missing_ids.len()].join(",");
     let query_names = format!(
         "SELECT id, display_name FROM permissions WHERE id IN ({})",
