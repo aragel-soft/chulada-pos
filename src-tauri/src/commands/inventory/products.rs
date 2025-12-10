@@ -95,8 +95,9 @@ pub fn get_products(
 
   let count_sql = if has_search {
     "SELECT COUNT(*) FROM products p 
+    LEFT JOIN categories c ON p.category_id = c.id
      WHERE p.deleted_at IS NULL 
-     AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1)"
+     AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1)"
   } else {
     "SELECT COUNT(*) FROM products p WHERE p.deleted_at IS NULL"
   };
@@ -113,12 +114,14 @@ pub fn get_products(
     Some("retail_price") => "p.retail_price",
     Some("stock") => "stock",
     Some("is_active") => "p.is_active",
-    _ => "p.name",
+    Some("name") => "p.name",
+    _ => "p.created_at",
   };
 
+  let default_direction = if sort_by.is_none() { "DESC" } else { "ASC" };
   let order_direction = match sort_order.as_deref() {
     Some("desc") => "DESC",
-    _ => "ASC",
+    _ => default_direction,
   };
 
   // TODO: Cambiar 'store-main' por un store_id dinámico cuando existan varias sucursales
@@ -144,7 +147,7 @@ pub fn get_products(
   ";
 
   let final_sql = if has_search {
-    format!("{} AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
+    format!("{} AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
   } else {
     format!("{} ORDER BY {} {} LIMIT ?1 OFFSET ?2", base_sql, order_column, order_direction)
   };

@@ -1,9 +1,15 @@
 import * as z from "zod";
 
 export const productSchema = z.object({
-  code: z.string().min(1, "El código es requerido"),
-  barcode: z.string().optional(),
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  code: z.string()
+    .transform(val => val.trim())
+    .pipe(z.string().min(1, "El código es requerido")),
+  barcode: z.string()
+    .transform(val => val.trim())
+    .optional(),
+  name: z.string()
+    .transform(val => val.trim().replace(/\s+/g, ' ')) 
+    .pipe(z.string().min(3, "El nombre debe tener al menos 3 caracteres")),
   description: z.string().optional(),
   category_id: z.string().min(1, "Selecciona una categoría"),
   

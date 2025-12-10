@@ -17,6 +17,12 @@ import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
 import { CreateProductDialog } from "../components/CreateProductDialog";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { ProductImagePreview } from "../components/ProductImageHover";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
@@ -31,15 +37,13 @@ export default function ProductsPage() {
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "name", desc: false } 
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const sortField = sorting.length > 0 ? sorting[0].id : "name";
-      const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
+      const sortField = sorting.length > 0 ? sorting[0].id : undefined;
+      const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : undefined;
 
       const response = await getProducts({
         page: pagination.pageIndex + 1, 
@@ -109,12 +113,26 @@ export default function ProductsPage() {
         header: "",
         cell: ({ row }) => (
           <div key={row.original.id} className="flex items-center justify-center">
-             <AppAvatar 
-               name={row.original.name} 
-               path={row.original.image_url} 
-               className="h-9 w-9" 
-               variant="muted"
-             />
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <div className="cursor-pointer">
+                  <AppAvatar 
+                    name={row.original.name} 
+                    path={row.original.image_url} 
+                    className="h-9 w-9" 
+                    variant="muted"
+                  />
+                </div>
+              </HoverCardTrigger>
+              {row.original.image_url && (
+                <HoverCardContent className="w-64 p-0 overflow-hidden border-2 z-50" side="right">
+                  <ProductImagePreview 
+                    path={row.original.image_url} 
+                    alt={row.original.name} 
+                  />
+                </HoverCardContent>
+              )}
+            </HoverCard>
           </div>
         ),
       },
@@ -128,7 +146,7 @@ export default function ProductsPage() {
             </span>
            <div className="flex">
             <Badge 
-              variant="outline" 
+              variant="outline"
               className="text-[10px] px-2 py-0 h-5 font-medium border-0"
               style={{ 
                 backgroundColor: (row.original.category_color || '#64748b') + '20', // Opacidad 20% hex
@@ -219,8 +237,8 @@ export default function ProductsPage() {
       columns={columns}
       data={data}
       isLoading={isLoading}
-      searchPlaceholder="Buscar por nombre o código..."
-      initialSorting={[{ id: "name", desc: false }]}
+      searchPlaceholder="Buscar por nombre, código o categoría..."
+      initialSorting={[]}
       columnTitles={{
         image_url: "Imagen",
         code: "Código",

@@ -215,7 +215,14 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                     <FormItem>
                       <FormLabel className="!text-foreground">Código Interno <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: TINT-001" {...field} />
+                        <Input 
+                          placeholder="Ej: TINT-001" 
+                          {...field}
+                          onChange={(e) => {
+                            const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+                            field.onChange(cleanValue);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -229,7 +236,14 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                     <FormItem>
                       <FormLabel>Código de Barras</FormLabel>
                       <FormControl>
-                        <Input placeholder="Escanea el código..." {...field} />
+                        <Input 
+                          placeholder="Escanea el código..." 
+                          {...field}
+                          onChange={(e) => {
+                            const cleanValue = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                            field.onChange(cleanValue);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
