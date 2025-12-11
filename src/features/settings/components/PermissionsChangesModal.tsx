@@ -71,7 +71,7 @@ export function PermissionsChangesModal({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <ScrollArea className="h-[400px] pr-4">
+        <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
             {Object.entries(changesByRole).map(([roleId, roleChanges]) => (
               <div key={roleId} className="space-y-2">
