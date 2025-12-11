@@ -9,3 +9,11 @@ export interface CategoryListDto {
     depth: number;
     created_at: string;
 }
+
+export interface CreateCategoryDto {
+    name: string;
+    parent_id?: string | null;
+    color: string;
+    sequence: number;
+    description?: string;
+}

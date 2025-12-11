@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { CategoryListDto } from "@/types/categories";
+import { CategoryListDto, CreateCategoryDto } from "@/types/categories";
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -29,4 +29,8 @@ export async function getCategories(params: PaginationParams): Promise<Paginated
     sortBy: params.sortBy,
     sortOrder: params.sortOrder,
   });
+}
+
+export async function createCategory(data: CreateCategoryDto): Promise<void> {
+  return await invoke("create_category", { data });
 }

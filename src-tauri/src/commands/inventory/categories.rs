@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::State;
@@ -226,4 +226,79 @@ pub async fn get_categories(
         page_size,
         total_pages,
     })
+}
+
+#[derive(serde::Deserialize)]
+pub struct CreateCategoryDto {
+    pub name: String,
+    pub parent_id: Option<String>,
+    pub color: String,
+    pub sequence: i32,
+    pub description: Option<String>,
+}
+
+#[tauri::command]
+pub fn create_category(
+    data: CreateCategoryDto,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| format!("Error de conexión: {}", e))?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Error iniciando transacción: {}", e))?;
+
+    // Validar profundidad
+    if let Some(ref parent_id) = data.parent_id {
+        let parent_depth: Option<i32> = tx.query_row(
+            "SELECT CASE WHEN parent_category_id IS NULL THEN 0 ELSE 1 END FROM categories WHERE id = ?",
+            [parent_id],
+            |row| row.get(0),
+        ).optional().map_err(|e| format!("Error consultando padre: {}", e))?;
+
+        match parent_depth {
+            Some(0) => {}
+            Some(_) => {
+                return Err("No se pueden crear subcategorías de nivel mayor a 1".to_string())
+            }
+            None => return Err("La categoría padre especificada no existe".to_string()),
+        }
+    }
+
+    // Validar nombre duplicado en el mismo nivel
+    let duplicate_count: i64 = if let Some(ref parent_id) = data.parent_id {
+        tx.query_row(
+            "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id = ? AND deleted_at IS NULL",
+            [&data.name, parent_id],
+            |row| row.get(0),
+        ).map_err(|e| format!("Error validando duplicados: {}", e))?
+    } else {
+        tx.query_row(
+            "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id IS NULL AND deleted_at IS NULL",
+            [&data.name],
+            |row| row.get(0),
+        ).map_err(|e| format!("Error validando duplicados: {}", e))?
+    };
+
+    if duplicate_count > 0 {
+        return Err("Ya existe una categoría con este nombre en esta categoría padre, solo se permite repetir el nombre una vez por categoría".to_string());
+    }
+
+    // Insertar
+    let id = uuid::Uuid::new_v4().to_string();
+    tx.execute(
+        "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, DATETIME('now'))",
+        rusqlite::params![
+            id,
+            data.name,
+            data.parent_id,
+            data.color,
+            data.sequence,
+            data.description
+        ],
+    ).map_err(|e| format!("Error al insertar categoría: {}", e))?;
+
+    tx.commit()
+        .map_err(|e| format!("Error confirmando transacción: {}", e))?;
+
+    Ok(())
 }

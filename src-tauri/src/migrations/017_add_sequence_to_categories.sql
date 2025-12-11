@@ -30,7 +30,7 @@ INSERT INTO permissions (id, name, display_name, description, module, sequence)
 VALUES 
 ('perm_categories_view', 'categories:view', 'Ver Categorias', 'Permite ver las categorias', 'inventory', 1),
 ('perm_categories_create', 'categories:create', 'Crear Categorias', 'Permite crear categorias', 'inventory', 2),
-('perm_categories_update', 'categories:update', 'Editar Categorias', 'Permite editar categorias', 'inventory', 3),
+('perm_categories_edit', 'categories:edit', 'Editar Categorias', 'Permite editar categorias', 'inventory', 3),
 ('perm_categories_delete', 'categories:delete', 'Eliminar Categorias', 'Permite eliminar categorias', 'inventory', 4);
 
 -- Asignar permisos a admin
@@ -43,6 +43,6 @@ FROM permissions
 WHERE id IN (
   'perm_categories_view', 
   'perm_categories_create', 
-  'perm_categories_update', 
+  'perm_categories_edit', 
   'perm_categories_delete'
 );
