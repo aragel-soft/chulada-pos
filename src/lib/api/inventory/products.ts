@@ -15,12 +15,11 @@ export const getProducts = async (params: GetProductsParams): Promise<PaginatedR
     return await invoke("get_products", {
       page: params.page,
       pageSize: params.pageSize,
-      search: params.search || null, 
+      search: params.search || null,
       sortBy: params.sortBy || null,
       sortOrder: params.sortOrder || null,
     });
   } catch (error) {
-    console.error("Error fetching products:", error);
     throw error;
   }
 };
@@ -44,9 +43,9 @@ export const createProduct = async (data: CreateProductPayload): Promise<Product
 };
 
 export const saveProductImage = async (fileData: number[], fileName: string): Promise<string> => {
-  return await invoke("save_product_image", { 
-    fileData, 
-    fileName 
+  return await invoke("save_product_image", {
+    fileData,
+    fileName
   });
 };
 
