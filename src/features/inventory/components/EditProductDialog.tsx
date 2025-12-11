@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Upload, X, Loader2, Save } from "lucide-react";
+import { Upload, X, Loader2, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +14,13 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/text-area"; 
 import {
   Select,
   SelectContent,
@@ -30,8 +31,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { TagInput } from "@/components/ui/tag-input"; // <--- Nuestro componente nuevo
+import { TagInput } from "@/components/ui/tag-input";
 
 import {
   productSchema,
@@ -44,7 +46,7 @@ import {
 } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { UpdateProductPayload, ImageAction } from "@/types/inventory";
-import { Label } from "@/components/ui/label";
+import { useAppImage } from "@/hooks/use-app-image";
 
 interface EditProductDialogProps {
   open: boolean;
@@ -58,13 +60,12 @@ export function EditProductDialog({
   productId,
 }: EditProductDialogProps) {
   const queryClient = useQueryClient();
+  const { can } = useAuthStore();
 
-  // Estado local para manejo de imágenes
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>("Keep");
 
-  // 1. Configuración del Formulario
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
     mode: "onChange",
@@ -84,8 +85,7 @@ export function EditProductDialog({
     },
   });
 
-  // 2. Carga de Datos (Categorías + Tags Disponibles + Producto)
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: ["categories"],
     queryFn: getAllCategories,
     enabled: open,
@@ -97,18 +97,15 @@ export function EditProductDialog({
     enabled: open,
   });
 
-  const {
-    data: product,
-    isLoading: loadingProduct,
-    error: loadError,
-  } = useQuery({
+  const { data: product, isLoading: loadingProduct } = useQuery({
     queryKey: ["product", productId],
     queryFn: () => getProductById(productId!),
     enabled: open && !!productId,
     retry: 1,
   });
 
-  // 3. Efecto para rellenar el formulario cuando llegan los datos
+  const resolvedImage = useAppImage(product?.image_url);
+
   useEffect(() => {
     if (product) {
       form.reset({
@@ -120,29 +117,27 @@ export function EditProductDialog({
         retail_price: product.retail_price,
         wholesale_price: product.wholesale_price,
         purchase_price: product.purchase_price,
-        stock: product.stock, // Solo visual
+        stock: product.stock,
         min_stock: product.min_stock,
         is_active: product.is_active,
         tags: product.tags,
       });
 
-      // Manejo de preview de imagen
-      if (product.image_url) {
-        setImagePreview(product.image_url);
-        setImageAction("Keep");
-      } else {
-        setImagePreview(null);
-        setImageAction("Keep");
-      }
+      setImageAction('Keep');
+      setImageFile(null);
     }
   }, [product, form]);
 
-  // 4. Mutación de Guardado
+  useEffect(() => {
+    if (imageAction === 'Keep') {
+      setImagePreview(resolvedImage || null);
+    }
+  }, [resolvedImage, imageAction]);
+
   const updateMutation = useMutation({
     mutationFn: async (values: ProductFormValues) => {
       if (!productId) throw new Error("No ID");
 
-      // Preparamos los bytes de la imagen si es nueva
       let newImageBytes: number[] | undefined;
       if (imageAction === "Replace" && imageFile) {
         const buffer = await imageFile.arrayBuffer();
@@ -165,32 +160,26 @@ export function EditProductDialog({
       toast.success("Producto actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product", productId] });
-      queryClient.invalidateQueries({ queryKey: ["tags"] }); // Refrescar lista de tags por si creamos nuevos
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
       handleClose();
     },
     onError: (error: any) => {
-      // Manejo de errores específicos del backend (Rust)
       try {
-        // A veces el error viene como string JSON, a veces como objeto
         const msg =
           typeof error === "string"
             ? error
             : error.message || "Error desconocido";
-
         if (msg.includes("CODE_EXISTS")) {
           form.setError("code", { message: "Este código ya está en uso" });
         } else if (msg.includes("BLOCKED_BY_HISTORY")) {
           form.setError("code", {
-            message: "No se puede cambiar el código: el producto tiene ventas.",
-          });
-          toast.error("Operación bloqueada", {
-            description: "El producto tiene historial de ventas.",
+            message: "Código bloqueado por historial de ventas",
           });
         } else {
-          toast.error("Error al actualizar", { description: msg });
+          toast.error(msg);
         }
       } catch (e) {
-        toast.error("Error inesperado");
+        toast.error("Error inesperado al actualizar");
       }
     },
   });
@@ -203,7 +192,6 @@ export function EditProductDialog({
     onOpenChange(false);
   };
 
-  // Lógica de Imagen (Local)
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -213,7 +201,6 @@ export function EditProductDialog({
       }
       setImageFile(file);
       setImageAction("Replace");
-
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
@@ -230,111 +217,51 @@ export function EditProductDialog({
     updateMutation.mutate(values);
   };
 
-  if (loadError) {
-    return null; // O un toast de error
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-4 shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <div className="bg-primary/10 p-2 rounded-md">
-              <Save className="h-5 w-5 text-primary" />
-            </div>
+            <Pencil className="h-5 w-5 text-primary" />
             Editar Producto
             {loadingProduct && (
-              <Loader2 className="h-4 w-4 animate-spin ml-2" />
+              <Loader2 className="h-4 w-4 animate-spin ml-2 text-muted-foreground" />
             )}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Loading State */}
-        {loadingProduct ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p>Cargando ficha técnica...</p>
-            </div>
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* --- HEADER: Estatus y Categoría --- */}
-              <div className="flex flex-col md:flex-row gap-6 justify-between items-start border-b pb-6">
-                <FormField
-                  control={form.control}
-                  name="is_active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 gap-4 shadow-sm w-full md:w-auto bg-muted/20">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Estado del Producto
-                        </FormLabel>
-                        <FormDescription>
-                          {field.value
-                            ? "Visible en ventas"
-                            : "Oculto en catálogo"}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="!text-foreground">
+                      Nombre del Producto{" "}
+                      <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nombre descriptivo del producto" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="category_id"
-                  render={({ field }) => (
-                    <FormItem className="w-full md:w-1/2">
-                      <FormLabel>Categoría</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{
-                                    backgroundColor: cat.color || "#ccc",
-                                  }}
-                                />
-                                {cat.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-                {/* --- COLUMNA IZQUIERDA: Imagen y Tags (4 cols) --- */}
-                <div className="md:col-span-4 space-y-6">
-                  {/* Imagen */}
-                  <div className="space-y-3">
-                    <Label>Imagen</Label>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+                <div className="md:col-span-2 flex flex-col gap-5">
+                  <div className="flex flex-col gap-3">
+                    <Label>Imagen del Producto</Label>
                     {!imagePreview ? (
-                      <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/10 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer transition-all">
-                        <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                        <span className="text-sm font-medium text-muted-foreground">
-                          Subir nueva imagen
+                      <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
+                        <Upload className="w-10 h-10 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground font-medium">
+                          Clic para subir
                         </span>
                         <input
                           type="file"
@@ -344,34 +271,24 @@ export function EditProductDialog({
                         />
                       </label>
                     ) : (
-                      <div className="relative h-48 rounded-xl overflow-hidden border bg-muted/20 group">
+                      <div className="relative h-56 rounded-lg overflow-hidden border border-border group">
                         <img
                           src={imagePreview}
                           alt="Preview"
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-contain bg-muted/20"
                         />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <label className="cursor-pointer">
-                            <div className="bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-sm text-white transition-colors">
-                              <Upload className="w-5 h-5" />
-                            </div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleImageChange}
-                            />
-                          </label>
-                          <button
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Button
                             type="button"
+                            variant="destructive"
+                            size="sm"
                             onClick={handleRemoveImage}
-                            className="bg-destructive/80 hover:bg-destructive p-2 rounded-full backdrop-blur-sm text-white transition-colors"
                           >
-                            <X className="w-5 h-5" />
-                          </button>
+                            <X className="w-4 h-4 mr-2" /> Quitar
+                          </Button>
                         </div>
                         {imageAction === "Replace" && (
-                          <Badge className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600 text-white border-0">
+                          <Badge className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600 border-0 text-white">
                             Nueva
                           </Badge>
                         )}
@@ -379,72 +296,136 @@ export function EditProductDialog({
                     )}
                   </div>
 
-                  {/* Tags */}
                   <FormField
                     control={form.control}
                     name="tags"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Etiquetas / Tags</FormLabel>
+                        <FormLabel>Etiquetas</FormLabel>
                         <FormControl>
                           <TagInput
                             availableTags={availableTags}
                             selectedTags={field.value}
                             onTagsChange={field.onChange}
-                            placeholder="+ Agregar etiqueta"
+                            placeholder="+ Tag"
                           />
                         </FormControl>
-                        <FormDescription className="text-xs">
-                          Escribe y presiona Enter para crear.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                {/* --- COLUMNA DERECHA: Datos (8 cols) --- */}
-                <div className="md:col-span-8 space-y-6">
-                  {/* Identificación */}
+                <div className="md:col-span-3 space-y-5">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Código Interno</FormLabel>
+                          <FormLabel className="!text-foreground">
+                            Código Interno{" "}
+                            <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} />
-                            {/* TODO: Agregar disabled={hasSales} cuando el backend lo soporte en ProductDetail */}
+                            <Input 
+                              placeholder="Ej: TINT-001" 
+                              maxLength={16}
+                              {...field}
+                              onChange={(e) => {
+                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+                                field.onChange(cleanValue);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={form.control}
-                      name="barcode"
+                      name="is_active"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Código de Barras</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Opcional" />
-                          </FormControl>
-                          <FormMessage />
+                          <FormLabel className="px-3">Estatus</FormLabel>
+                          <div className="flex items-center gap-2 h-10 rounded-md px-3 bg-muted/10">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <span className="text-sm text-muted-foreground">
+                              {field.value ? "Activo" : "Inactivo"}
+                            </span>
+                          </div>
                         </FormItem>
                       )}
                     />
                   </div>
 
                   <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Código de Barras</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Escanea el código..." 
+                              maxLength={32}
+                              {...field}
+                              onChange={(e) => {
+                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                                field.onChange(cleanValue);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                  <FormField
                     control={form.control}
-                    name="name"
+                    name="category_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nombre del Producto</FormLabel>
-                        <FormControl>
-                          <Input {...field} className="text-lg font-medium" />
-                        </FormControl>
+                        <FormLabel className="!text-foreground">
+                          Categoría <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={loadingCategories}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  loadingCategories ? "..." : "Selecciona"
+                                }
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                <Badge 
+                                  variant="outline" 
+                                  className="font-normal border-0 px-2"
+                                  style={{ 
+                                    backgroundColor: (cat.color || '#64748b') + '20',
+                                    color: cat.color || '#64748b', 
+                                  }}
+                                >
+                                  {cat.name}
+                                </Badge>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -457,166 +438,172 @@ export function EditProductDialog({
                       <FormItem>
                         <FormLabel>Descripción</FormLabel>
                         <FormControl>
-                          <Input
+                          <Textarea
                             {...field}
-                            placeholder="Detalles adicionales..."
+                            placeholder="Detalles adicionales del producto..."
+                            className="min-h-[80px]"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
+              </div>
 
-                  <Separator />
+              <Separator />
 
-                  {/* Precios */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="retail_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Precio Menudeo</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1.5 text-muted-foreground">
-                                $
-                              </span>
-                              <Input
-                                type="number"
-                                step="0.50"
-                                className="pl-7 font-bold text-foreground"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="wholesale_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Precio Mayoreo</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1.5 text-muted-foreground">
-                                $
-                              </span>
-                              <Input
-                                type="number"
-                                step="0.50"
-                                className="pl-7"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="purchase_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-muted-foreground">
-                            Costo Compra
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1.5 text-muted-foreground">
-                                $
-                              </span>
-                              <Input
-                                type="number"
-                                step="0.50"
-                                className="pl-7 bg-muted/20"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="retail_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="!text-foreground">
+                        Precio Menudeo{" "}
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1.5 text-muted-foreground">
+                            $
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.50"
+                            className="pl-7 font-semibold"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <Separator />
-
-                  {/* Inventario (Stock Disabled, Min Stock Enabled) */}
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50/50 dark:bg-blue-950/10 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            Existencias Reales
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] h-5 px-1 font-normal bg-background"
-                            >
-                              Solo Lectura
-                            </Badge>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              disabled
-                              className="bg-muted text-muted-foreground font-mono"
-                            />
-                          </FormControl>
-                          <FormDescription className="text-xs">
-                            Para ajustar, use "Entrada/Salida".
-                          </FormDescription>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="min_stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock Mínimo</FormLabel>
-                          <FormControl>
+                <FormField
+                  control={form.control}
+                  name="wholesale_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="!text-foreground">
+                        Precio Mayoreo{" "}
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1.5 text-muted-foreground">
+                            $
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.50"
+                            className="pl-7"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {can("products:purchase_price") && (
+                  <FormField
+                    control={form.control}
+                    name="purchase_price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Costo de Compra</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1.5 text-muted-foreground">
+                              $
+                            </span>
                             <Input
                               type="number"
+                              step="0.50"
+                              className="pl-7 bg-muted/20"
                               {...field}
-                              className="bg-background"
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
-              <div className="flex justify-between pt-6 border-t">
-                <Button type="button" variant="ghost" onClick={handleClose}>
-                  Cancelar
-                </Button>
-                <div className="flex gap-3">
-                  {/* Aquí podrías poner un botón de "Eliminar Producto" si quisieras */}
-                  <Button
-                    type="submit"
-                    disabled={updateMutation.isPending}
-                    className="min-w-[150px]"
-                  >
-                    {updateMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Guardar Cambios
-                  </Button>
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-8 p-6 bg-muted/30 rounded-xl border border-border/50">
+                <div className="col-span-2 flex items-center gap-1">
+                  <span className="text-sm font-semibold text-foreground">Inventario</span>
                 </div>
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="!text-foreground">Existencias</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className="bg-muted text-muted-foreground cursor-not-allowed"
+                          disabled
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="min_stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="!text-foreground">
+                        Stock Mínimo
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className="bg-background"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </form>
-          </Form>
-        )}
+
+            </div>
+
+            <div className="p-6 pt-4 bg-background flex justify-end gap-3 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={updateMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending}
+                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              >
+                {updateMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Guardar Cambios
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

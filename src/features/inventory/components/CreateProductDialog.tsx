@@ -169,7 +169,6 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
             />
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-              {/* --- Columna Izquierda: Imagen --- */}
               <div className="md:col-span-2 flex flex-col gap-3">
                 <Label>Imagen del Producto</Label>
                 
@@ -206,7 +205,6 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                 )}
               </div>
 
-              {/* --- Columna Derecha: Datos Principales --- */}
               <div className="md:col-span-3 space-y-5">
                 <FormField
                   control={form.control}
@@ -273,8 +271,8 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                                 variant="outline" 
                                 className="font-normal border-0 px-2"
                                 style={{ 
-                                  backgroundColor: (cat.color || '#64748b') + '20', // Fondo 20% opacidad
-                                  color: cat.color || '#64748b', // Texto del color real
+                                  backgroundColor: (cat.color || '#64748b') + '20', 
+                                  color: cat.color || '#64748b', 
                                 }}
                               >
                                 {cat.name}
@@ -292,7 +290,6 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
 
             <Separator />
 
-            {/* --- Precios --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
@@ -349,7 +346,6 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
 
             <Separator />
 
-            {/* --- Inventario --- */}
             <div className="grid grid-cols-2 gap-8 p-6 bg-muted/30 rounded-xl border border-border/50">
               <div className="col-span-2 flex items-center gap-1">
                 <span className="text-sm font-semibold text-foreground">Inventario Inicial</span>

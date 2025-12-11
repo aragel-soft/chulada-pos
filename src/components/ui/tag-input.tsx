@@ -68,7 +68,7 @@ export function TagInput({
       className={cn("overflow-visible bg-transparent", className)}
     >
       <div
-        className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 bg-background"
+        className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-1 bg-background"
       >
         <div className="flex flex-wrap gap-1">
           {selectedTags.map((tag) => (
@@ -76,7 +76,7 @@ export function TagInput({
               {tag}
               <button
                 type="button"
-                className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-destructive/20 hover:text-destructive transition-colors"
+                className="ml-1 ring-offset-background rounded-full outline-none focus:ring-1 focus:ring-ring focus:ring-offset-2 hover:bg-destructive/20 hover:text-destructive transition-colors"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

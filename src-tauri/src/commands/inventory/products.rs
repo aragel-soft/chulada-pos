@@ -517,7 +517,7 @@ pub async fn update_product(
 
     if let Some(min_stock) = payload.min_stock {
       tx.execute(
-        "UPDATE store_inventory SET minimum_stock = ?2 WHERE product_id = ?3",
+        "UPDATE store_inventory SET minimum_stock = ?1 WHERE product_id = ?2",
         rusqlite::params![min_stock, payload.id],
       ).map_err(|e| format!("Error actualizando inventario: {}", e))?;
     }
@@ -571,9 +571,9 @@ pub async fn update_product(
   }
 
   let current_stock: i64 = conn.query_row(
-      "SELECT stock FROM store_inventory WHERE product_id = ?",
-      [&payload.id],
-      |row| row.get(0)
+    "SELECT stock FROM store_inventory WHERE product_id = ?",
+    [&payload.id],
+    |row| row.get(0)
   ).unwrap_or(0);
   let final_full_image_url = new_db_path.map(|p| app_dir.join(p).to_string_lossy().to_string());
 

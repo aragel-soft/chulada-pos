@@ -3,9 +3,17 @@ import * as z from "zod";
 export const productSchema = z.object({
   code: z.string()
     .transform(val => val.trim())
-    .pipe(z.string().min(1, "El código es requerido")),
+    .pipe(
+      z.string()
+      .min(1, "El código es requerido")
+      .max(16, "El código no debe exceder 16 caracteres")
+    ),
   barcode: z.string()
     .transform(val => val.trim())
+    .pipe(
+      z.string()
+      .max(32, "El código de barras no debe exceder 32 caracteres")
+    )
     .optional(),
   name: z.string()
     .transform(val => val.trim().replace(/\s+/g, ' ')) 
