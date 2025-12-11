@@ -40,10 +40,9 @@ fn main() {
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,
             commands::inventory::products::update_product,
-
             // Inventory - Categories
+            commands::inventory::categories::get_categories,
             commands::inventory::categories::get_all_categories,
-
             // Inventory - Tags
             commands::inventory::tags::get_all_tags,
         ])
