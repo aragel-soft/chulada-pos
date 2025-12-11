@@ -1,0 +1,11 @@
+export interface CategoryListDto {
+    id: string;
+    name: string;
+    description?: string;
+    color: string;
+    parent_id?: string;
+    sequence: number;
+    product_count: number;
+    depth: number;
+    created_at: string;
+}

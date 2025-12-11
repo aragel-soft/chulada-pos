@@ -38,6 +38,7 @@ fn main() {
             commands::inventory::products::get_products,
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,
+            commands::inventory::categories::get_categories,
             commands::inventory::categories::get_all_categories
         ])
         .run(tauri::generate_context!())

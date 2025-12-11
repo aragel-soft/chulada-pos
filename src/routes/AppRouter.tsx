@@ -1,8 +1,8 @@
 // MALR: Importaciones
-import { 
-  createBrowserRouter, 
-  RouterProvider, 
-  Navigate 
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate
 } from 'react-router-dom';
 
 // --- Layouts ---
@@ -16,9 +16,10 @@ import CustomersPage from '@/pages/CustomersPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
+import CategoriesPage from '@/features/inventory/pages/CategoriesPage';
 
 // --- Ruta Protegida ---
-import ProtectedRoute from './ProtectedRoute'; 
+import ProtectedRoute from './ProtectedRoute';
 
 // --- Settings
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
@@ -36,7 +37,7 @@ const router = createBrowserRouter([
     element: <LoginPage />,
   },
 
-    // --- Rutas Protegidas con Layout ---
+  // --- Rutas Protegidas con Layout ---
   {
     path: "/",
     element: (
@@ -59,13 +60,21 @@ const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="products" replace />, 
+            element: <Navigate to="products" replace />,
           },
           {
             path: "products",
             element: (
               <ProtectedRoute module="products:view">
                 <ProductsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "categories",
+            element: (
+              <ProtectedRoute module="categories:view">
+                <CategoriesPage />
               </ProtectedRoute>
             ),
           },
@@ -87,19 +96,19 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      
+
       // --- Rutas Anidadas para Settings ---
       {
         path: "settings",
         element: (
           <ProtectedRoute module="settings:view">
-            <SettingsPage /> 
+            <SettingsPage />
           </ProtectedRoute>
         ),
         children: [
           {
             index: true,
-            element: <Navigate to="profile" replace />, 
+            element: <Navigate to="profile" replace />,
           },
           {
             path: "users",
@@ -150,6 +159,6 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
-  
+
   return <RouterProvider router={router} />;
 }
