@@ -1,3 +1,4 @@
+// importaciones
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,12 +36,14 @@ import { categorySchema, CategoryFormValues } from "@/features/inventory/schemas
 import { createCategory, getAllCategories } from "@/lib/api/inventory/categories";
 import { toast } from "sonner";
 
+// interfaces
 interface CreateCategoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
+// componentes
 export function CreateCategoryModal({
   open,
   onOpenChange,
@@ -48,7 +51,7 @@ export function CreateCategoryModal({
 }: CreateCategoryModalProps) {
   const queryClient = useQueryClient();
 
-  // Query para obtener categorías padre (solo fetch cuando el modal está abierto)
+  // Query para obtener categorías padre
   const { data: parentCategories = [], isLoading: isLoadingParents } = useQuery({
     queryKey: ['categories', 'all'], // Usamos una key específica para listado completo
     queryFn: getAllCategories,
@@ -56,6 +59,7 @@ export function CreateCategoryModal({
     select: (data) => data.filter((c) => !c.parent_id), // Filtrar solo raíces en el cliente
   });
 
+  // Formulario
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
@@ -72,8 +76,7 @@ export function CreateCategoryModal({
     mutationFn: createCategory,
     onSuccess: () => {
       toast.success("Categoría creada correctamente");
-      queryClient.invalidateQueries({ queryKey: ['categories'] }); // Invalidar todas las queries de categorías
-      onSuccess();
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       handleClose();
     },
     onError: (error) => {
@@ -94,10 +97,10 @@ export function CreateCategoryModal({
     }
   }, [open, form]);
 
+  // Funciones
   const onSubmit = (values: CategoryFormValues) => {
     createMutation.mutate({
       name: values.name,
-      // Convert "null" string from Select or empty string to actual null
       parent_id: values.parent_id === "null" || !values.parent_id ? null : values.parent_id,
       color: values.color,
       sequence: Number(values.sequence),
@@ -109,6 +112,7 @@ export function CreateCategoryModal({
     onOpenChange(false);
   };
 
+  // Renderizado
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">

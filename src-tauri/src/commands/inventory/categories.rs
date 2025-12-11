@@ -247,7 +247,8 @@ pub fn create_category(
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
 
-    // Validar profundidad
+    let name = data.name.trim().to_string();
+
     if let Some(ref parent_id) = data.parent_id {
         let parent_depth: Option<i32> = tx.query_row(
             "SELECT CASE WHEN parent_category_id IS NULL THEN 0 ELSE 1 END FROM categories WHERE id = ?",
@@ -264,17 +265,17 @@ pub fn create_category(
         }
     }
 
-    // Validar nombre duplicado en el mismo nivel
+    // Validar nombre duplicado
     let duplicate_count: i64 = if let Some(ref parent_id) = data.parent_id {
         tx.query_row(
             "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id = ? AND deleted_at IS NULL",
-            [&data.name, parent_id],
+            [&name, parent_id],
             |row| row.get(0),
         ).map_err(|e| format!("Error validando duplicados: {}", e))?
     } else {
         tx.query_row(
             "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id IS NULL AND deleted_at IS NULL",
-            [&data.name],
+            [&name],
             |row| row.get(0),
         ).map_err(|e| format!("Error validando duplicados: {}", e))?
     };
@@ -289,7 +290,7 @@ pub fn create_category(
         "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, DATETIME('now'))",
         rusqlite::params![
             id,
-            data.name,
+            name,
             data.parent_id,
             data.color,
             data.sequence,
