@@ -36,10 +36,15 @@ fn main() {
             commands::settings::permissions::update_role_permissions,
             // Inventory - Products
             commands::inventory::products::get_products,
+            commands::inventory::products::get_product_by_id,
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,
+            commands::inventory::products::update_product,
+            // Inventory - Categories
             commands::inventory::categories::get_categories,
-            commands::inventory::categories::get_all_categories
+            commands::inventory::categories::get_all_categories,
+            // Inventory - Tags
+            commands::inventory::tags::get_all_tags,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

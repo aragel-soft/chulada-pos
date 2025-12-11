@@ -45,3 +45,28 @@ export interface Category {
   color?: string;
 }
 
+export type ImageAction = 'Keep' | 'Remove' | 'Replace';
+
+export interface ProductDetail extends Omit<Product, 'current_stock'> {
+  description?: string;
+  purchase_price: number;
+  stock: number;    
+  min_stock: number;  
+  tags: string[];     
+}
+export interface UpdateProductPayload {
+  id: string;
+  code: string;
+  barcode?: string;
+  name: string;
+  description?: string;
+  category_id: string;
+  retail_price: number;
+  wholesale_price: number;
+  purchase_price?: number;
+  min_stock?: number; 
+  is_active: boolean;
+  tags: string[];
+  image_action: ImageAction;
+  new_image_bytes?: number[];
+}
