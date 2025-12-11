@@ -17,6 +17,7 @@ import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
 import { CreateProductDialog } from "../components/CreateProductDialog";
+import { EditProductDialog } from "../components/EditProductDialog";
 import {
   HoverCard,
   HoverCardContent,
@@ -30,6 +31,8 @@ export default function ProductsPage() {
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 16,
@@ -274,7 +277,12 @@ export default function ProductsPage() {
           {can('products:edit') && (
             <Button 
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              onClick={() => console.log("Abrir modal crear")}
+              disabled={table.getFilteredSelectedRowModel().rows.length !== 1}
+              onClick={() => {
+                const selectedRow = table.getFilteredSelectedRowModel().rows[0];
+                setEditingId(selectedRow.original.id);
+                setIsEditDialogOpen(true);
+              }}
             >
               <Pencil className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Modificar</span>
@@ -294,16 +302,28 @@ export default function ProductsPage() {
         </div>
       )}
     />
-  <CreateProductDialog 
-    open={isCreateDialogOpen} 
-    onOpenChange={(open) => {
-      setIsCreateDialogOpen(open);
-      if (!open) {
-        fetchProducts();
-        setRowSelection({});
-      }
-    }}
+      <CreateProductDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            fetchProducts();
+            setRowSelection({});
+          }
+        }}
       />
+      <EditProductDialog
+      open={isEditDialogOpen}
+      productId={editingId}
+      onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingId(null); 
+          fetchProducts(); 
+          setRowSelection({}); 
+        }
+      }}
+    />
   </>
   );
 }
