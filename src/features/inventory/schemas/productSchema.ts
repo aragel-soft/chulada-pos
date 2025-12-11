@@ -39,7 +39,10 @@ export const productSchema = z.object({
     .min(0, "El stock mínimo no puede ser negativo")
     .default(5),
     
-  image_url: z.string().optional(), 
+  image_url: z.string().optional(),
+  
+  is_active: z.boolean().default(true),
+  tags: z.array(z.string()).default([]),
 }).refine((data) => data.wholesale_price <= data.retail_price, {
   message: "El precio de mayoreo no puede ser mayor al precio de menudeo",
   path: ["wholesale_price"], 

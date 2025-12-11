@@ -99,6 +99,24 @@ pub struct UpdateProductPayload {
   pub new_image_bytes: Option<Vec<u8>>, 
 }
 
+#[derive(Debug, Serialize)]
+pub struct ProductDetail {
+    pub id: String,
+    pub code: String,
+    pub barcode: Option<String>,
+    pub name: String,
+    pub description: Option<String>,
+    pub category_id: String,
+    pub retail_price: f64,
+    pub wholesale_price: f64,
+    pub purchase_price: f64,
+    pub stock: i64,      
+    pub min_stock: i64, 
+    pub image_url: Option<String>,
+    pub is_active: bool,
+    pub tags: Vec<String>,
+}
+
 #[tauri::command]
 pub fn get_products(
   db_state: State<'_, Mutex<Connection>>,
@@ -577,4 +595,71 @@ pub async fn update_product(
 fn check_product_has_sales(_conn: &Connection, _product_id: &str) -> Result<bool, rusqlite::Error> {
   // Por ahora, asumimos que no hay ventas para permitir la edición
   Ok(false)
+}
+
+#[tauri::command]
+pub fn get_product_by_id(
+  app_handle: AppHandle,
+  db: State<'_, Mutex<Connection>>,
+  id: String,
+) -> Result<ProductDetail, String> {
+  let conn = db.lock().map_err(|e| e.to_string())?;
+  let app_dir = app_handle.path().app_data_dir().unwrap();
+
+  // TODO: Cambiar 'store-main' por un store_id dinámico cuando existan varias sucursales
+  let sql = "
+    SELECT 
+      p.id, p.code, p.barcode, p.name, p.description, p.category_id,
+      p.retail_price, p.wholesale_price, p.purchase_price, p.image_url, p.is_active,
+      COALESCE(si.stock, 0) as stock,
+      COALESCE(si.minimum_stock, 5) as min_stock
+    FROM products p
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = 'store-main'
+    WHERE p.id = ?1
+  ";
+
+  let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    
+  let mut product_detail = stmt.query_row([&id], |row| {
+    let raw_image: Option<String> = row.get(9)?;
+    let resolved_image = raw_image.map(|path| {
+      if path.starts_with("http") { path } 
+      else { app_dir.join(path).to_string_lossy().to_string() }
+    });
+
+  Ok(ProductDetail {
+    id: row.get(0)?,
+    code: row.get(1)?,
+    barcode: row.get(2)?,
+    name: row.get(3)?,
+    description: row.get(4)?,
+    category_id: row.get(5)?,
+    retail_price: row.get(6)?,
+    wholesale_price: row.get(7)?,
+    purchase_price: row.get(8)?,
+    image_url: resolved_image,
+    is_active: row.get(10)?,
+    stock: row.get(11)?,
+    min_stock: row.get(12)?,
+    tags: Vec::new(), 
+  })
+  }).map_err(|e| format!("Producto no encontrado: {}", e))?;
+
+  let mut tags_stmt = conn.prepare(
+    "SELECT t.name 
+     FROM tags t
+     INNER JOIN product_tags pt ON t.id = pt.tag_id
+     WHERE pt.product_id = ?"
+  ).map_err(|e| e.to_string())?;
+
+  let tags_rows = tags_stmt.query_map([&id], |row| row.get(0))
+    .map_err(|e| e.to_string())?;
+
+  for tag in tags_rows {
+    if let Ok(name) = tag {
+      product_detail.tags.push(name);
+    }
+  }
+
+  Ok(product_detail)
 }
