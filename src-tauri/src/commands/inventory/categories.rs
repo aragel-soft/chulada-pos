@@ -122,14 +122,8 @@ pub async fn get_categories(
            WHERE c.deleted_at IS NULL 
            AND (
                (c.name LIKE ?1 OR c.description LIKE ?1)
-               OR c.id IN (
-                   SELECT parent_category_id FROM categories sub 
-                   WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1)
-               )
-               OR c.parent_category_id IN (
-                   SELECT id FROM categories parent 
-                   WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1)
-               )
+               OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
+               OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
            )"#
     } else {
         "SELECT COUNT(*) FROM categories c WHERE c.deleted_at IS NULL"
@@ -142,13 +136,12 @@ pub async fn get_categories(
     }
     .map_err(|e| format!("Error contando categorías: {}", e))?;
 
-    let (sort_column, parent_sort_field) = match sort_by.as_deref() {
-        Some("name") => ("c.name", "name"),
-        Some("description") => ("c.description", "description"),
-        Some("created_at") => ("c.created_at", "created_at"),
-        Some("product_count") => ("product_count", "sequence"),
-        Some("sequence") => ("c.sequence", "sequence"),
-        _ => ("c.created_at", "created_at"),
+    let (sort_column, parent_column) = match sort_by.as_deref() {
+        Some("name") => ("c.name", "parent.name"),
+        Some("description") => ("c.description", "parent.description"),
+        Some("created_at") => ("c.created_at", "parent.created_at"),
+        Some("sequence") => ("c.sequence", "parent.sequence"),
+        _ => ("c.created_at", "parent.created_at"),
     };
 
     let sort_direction = match sort_order.as_deref() {
@@ -168,20 +161,15 @@ pub async fn get_categories(
             (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
             (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
+        LEFT JOIN categories parent ON c.parent_category_id = parent.id
         WHERE c.deleted_at IS NULL
     "#;
 
     let filter_clause = if has_search {
         r#" AND (
                 (c.name LIKE ?1 OR c.description LIKE ?1)
-                OR c.id IN (
-                    SELECT parent_category_id FROM categories sub 
-                    WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1)
-                )
-                OR c.parent_category_id IN (
-                    SELECT id FROM categories parent 
-                    WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1)
-                )
+                OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
+                OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
             )"#
     } else {
         ""
@@ -190,13 +178,12 @@ pub async fn get_categories(
     let order_clause = format!(
         r#"
         ORDER BY 
-            CASE WHEN c.parent_category_id IS NULL THEN {} ELSE 
-                (SELECT {} FROM categories parent WHERE parent.id = c.parent_category_id) 
-            END {},
-            c.parent_category_id IS NOT NULL,
+            COALESCE({}, {}) {}, 
+            COALESCE(parent.id, c.id) {}, 
+            CASE WHEN c.parent_category_id IS NULL THEN 0 ELSE 1 END ASC,
             {} {}
         "#,
-        sort_column, parent_sort_field, sort_direction, sort_column, sort_direction
+        parent_column, sort_column, sort_direction, sort_direction, sort_column, sort_direction
     );
 
     let pagination_clause = if has_search {
