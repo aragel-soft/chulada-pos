@@ -44,6 +44,7 @@ fn main() {
             commands::inventory::categories::get_categories,
             commands::inventory::categories::get_all_categories,
             commands::inventory::categories::create_category,
+            commands::inventory::categories::update_category,
             // Inventory - Tags
             commands::inventory::tags::get_all_tags,
         ])
