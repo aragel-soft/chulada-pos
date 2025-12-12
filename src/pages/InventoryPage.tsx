@@ -84,7 +84,7 @@ export default function InventoryPage() {
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-hidden min-h-0 pt-4">
+      <div className="flex-1 overflow-hidden min-h-0">
         <Outlet />
       </div>
     </div>

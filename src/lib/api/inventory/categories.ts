@@ -24,3 +24,7 @@ export async function createCategory(data: CreateCategoryDto): Promise<void> {
 export async function updateCategory(data: UpdateCategoryDto): Promise<void> {
   return await invoke("update_category", { data });
 }
+
+export async function deleteCategories(ids: string[]): Promise<void> {
+  return await invoke("delete_categories", { ids });
+}
