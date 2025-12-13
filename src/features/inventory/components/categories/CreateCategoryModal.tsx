@@ -40,12 +40,14 @@ import { toast } from "sonner";
 interface CreateCategoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
 }
 
 // componentes
 export function CreateCategoryModal({
   open,
   onOpenChange,
+  onSuccess,
 }: CreateCategoryModalProps) {
   const queryClient = useQueryClient();
 
@@ -75,6 +77,7 @@ export function CreateCategoryModal({
     onSuccess: () => {
       toast.success("Categoría creada correctamente");
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      if (onSuccess) onSuccess();
       handleClose();
     },
     onError: (error) => {
