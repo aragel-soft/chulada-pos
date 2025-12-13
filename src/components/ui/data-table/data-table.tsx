@@ -1,5 +1,5 @@
 // Importaciones
-import {ReactNode, useState} from "react"
+import { ReactNode, useState } from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -38,7 +38,7 @@ interface DataTableProps<TData, TValue> {
   rowSelection?: RowSelectionState
   onRowSelectionChange?: OnChangeFn<RowSelectionState>
 
-  rowCount?: number; 
+  rowCount?: number;
   manualPagination?: boolean;
   manualFiltering?: boolean;
   pagination?: PaginationState;
@@ -48,6 +48,7 @@ interface DataTableProps<TData, TValue> {
   manualSorting?: boolean;
   sorting?: SortingState;
   onSortingChange?: OnChangeFn<SortingState>;
+  getRowId?: (originalRow: TData, index: number, parent?: any) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -72,6 +73,7 @@ export function DataTable<TData, TValue>({
   manualSorting = false,
   sorting: externalSorting,
   onSortingChange: externalOnSortingChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -83,12 +85,12 @@ export function DataTable<TData, TValue>({
   })
   const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
 
-  const sorting = externalSorting ?? internalSorting 
+  const sorting = externalSorting ?? internalSorting
   const globalFilter = externalGlobalFilter ?? internalGlobalFilter
   const pagination = externalPagination ?? internalPagination
   const rowSelection = externalRowSelection ?? internalRowSelection
 
-  const onSortingChange = externalOnSortingChange ?? setInternalSorting 
+  const onSortingChange = externalOnSortingChange ?? setInternalSorting
   const onGlobalFilterChange = externalOnGlobalFilterChange ?? setInternalGlobalFilter
   const onPaginationChange = externalOnPaginationChange ?? setInternalPagination
   const onRowSelectionChange = externalOnRowSelectionChange ?? setInternalRowSelection
@@ -111,6 +113,7 @@ export function DataTable<TData, TValue>({
     getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
+    getRowId,
   })
 
   return (

@@ -1,11 +1,30 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Category } from "@/types/inventory";
+import { CategoryListDto, CreateCategoryDto, UpdateCategoryDto } from "@/types/categories";
+import { PaginationParams, PaginatedResponse } from "@/types/pagination";
 
-export const getAllCategories = async (): Promise<Category[]> => {
-  try {
-    return await invoke("get_all_categories");
-  } catch (error) {
-    console.error("Error fetching categories:", error);
-    throw error;
-  }
-};
+
+export async function getAllCategories(): Promise<CategoryListDto[]> {
+  return await invoke("get_all_categories");
+}
+
+export async function getCategories(params: PaginationParams): Promise<PaginatedResponse<CategoryListDto>> {
+  return await invoke("get_categories", {
+    page: params.page,
+    pageSize: params.pageSize,
+    search: params.search,
+    sortBy: params.sortBy,
+    sortOrder: params.sortOrder,
+  });
+}
+
+export async function createCategory(data: CreateCategoryDto): Promise<void> {
+  return await invoke("create_category", { data });
+}
+
+export async function updateCategory(data: UpdateCategoryDto): Promise<void> {
+  return await invoke("update_category", { data });
+}
+
+export async function deleteCategories(ids: string[]): Promise<void> {
+  return await invoke("delete_categories", { ids });
+}
