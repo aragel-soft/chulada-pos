@@ -1,13 +1,18 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from '@/stores/authStore';
-import { cn } from '@/lib/utils'; 
+import { cn } from '@/lib/utils';
 
 const inventoryTabs = [
   {
     value: 'products',
     label: 'Productos',
     permission: 'products:view',
+  },
+  {
+    value: 'categories',
+    label: 'Categorías',
+    permission: 'categories:view',
   },
 ];
 
@@ -31,8 +36,8 @@ export default function InventoryPage() {
 
       <div className="flex-none w-full">
         <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
-          <TabsList 
-              className="
+          <TabsList
+            className="
                   w-full 
                   justify-start 
                   rounded-none 
@@ -50,26 +55,26 @@ export default function InventoryPage() {
               "
           >
             {availableTabs.map((tab) => (
-              <TabsTrigger 
-                key={tab.value} 
+              <TabsTrigger
+                key={tab.value}
                 value={tab.value}
                 className={cn(
-                    "relative",
-                    "rounded-none",
-                    "bg-transparent",
-                    "px-4 pb-0 pt-1", 
-                    "text-muted-foreground",
-                    "shadow-none",
-                    "border-b-2 border-transparent", 
-                    "transition-colors duration-200",
-                    
-                    "data-[state=active]:border-[#480489]",
-                    "data-[state=active]:text-[#480489]",
-                    "data-[state=active]:font-bold",
-                    "data-[state=active]:shadow-none",
+                  "relative",
+                  "rounded-none",
+                  "bg-transparent",
+                  "px-4 pb-0 pt-1",
+                  "text-muted-foreground",
+                  "shadow-none",
+                  "border-b-2 border-transparent",
+                  "transition-colors duration-200",
 
-                    "hover:text-[#818181]",
-                    "hover:border-[#818181]"
+                  "data-[state=active]:border-[#480489]",
+                  "data-[state=active]:text-[#480489]",
+                  "data-[state=active]:font-bold",
+                  "data-[state=active]:shadow-none",
+
+                  "hover:text-[#818181]",
+                  "hover:border-[#818181]"
                 )}
               >
                 {tab.label}
@@ -80,7 +85,7 @@ export default function InventoryPage() {
       </div>
 
       <div className="flex-1 overflow-hidden min-h-0 pt-4">
-        <Outlet /> 
+        <Outlet />
       </div>
     </div>
   );
