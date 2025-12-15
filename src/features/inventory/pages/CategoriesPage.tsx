@@ -6,19 +6,29 @@ import {
     SortingState,
     PaginationState,
 } from "@tanstack/react-table";
-import { CornerDownRight } from "lucide-react";
+import {
+    PlusCircle,
+    Pencil,
+    Trash,
+    CornerDownRight
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table/data-table"; // Asegúrate que tu DataTable soporte server-side props
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { getCategories } from "@/lib/api/inventory/categories";
 import { CategoryListDto } from "@/types/categories";
+import { useAuthStore } from "@/stores/authStore";
+import { Button } from "@/components/ui/button";
+import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
 
 // Componente principal
 export default function CategoriesPage() {
+    const { can } = useAuthStore();
     // Estados
     const [data, setData] = useState<CategoryListDto[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Estados de la tabla
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -147,35 +157,81 @@ export default function CategoriesPage() {
     );
 
     return (
-        <DataTable
-            columns={columns}
-            data={data}
-            isLoading={isLoading}
-            searchPlaceholder="Buscar por nombre o descripción..."
-            columnTitles={{
-                name: "Nombre",
-                description: "Descripción",
-                product_count: "Productos",
-                sequence: "Secuencia",
-                created_at: "Creado",
-            }}
+        <>
+            <DataTable
+                columns={columns}
+                data={data}
+                isLoading={isLoading}
+                searchPlaceholder="Buscar por nombre o descripción..."
+                columnTitles={{
+                    name: "Nombre",
+                    description: "Descripción",
+                    product_count: "Productos",
+                    sequence: "Secuencia",
+                    created_at: "Creado",
+                }}
+                actions={(table) => (
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        {can('categories:create') && (
+                            <Button
+                                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                                onClick={() => setIsCreateModalOpen(true)}
+                            >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                <span className="hidden sm:inline">Agregar</span>
+                            </Button>
+                        )}
 
-            // Estado controlado
-            sorting={sorting}
-            onSortingChange={setSorting}
-            pagination={pagination}
-            onPaginationChange={setPagination}
-            rowSelection={rowSelection}
-            onRowSelectionChange={setRowSelection}
-            globalFilter={globalFilter}
-            onGlobalFilterChange={setGlobalFilter}
-            initialColumnVisibility={{ created_at: false, sequence: false }}
+                        {can('categories:edit') && (
+                            <Button
+                                className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
+                                disabled={table.getFilteredSelectedRowModel().rows.length !== 1}
+                                onClick={() => {
+                                    console.log("Modificar seleccionados")
+                                }}
+                            >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                <span className="hidden sm:inline">Modificar</span>
+                            </Button>
+                        )}
 
-            // Configuración Manual (Server-side)
-            manualPagination={true}
-            manualSorting={true}
-            manualFiltering={true}
-            rowCount={rowCount}
-        />
+                        {can('categories:delete') && (
+                            <Button
+                                variant="destructive"
+                                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                                onClick={() => console.log("Eliminar seleccionados")}
+                            >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Eliminar ({table.getFilteredSelectedRowModel().rows.length})
+                            </Button>
+                        )}
+                    </div>
+                )}
+
+                // Estado controlado
+                sorting={sorting}
+                onSortingChange={setSorting}
+                pagination={pagination}
+                onPaginationChange={setPagination}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                globalFilter={globalFilter}
+                onGlobalFilterChange={setGlobalFilter}
+                initialColumnVisibility={{ created_at: false, sequence: false }}
+
+                // Configuración Manual (Server-side)
+                manualPagination={true}
+                manualSorting={true}
+                manualFiltering={true}
+                rowCount={rowCount}
+            />
+
+            <CreateCategoryModal
+                open={isCreateModalOpen}
+                onOpenChange={setIsCreateModalOpen}
+                onSuccess={fetchCategories}
+            />
+        </>
+
     );
 }
