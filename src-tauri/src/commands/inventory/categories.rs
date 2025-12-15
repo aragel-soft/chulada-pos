@@ -421,3 +421,141 @@ pub fn update_category(
 
     Ok(())
 }
+
+#[derive(Debug, Serialize)]
+pub struct DeleteCategoryError {
+    pub code: String,
+    pub message: String,
+    pub details: Vec<String>,
+}
+
+impl From<DeleteCategoryError> for String {
+    fn from(err: DeleteCategoryError) -> String {
+        serde_json::to_string(&err).unwrap_or_else(|_| err.message)
+    }
+}
+
+#[tauri::command]
+pub async fn delete_categories(
+    db: State<'_, Mutex<Connection>>,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| DeleteCategoryError {
+        code: "DB_LOCK_ERROR".to_string(),
+        message: format!("Error al acceder a la base de datos: {}", e),
+        details: vec![],
+    })?;
+
+    let tx = conn.transaction().map_err(|e| DeleteCategoryError {
+        code: "DB_TRANSACTION_ERROR".to_string(),
+        message: format!("Error al iniciar transacción: {}", e),
+        details: vec![],
+    })?;
+
+    let mut validation_errors: Vec<String> = Vec::new();
+
+    for id in &ids {
+        // Obtenemos el nombre de la categoría para mensajes más claros
+        let category_name: String = tx
+            .query_row("SELECT name FROM categories WHERE id = ?", [id], |row| {
+                row.get(0)
+            })
+            .unwrap_or_else(|_| "Desconocida".to_string());
+
+        // 1. Validar Subcategorías (Hijos)
+        // Ignoramos los hijos que TAMBIÉN se van a eliminar (están en la lista `ids`)
+
+        // Construimos placeholders para la lista de exclusión (ids a borrar)
+        let exclusion_placeholders = std::iter::repeat("?")
+            .take(ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let sql_check_children = format!(
+            "SELECT COUNT(*) FROM categories WHERE parent_category_id = ? AND deleted_at IS NULL AND id NOT IN ({})",
+            exclusion_placeholders
+        );
+
+        // Preparamos parámetros: [parent_id, id_1, id_2, ..., id_n]
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(ids.len() + 1);
+        params.push(id); // El parent_id que estamos chequeando
+        for excluded_id in &ids {
+            params.push(excluded_id);
+        }
+
+        let children_count: i64 = tx
+            .query_row(
+                &sql_check_children,
+                rusqlite::params_from_iter(params.iter()),
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        if children_count > 0 {
+            validation_errors.push(format!(
+                "La categoría '{}' tiene {} subcategorías activas que no están seleccionadas para eliminación.",
+                category_name, children_count
+            ));
+        }
+
+        // 2. Validar Productos
+        let product_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM products WHERE category_id = ? AND deleted_at IS NULL",
+                [id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        if product_count > 0 {
+            validation_errors.push(format!(
+                "La categoría '{}' contiene {} productos.",
+                category_name, product_count
+            ));
+        }
+    }
+
+    if !validation_errors.is_empty() {
+        return Err(DeleteCategoryError {
+            code: "VALIDATION_ERROR".to_string(),
+            message: "No se pueden eliminar algunas categorías.".to_string(),
+            details: validation_errors,
+        }
+        .into());
+    }
+
+    // 3. Ejecutar Soft Delete
+    // Usamos un loop para mantenerlo simple con la transacción ya abierta,
+    // aunque un IN clause sería más eficiente, el prepare cacheado de rusqlite ayuda.
+    // Dado que ya iteramos arriba, podríamos haber hecho un statement global, pero
+    // por seguridad solo borramos si todo pasó.
+
+    let placeholders = std::iter::repeat("?")
+        .take(ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql_delete = format!(
+        "UPDATE categories SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})",
+        placeholders
+    );
+
+    let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    for id in &ids {
+        params.push(id);
+    }
+
+    tx.execute(&sql_delete, rusqlite::params_from_iter(params.iter()))
+        .map_err(|e| DeleteCategoryError {
+            code: "DB_UPDATE_ERROR".to_string(),
+            message: format!("Error al eliminar categorías: {}", e),
+            details: vec![],
+        })?;
+
+    tx.commit().map_err(|e| DeleteCategoryError {
+        code: "DB_COMMIT_ERROR".to_string(),
+        message: format!("Error cancelando transacción: {}", e),
+        details: vec![],
+    })?;
+
+    Ok(())
+}

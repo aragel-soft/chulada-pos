@@ -16,12 +16,21 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table/data-table"; // Asegúrate que tu DataTable soporte server-side props
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { getCategories } from "@/lib/api/inventory/categories";
+import { getCategories, deleteCategories } from "@/lib/api/inventory/categories";
 import { CategoryListDto } from "@/types/categories";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
 import { EditCategoryModal } from "@/features/inventory/components/categories/EditCategoryModal";
+import { DeleteCategoryAlert } from "@/features/inventory/components/categories/DeleteCategoryAlert";
+import { DeleteCategoryErrorModal } from "@/features/inventory/components/categories/DeleteCategoryErrorModal";
+import { toast } from "sonner";
+
+interface DeleteCategoryError {
+  code: string;
+  message: string;
+  details: string[];
+}
 
 // Componente principal
 export default function CategoriesPage() {
@@ -45,6 +54,11 @@ export default function CategoriesPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowCount, setRowCount] = useState(0);
 
+  // Estados Borrado
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isDeleteErrorModalOpen, setIsDeleteErrorModalOpen] = useState(false);
+  const [deleteErrors, setDeleteErrors] = useState<string[]>([]);
+
   // Funciones
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -62,10 +76,42 @@ export default function CategoriesPage() {
       setData(result.data);
       setRowCount(result.total);
     } catch (error) {
-      console.error("Error loading categories:", error);
-      // Aquí podrías poner un toast de error
+      toast.error("Error al cargar categorías");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleteAlertOpen(false);
+    const selectedIds = Object.keys(rowSelection);
+    if (selectedIds.length === 0) return;
+
+    try {
+      await deleteCategories(selectedIds);
+      toast.success(`Se eliminaron ${selectedIds.length} categorías`);
+      setRowSelection({});
+      fetchCategories();
+    } catch (error: any) {
+      console.error("Delete error:", error);
+
+      let errorData: DeleteCategoryError | null = null;
+      try {
+        if (typeof error === 'string') {
+          errorData = JSON.parse(error);
+        } else {
+          errorData = error;
+        }
+      } catch (e) {
+        errorData = null;
+      }
+
+      if (errorData && errorData.code === "VALIDATION_ERROR" && errorData.details) {
+        setDeleteErrors(errorData.details);
+        setIsDeleteErrorModalOpen(true);
+      } else {
+        toast.error(typeof error === 'string' ? error : "Error desconocido al eliminar");
+      }
     }
   };
 
@@ -138,20 +184,20 @@ export default function CategoriesPage() {
         ),
       },
       {
-        accessorKey: "created_at",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Creado" />,
-        cell: ({ row }) => (
-          <div className="text-xs text-muted-foreground">
-            {row.getValue("created_at")}
-          </div>
-        ),
-      },
-      {
         accessorKey: "sequence",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Secuencia" />,
         cell: ({ row }) => (
           <div className="text-center font-medium">
             {row.getValue("sequence")}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "created_at",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Creado" />,
+        cell: ({ row }) => (
+          <div className="text-xs text-muted-foreground">
+            {row.getValue("created_at")}
           </div>
         ),
       },
@@ -207,7 +253,7 @@ export default function CategoriesPage() {
               <Button
                 variant="destructive"
                 disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() => console.log("Eliminar seleccionados")}
+                onClick={() => setIsDeleteAlertOpen(true)}
               >
                 <Trash className="mr-2 h-4 w-4" />
                 Eliminar ({table.getFilteredSelectedRowModel().rows.length})
@@ -232,11 +278,13 @@ export default function CategoriesPage() {
         manualSorting={true}
         manualFiltering={true}
         rowCount={rowCount}
+        getRowId={(row) => row.id}
       />
 
       <CreateCategoryModal
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
+        onSuccess={fetchCategories}
       />
 
       <EditCategoryModal
@@ -245,7 +293,19 @@ export default function CategoriesPage() {
         category={editingCategory}
         onSuccess={fetchCategories}
       />
-    </>
 
+      <DeleteCategoryAlert
+        open={isDeleteAlertOpen}
+        onOpenChange={setIsDeleteAlertOpen}
+        onConfirm={handleDelete}
+        count={Object.keys(rowSelection).length}
+      />
+
+      <DeleteCategoryErrorModal
+        open={isDeleteErrorModalOpen}
+        onOpenChange={setIsDeleteErrorModalOpen}
+        errors={deleteErrors}
+      />
+    </>
   );
 }
