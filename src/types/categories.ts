@@ -1,19 +1,29 @@
 export interface CategoryListDto {
-    id: string;
-    name: string;
-    description?: string;
-    color: string;
-    parent_id?: string;
-    sequence: number;
-    product_count: number;
-    depth: number;
-    created_at: string;
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  parent_id?: string;
+  sequence: number;
+  product_count: number;
+  children_count: number;
+  depth: number;
+  created_at: string;
 }
 
 export interface CreateCategoryDto {
-    name: string;
-    parent_id?: string | null;
-    color: string;
-    sequence: number;
-    description?: string;
+  name: string;
+  parent_id?: string | null;
+  color: string;
+  sequence: number;
+  description?: string;
+}
+
+export interface UpdateCategoryDto {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  color: string;
+  sequence: number;
+  description?: string | null;
 }

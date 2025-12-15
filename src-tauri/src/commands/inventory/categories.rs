@@ -12,6 +12,7 @@ pub struct CategoryListDto {
     pub parent_id: Option<String>,
     pub sequence: i32,
     pub product_count: i64,
+    pub children_count: i64,
     pub depth: i32,
     pub created_at: String,
 }
@@ -21,8 +22,20 @@ pub struct PaginatedResponse<T> {
     data: Vec<T>,
     total: i64,
     page: i64,
-    page_size: i64,
-    total_pages: i64,
+    pub page_size: i64,
+    pub total_pages: i64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct InventoryError {
+    pub code: String,
+    pub message: String,
+}
+
+impl From<InventoryError> for String {
+    fn from(err: InventoryError) -> String {
+        serde_json::to_string(&err).unwrap_or_else(|_| err.message)
+    }
 }
 
 #[tauri::command]
@@ -40,7 +53,8 @@ pub async fn get_all_categories(
             c.parent_category_id, 
             c.sequence, 
             c.created_at,
-            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count
+            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
+            (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
         WHERE c.deleted_at IS NULL
         ORDER BY 
@@ -81,6 +95,7 @@ fn map_category_row(row: &rusqlite::Row) -> rusqlite::Result<CategoryListDto> {
         sequence: row.get(5)?,
         created_at: row.get(6)?,
         product_count: row.get(7)?,
+        children_count: row.get(8)?,
         depth,
     })
 }
@@ -107,14 +122,8 @@ pub async fn get_categories(
            WHERE c.deleted_at IS NULL 
            AND (
                (c.name LIKE ?1 OR c.description LIKE ?1)
-               OR c.id IN (
-                   SELECT parent_category_id FROM categories sub 
-                   WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1)
-               )
-               OR c.parent_category_id IN (
-                   SELECT id FROM categories parent 
-                   WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1)
-               )
+               OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
+               OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
            )"#
     } else {
         "SELECT COUNT(*) FROM categories c WHERE c.deleted_at IS NULL"
@@ -127,13 +136,12 @@ pub async fn get_categories(
     }
     .map_err(|e| format!("Error contando categorías: {}", e))?;
 
-    let (sort_column, parent_sort_field) = match sort_by.as_deref() {
-        Some("name") => ("c.name", "name"),
-        Some("description") => ("c.description", "description"),
-        Some("created_at") => ("c.created_at", "created_at"),
-        Some("product_count") => ("product_count", "sequence"),
-        Some("sequence") => ("c.sequence", "sequence"),
-        _ => ("c.created_at", "created_at"),
+    let (sort_column, parent_column) = match sort_by.as_deref() {
+        Some("name") => ("c.name", "parent.name"),
+        Some("description") => ("c.description", "parent.description"),
+        Some("created_at") => ("c.created_at", "parent.created_at"),
+        Some("sequence") => ("c.sequence", "parent.sequence"),
+        _ => ("c.created_at", "parent.created_at"),
     };
 
     let sort_direction = match sort_order.as_deref() {
@@ -150,22 +158,18 @@ pub async fn get_categories(
             c.parent_category_id, 
             c.sequence, 
             c.created_at,
-            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count
+            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
+            (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
+        LEFT JOIN categories parent ON c.parent_category_id = parent.id
         WHERE c.deleted_at IS NULL
     "#;
 
     let filter_clause = if has_search {
         r#" AND (
                 (c.name LIKE ?1 OR c.description LIKE ?1)
-                OR c.id IN (
-                    SELECT parent_category_id FROM categories sub 
-                    WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1)
-                )
-                OR c.parent_category_id IN (
-                    SELECT id FROM categories parent 
-                    WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1)
-                )
+                OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
+                OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
             )"#
     } else {
         ""
@@ -174,13 +178,12 @@ pub async fn get_categories(
     let order_clause = format!(
         r#"
         ORDER BY 
-            CASE WHEN c.parent_category_id IS NULL THEN {} ELSE 
-                (SELECT {} FROM categories parent WHERE parent.id = c.parent_category_id) 
-            END {},
-            c.parent_category_id IS NOT NULL,
+            COALESCE({}, {}) {}, 
+            COALESCE(parent.id, c.id) {}, 
+            CASE WHEN c.parent_category_id IS NULL THEN 0 ELSE 1 END ASC,
             {} {}
         "#,
-        sort_column, parent_sort_field, sort_direction, sort_column, sort_direction
+        parent_column, sort_column, sort_direction, sort_direction, sort_column, sort_direction
     );
 
     let pagination_clause = if has_search {
@@ -230,6 +233,16 @@ pub async fn get_categories(
 
 #[derive(serde::Deserialize)]
 pub struct CreateCategoryDto {
+    pub name: String,
+    pub parent_id: Option<String>,
+    pub color: String,
+    pub sequence: i32,
+    pub description: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct UpdateCategoryDto {
+    pub id: String,
     pub name: String,
     pub parent_id: Option<String>,
     pub color: String,
@@ -300,6 +313,111 @@ pub fn create_category(
 
     tx.commit()
         .map_err(|e| format!("Error confirmando transacción: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_category(
+    data: UpdateCategoryDto,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<(), String> {
+    let mut conn = db.lock().map_err(|e| format!("Error de conexión: {}", e))?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Error iniciando transacción: {}", e))?;
+
+    let name = data.name.trim().to_string();
+
+    // 1. Validar nombre duplicado
+    let duplicate_count: i64 = if let Some(ref parent_id) = data.parent_id {
+        tx.query_row(
+            "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id = ? AND id != ? AND deleted_at IS NULL",
+            [&name, parent_id, &data.id],
+            |row| row.get(0),
+        ).map_err(|e| InventoryError { code: "DB_ERROR".to_string(), message: e.to_string() })?
+    } else {
+        tx.query_row(
+            "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id IS NULL AND id != ? AND deleted_at IS NULL",
+            [&name, &data.id],
+            |row| row.get(0),
+        ).map_err(|e| InventoryError { code: "DB_ERROR".to_string(), message: e.to_string() })?
+    };
+
+    if duplicate_count > 0 {
+        return Err(InventoryError {
+            code: "DUPLICATE_NAME".to_string(),
+            message: "Ya existe otra categoría con este nombre en este nivel".to_string(),
+        }
+        .into());
+    }
+
+    // Validar Jerarquía
+    if let Some(ref parent_id) = data.parent_id {
+        if parent_id == &data.id {
+            return Err(InventoryError {
+                code: "CIRCULAR_DEPENDENCY".to_string(),
+                message: "Una categoría no puede ser su propio padre".to_string(),
+            }
+            .into());
+        }
+        // El padre destino debe existir y ser Raíz
+        let parent_is_root: bool = tx
+            .query_row(
+                "SELECT parent_category_id IS NULL FROM categories WHERE id = ?",
+                [parent_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| InventoryError {
+                code: "DB_ERROR".to_string(),
+                message: e.to_string(),
+            })?
+            .ok_or(InventoryError {
+                code: "PARENT_NOT_FOUND".to_string(),
+                message: "La categoría padre especificada no existe".to_string(),
+            })?;
+
+        if !parent_is_root {
+            return Err(InventoryError {
+                code: "HIERARCHY_VIOLATION".to_string(),
+                message: "No se pueden crear subcategorías de nivel 3 (El padre seleccionado ya es una subcategoría)".to_string(),
+            }.into());
+        }
+
+        let has_children: bool = tx.query_row(
+            "SELECT COUNT(*) > 0 FROM categories WHERE parent_category_id = ? AND deleted_at IS NULL",
+            [&data.id],
+            |row| row.get(0),
+        ).map_err(|e| InventoryError { code: "DB_ERROR".to_string(), message: e.to_string() })?;
+
+        if has_children {
+            return Err(InventoryError {
+                code: "HIERARCHY_VIOLATION".to_string(),
+                message: "Esta categoría tiene subcategorías. No puede convertirse en secundaria"
+                    .to_string(),
+            }
+            .into());
+        }
+    }
+
+    // Update
+    tx.execute(
+        "UPDATE categories SET name = ?1, parent_category_id = ?2, color = ?3, sequence = ?4, description = ?5 WHERE id = ?6",
+        rusqlite::params![
+            name,
+            data.parent_id,
+            data.color,
+            data.sequence,
+            data.description,
+            data.id
+        ],
+    ).map_err(|e| InventoryError { code: "DB_UPDATE_ERROR".to_string(), message: format!("Error al actualizar categoría: {}", e) })?;
+
+    tx.commit().map_err(|e| InventoryError {
+        code: "DB_COMMIT_ERROR".to_string(),
+        message: format!("Error confirmando transacción: {}", e),
+    })?;
 
     Ok(())
 }
