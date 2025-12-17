@@ -70,3 +70,12 @@ export interface UpdateProductPayload {
   image_action: ImageAction;
   new_image_bytes?: number[];
 }
+
+export interface BulkUpdateProductsPayload {
+  ids: string[];
+  category_id?: string;
+  is_active?: boolean;
+  retail_price?: number;
+  wholesale_price?: number;
+  tags_to_add?: string[];
+}

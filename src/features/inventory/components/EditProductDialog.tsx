@@ -307,7 +307,7 @@ export function EditProductDialog({
                             availableTags={availableTags}
                             selectedTags={field.value}
                             onTagsChange={field.onChange}
-                            placeholder="+ Tag"
+                            placeholder="+ Etiqueta"
                           />
                         </FormControl>
                         <FormMessage />

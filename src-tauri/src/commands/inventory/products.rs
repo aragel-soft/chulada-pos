@@ -101,20 +101,30 @@ pub struct UpdateProductPayload {
 
 #[derive(Debug, Serialize)]
 pub struct ProductDetail {
-    pub id: String,
-    pub code: String,
-    pub barcode: Option<String>,
-    pub name: String,
-    pub description: Option<String>,
-    pub category_id: String,
-    pub retail_price: f64,
-    pub wholesale_price: f64,
-    pub purchase_price: f64,
-    pub stock: i64,      
-    pub min_stock: i64, 
-    pub image_url: Option<String>,
-    pub is_active: bool,
-    pub tags: Vec<String>,
+  pub id: String,
+  pub code: String,
+  pub barcode: Option<String>,
+  pub name: String,
+  pub description: Option<String>,
+  pub category_id: String,
+  pub retail_price: f64,
+  pub wholesale_price: f64,
+  pub purchase_price: f64,
+  pub stock: i64,      
+  pub min_stock: i64, 
+  pub image_url: Option<String>,
+  pub is_active: bool,
+  pub tags: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BulkUpdateProductsPayload {
+  pub ids: Vec<String>,
+  pub category_id: Option<String>,
+  pub is_active: Option<bool>,
+  pub retail_price: Option<f64>,
+  pub wholesale_price: Option<f64>,
+  pub tags_to_add: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -689,4 +699,88 @@ pub fn delete_products(
 
   tx.commit().map_err(|e| format!("Error en commit de transacción: {}", e))?;
   Ok(format!("{} productos eliminados correctamente", ids.len()))
+}
+
+#[tauri::command]
+pub fn bulk_update_products(
+  db: State<'_, Mutex<Connection>>,
+  payload: BulkUpdateProductsPayload,
+) -> Result<String, String> {
+  let mut conn = db.lock().map_err(|e| e.to_string())?;
+  
+  let tx = conn.transaction().map_err(|e| format!("Error iniciando transacción: {}", e))?;
+  let mut updated_count = 0;
+
+  for id in &payload.ids {
+    let (current_retail, current_wholesale): (f64, f64) = tx.query_row(
+      "SELECT retail_price, wholesale_price FROM products WHERE id = ?",
+      [id],
+      |row| Ok((row.get(0)?, row.get(1)?))
+    ).map_err(|e| format!("Error leyendo producto {}: {}", id, e))?;
+
+    let new_retail = payload.retail_price.unwrap_or(current_retail);
+    let new_wholesale = payload.wholesale_price.unwrap_or(current_wholesale);
+
+    if new_wholesale > new_retail {
+      return Err(InventoryError {
+        code: "PRICE_INCONSISTENCY".to_string(),
+        message: format!(
+          "La actualización generaría un precio de mayoreo (${}) mayor al menudeo (${}) en el producto ID: {}. Operación cancelada.", 
+          new_wholesale, new_retail, id
+        )
+      }.into());
+    }
+
+    tx.execute(
+      "UPDATE products SET 
+        category_id = COALESCE(?1, category_id),
+        is_active = COALESCE(?2, is_active),
+        retail_price = ?3,
+        wholesale_price = ?4
+       WHERE id = ?5",
+      rusqlite::params![
+        payload.category_id,
+        payload.is_active,
+        new_retail,
+        new_wholesale,
+        id
+      ]
+    ).map_err(|e| format!("Error actualizando producto {}: {}", id, e))?;
+
+    if let Some(tags) = &payload.tags_to_add {
+      if !tags.is_empty() {
+        for tag_name in tags {
+          let tag_id: String = {
+            let existing: Option<String> = tx.query_row(
+              "SELECT id FROM tags WHERE name = ?", 
+              [tag_name], 
+              |row| row.get(0)
+            ).ok();
+
+            match existing {
+              Some(tid) => tid,
+              None => {
+                let new_tid = Uuid::new_v4().to_string();
+                tx.execute(
+                  "INSERT INTO tags (id, name) VALUES (?1, ?2)",
+                  [&new_tid, tag_name]
+                ).map_err(|e| format!("Error creando tag '{}': {}", tag_name, e))?;
+                new_tid
+              }
+            }
+          };
+
+          tx.execute(
+            "INSERT OR IGNORE INTO product_tags (id, product_id, tag_id) VALUES (?1, ?2, ?3)",
+            [Uuid::new_v4().to_string(), id.clone(), tag_id]
+          ).map_err(|e| format!("Error vinculando tag '{}': {}", tag_name, e))?;
+        }
+      }
+    }
+
+    updated_count += 1;
+  }
+
+  tx.commit().map_err(|e| format!("Error al confirmar la transacción masiva: {}", e))?;
+  Ok(format!("Se actualizaron {} productos correctamente.", updated_count))
 }

@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { CategoryListDto, CreateCategoryDto, UpdateCategoryDto } from "@/types/categories";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
 
-
 export async function getAllCategories(): Promise<CategoryListDto[]> {
   return await invoke("get_all_categories");
 }
