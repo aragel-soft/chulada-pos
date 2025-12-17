@@ -66,3 +66,12 @@ export const getAllTags = async (): Promise<string[]> => {
     return [];
   }
 };
+
+export const deleteProducts = async (productIds: string[]): Promise<void> => {
+  try {
+    await invoke("delete_products", { ids: productIds });
+  } catch (error) {
+    console.error("Error deleting products:", error);
+    throw error;
+  }
+};

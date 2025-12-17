@@ -40,6 +40,7 @@ fn main() {
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,
             commands::inventory::products::update_product,
+            commands::inventory::products::delete_products,
             // Inventory - Categories
             commands::inventory::categories::get_categories,
             commands::inventory::categories::get_all_categories,

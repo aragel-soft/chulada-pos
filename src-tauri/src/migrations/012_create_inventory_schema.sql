@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS categories (
 -- 2. Productos
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
-  code TEXT UNIQUE NOT NULL,
+  code TEXT NOT NULL,
   barcode TEXT,
   name TEXT NOT NULL,
   description TEXT,
@@ -50,5 +50,8 @@ CREATE TABLE IF NOT EXISTS store_inventory (
 
 -- Índices para optimizar búsquedas
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
-CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_code_active 
+ON products(code) 
+WHERE deleted_at IS NULL;
