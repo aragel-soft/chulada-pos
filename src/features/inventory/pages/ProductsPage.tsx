@@ -342,9 +342,12 @@ export default function ProductsPage() {
           setIsEditDialogOpen(open);
           if (!open) {
             setEditingId(null); 
-            fetchProducts(); 
-            setRowSelection({}); 
           }
+        }}
+        onSuccess={() => {
+          fetchProducts();
+          setRowSelection({});
+          setIsEditDialogOpen(false);
         }}
       />
       <BulkEditProductDialog

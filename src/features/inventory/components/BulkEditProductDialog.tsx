@@ -117,7 +117,11 @@ export function BulkEditProductDialog({
       setConfirmOpen(false);
     },
     onError: (error) => {
-      toast.error("Error en la actualización", { description: error.message });
+      let userMessage = error.message;
+      if (userMessage.includes("PRICE_INCONSISTENCY") || userMessage.includes("constraint failed")) {
+        userMessage = "No se pueden guardar los cambios porque generarían una inconsistencia (Mayoreo > Menudeo) en uno o más productos.";
+      }
+      toast.error("Error en la actualización", { description: userMessage });
       setConfirmOpen(false);
     },
   });
@@ -138,6 +142,22 @@ export function BulkEditProductDialog({
 
   const handleConfirm = () => {
     if (!pendingValues) return;
+
+    const commonRetail = getCommonValue(selectedProducts, "retail_price");
+    const commonWholesale = getCommonValue(selectedProducts, "wholesale_price");
+
+    const finalRetail = pendingValues.retail_price ?? commonRetail;
+    const finalWholesale = pendingValues.wholesale_price ?? commonWholesale;
+
+    if (finalRetail !== undefined && finalWholesale !== undefined) {
+      if (finalWholesale > finalRetail) {
+        toast.error("Error de Integridad", {
+          description: "El precio de mayoreo no puede ser mayor al precio de menudeo."
+        });
+        setConfirmOpen(false);
+        return;
+      }
+    }
 
     const tagsToAdd = pendingValues.tags && pendingValues.tags.length > 0 
       ? pendingValues.tags 
@@ -250,23 +270,20 @@ export function BulkEditProductDialog({
                       name="retail_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Precio Menudeo</FormLabel>
+                          <FormLabel className="!text-foreground">Precio Menudeo</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder={
-                                isMixed("retail_price")
-                                  ? "Varios..."
-                                  : "0.00"
-                              }
-                              {...field}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                field.onChange(val);
-                              }}
-                              value={field.value ?? ""}
-                            />
+                            <div className="relative">
+                              <span className="absolute left-3 top-1.5 text-muted-foreground">
+                                $
+                              </span>
+                                <Input
+                                  type="number"
+                                  step="0.50"
+                                  placeholder={isMixed("wholesale_price") ? "Varios..." : "0.00" }
+                                  className="pl-7"
+                                  {...field}
+                                />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -278,23 +295,20 @@ export function BulkEditProductDialog({
                       name="wholesale_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Precio Mayoreo</FormLabel>
+                          <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder={
-                                isMixed("wholesale_price")
-                                  ? "Varios..."
-                                  : "0.00"
-                              }
-                              {...field}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                field.onChange(val);
-                              }}
-                              value={field.value ?? ""}
-                            />
+                            <div className="relative">
+                              <span className="absolute left-3 top-1.5 text-muted-foreground">
+                                $
+                              </span>
+                                <Input
+                                  type="number"
+                                  step="0.50"
+                                  placeholder={isMixed("wholesale_price") ? "Varios..." : "0.00" }
+                                  className="pl-7"
+                                  {...field}
+                                />
+                              </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -379,7 +393,7 @@ export function BulkEditProductDialog({
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
               type="submit" 
               form="bulk-edit-form"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !form.formState.isDirty}
             >
               {mutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
