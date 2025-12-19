@@ -663,3 +663,30 @@ pub fn get_product_by_id(
 
   Ok(product_detail)
 }
+
+#[tauri::command]
+pub fn delete_products(
+  db_state: State<'_, Mutex<Connection>>,
+  ids: Vec<String>,
+) -> Result<String, String> {
+  if ids.is_empty() {
+    return Ok("No hay productos para eliminar".to_string());
+  }
+
+  let mut conn = db_state.lock().map_err(|e| e.to_string())?;
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  {
+    let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+      "UPDATE products SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})", 
+      placeholders
+    );
+    let mut stmt = tx.prepare(&sql).map_err(|e| e.to_string())?;
+    let params = rusqlite::params_from_iter(ids.iter());
+    stmt.execute(params).map_err(|e| format!("Error eliminando productos: {}", e))?;
+  }
+
+  tx.commit().map_err(|e| format!("Error en commit de transacción: {}", e))?;
+  Ok(format!("{} productos eliminados correctamente", ids.len()))
+}

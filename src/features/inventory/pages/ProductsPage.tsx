@@ -18,6 +18,7 @@ import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
 import { CreateProductDialog } from "../components/CreateProductDialog";
 import { EditProductDialog } from "../components/EditProductDialog";
+import { DeleteProductsDialog } from "../components/DeleteProductsDialog";
 import {
   HoverCard,
   HoverCardContent,
@@ -33,6 +34,8 @@ export default function ProductsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productsToDelete, setProductsToDelete] = useState<Product[]>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 16,
@@ -293,7 +296,13 @@ export default function ProductsPage() {
             <Button
               variant="destructive"
               disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-              onClick={() => console.log("Eliminar seleccionados")}
+              onClick={() => {
+                const selectedProducts = table
+                  .getFilteredSelectedRowModel()
+                  .rows.map((row) => row.original);
+                setProductsToDelete(selectedProducts);
+                setDeleteDialogOpen(true);
+              }}
             >
               <Trash className="mr-2 h-4 w-4" />
               Eliminar ({table.getFilteredSelectedRowModel().rows.length})
@@ -313,17 +322,27 @@ export default function ProductsPage() {
         }}
       />
       <EditProductDialog
-      open={isEditDialogOpen}
-      productId={editingId}
-      onOpenChange={(open) => {
-        setIsEditDialogOpen(open);
-        if (!open) {
-          setEditingId(null); 
+        open={isEditDialogOpen}
+        productId={editingId}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setEditingId(null); 
+            fetchProducts(); 
+            setRowSelection({}); 
+          }
+        }}
+      />
+      <DeleteProductsDialog 
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        products={productsToDelete}
+        onSuccess={() => {
+          setProductsToDelete([]);
           fetchProducts(); 
           setRowSelection({}); 
-        }
-      }}
-    />
+        }}
+      />
   </>
   );
 }
