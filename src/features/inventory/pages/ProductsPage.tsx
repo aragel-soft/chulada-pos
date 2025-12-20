@@ -18,6 +18,7 @@ import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
 import { CreateProductDialog } from "../components/CreateProductDialog";
 import { EditProductDialog } from "../components/EditProductDialog";
+import { BulkEditProductDialog } from "../components/BulkEditProductDialog";
 import { DeleteProductsDialog } from "../components/DeleteProductsDialog";
 import {
   HoverCard,
@@ -34,6 +35,8 @@ export default function ProductsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [selectedProductsForBulk, setSelectedProductsForBulk] = useState<Product[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productsToDelete, setProductsToDelete] = useState<Product[]>([]);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -279,16 +282,27 @@ export default function ProductsPage() {
 
           {can('products:edit') && (
             <Button 
-              className="rounded-l bg-[#480489] hover:bg-[#480489]/90"
-              disabled={table.getFilteredSelectedRowModel().rows.length !== 1}
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+              disabled={table.getFilteredSelectedRowModel().rows.length === 0}
               onClick={() => {
-                const selectedRow = table.getFilteredSelectedRowModel().rows[0];
-                setEditingId(selectedRow.original.id);
-                setIsEditDialogOpen(true);
+                const selectedRows = table.getFilteredSelectedRowModel().rows;
+                if (selectedRows.length === 1) {
+                  const selectedRow = selectedRows[0];
+                  setEditingId(selectedRow.original.id);
+                  setIsEditDialogOpen(true);
+                } else {
+                  const products = selectedRows.map((row) => row.original);
+                  setSelectedProductsForBulk(products);
+                  setIsBulkEditOpen(true);
+                }
               }}
             >
               <Pencil className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Modificar</span>
+              <span className="hidden sm:inline">
+                {table.getFilteredSelectedRowModel().rows.length > 1 
+                  ? `Modificar (${table.getFilteredSelectedRowModel().rows.length})` 
+                  : "Modificar"}
+              </span>
             </Button>
           )}
           
@@ -328,9 +342,22 @@ export default function ProductsPage() {
           setIsEditDialogOpen(open);
           if (!open) {
             setEditingId(null); 
-            fetchProducts(); 
-            setRowSelection({}); 
           }
+        }}
+        onSuccess={() => {
+          fetchProducts();
+          setRowSelection({});
+          setIsEditDialogOpen(false);
+        }}
+      />
+      <BulkEditProductDialog
+        open={isBulkEditOpen}
+        onOpenChange={setIsBulkEditOpen}
+        selectedProducts={selectedProductsForBulk}
+        onSuccess={() => {
+          setSelectedProductsForBulk([]);
+          fetchProducts(); 
+          setRowSelection({});
         }}
       />
       <DeleteProductsDialog 
