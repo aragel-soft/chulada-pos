@@ -179,16 +179,16 @@ export function BulkEditProductDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader className="pb-4 shrink-0">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-6 pb-2 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" />
               Editar Productos
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0 py-4">
-            <div className="flex flex-col gap-4 overflow-y-auto px-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0 p-6">
+            <div className="flex flex-col gap-4 overflow-y-auto px-1 h-full">
               <Form {...form}>
                 <form
                   id="bulk-edit-form"
@@ -341,8 +341,8 @@ export function BulkEditProductDialog({
               </Form>
             </div>
 
-            <div className="border rounded-md flex flex-col bg-muted/20">
-              <div className="p-3 border-b bg-muted/40 font-medium text-sm flex justify-between items-center">
+            <div className="border rounded-md flex flex-col bg-muted/20 h-full overflow-hidden">
+              <div className="p-3 border-b bg-muted/40 font-medium text-sm flex justify-between items-center shrink-0">
                 <span>Productos Afectados</span>
                 <span className="pr-1">{selectedProducts.length}</span>
               </div>
@@ -353,8 +353,8 @@ export function BulkEditProductDialog({
                       key={product.id}
                       className={"flex items-center justify-between p-3 text-sm border-b last:border-0 bg-background"}
                     >
-                      <div className="flex flex-col gap-1 overflow-hidden">
-                        <span className="font-medium truncate">
+                      <div className="flex flex-col gap-1 overflow-hidden min-w-0 flex-1 pr-3 max-w-[300px]">
+                        <span className="font-medium truncate" title={product.name}>
                           {product.name}
                         </span>
                         <span className="text-xs text-muted-foreground flex gap-2">
@@ -362,7 +362,7 @@ export function BulkEditProductDialog({
                         </span>
                       </div>
                       <div className="text-right text-xs">
-                        <div className="font-mono">
+                        <div className="font-medium">
                           ${product.retail_price.toFixed(2)}
                         </div>
                         <Badge
@@ -381,7 +381,7 @@ export function BulkEditProductDialog({
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="p-6 pt-2 gap-2 sm:gap-0 bg-background shrink-0">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}

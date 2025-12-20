@@ -24,6 +24,12 @@ interface TagInputProps {
   className?: string;
 }
 
+const cleanTag = (tag: string) => {
+  const trimmed = tag.trim();
+  if (!trimmed) return "";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
 export function TagInput({
   placeholder = "Seleccionar etiquetas...",
   availableTags,
@@ -48,8 +54,13 @@ export function TagInput({
   }, [open, selectedTags]);
 
   const handleSelect = (tag: string) => {
-    onTagsChange([...selectedTags, tag]);
-    setInputValue("");
+    const cleaned = cleanTag(tag); 
+
+    if (cleaned && !selectedTags.includes(cleaned)) {
+      onTagsChange([...selectedTags, cleaned]);
+    }
+
+    setInputValue(""); 
     setTimeout(() => {
       inputRef.current?.focus();
     }, 0);
@@ -67,6 +78,12 @@ export function TagInput({
           handleUnselect(selectedTags[selectedTags.length - 1]);
         }
       }
+
+      if (e.key === "Enter" && inputValue) {
+        e.preventDefault();
+        handleSelect(inputValue);
+      }
+
       if (e.key === "Escape") {
         setOpen(false);
       }
