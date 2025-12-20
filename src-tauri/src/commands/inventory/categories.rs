@@ -96,10 +96,10 @@ fn map_category_row(row: &rusqlite::Row) -> rusqlite::Result<CategoryListDto> {
         parent_id,
         sequence: row.get(5)?,
         created_at: row.get(6)?,
-        product_count: row.get(7)?,
-        children_count: row.get(8)?,
+        product_count: row.get(8)?,
+        children_count: row.get(9)?,
         depth,
-        is_active: row.get(9)?,
+        is_active: row.get(7)?,
     })
 }
 
@@ -299,13 +299,13 @@ pub fn create_category(
     };
 
     if duplicate_count > 0 {
-        return Err("Ya existe una categoría con este nombre en esta categoría padre, solo se permite repetir el nombre una vez por categoría".to_string());
+        return Err("Ya existe una categoría con este nombre en este grupo.".to_string());
     }
 
     // Insertar
     let id = uuid::Uuid::new_v4().to_string();
     tx.execute(
-        "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, DATETIME('now'))",
+        "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, DATETIME('now'), DATETIME('now'))",
         rusqlite::params![
             id,
             name,
@@ -334,7 +334,7 @@ pub fn update_category(
 
     let name = data.name.trim().to_string();
 
-    // 1. Validar nombre duplicado
+    // Validar nombre duplicado
     let duplicate_count: i64 = if let Some(ref parent_id) = data.parent_id {
         tx.query_row(
             "SELECT COUNT(*) FROM categories WHERE name = ? AND parent_category_id = ? AND id != ? AND deleted_at IS NULL",
@@ -475,17 +475,13 @@ pub async fn delete_categories(
     let mut validation_errors: Vec<String> = Vec::new();
 
     for id in &ids {
-        // Obtenemos el nombre de la categoría para mensajes más claros
         let category_name: String = tx
             .query_row("SELECT name FROM categories WHERE id = ?", [id], |row| {
                 row.get(0)
             })
             .unwrap_or_else(|_| "Desconocida".to_string());
 
-        // 1. Validar Subcategorías (Hijos)
-        // Ignoramos los hijos que TAMBIÉN se van a eliminar (están en la lista `ids`)
-
-        // Construimos placeholders para la lista de exclusión (ids a borrar)
+        // Validar Subcategorías
         let exclusion_placeholders = std::iter::repeat("?")
             .take(ids.len())
             .collect::<Vec<_>>()
@@ -496,9 +492,8 @@ pub async fn delete_categories(
             exclusion_placeholders
         );
 
-        // Preparamos parámetros: [parent_id, id_1, id_2, ..., id_n]
         let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(ids.len() + 1);
-        params.push(id); // El parent_id que estamos chequeando
+        params.push(id);
         for excluded_id in &ids {
             params.push(excluded_id);
         }
@@ -518,7 +513,7 @@ pub async fn delete_categories(
             ));
         }
 
-        // 2. Validar Productos
+        // Validar Productos
         let product_count: i64 = tx
             .query_row(
                 "SELECT COUNT(*) FROM products WHERE category_id = ? AND deleted_at IS NULL",
@@ -543,12 +538,6 @@ pub async fn delete_categories(
         }
         .into());
     }
-
-    // 3. Ejecutar Soft Delete
-    // Usamos un loop para mantenerlo simple con la transacción ya abierta,
-    // aunque un IN clause sería más eficiente, el prepare cacheado de rusqlite ayuda.
-    // Dado que ya iteramos arriba, podríamos haber hecho un statement global, pero
-    // por seguridad solo borramos si todo pasó.
 
     let placeholders = std::iter::repeat("?")
         .take(ids.len())

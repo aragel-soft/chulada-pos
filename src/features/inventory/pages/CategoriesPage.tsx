@@ -155,7 +155,7 @@ export default function CategoriesPage() {
                 variant="outline"
                 className="text-base px-2 py-0.5 font-medium border-0"
                 style={{
-                  backgroundColor: (row.original.color || '#64748b') + '33', // ~20% opacity (hex 33 is 20%)
+                  backgroundColor: (row.original.color || '#64748b') + '33',
                   color: row.original.color || '#64748b'
                 }}
               >

@@ -60,7 +60,6 @@ export default function InventoryPage() {
                 value={tab.value}
                 className={cn(
                   "relative",
-                  "z-10",
                   "rounded-none",
                   "bg-transparent",
                   "px-4 pb-0 pt-1",
