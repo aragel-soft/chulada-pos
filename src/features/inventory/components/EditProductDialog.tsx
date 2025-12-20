@@ -52,12 +52,14 @@ interface EditProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productId: string | null;
+  onSuccess: () => void;
 }
 
 export function EditProductDialog({
   open,
   onOpenChange,
   productId,
+  onSuccess,
 }: EditProductDialogProps) {
   const queryClient = useQueryClient();
   const { can } = useAuthStore();
@@ -84,6 +86,7 @@ export function EditProductDialog({
       tags: [],
     },
   });
+  const { isDirty } = form.formState
 
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: ["categories"],
@@ -161,6 +164,7 @@ export function EditProductDialog({
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product", productId] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
+      onSuccess();
       handleClose();
     },
     onError: (error: any) => {
@@ -307,7 +311,7 @@ export function EditProductDialog({
                             availableTags={availableTags}
                             selectedTags={field.value}
                             onTagsChange={field.onChange}
-                            placeholder="+ Tag"
+                            placeholder="+ Etiqueta"
                           />
                         </FormControl>
                         <FormMessage />
@@ -593,7 +597,7 @@ export function EditProductDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || (!isDirty && imageAction === "Keep")}
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
               >
                 {updateMutation.isPending && (

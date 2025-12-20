@@ -1,16 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { PaginationParams } from "@/types/pagination";
 import { Product, PaginatedResponse, CreateProductPayload, ProductDetail, UpdateProductPayload } from "@/types/inventory";
+import { BulkUpdateProductsPayload } from "@/types/inventory";
 
-// TODO: Moverla a un archivo común y hacerla genérica
-export interface GetProductsParams {
-  page: number;
-  pageSize: number;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
-
-export const getProducts = async (params: GetProductsParams): Promise<PaginatedResponse<Product>> => {
+export const getProducts = async (params: PaginationParams): Promise<PaginatedResponse<Product>> => {
   try {
     return await invoke("get_products", {
       page: params.page,
@@ -73,5 +66,15 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
   } catch (error) {
     console.error("Error deleting products:", error);
     throw error;
+  }
+};
+
+export const bulkUpdateProducts = async (payload: BulkUpdateProductsPayload): Promise<string> => {
+  try {
+    const result = await invoke<string>("bulk_update_products", { payload });
+    return result;
+  } catch (error) {
+    console.error("Error updating products:", error);
+    throw new Error(String(error));
   }
 };
