@@ -14,6 +14,7 @@ export const categorySchema = z.object({
   description: z.string()
     .max(200, "Máximo 200 caracteres")
     .optional(),
+  is_active: z.boolean().optional(),
 });
 
 export type CategoryFormValues = z.infer<typeof categorySchema>;

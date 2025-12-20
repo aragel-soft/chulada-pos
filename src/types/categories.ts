@@ -9,6 +9,7 @@ export interface CategoryListDto {
   children_count: number;
   depth: number;
   created_at: string;
+  is_active: boolean;
 }
 
 export interface CreateCategoryDto {
@@ -26,4 +27,5 @@ export interface UpdateCategoryDto {
   color: string;
   sequence: number;
   description?: string | null;
+  is_active?: boolean;
 }

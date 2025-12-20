@@ -15,6 +15,7 @@ pub struct CategoryListDto {
     pub children_count: i64,
     pub depth: i32,
     pub created_at: String,
+    pub is_active: bool,
 }
 
 #[derive(Serialize)]
@@ -53,6 +54,7 @@ pub async fn get_all_categories(
             c.parent_category_id, 
             c.sequence, 
             c.created_at,
+            COALESCE(c.is_active, 1) as is_active,
             (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
             (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
@@ -97,6 +99,7 @@ fn map_category_row(row: &rusqlite::Row) -> rusqlite::Result<CategoryListDto> {
         product_count: row.get(7)?,
         children_count: row.get(8)?,
         depth,
+        is_active: row.get(9)?,
     })
 }
 
@@ -158,6 +161,7 @@ pub async fn get_categories(
             c.parent_category_id, 
             c.sequence, 
             c.created_at,
+            COALESCE(c.is_active, 1) as is_active,
             (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
             (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
@@ -248,6 +252,7 @@ pub struct UpdateCategoryDto {
     pub color: String,
     pub sequence: i32,
     pub description: Option<String>,
+    pub is_active: Option<bool>,
 }
 
 #[tauri::command]
@@ -402,17 +407,32 @@ pub fn update_category(
     }
 
     // Update
-    tx.execute(
-        "UPDATE categories SET name = ?1, parent_category_id = ?2, color = ?3, sequence = ?4, description = ?5 WHERE id = ?6",
-        rusqlite::params![
-            name,
-            data.parent_id,
-            data.color,
-            data.sequence,
-            data.description,
-            data.id
-        ],
-    ).map_err(|e| InventoryError { code: "DB_UPDATE_ERROR".to_string(), message: format!("Error al actualizar categoría: {}", e) })?;
+    if let Some(is_active) = data.is_active {
+        tx.execute(
+            "UPDATE categories SET name = ?1, parent_category_id = ?2, color = ?3, sequence = ?4, description = ?5, is_active = ?6 WHERE id = ?7",
+            rusqlite::params![
+                name,
+                data.parent_id,
+                data.color,
+                data.sequence,
+                data.description,
+                if is_active { 1 } else { 0 },
+                data.id
+            ],
+        ).map_err(|e| InventoryError { code: "DB_UPDATE_ERROR".to_string(), message: format!("Error al actualizar categoría: {}", e) })?;
+    } else {
+        tx.execute(
+            "UPDATE categories SET name = ?1, parent_category_id = ?2, color = ?3, sequence = ?4, description = ?5 WHERE id = ?6",
+            rusqlite::params![
+                name,
+                data.parent_id,
+                data.color,
+                data.sequence,
+                data.description,
+                data.id
+            ],
+        ).map_err(|e| InventoryError { code: "DB_UPDATE_ERROR".to_string(), message: format!("Error al actualizar categoría: {}", e) })?;
+    }
 
     tx.commit().map_err(|e| InventoryError {
         code: "DB_COMMIT_ERROR".to_string(),

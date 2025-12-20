@@ -46,7 +46,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-18 border-b bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+    <header className="h-18 border-b bg-white shadow-sm fixed top-0 left-0 right-0 z-50 will-change-transform transform-gpu backface-hidden">
       <div className="h-full px-4 flex items-center justify-between">
         {/* Left Section: Hamburger + Logo */}
         <div className="flex items-center gap-3">
@@ -64,14 +64,14 @@ export function Header() {
             onClick={handleLogoClick}
             className="flex p-2 items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <img 
-              src="/logo.svg" 
-              alt="ChuladaPOS" 
+            <img
+              src="/logo.svg"
+              alt="ChuladaPOS"
               className="h-12 hidden min-[480px]:block"
             />
-            <img 
-              src="/logo-icon.svg" 
-              alt="ChuladaPOS" 
+            <img
+              src="/logo-icon.svg"
+              alt="ChuladaPOS"
               className="h-12 block min-[480px]:hidden"
             />
           </button>
@@ -80,20 +80,20 @@ export function Header() {
         {/* Right Section: Bell + User Dropdown */}
         <div className="flex items-center gap-3">
           {/* Notification Bell */}
-          <Button 
-            variant="outline" 
-            size="icon" 
+          <Button
+            variant="outline"
+            size="icon"
             className="rounded-full w-11 h-11 border-gray-200 hover:bg-gray-100 shadow-none"
           >
-            <Bell className="!h-5 !w-5 text-gray-600" /> 
+            <Bell className="!h-5 !w-5 text-gray-600" />
           </Button>
 
           {/* User Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 hover:bg-gray-100"              
+              <Button
+                variant="outline"
+                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 hover:bg-gray-100"
                 data-testid="user-menu-trigger"
               >
                 <AppAvatar
@@ -111,8 +111,8 @@ export function Header() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem
                 onSelect={(e) => {
-                  e.preventDefault(); 
-                  setIsModalOpen(true); 
+                  e.preventDefault();
+                  setIsModalOpen(true);
                 }}
                 className="text-red-600 focus:text-red-600 cursor-pointer"
               >
@@ -130,15 +130,15 @@ export function Header() {
                   Cerrar Sesión
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  ¿Estás seguro que deseas salir? Serás redirigido a la 
+                  ¿Estás seguro que deseas salir? Serás redirigido a la
                   pantalla de inicio de sesión.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction asChild> 
-                  <Button 
-                    onClick={handleLogout} 
+                <AlertDialogAction asChild>
+                  <Button
+                    onClick={handleLogout}
                     variant="destructive"
                   >
                     Cerrar sesión

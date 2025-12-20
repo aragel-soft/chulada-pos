@@ -126,7 +126,8 @@ export function CreateCategoryModal({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 py-4">
+              {/* Fila 1 */}
               <FormField
                 control={form.control}
                 name="name"
@@ -136,74 +137,84 @@ export function CreateCategoryModal({
                       Nombre <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej. Tintes" {...field} />
+                      <Input maxLength={50} placeholder="Ej. Tintes" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="parent_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="!text-current">
-                      Categoría Padre <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <Select
-                      onValueChange={(val) => field.onChange(val === "null" ? null : val)}
-                      value={field.value || "null"}
-                      disabled={isLoadingParents}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={isLoadingParents ? "Cargando..." : "Raíz (Principal)"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="null">Raíz (Principal)</SelectItem>
-                        {parentCategories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <Badge
-                              variant="outline"
-                              className="font-normal border-0 px-2"
-                              style={{
-                                backgroundColor: (cat.color || '#64748b') + '20',
-                                color: cat.color || '#64748b',
-                              }}
-                            >
-                              {cat.name}
-                            </Badge>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              {/* Fila 2 */}
+              <div className="flex gap-4">
+                <div className="w-[20%] min-w-[120px]">
+                  <FormField
+                    control={form.control}
+                    name="sequence"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="!text-current">
+                          Orden
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              field.onChange(val === "" ? "" : Number(val));
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="sequence"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="!text-current">
-                    Orden (Prioridad) <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <div className="flex-1">
+                  <FormField
+                    control={form.control}
+                    name="parent_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="!text-current">
+                          Categoría Padre
+                        </FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "null" ? null : val)}
+                          value={field.value || "null"}
+                          disabled={isLoadingParents}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={isLoadingParents ? "Cargando..." : "Raíz (Principal)"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="null">Raíz (Principal)</SelectItem>
+                            {parentCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                <Badge
+                                  variant="outline"
+                                  className="font-normal border-0 px-2"
+                                  style={{
+                                    backgroundColor: (cat.color || '#64748b') + '33',
+                                    color: cat.color || '#64748b',
+                                  }}
+                                >
+                                  {cat.name}
+                                </Badge>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
 
             <FormField
               control={form.control}
@@ -257,7 +268,7 @@ export function CreateCategoryModal({
                             className={`
                               flex h-8 w-8 cursor-pointer items-center justify-center rounded-full ring-offset-2 transition-all hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-ring peer-data-[state=checked]:scale-110
                             `}
-                            style={{ backgroundColor: color.value }}
+                            style={{ backgroundColor: color.value + '33' }}
                             title={color.name}
                           >
                             {field.value === color.value && (
