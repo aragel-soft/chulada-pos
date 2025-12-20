@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS categories (
   parent_category_id TEXT,
   color TEXT,
   is_active BOOLEAN DEFAULT 1,
+  sequence INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   deleted_at DATETIME,

@@ -22,7 +22,7 @@ INSERT INTO categories (id, name, parent_category_id, color, sequence, created_a
 ('cat-root-10', 'Hidracolor', NULL, '#BE185D', 10, DATETIME('now', '-6 hours'), 'Hidracolor especializada'),
 ('cat-child-11', 'Tintes', 'cat-root-10', '#1D4ED8', 1, DATETIME('now', '-6 hours'), 'Tintes para cabello'),
 ('cat-child-12', 'Shampoos', 'cat-root-10', '#0E7490', 2, DATETIME('now', '-6 hours'), 'Shampoos para cabello'),
-('cat-child-13', 'Cremas', 'cat-root-10', '#6D28D9', 3, DATETIME('now', '-6 hours'), 'Cremas para piel'), 
+('cat-child-13', 'Cremas', 'cat-root-10', '#6D28D9', 3, DATETIME('now', '-6 hours'), 'Cremas para piel',), 
 ('cat-child-14', 'Ampolletas', 'cat-root-10', '#B45309', 4, DATETIME('now', '-6 hours'), 'Ampolletas para el cabello');
 
 -- Insertar permiso para ver, crear, editar y eliminar categorias

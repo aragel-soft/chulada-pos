@@ -31,6 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Loader2, AlertCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { CATEGORY_COLORS } from "@/lib/constants";
 import { categorySchema, CategoryFormValues } from "@/features/inventory/schemas/categorySchema";
 import { updateCategory, getAllCategories } from "@/lib/api/inventory/categories";
@@ -62,8 +63,8 @@ export function EditCategoryModal({
     queryFn: getAllCategories,
     enabled: open && !!category,
     select: (data) => data.filter((c) =>
-      !c.parent_id && // Must be Root
-      c.id !== category?.id // Cannot be parent of itself
+      !c.parent_id &&
+      c.id !== category?.id
     ),
   });
 
@@ -76,6 +77,7 @@ export function EditCategoryModal({
       color: CATEGORY_COLORS[0].value,
       sequence: 0,
       description: "",
+      is_active: true,
     },
   });
 
@@ -87,6 +89,7 @@ export function EditCategoryModal({
         color: category.color,
         sequence: category.sequence,
         description: category.description || "",
+        is_active: category.is_active ?? true,
       });
     }
   }, [open, category, form]);
@@ -126,6 +129,7 @@ export function EditCategoryModal({
       color: values.color,
       sequence: Number(values.sequence),
       description: values.description || undefined,
+      is_active: values.is_active,
     });
   };
 
@@ -150,7 +154,8 @@ export function EditCategoryModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 py-4">
+              {/* Fila 1 */}
               <FormField
                 control={form.control}
                 name="name"
@@ -160,57 +165,108 @@ export function EditCategoryModal({
                       Nombre <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej. Tintes" {...field} />
+                      <Input
+                        maxLength={50}
+                        placeholder="Ej. Tintes"
+                        {...field}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/  /g, ' ');
+                          field.onChange(val);
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="parent_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Categoría Padre
-                    </FormLabel>
-                    <Select
-                      onValueChange={(val) => field.onChange(val === "null" ? null : val)}
-                      value={field.value || "null"}
-                      disabled={isLoadingParents || hasChildren}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={
-                            isLoadingParents ? "Cargando..." :
-                              hasChildren ? "Bloqueado (Tiene Subcategorías)" :
-                                "Raíz (Principal)"
-                          } />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="null">Raíz (Principal)</SelectItem>
-                        {parentCategories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <Badge
-                              variant="outline"
-                              className="font-normal border-0 px-2"
-                              style={{
-                                backgroundColor: (cat.color || '#64748b') + '20',
-                                color: cat.color || '#64748b',
-                              }}
-                            >
-                              {cat.name}
-                            </Badge>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Fila 2 */}
+              <div className="flex gap-4">
+                <div className="w-[20%] min-w-[120px]">
+                  <FormField
+                    control={form.control}
+                    name="sequence"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Orden
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            {...field}
+                            onKeyDown={(e) => {
+                              if (["e", "E", "+", "-", "."].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "") {
+                                field.onChange("");
+                                return;
+                              }
+                              const numVal = Number(val);
+                              if (numVal >= 0) {
+                                field.onChange(numVal);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <FormField
+                    control={form.control}
+                    name="parent_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Categoría Padre
+                        </FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "null" ? null : val)}
+                          value={field.value || "null"}
+                          disabled={isLoadingParents || hasChildren}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={
+                                isLoadingParents ? "Cargando..." :
+                                  hasChildren ? "Bloqueado (Tiene Subcategorías)" :
+                                    "Raíz (Principal)"
+                              } />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="null">Raíz (Principal)</SelectItem>
+                            {parentCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                <Badge
+                                  variant="outline"
+                                  className="font-normal border-0 px-2 text-sm"
+                                  style={{
+                                    backgroundColor: (cat.color || '#64748b') + '33',
+                                    color: cat.color || '#64748b',
+                                  }}
+                                >
+                                  {cat.name}
+                                </Badge>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
 
             {hasChildren && (
@@ -225,20 +281,18 @@ export function EditCategoryModal({
 
             <FormField
               control={form.control}
-              name="sequence"
+              name="is_active"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Orden (Prioridad) <span className="text-destructive">*</span>
-                  </FormLabel>
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Estado Activo</FormLabel>
+                  </div>
                   <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -295,7 +349,7 @@ export function EditCategoryModal({
                             className={`
                               flex h-8 w-8 cursor-pointer items-center justify-center rounded-full ring-offset-2 transition-all hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-ring peer-data-[state=checked]:scale-110
                             `}
-                            style={{ backgroundColor: color.value }}
+                            style={{ backgroundColor: color.value + 'B9' }}
                             title={color.name}
                           >
                             {field.value === color.value && (

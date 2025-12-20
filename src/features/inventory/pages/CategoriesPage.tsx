@@ -44,7 +44,7 @@ export default function CategoriesPage() {
 
   // Estados de la tabla
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [sorting, setSorting] = useState<SortingState>([{ id: "sequence", desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
 
   // Paginación y Filtro
   const [pagination, setPagination] = useState<PaginationState>({
@@ -153,9 +153,9 @@ export default function CategoriesPage() {
               {isChild && <CornerDownRight className="h-4 w-4 text-muted-foreground" />}
               <Badge
                 variant="outline"
-                className="text-[10px] px-2 py-0 h-5 font-medium border-0"
+                className="text-base px-2 py-0.5 font-medium border-0"
                 style={{
-                  backgroundColor: (row.original.color || '#64748b') + '20',
+                  backgroundColor: (row.original.color || '#64748b') + '33',
                   color: row.original.color || '#64748b'
                 }}
               >
@@ -176,7 +176,7 @@ export default function CategoriesPage() {
       },
       {
         accessorKey: "product_count",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Productos" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Productos" className="w-full justify-center" />,
         cell: ({ row }) => (
           <div className="text-center font-medium">
             {row.getValue("product_count")}
@@ -184,8 +184,24 @@ export default function CategoriesPage() {
         ),
       },
       {
+        accessorKey: "is_active",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" className="w-full justify-center" />,
+        cell: ({ row }) => (
+          <div className="flex justify-center">
+            <Badge
+              className={`capitalize min-w-[80px] justify-center ${row.original.is_active
+                ? "bg-green-600 text-white hover:bg-green-600/80"
+                : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
+                }`}
+            >
+              {row.original.is_active ? "activo" : "inactivo"}
+            </Badge>
+          </div>
+        ),
+      },
+      {
         accessorKey: "sequence",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Secuencia" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Secuencia" className="w-full justify-center" />,
         cell: ({ row }) => (
           <div className="text-center font-medium">
             {row.getValue("sequence")}
@@ -218,6 +234,7 @@ export default function CategoriesPage() {
           product_count: "Productos",
           sequence: "Secuencia",
           created_at: "Creado",
+          is_active: "Estado",
         }}
         actions={(table) => (
           <div className="flex items-center gap-2 w-full md:w-auto">
@@ -271,7 +288,7 @@ export default function CategoriesPage() {
         onRowSelectionChange={setRowSelection}
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
-        initialColumnVisibility={{ created_at: false, sequence: false }}
+        initialColumnVisibility={{ created_at: false }}
 
         // Configuración Manual (Server-side)
         manualPagination={true}
