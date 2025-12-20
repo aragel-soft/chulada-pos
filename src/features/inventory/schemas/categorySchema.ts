@@ -2,10 +2,12 @@ import { z } from "zod";
 
 export const categorySchema = z.object({
   name: z.string()
-    .trim()
-    .min(3, "Mínimo 3 caracteres")
-    .max(50, "Máximo 50 caracteres")
-    .regex(/^(?!.*\s{2})/, 'No se permiten dos espacios seguidos'),
+    .transform((val) => val.replace(/\s+/g, " ").trim())
+    .pipe(
+      z.string()
+        .min(3, "Mínimo 3 caracteres")
+        .max(50, "Máximo 50 caracteres")
+    ),
   parent_id: z.string().nullable().optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Color inválido"),
   sequence: z.union([z.string(), z.number()])
