@@ -11,8 +11,7 @@ export const categorySchema = z.object({
   parent_id: z.string().nullable().optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Color inválido"),
   sequence: z.union([z.string(), z.number()])
-    .transform((val) => (val === "" ? undefined : Number(val)))
-    .refine((val) => val !== undefined, { message: "Obligatorio" })
+    .transform((val) => (val === "" || val === undefined || val === null ? 0 : Number(val)))
     .pipe(
       z.number()
         .int()
