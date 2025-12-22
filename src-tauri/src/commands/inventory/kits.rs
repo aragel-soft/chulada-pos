@@ -8,19 +8,19 @@ pub struct KitListItem {
   id: String,
   name: String,
   description: Option<String>,
-  triggers_count: i64,    
-  items_summary: Option<String>, 
+  triggers_count: i64,
+  items_summary: Option<String>,
   is_active: bool,
   created_at: String,
 }
 
 #[derive(Serialize)]
 pub struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total: i64,
-    page: i64,
-    page_size: i64,
-    total_pages: i64,
+  data: Vec<T>,
+  total: i64,
+  page: i64,
+  page_size: i64,
+  total_pages: i64,
 }
 
 #[tauri::command]
@@ -30,23 +30,45 @@ pub fn get_kits(
   page_size: i64,
   search: Option<String>,
   sort_by: Option<String>,
-  sort_order: Option<String>
+  sort_order: Option<String>,
 ) -> Result<PaginatedResponse<KitListItem>, String> {
   let conn = db_state.lock().map_err(|e| e.to_string())?;
 
   let search_term = search.as_ref().map(|s| format!("%{}%", s));
   let has_search = search.is_some() && !search.as_ref().unwrap().is_empty();
 
-  let count_sql = if has_search {
-    "SELECT COUNT(*) FROM product_kit_options WHERE deleted_at IS NULL AND name LIKE ?1"
+  let search_clause = if has_search {
+    " AND (
+      k.name LIKE :search 
+      OR k.description LIKE :search
+      OR EXISTS (
+        SELECT 1 FROM product_kit_main pkm
+        JOIN products p ON pkm.main_product_id = p.id
+        WHERE pkm.kit_option_id = k.id AND (p.name LIKE :search OR p.code LIKE :search)
+      )
+      OR EXISTS (
+        SELECT 1 FROM product_kit_items pki
+        JOIN products p ON pki.included_product_id = p.id
+        WHERE pki.kit_option_id = k.id AND (p.name LIKE :search OR p.code LIKE :search)
+      )
+    )"
   } else {
-    "SELECT COUNT(*) FROM product_kit_options WHERE deleted_at IS NULL"
+    ""
   };
 
+  let count_sql = format!(
+    "SELECT COUNT(*) FROM product_kit_options k WHERE k.deleted_at IS NULL {}",
+    search_clause
+  );
+
   let total: i64 = if has_search {
-    conn.query_row(count_sql, [search_term.as_ref().unwrap()], |row| row.get(0))
+    conn.query_row(
+      &count_sql,
+      rusqlite::named_params! { ":search": search_term },
+      |row| row.get(0),
+    )
   } else {
-    conn.query_row(count_sql, [], |row| row.get(0))
+    conn.query_row(&count_sql, [], |row| row.get(0))
   }
   .map_err(|e| format!("Error contando kits: {}", e))?;
 
@@ -63,7 +85,8 @@ pub fn get_kits(
     _ => "DESC",
   };
 
-  let base_sql = "
+  let base_sql = format!(
+    "
     SELECT 
       k.id,
       k.name,
@@ -79,32 +102,40 @@ pub fn get_kits(
       k.created_at
     FROM product_kit_options k
     WHERE k.deleted_at IS NULL
-  ";
-
-  let final_sql = if has_search {
-    format!("{} AND k.name LIKE ?1 ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
-  } else {
-    format!("{} ORDER BY {} {} LIMIT ?1 OFFSET ?2", base_sql, order_column, order_direction)
-  };
+    {} 
+    ORDER BY {} {} 
+    LIMIT :limit OFFSET :offset",
+    search_clause, order_column, order_direction
+  );
 
   let limit = page_size;
   let offset = (page - 1) * page_size;
 
-  let mut stmt = conn.prepare(&final_sql).map_err(|e| e.to_string())?;
+  let mut stmt = conn.prepare(&base_sql).map_err(|e| e.to_string())?;
 
   let kits_iter = if has_search {
     stmt.query_map(
-      rusqlite::params![search_term.unwrap(), limit, offset], 
-      map_kit_row
+      rusqlite::named_params! {
+        ":search": search_term,
+        ":limit": limit,
+        ":offset": offset
+      },
+      map_kit_row,
     )
   } else {
     stmt.query_map(
-      rusqlite::params![limit, offset], 
-      map_kit_row
+      rusqlite::named_params! {
+        ":limit": limit,
+        ":offset": offset
+      },
+      map_kit_row,
     )
-  }.map_err(|e| e.to_string())?;
+  }
+  .map_err(|e| e.to_string())?;
 
-  let kits = kits_iter.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+  let kits = kits_iter
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| e.to_string())?;
   let total_pages = (total as f64 / page_size as f64).ceil() as i64;
 
   Ok(PaginatedResponse {
