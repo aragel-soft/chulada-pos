@@ -50,6 +50,8 @@ fn main() {
             commands::inventory::categories::delete_categories,
             // Inventory - Tags
             commands::inventory::tags::get_all_tags,
+            // Inventory - Kits
+            commands::inventory::kits::get_kits,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
