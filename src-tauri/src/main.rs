@@ -52,6 +52,10 @@ fn main() {
             commands::inventory::tags::get_all_tags,
             // Inventory - Kits
             commands::inventory::kits::get_kits,
+            // Cash Register
+            commands::cash_register::shifts::get_active_shift,
+            commands::cash_register::shifts::open_shift,
+            commands::cash_register::shifts::close_shift,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

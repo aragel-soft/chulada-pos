@@ -1,9 +1,12 @@
-import { Menu, Bell, ChevronDown, LogOut } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { useCashRegisterStore } from '@/stores/cashRegisterStore';
+import { OpenShiftModal } from '@/features/cash-register/components/OpenShiftModal';
 import { useSidebar } from "@/components/ui/sidebar";
 import { AppAvatar } from '@/components/ui/app-avatar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export function Header() {
   const navigate = useNavigate();
@@ -28,6 +31,12 @@ export function Header() {
   const logout = useAuthStore((state) => state.logout);
   const { toggleSidebar } = useSidebar();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const { shift, checkActiveShift } = useCashRegisterStore();
+
+  useEffect(() => {
+    checkActiveShift();
+  }, [checkActiveShift]);
 
   const handleLogout = () => {
     try {
@@ -75,6 +84,25 @@ export function Header() {
               className="h-12 block min-[480px]:hidden"
             />
           </button>
+        </div>
+
+        {/* Shift Status Reminder */}
+        <div className="flex-1 flex justify-center">
+          {shift && shift.status === 'open' ? (
+            <div className="hidden md:flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-green-700">Caja Abierta #{shift.code || shift.id}</span>
+            </div>
+          ) : (
+            <OpenShiftModal
+              trigger={
+                <div className="flex items-center gap-2 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors">
+                  <Wallet className="w-3 h-3 text-amber-600" />
+                  <span className="text-xs font-medium text-amber-700">Caja Cerrada - Click para abrir</span>
+                </div>
+              }
+            />
+          )}
         </div>
 
         {/* Right Section: Bell + User Dropdown */}

@@ -11,6 +11,9 @@ import { RootLayout } from '@/components/layouts/RootLayout';
 // --- Tus Páginas Principales ---
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
+import SalesPage from '@/features/dashboard/pages/SalesPage';
+import HistoryPage from '@/features/dashboard/pages/HistoryPage';
+import AddInventoryPage from '@/features/dashboard/pages/AddInventoryPage';
 import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
 import ReportsPage from '@/pages/ReportsPage';
@@ -24,6 +27,8 @@ import ProtectedRoute from './ProtectedRoute';
 // --- Settings
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
+import CashRegisterPage from '@/pages/CashRegisterPage';
+
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -49,6 +54,44 @@ const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardPage />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="sales" replace />,
+          },
+          {
+            path: "sales",
+            element: (
+              <ProtectedRoute module="sales:view">
+                <SalesPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "history",
+            element: (
+              <ProtectedRoute module="history:view">
+                <HistoryPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "add_inventory",
+            element: (
+              <ProtectedRoute module="add_inventory:view">
+                <AddInventoryPage />
+              </ProtectedRoute>
+            )
+          }
+        ]
+      },
+      {
+        path: "cash-register",
+        element: (
+          <ProtectedRoute module="cash_register:view">
+            <CashRegisterPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: "inventory",
