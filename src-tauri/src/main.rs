@@ -50,6 +50,8 @@ fn main() {
             commands::inventory::categories::delete_categories,
             // Inventory - Tags
             commands::inventory::tags::get_all_tags,
+            // Inventory - Kits
+            commands::inventory::kits::get_kits,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
