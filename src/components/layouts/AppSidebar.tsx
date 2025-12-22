@@ -30,6 +30,12 @@ const mainNavItems: NavItem[] = [
     path: '/dashboard',
   },
   {
+    title: 'Corte de Caja',
+    icon: ClipboardList,
+    path: '/cash-register',
+    permission: 'cash_register:view',
+  },
+  {
     title: 'Inventario',
     icon: Package,
     path: '/inventory',
@@ -100,7 +106,7 @@ export function AppSidebar() {
         onClick={() => handleNavigation(item.path)}
         isActive={active}
         tooltip={item.title}
-        className={`w-full h-12 transition-colors duration-200 hover:bg-zinc-100 data-[active=true]:bg-zinc-200 data-[active=true]:text-zinc-900 data-[active=true]:font-semibold`} 
+        className={`w-full h-12 transition-colors duration-200 hover:bg-zinc-100 data-[active=true]:bg-zinc-200 data-[active=true]:text-zinc-900 data-[active=true]:font-semibold`}
         data-testid={testId}
         data-active={active.toString()}
       >
@@ -114,35 +120,35 @@ export function AppSidebar() {
 
   return (
     <TooltipProvider delayDuration={0}>
-        <Sidebar 
-          collapsible="icon" 
-          className={'fixed left-0 z-10 top-[64px] h-[calc(100vh-64px)] pt-1 flex-col !bg-white'}
-          data-testid="sidebar"
-        >
-          <SidebarContent className='flex-1 overflow-y-auto'>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-3">
-                  {visibleMainItems.map((item) => (
-                    <SidebarMenuItem key={item.path}>
-                      {renderMenuItem(item)}
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
+      <Sidebar
+        collapsible="icon"
+        className={'fixed left-0 z-10 top-[64px] h-[calc(100vh-64px)] pt-1 flex-col !bg-white'}
+        data-testid="sidebar"
+      >
+        <SidebarContent className='flex-1 overflow-y-auto'>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-3">
+                {visibleMainItems.map((item) => (
+                  <SidebarMenuItem key={item.path}>
+                    {renderMenuItem(item)}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
 
-          <SidebarFooter>
-            <SidebarMenu className="gap-3">
-              {visibleFooterItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  {renderMenuItem(item)}
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarFooter>
-        </Sidebar>
+        <SidebarFooter>
+          <SidebarMenu className="gap-3">
+            {visibleFooterItems.map((item) => (
+              <SidebarMenuItem key={item.path}>
+                {renderMenuItem(item)}
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
     </TooltipProvider>
   );
 }

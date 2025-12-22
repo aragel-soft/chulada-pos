@@ -1,38 +1,95 @@
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { ArrowDownFromLine, ArrowUpFromLine, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { can } = useAuthStore();
+
+  const dashboardTabs = [
+    { value: 'sales', label: 'Venta', permission: 'sales:view' },
+    { value: 'history', label: 'Historial', permission: 'history:view' },
+    { value: 'add_inventory', label: 'Añadir Inventario', permission: 'add_inventory:view' },
+  ].filter(tab => can(tab.permission));
+
+  const currentTab = location.pathname.split('/')[2] || 'sales';
+
+  const onTabChange = (value: string) => {
+    if (value === 'sales') navigate('/dashboard');
+    else navigate(`/dashboard/${value}`);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-              <p className="text-slate-600 mt-2">
-                Bienvenido, {user?.full_name}
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col h-full p-4 gap-1 overflow-hidden">
 
-          <div className="space-y-4">
-            <div className="p-4 bg-slate-50 rounded-md">
-              <p className="text-sm text-slate-600">Usuario:</p>
-              <p className="font-semibold">{user?.username}</p>
-            </div>
+      <div className="bg-white flex items-center justify-between shrink-0 mb-2">
+        <div className="flex items-center gap-6 flex-1">
+          <Tabs value={currentTab} onValueChange={onTabChange} className="w-[400px]">
+            <TabsList className="
+                  w-full 
+                  justify-start 
+                  rounded-none 
+                  bg-transparent 
+                  p-0 
+                  relative 
+                  after:content-[''] 
+                  after:absolute 
+                  after:bottom-0 
+                  after:left-0 
+                  after:w-full 
+                  after:h-[1px] 
+                  after:bg-gray-200 
+                  dark:after:bg-gray-700
+                ">
+              {dashboardTabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={cn(
+                    "relative",
+                    "rounded-none",
+                    "bg-transparent",
+                    "px-4 pb-0 pt-1",
+                    "text-muted-foreground",
+                    "shadow-none",
+                    "border-b-2 border-transparent",
+                    "transition-colors duration-200",
 
-            <div className="p-4 bg-slate-50 rounded-md">
-              <p className="text-sm text-slate-600">Rol:</p>
-              <p className="font-semibold">{user?.role_display_name}</p>
-            </div>
+                    "data-[state=active]:border-[#480489]",
+                    "data-[state=active]:text-[#480489]",
+                    "data-[state=active]:font-bold",
+                    "data-[state=active]:shadow-none",
 
-            <div className="p-4 bg-slate-50 rounded-md">
-              <p className="text-sm text-slate-600">ID de Usuario:</p>
-              <p className="font-mono text-xs">{user?.id}</p>
-            </div>
-          </div>
+                    "hover:text-[#818181]",
+                    "hover:border-[#818181]"
+                  )}
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" className="bg-purple-100 text-[#480489] hover:bg-purple-200 border-purple-200">
+            <ArrowDownFromLine className="w-4 h-4 mr-2" /> Entradas
+          </Button>
+          <Button variant="secondary" size="sm" className="bg-purple-100 text-[#480489] hover:bg-purple-200 border-purple-200">
+            <ArrowUpFromLine className="w-4 h-4 mr-2" /> Salidas
+          </Button>
+          <Button variant="secondary" size="sm" className="bg-[#480489] text-white hover:bg-[#360368]">
+            <Star className="w-4 h-4 mr-2" /> Mayoreo
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
       </div>
     </div>
   );
