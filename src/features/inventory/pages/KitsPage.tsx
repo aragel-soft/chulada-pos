@@ -10,24 +10,17 @@ import {
   PlusCircle, 
   Pencil, 
   Trash,
-  MoreHorizontal
 } from "lucide-react";
-
 import { DataTable } from "@/components/ui/data-table/data-table"; 
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/stores/authStore"; 
 import { getKits } from "@/lib/api/inventory/kits";
 import { KitListItem } from "@/types/kits";
 import { PaginationParams } from "@/types/pagination";
+import { format } from "date-fns";
 
 export default function KitsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -41,12 +34,11 @@ export default function KitsPage() {
   const { can } = useAuthStore();
 
   const queryParams: PaginationParams = useMemo(() => ({
-    page: pagination.pageIndex + 1, // API usa base 1
+    page: pagination.pageIndex + 1,
     pageSize: pagination.pageSize,
     search: globalFilter,
-    // TODO: El backend necesita soportar sorting dinámico si queremos habilitarlo real
-    // sortBy: sorting.length > 0 ? sorting[0].id : undefined,
-    // sortOrder: sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined,
+    sortBy: sorting.length > 0 ? sorting[0].id : undefined,
+    sortOrder: sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined,
   }), [pagination, globalFilter, sorting]);
 
   const { data, isLoading } = useQuery({
@@ -56,8 +48,29 @@ export default function KitsPage() {
 
   const columns: ColumnDef<KitListItem>[] = useMemo(() => [
     {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="translate-y-[2px]"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="translate-y-[2px]"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
       accessorKey: "name",
-      header: "Nombre del Kit",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Nombre del Kit" />,
       cell: ({ row }) => (
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
@@ -69,16 +82,16 @@ export default function KitsPage() {
     },
     {
       accessorKey: "triggers_count",
-      header: "Alcance",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Alcance" />,
       cell: ({ row }) => (
         <Badge variant="outline" className="font-normal">
-          {row.original.triggers_count} prod.
+          {row.original.triggers_count} {row.original.triggers_count === 1 ? "producto" : "productos"}
         </Badge>
       ),
     },
     {
       accessorKey: "items_summary",
-      header: "Contenido (Regalo)",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Contenido (Regalo)" />,
       cell: ({ row }) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Gift className="h-4 w-4 text-pink-500" />
@@ -89,8 +102,17 @@ export default function KitsPage() {
       ),
     },
     {
+      accessorKey: "created_at",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Fecha de Creación" />
+      ),
+      cell: ({ row }) => (
+        <div>{(format(row.getValue("created_at") as string, 'yyyy-MM-dd HH:mm'))}</div>
+      ),
+    },
+    {
       accessorKey: "is_active",
-      header: "Estado",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
       cell: ({ row }) => {
         const estado = row.getValue("is_active") as boolean
         return (
@@ -105,34 +127,6 @@ export default function KitsPage() {
         )
       },
     },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Abrir menú</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              {can('kits:edit') && (
-                 <DropdownMenuItem onClick={() => console.log("Editar", row.original.id)}>
-                   Editar Reglas
-                 </DropdownMenuItem>
-              )}
-              {can('kits:delete') && (
-                <DropdownMenuItem className="text-red-600" onClick={() => console.log("Borrar", row.original.id)}>
-                  Desactivar
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
   ], [can]);
 
   return (
@@ -142,10 +136,13 @@ export default function KitsPage() {
           data={data?.data || []}
           isLoading={isLoading}
           searchPlaceholder="Buscar kit..."
+          initialSorting={[{ id: "created_at", desc: true }]}
+          initialColumnVisibility={{ created_at: false }}
           columnTitles={{
             name: "Nombre",
             triggers_count: "Alcance",
             items_summary: "Contenido",
+            created_at: "Fecha de Creación",
             is_active: "Estado"
           }}
           manualPagination={true}
@@ -200,7 +197,7 @@ export default function KitsPage() {
             </div>
           )}
        />
-       
+
     </div>
   );
 }

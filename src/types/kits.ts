@@ -5,4 +5,5 @@ export interface KitListItem {
   triggers_count: number;
   items_summary?: string;
   is_active: boolean;
+  created_at: string;
 }

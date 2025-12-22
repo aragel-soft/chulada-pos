@@ -8,6 +8,8 @@ export const getKits = async (params: PaginationParams): Promise<PaginatedRespon
       page: params.page,
       pageSize: params.pageSize,
       search: params.search || null,
+      sortBy: params.sortBy || null,
+      sortOrder: params.sortOrder || null,
     });
   } catch (error) {
     console.error("Error fetching kits:", error);
