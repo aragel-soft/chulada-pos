@@ -14,6 +14,11 @@ const inventoryTabs = [
     label: 'Categorías',
     permission: 'categories:view',
   },
+  {
+    value: 'kits',
+    label: 'Kits',
+    permission: 'kits:view',
+  }
 ];
 
 export default function InventoryPage() {

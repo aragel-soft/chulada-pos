@@ -20,6 +20,7 @@ import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
 import CategoriesPage from '@/features/inventory/pages/CategoriesPage';
+import KitsPage from '@/features/inventory/pages/KitsPage';
 
 // --- Ruta Protegida ---
 import ProtectedRoute from './ProtectedRoute';
@@ -28,7 +29,6 @@ import ProtectedRoute from './ProtectedRoute';
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 import CashRegisterPage from '@/pages/CashRegisterPage';
-
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -121,6 +121,12 @@ const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
+          {
+            path: "kits",
+            element: (
+                <KitsPage />
+            ),
+          }
         ]
       },
       {
