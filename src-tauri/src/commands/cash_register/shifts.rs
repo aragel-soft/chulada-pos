@@ -43,6 +43,7 @@ pub fn get_active_shift(db: State<Mutex<Connection>>) -> Result<Option<ShiftDto>
     Ok(shift)
 }
 const STORE_ID: &str = "store-main";
+const MAX_INITIAL_CASH: f64 = 5000.0; // Estos se tienen configurar para que se administren desde el frontend
 #[tauri::command]
 pub fn open_shift(
     db: State<Mutex<Connection>>,
@@ -53,7 +54,7 @@ pub fn open_shift(
     if initial_cash < 0.0 {
         return Err("El fondo inicial no puede ser negativo.".to_string());
     }
-    if initial_cash > 5000.0 {
+    if initial_cash > MAX_INITIAL_CASH {
         return Err("El fondo inicial es demasiado alto. Verifique el monto.".to_string());
     }
 
