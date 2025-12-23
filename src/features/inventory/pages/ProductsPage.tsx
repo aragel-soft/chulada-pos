@@ -158,7 +158,7 @@ export default function ProductsPage() {
               variant="outline"
               className="text-[10px] px-2 py-0 h-5 font-medium border-0"
               style={{ 
-                backgroundColor: (row.original.category_color || '#64748b') + '20', // Opacidad 20% hex
+                backgroundColor: (row.original.category_color || '#64748b') + '20', 
                 color: row.original.category_color || '#64748b'
               }}
             >
