@@ -152,7 +152,7 @@ pub fn get_products(
     "SELECT COUNT(*) FROM products p 
     LEFT JOIN categories c ON p.category_id = c.id
      WHERE p.deleted_at IS NULL 
-     AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1)"
+     AND (p.name LIKE ?1 OR p.description LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1)"
   } else {
     "SELECT COUNT(*) FROM products p WHERE p.deleted_at IS NULL"
   };
@@ -203,7 +203,7 @@ pub fn get_products(
   ";
 
   let final_sql = if has_search {
-    format!("{} AND (p.name LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
+    format!("{} AND (p.name LIKE ?1 OR p.description LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
   } else {
     format!("{} ORDER BY {} {} LIMIT ?1 OFFSET ?2", base_sql, order_column, order_direction)
   };
