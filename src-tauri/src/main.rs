@@ -56,6 +56,9 @@ fn main() {
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
             commands::cash_register::shifts::close_shift,
+            commands::cash_register::movements::register_cash_movement,
+            commands::cash_register::details::get_shift_details,
+            commands::cash_register::details::get_closed_shifts,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
