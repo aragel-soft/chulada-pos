@@ -118,29 +118,29 @@ export const useCartStore = create<CartState>()(
 
       toggleTicketPriceType: () => {
         set((state) => {
-            const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
-            if (ticketIndex === -1) return state;
-            
-            const currentTicket = state.tickets[ticketIndex];
-            const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
+          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+          if (ticketIndex === -1) return state;
 
-            const newItems = currentTicket.items.map(item => {
-                const wholesale = item.wholesale_price ?? item.retail_price;
-                return {
-                    ...item,
-                    priceType: newType,
-                    finalPrice: newType === 'retail' ? item.retail_price : wholesale
-                };
-            });
+          const currentTicket = state.tickets[ticketIndex];
+          const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
 
-            const newTickets = [...state.tickets];
-            newTickets[ticketIndex] = { 
-                ...currentTicket, 
-                items: newItems,
-                priceType: newType 
+          const newItems = currentTicket.items.map(item => {
+            const wholesale = item.wholesale_price ?? item.retail_price;
+            return {
+              ...item,
+              priceType: newType,
+              finalPrice: newType === 'retail' ? item.retail_price : wholesale
             };
-            
-            return { tickets: newTickets };
+          });
+
+          const newTickets = [...state.tickets];
+          newTickets[ticketIndex] = {
+            ...currentTicket,
+            items: newItems,
+            priceType: newType
+          };
+
+          return { tickets: newTickets };
         });
       },
 
@@ -209,7 +209,11 @@ export const useCartStore = create<CartState>()(
           if (ticketIndex === -1) return state;
 
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...state.tickets[ticketIndex], items: [] };
+          newTickets[ticketIndex] = {
+            ...state.tickets[ticketIndex],
+            items: [],
+            priceType: 'retail'
+          };
           return { tickets: newTickets };
         });
       },
