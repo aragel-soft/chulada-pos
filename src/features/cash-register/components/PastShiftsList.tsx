@@ -1,4 +1,4 @@
-
+// this file is only for testing purposes
 import { useQuery } from "@tanstack/react-query";
 import { getClosedShifts } from "@/lib/api/cash-register/details";
 import { format } from "date-fns";
@@ -19,9 +19,6 @@ import { useState } from "react";
 import { ShiftSummary } from "./ShiftSummary";
 
 export function PastShiftsList() {
-  // Use a set or simple state to track expanded row ID.
-  // Assuming single row expansion for simplicity, but multiple is fine too.
-  // User says "expanded details".
   const [expandedShiftId, setExpandedShiftId] = useState<number | null>(null);
 
   const { data: pastShifts, isLoading } = useQuery({

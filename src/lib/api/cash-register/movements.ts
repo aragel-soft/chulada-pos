@@ -1,20 +1,21 @@
 import { invoke } from '@tauri-apps/api/core';
-
+// TODO: refactor change interface origin to types
 export interface CashMovementDto {
   id: number;
   shift_id: number;
   type_: 'IN' | 'OUT';
   amount: number;
-  reason: string;
+  concept: string;
   description?: string;
   created_at: string;
 }
 
+// TODO: refactor change interface origin to types
 export interface CreateCashMovementRequest {
   shift_id: number;
   type_: 'IN' | 'OUT';
   amount: number;
-  reason: string;
+  concept: string;
   description?: string;
 }
 

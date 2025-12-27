@@ -1,4 +1,4 @@
-
+// This component is only for testing purposes, it could be removed in the future
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -102,7 +102,7 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
                   </span>
                 </div>
                 <div className="flex justify-between items-baseline">
-                  <span className="font-medium text-zinc-700">{move.reason}</span>
+                  <span className="font-medium text-zinc-700">{move.concept}</span>
                   <span className={`font-bold ${move.type_ === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
                     {move.type_ === 'IN' ? '+' : '-'}{formatCurrency(move.amount)}
                   </span>

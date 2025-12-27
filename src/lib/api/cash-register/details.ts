@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-
+// TODO: refactor change interface origin to types
 export interface ShiftDto {
   id: number;
   initial_cash: number;
@@ -11,16 +11,18 @@ export interface ShiftDto {
   closing_date?: string;
   closing_user_id?: string;
 }
+// TODO: refactor change interface origin to types
 
 export interface CashMovementDto {
   id: number;
   shift_id: number;
   type_: string;
   amount: number;
-  reason: string;
+  concept: string;
   description?: string;
   created_at: string;
 }
+// TODO: refactor change interface origin to types
 
 export interface ShiftDetailsDto {
   shift: ShiftDto;

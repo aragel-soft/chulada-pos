@@ -9,7 +9,7 @@ pub struct CashMovementDto {
     pub shift_id: i64,
     pub type_: String,
     pub amount: f64,
-    pub reason: String,
+    pub concept: String,
     pub description: Option<String>,
     pub created_at: String,
 }
@@ -19,7 +19,7 @@ pub struct CreateCashMovementRequest {
     pub shift_id: i64,
     pub type_: String,
     pub amount: f64,
-    pub reason: String,
+    pub concept: String,
     pub description: Option<String>,
 }
 
@@ -37,15 +37,14 @@ pub fn register_cash_movement(
         return Err("Tipo de movimiento inválido".to_string());
     }
 
-    if request.type_ == "OUT" && request.description.is_none() {
-        return Err("La descripción es obligatoria para las salidas".to_string());
-    }
-
     if request.type_ == "OUT" {
-        if let Some(desc) = &request.description {
-            if desc.trim().is_empty() {
-                return Err("La descripción es obligatoria para las salidas".to_string());
-            }
+        let is_empty = request
+            .description
+            .as_ref()
+            .map(|d| d.trim().is_empty())
+            .unwrap_or(true);
+        if is_empty {
+            return Err("La descripción es obligatoria para las salidas".to_string());
         }
     }
 
@@ -66,13 +65,13 @@ pub fn register_cash_movement(
     let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
-        "INSERT INTO cash_movements (cash_register_shift_id, type, amount, reason, description, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+        "INSERT INTO cash_movements (cash_register_shift_id, type, amount, concept, description, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             request.shift_id,
             request.type_,
             request.amount,
-            request.reason,
+            request.concept,
             request.description,
             now
         ],
@@ -85,7 +84,7 @@ pub fn register_cash_movement(
         shift_id: request.shift_id,
         type_: request.type_,
         amount: request.amount,
-        reason: request.reason,
+        concept: request.concept,
         description: request.description,
         created_at: now,
     })

@@ -6,11 +6,10 @@ CREATE TABLE IF NOT EXISTS cash_movements (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cash_register_shift_id INTEGER NOT NULL,
   type TEXT NOT NULL,
-  amount REAL NOT NULL,
-  reason TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  concept TEXT NOT NULL,
   description TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (cash_register_shift_id) REFERENCES cash_register_shifts(id)
 );
 

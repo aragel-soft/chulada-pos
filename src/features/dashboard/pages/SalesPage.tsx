@@ -13,7 +13,6 @@ import { Product } from "@/types/inventory";
 import { useCartStore } from '@/features/sales/stores/cartStore';
 import { CartItemRow } from '@/features/sales/components/CardItemRow';
 
-
 export default function SalesPage() {
   const { shift } = useCashRegisterStore();
   const { can } = useAuthStore();

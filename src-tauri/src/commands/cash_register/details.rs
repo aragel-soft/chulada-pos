@@ -1,3 +1,4 @@
+// this file is temporary, only for testing purposes
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -9,7 +10,7 @@ pub struct CashMovementDto {
     pub shift_id: i64,
     pub type_: String,
     pub amount: f64,
-    pub reason: String,
+    pub concept: String,
     pub description: Option<String>,
     pub created_at: String,
 }
@@ -54,7 +55,7 @@ pub fn get_shift_details(
     // 2. Get Movements
     let mut stmt_mov = conn
         .prepare(
-            "SELECT id, cash_register_shift_id, type, amount, reason, description, created_at 
+            "SELECT id, cash_register_shift_id, type, amount, concept, description, created_at 
          FROM cash_movements 
          WHERE cash_register_shift_id = ?1
          ORDER BY created_at DESC",
@@ -68,7 +69,7 @@ pub fn get_shift_details(
                 shift_id: row.get(1)?,
                 type_: row.get(2)?,
                 amount: row.get(3)?,
-                reason: row.get(4)?,
+                concept: row.get(4)?,
                 description: row.get(5)?,
                 created_at: row.get(6)?,
             })

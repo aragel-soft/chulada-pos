@@ -41,17 +41,17 @@ interface CashMovementModalProps {
   trigger?: React.ReactNode;
 }
 
-const IN_REASONS = ["Feria", "Pago", "Otro"];
-const OUT_REASONS = ["Sueldo", "Pago", "Compra", "Otra"];
+const IN_CONCEPTS = ["Feria", "Pago", "Otro"];
+const OUT_CONCEPTS = ["Sueldo", "Pago", "Compra", "Otra"];
 
 export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
   const { shift } = useCashRegisterStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  // TODO: refactor schema in another file
   const formSchema = z.object({
     amount: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
-    reason: z.string().min(1, "Seleccione un motivo"),
+    concept: z.string().min(1, "Seleccione un concepto"),
     description: z.string().optional(),
   }).superRefine((data, ctx) => {
     if (type === "OUT") {
@@ -71,7 +71,7 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
       amount: 0,
-      reason: "",
+      concept: "",
       description: "",
     },
   });
@@ -88,7 +88,7 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
         shift_id: shift.id,
         type_: type,
         amount: values.amount,
-        reason: values.reason,
+        concept: values.concept,
         description: values.description,
       });
 
@@ -106,7 +106,7 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
   };
 
   const isEntry = type === "IN";
-  const reasons = isEntry ? IN_REASONS : OUT_REASONS;
+  const concepts = isEntry ? IN_CONCEPTS : OUT_CONCEPTS;
   const title = isEntry ? "Registrar Entrada" : "Registrar Salida";
   const Icon = isEntry ? ArrowDownCircle : ArrowUpCircle;
 
@@ -139,7 +139,7 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="reason"
+                name="concept"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo</FormLabel>
@@ -150,9 +150,9 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {reasons.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
+                        {concepts.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
                           </SelectItem>
                         ))}
                       </SelectContent>
