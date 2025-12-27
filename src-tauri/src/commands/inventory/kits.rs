@@ -1,7 +1,9 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use rusqlite::OptionalExtension;
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
+use uuid::Uuid;
 
 #[derive(Serialize)]
 pub struct KitListItem {
@@ -21,6 +23,21 @@ pub struct PaginatedResponse<T> {
   page: i64,
   page_size: i64,
   total_pages: i64,
+}
+
+#[derive(Deserialize)]
+pub struct KitItemDto {
+  pub product_id: String,
+  pub quantity: i64,
+}
+
+#[derive(Deserialize)]
+pub struct CreateKitDto {
+  pub name: String,
+  pub description: Option<String>,
+  pub is_required: bool,
+  pub trigger_product_ids: Vec<String>,
+  pub included_items: Vec<KitItemDto>,
 }
 
 #[tauri::command]
@@ -157,4 +174,106 @@ fn map_kit_row(row: &rusqlite::Row) -> rusqlite::Result<KitListItem> {
     items_summary: row.get(5)?,
     created_at: row.get(6)?,
   })
+}
+
+#[tauri::command]
+pub fn check_products_in_active_kits(
+  db_state: State<'_, Mutex<Connection>>,
+  product_ids: Vec<String>,
+) -> Result<Vec<String>, String> {
+  if product_ids.is_empty() {
+    return Ok(Vec::new());
+  }
+
+  let conn = db_state.lock().map_err(|e| e.to_string())?;
+  let placeholders: String = product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+  let sql = format!(
+    "SELECT main_product_id FROM product_kit_main WHERE main_product_id IN ({})",
+    placeholders
+  );
+
+  let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+  let params = rusqlite::params_from_iter(product_ids.iter());
+  
+  let existing_ids: Result<Vec<String>, _> = stmt
+    .query_map(params, |row| row.get(0))
+    .map_err(|e| e.to_string())?
+    .collect();
+
+  existing_ids.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_kit(
+  db_state: State<'_, Mutex<Connection>>,
+  payload: CreateKitDto,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().map_err(|e| e.to_string())?;
+
+  if payload.trigger_product_ids.is_empty() {
+    return Err("El kit debe tener al menos un producto activador (Trigger).".to_string());
+  }
+  if payload.included_items.is_empty() {
+    return Err("El kit debe tener al menos un producto de regalo.".to_string());
+  }
+
+  let tx = conn.transaction().map_err(|e| format!("Error iniciando transacción: {}", e))?;
+  {
+    let placeholders: String = payload.trigger_product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let check_sql = format!(
+      "SELECT p.name FROM product_kit_main pkm 
+       JOIN products p ON pkm.main_product_id = p.id 
+       WHERE pkm.main_product_id IN ({}) LIMIT 1",
+      placeholders
+    );
+    
+    let mut check_stmt = tx.prepare(&check_sql).map_err(|e| e.to_string())?;
+    let params = rusqlite::params_from_iter(payload.trigger_product_ids.iter());
+    
+    let conflict_name: Option<String> = check_stmt
+      .query_row(params, |row| row.get(0))
+      .optional() 
+      .map_err(|e| format!("Error verificando conflictos: {}", e))?;
+
+    if let Some(name) = conflict_name {
+      return Err(format!("El producto '{}' ya pertenece a otro kit activo. No se puede continuar.", name));
+    }
+
+    let kit_id = Uuid::new_v4().to_string();
+    tx.execute(
+      "INSERT INTO product_kit_options (id, name, description, is_required, is_active) VALUES (?1, ?2, ?3, ?4, 1)",
+      rusqlite::params![
+        kit_id,
+        payload.name,
+        payload.description,
+        payload.is_required
+      ],
+    ).map_err(|e| format!("Error creando cabecera del kit: {}", e))?;
+
+    let mut stmt_trigger = tx.prepare(
+      "INSERT INTO product_kit_main (kit_option_id, main_product_id) VALUES (?1, ?2)"
+    ).map_err(|e| e.to_string())?;
+
+    for trigger_id in &payload.trigger_product_ids {
+      stmt_trigger.execute(rusqlite::params![kit_id, trigger_id])
+        .map_err(|e| format!("Error insertando trigger {}: {}", trigger_id, e))?;
+    }
+
+    let mut stmt_items = tx.prepare(
+      "INSERT INTO product_kit_items (id, kit_option_id, included_product_id, quantity) VALUES (?1, ?2, ?3, ?4)"
+    ).map_err(|e| e.to_string())?;
+
+    for item in &payload.included_items {
+      stmt_items.execute(rusqlite::params![
+        Uuid::new_v4().to_string(),
+        kit_id,
+        item.product_id,
+        item.quantity
+      ]).map_err(|e| format!("Error insertando item de regalo: {}", e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error confirmando transacción del kit: {}", e))?;
+
+  Ok(())
 }
