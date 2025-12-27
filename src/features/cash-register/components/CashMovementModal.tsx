@@ -1,12 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { toast } from "sonner";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
-
 import {
   Dialog,
   DialogContent,
@@ -30,11 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/text-area";
-
 import { registerCashMovement } from "@/lib/api/cash-register/movements";
+import { getCashMovementSchema, type CashMovementFormValues } from "../schemas/cashMovementSchema";
+import { MoneyInput } from "@/components/ui/money-input";
 
 interface CashMovementModalProps {
   type: "IN" | "OUT";
@@ -48,26 +46,9 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
   const { shift } = useCashRegisterStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // TODO: refactor schema in another file
-  const formSchema = z.object({
-    amount: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
-    concept: z.string().min(1, "Seleccione un concepto"),
-    description: z.string().optional(),
-  }).superRefine((data, ctx) => {
-    if (type === "OUT") {
-      if (!data.description || data.description.trim().length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "La nota es obligatoria para las salidas",
-          path: ["description"],
-        });
-      }
-    }
-  });
+  const formSchema = getCashMovementSchema(type);
 
-  type FormValues = z.infer<typeof formSchema>;
-
-  const form = useForm<FormValues>({
+  const form = useForm<CashMovementFormValues>({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
       amount: 0,
@@ -76,7 +57,13 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
     },
   });
 
-  const onSubmit = async (values: FormValues) => {
+  useEffect(() => {
+    if (isOpen) {
+      form.reset();
+    }
+  }, [isOpen]);
+
+  const onSubmit = async (values: CashMovementFormValues) => {
     if (!shift) {
       toast.error("No hay un turno activo");
       return;
@@ -142,7 +129,9 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
                 name="concept"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo</FormLabel>
+                    <FormLabel className="!text-current">
+                      Tipo <span className="text-destructive">*</span>
+                    </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -167,18 +156,13 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monto</FormLabel>
+                    <FormLabel className="!text-current">
+                      Monto <span className="text-destructive">*</span>
+                    </FormLabel>
                     <FormControl>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3 text-gray-500 font-bold">$</span>
-                        <Input
-                          className="pl-7"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          {...field}
-                        />
-                      </div>
+                      <MoneyInput
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,8 +175,8 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Notas {type === "OUT" ? "(Obligatorio)" : "(Opcional)"}
+                  <FormLabel className="!text-current">
+                    Notas {type === "OUT" ? <span className="text-destructive">*</span> : ""}
                   </FormLabel>
                   <FormControl>
                     <Textarea
