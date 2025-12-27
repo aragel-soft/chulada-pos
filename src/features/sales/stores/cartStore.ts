@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Product } from '@/types/inventory';
 import { v4 as uuidv4 } from 'uuid';
+import { MAX_OPEN_TICKETS } from '@/config/constants';
 export interface CartItem extends Product {
   quantity: number;
   priceType: 'retail' | 'wholesale';
@@ -11,6 +12,7 @@ interface Ticket {
   id: string;
   name: string;
   items: CartItem[];
+  priceType: 'retail' | 'wholesale';
 }
 
 interface CartState {
@@ -24,6 +26,7 @@ interface CartState {
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleItemPriceType: (productId: string) => void;
+  toggleTicketPriceType: () => void;
   clearTicket: () => void;
 
   getActiveTicket: () => Ticket | undefined;
@@ -33,19 +36,37 @@ interface CartState {
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      tickets: [{ id: 'default', name: 'Ticket 1', items: [] }],
+      tickets: [{ id: 'default', name: 'Ticket 1', items: [], priceType: 'retail' }],
       activeTicketId: 'default',
 
-      //TODO: LIMITE DE 5 TICKETS SIMULTANEOS. ESTO PODRÍA SER CONFIGURABLE EN EL FUTURO. 
       createTicket: () => {
         set((state) => {
-          if (state.tickets.length >= 5) {
-            return state;
+          if (state.tickets.length >= MAX_OPEN_TICKETS) return state;
+          const existingNumbers = state.tickets
+            .map(t => {
+              const match = t.name.match(/Ticket (\d+)/);
+              return match ? parseInt(match[1]) : 0;
+            })
+            .sort((a, b) => a - b);
+
+          let nextNumber = 1;
+          for (const num of existingNumbers) {
+            if (num === nextNumber) {
+              nextNumber++;
+            } else if (num > nextNumber) {
+              break;
+            }
           }
 
           const newId = uuidv4();
+          const newTicket: Ticket = {
+            id: newId,
+            name: `Ticket ${nextNumber}`,
+            items: [],
+            priceType: 'retail'
+          };
           return {
-            tickets: [...state.tickets, { id: newId, name: `Ticket ${state.tickets.length + 1}`, items: [] }],
+            tickets: [...state.tickets, newTicket],
             activeTicketId: newId
           };
         });
@@ -68,6 +89,7 @@ export const useCartStore = create<CartState>()(
           if (ticketIndex === -1) return state;
 
           const currentTicket = state.tickets[ticketIndex];
+          const targetPriceType = currentTicket.priceType;
           const existingItemIndex = currentTicket.items.findIndex(i => i.id === product.id);
 
           const newItems = [...currentTicket.items];
@@ -78,11 +100,12 @@ export const useCartStore = create<CartState>()(
               newItems[existingItemIndex].quantity += 1;
             }
           } else {
+            const priceToUse = targetPriceType === 'retail' ? product.retail_price : (product.wholesale_price ?? product.retail_price);
             newItems.push({
               ...product,
               quantity: 1,
-              priceType: 'retail',
-              finalPrice: product.retail_price
+              priceType: targetPriceType,
+              finalPrice: priceToUse
             });
           }
 
@@ -90,6 +113,34 @@ export const useCartStore = create<CartState>()(
           newTickets[ticketIndex] = { ...currentTicket, items: newItems };
 
           return { tickets: newTickets };
+        });
+      },
+
+      toggleTicketPriceType: () => {
+        set((state) => {
+            const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+            if (ticketIndex === -1) return state;
+            
+            const currentTicket = state.tickets[ticketIndex];
+            const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
+
+            const newItems = currentTicket.items.map(item => {
+                const wholesale = item.wholesale_price ?? item.retail_price;
+                return {
+                    ...item,
+                    priceType: newType,
+                    finalPrice: newType === 'retail' ? item.retail_price : wholesale
+                };
+            });
+
+            const newTickets = [...state.tickets];
+            newTickets[ticketIndex] = { 
+                ...currentTicket, 
+                items: newItems,
+                priceType: newType 
+            };
+            
+            return { tickets: newTickets };
         });
       },
 
