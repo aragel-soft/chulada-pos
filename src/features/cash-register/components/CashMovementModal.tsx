@@ -33,14 +33,12 @@ import { Textarea } from "@/components/ui/text-area";
 import { registerCashMovement } from "@/lib/api/cash-register/movements";
 import { getCashMovementSchema, type CashMovementFormValues } from "../schemas/cashMovementSchema";
 import { MoneyInput } from "@/components/ui/money-input";
+import { IN_CONCEPTS, OUT_CONCEPTS } from "@/constants/cash-cut";
 
 interface CashMovementModalProps {
   type: "IN" | "OUT";
   trigger?: React.ReactNode;
 }
-
-const IN_CONCEPTS = ["Feria", "Pago", "Otro"];
-const OUT_CONCEPTS = ["Sueldo", "Pago", "Compra", "Otra"];
 
 export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
   const { shift } = useCashRegisterStore();
@@ -139,7 +137,7 @@ export function CashMovementModal({ type, trigger }: CashMovementModalProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {concepts.map((c) => (
+                        {concepts.map((c: string) => (
                           <SelectItem key={c} value={c}>
                             {c}
                           </SelectItem>
