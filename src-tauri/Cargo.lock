@@ -509,6 +509,8 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "chrono",
+ "directories",
+ "printers",
  "rusqlite",
  "serde",
  "serde_json",
@@ -742,6 +744,15 @@ dependencies = [
  "block-buffer",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "directories"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
+dependencies = [
+ "dirs-sys",
 ]
 
 [[package]]
@@ -2902,6 +2913,15 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
+
+[[package]]
+name = "printers"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2545100430ea007e340a922b4d1457c7202a86e15e182aa0f2f54eba214a8660"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "proc-macro-crate"

@@ -29,6 +29,7 @@ import ProtectedRoute from './ProtectedRoute';
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 import CashRegisterPage from '@/pages/CashRegisterPage';
+import HardwarePage from '@/features/settings/pages/HardwarePage';
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -164,6 +165,15 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute module="users:view">
                 <UsersListPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "hardware-settings",
+            element: (
+              <ProtectedRoute module="profile:view">
+                {/* TODO: Change to 'hardware-settings:view' when permission is created */}
+                <HardwarePage />
               </ProtectedRoute>
             ),
           },

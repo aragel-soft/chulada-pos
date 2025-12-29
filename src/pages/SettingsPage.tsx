@@ -8,7 +8,13 @@ const settingTabs = [
     value: 'profile',
     label: 'Perfil',
     permission: 'profile:view',
-  }, {
+  },
+  {
+    value: 'hardware-settings',
+    label: 'Configuración de Hardware',
+    permission: 'profile:view',// TODO: Create a new permission for hardware settings (hardware-settings:view)
+  },
+  {
     value: 'users',
     label: 'Usuarios',
     permission: 'users:view',

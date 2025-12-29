@@ -34,6 +34,11 @@ fn main() {
             commands::settings::permissions::get_all_permissions,
             commands::settings::permissions::get_role_permissions,
             commands::settings::permissions::update_role_permissions,
+            // Settings - Hardware
+            commands::settings::hardware::save_settings,
+            commands::settings::hardware::load_settings,
+            commands::settings::hardware::get_system_printers,
+            commands::settings::hardware::test_printer_connection,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
