@@ -16,12 +16,12 @@ import { CartItemRow } from '@/features/sales/components/CardItemRow';
 export default function SalesPage() {
   const { shift } = useCashRegisterStore();
   const { can } = useAuthStore();
-  const { 
-    tickets, 
-    activeTicketId, 
-    createTicket, 
-    closeTicket, 
-    setActiveTicket, 
+  const {
+    tickets,
+    activeTicketId,
+    createTicket,
+    closeTicket,
+    setActiveTicket,
     addToCart,
     removeFromCart,
     updateQuantity,
@@ -34,15 +34,15 @@ export default function SalesPage() {
   const ticketTotal = getTicketTotal();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const { 
-    products, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage, 
-    isLoading: isProductsLoading 
-  } = usePosProducts({ 
+  const {
+    products,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isProductsLoading
+  } = usePosProducts({
     search: searchTerm,
-    enabled: !!shift && shift.status === 'open' 
+    enabled: !!shift && shift.status === 'open'
   });
 
   const handleProductSelect = (product: Product) => {
@@ -54,8 +54,8 @@ export default function SalesPage() {
 
       <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
         <div className="shrink-0 bg-white rounded-lg p-1 shadow-sm border border-transparent transition-all">
-          <CatalogSearch 
-            onSearch={setSearchTerm} 
+          <CatalogSearch
+            onSearch={setSearchTerm}
             isLoading={isProductsLoading || isFetchingNextPage}
             className="w-full"
             placeholder="Buscar por nombre, código..."
@@ -63,7 +63,7 @@ export default function SalesPage() {
         </div>
 
         <div className="flex-1 bg-white rounded-lg border border-zinc-200 shadow-sm overflow-hidden relative">
-          <ProductsGrid 
+          <ProductsGrid
             products={products}
             isLoading={isProductsLoading}
             isFetchingNextPage={isFetchingNextPage}
@@ -91,6 +91,7 @@ export default function SalesPage() {
               <Printer className="w-4 h-4 mr-2" /> Re-imprimir ticket
             </Button>
           </div>
+
         </div>
       </div>
 
@@ -122,24 +123,23 @@ export default function SalesPage() {
           {tickets.map((ticket) => (
             <div
               key={ticket.id}
-              className={`group px-3 py-2 text-xs font-medium rounded-t-lg cursor-pointer flex items-center gap-2 border-t border-x select-none transition-all ${
-                activeTicketId === ticket.id
-                  ? 'bg-purple-50 text-[#480489] border-b-2 border-[#480489] relative top-[1px] shadow-sm' 
-                  : 'bg-zinc-100 text-zinc-500 border-transparent hover:bg-zinc-200/80'
-              }`}
+              className={`group px-3 py-2 text-xs font-medium rounded-t-lg cursor-pointer flex items-center gap-2 border-t border-x select-none transition-all ${activeTicketId === ticket.id
+                ? 'bg-purple-50 text-[#480489] border-b-2 border-[#480489] relative top-[1px] shadow-sm'
+                : 'bg-zinc-100 text-zinc-500 border-transparent hover:bg-zinc-200/80'
+                }`}
 
               onClick={() => setActiveTicket(ticket.id)}
             >
               <span className="max-w-[80px] truncate">{ticket.name}</span>
-              <X 
+              <X
                 className={`w-3 h-3 hover:text-red-500 hover:bg-red-100 rounded-full transition-colors ${tickets.length === 1 ? 'hidden' : ''}`}
-                onClick={(e) => { e.stopPropagation(); closeTicket(ticket.id); }} 
+                onClick={(e) => { e.stopPropagation(); closeTicket(ticket.id); }}
               />
             </div>
           ))}
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-8 w-8 ml-1 rounded-full text-[#480489] hover:bg-purple-50"
             onClick={createTicket}
             title="Nuevo Ticket"
@@ -151,15 +151,15 @@ export default function SalesPage() {
         <div className={`p-3 border-b ${(!shift || shift.status !== 'open') ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="relative">
             <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input 
-              placeholder="Escanear código..." 
+            <Input
+              placeholder="Escanear código..."
               className="pl-9 bg-zinc-50 border-zinc-200 focus-visible:ring-[#480489]"
               onKeyDown={(e) => {
-                 if (e.key === 'Enter') {
-                    // TODO: Buscar producto por código exacto y agregarlo
-                    console.log("Buscar código:", e.currentTarget.value);
-                    e.currentTarget.value = "";
-                 }
+                if (e.key === 'Enter') {
+                  // TODO: Buscar producto por código exacto y agregarlo
+                  console.log("Buscar código:", e.currentTarget.value);
+                  e.currentTarget.value = "";
+                }
               }}
             />
           </div>
@@ -173,24 +173,24 @@ export default function SalesPage() {
             </div>
           ) : (
             activeTicket.items.map((item) => (
-              <CartItemRow 
-                key={item.id} 
-                item={item} 
-                onUpdateQuantity={updateQuantity} 
-                onRemove={removeFromCart} 
+              <CartItemRow
+                key={item.id}
+                item={item}
+                onUpdateQuantity={updateQuantity}
+                onRemove={removeFromCart}
               />
             ))
           )}
         </div>
 
         <div className="p-4 border-t bg-white space-y-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-           {activeTicket && activeTicket.items.length > 0 && (
-             <div className="flex justify-end">
-                <Button variant="ghost" size="sm" className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 px-2" onClick={clearTicket}>
-                   <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
-                </Button>
-             </div>
-           )}
+          {activeTicket && activeTicket.items.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 px-2" onClick={clearTicket}>
+                <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
+              </Button>
+            </div>
+          )}
 
           <div className="flex justify-between items-end">
             <span className="text-lg font-bold text-zinc-700">Total:</span>

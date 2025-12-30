@@ -6,7 +6,6 @@ import { OpenShiftModal } from '@/features/cash-register/components/OpenShiftMod
 import { useSidebar } from "@/components/ui/sidebar";
 import { AppAvatar } from '@/components/ui/app-avatar';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
