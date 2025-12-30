@@ -1,3 +1,5 @@
+use chrono::Local;
+use printers::common::base::job::PrinterJobOptions;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use tauri::{command, AppHandle, Manager};
@@ -92,14 +94,34 @@ pub fn get_system_printers() -> Result<Vec<String>, String> {
 #[command]
 pub fn test_printer_connection(printer_name: String) -> Result<String, String> {
     let printers = printers::get_printers();
-    if let Some(_printer) = printers.iter().find(|p| p.name == printer_name) {
-        // NOTE: We verified the printer exists. Printing requires resolving PrinterJobOptions.
-        // For now, we return success on connection.
-        // Uncomment below once imports are fixed.
-        /*
-        match printer.print("Test".as_bytes(), None) { ... }
-        */
-        Ok(format!("Conexión verificada con {}", printer_name))
+    if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
+        let now = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
+
+        // Ticket básico de prueba con comandos genéricos
+        let test_ticket = format!(
+            "\n\
+            --------------------------------\n\
+                   PRUEBA DE CONEXION       \n\
+            --------------------------------\n\
+            Dispositivo: {}\n\
+            Fecha:       {}\n\
+            \n\
+            [ OK ] Sistema de impresion\n\
+            [ OK ] Conexion establecida\n\
+            \n\
+            Si puedes leer esto, tu\n\
+            impresora funciona correctamente.\n\
+            \n\
+            Chulada POS\n\
+            --------------------------------\n\
+            \n\n\n",
+            printer_name, now
+        );
+
+        match printer.print(test_ticket.as_bytes(), PrinterJobOptions::none()) {
+            Ok(_) => Ok(format!("Ticket de prueba enviado a {}", printer_name)),
+            Err(e) => Err(format!("Error al imprimir: {:?}", e)),
+        }
     } else {
         Err(format!("Impresora '{}' no encontrada", printer_name))
     }
