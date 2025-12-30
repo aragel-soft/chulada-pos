@@ -6,16 +6,18 @@ import { cn } from "@/lib/utils";
 
 interface CatalogSearchProps {
   onSearch: (term: string) => void;
+  onEnter?: (test: string) => boolean;
   isLoading?: boolean;
   className?: string;
   placeholder?: string;
 }
 
-export const CatalogSearch = ({ 
-  onSearch, 
+export const CatalogSearch = ({
+  onSearch,
+  onEnter,
   isLoading = false,
   className,
-  placeholder = "Buscar producto..." 
+  placeholder = "Buscar producto...",
 }: CatalogSearchProps) => {
   const [localValue, setLocalValue] = useState("");
 
@@ -29,7 +31,7 @@ export const CatalogSearch = ({
 
   const handleClear = () => {
     setLocalValue("");
-    onSearch(""); 
+    onSearch("");
   };
 
   return (
@@ -45,6 +47,15 @@ export const CatalogSearch = ({
       <Input
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            const wasConsumed = onEnter?.(localValue);
+            if (wasConsumed) {
+              setLocalValue(""); 
+              onSearch("");
+            }
+          }
+        }}
         className="pl-10 pr-10 h-12 text-lg bg-white border-zinc-200 shadow-sm transition-colors duration-200 focus-visible:ring-0 focus-visible:border-[#480489] hover:border-[#480489]/50"
         placeholder={placeholder}
         autoComplete="off"

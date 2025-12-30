@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, Barcode, Printer, Wallet, Lock, Trash } from "lucide-react";
+import { Plus, X,  Printer, Wallet, Lock, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
 import { useAuthStore } from "@/stores/authStore";
@@ -16,8 +15,6 @@ import { useScanDetection } from "@/hooks/use-scan-detection";
 import { playSound } from "@/lib/sounds";
 import { CartItemRow } from "@/features/sales/components/CardItemRow";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
-
-// IMPORTANTE: Componentes para el Dialog de confirmación
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +43,6 @@ export default function SalesPage() {
     getTicketTotal,
     clearTicket,
     toggleItemPriceType,
-    // toggleTicketPriceType <-- ELIMINADO: Ya está en el Dashboard
   } = useCartStore();
 
   const activeTicket = getActiveTicket();
@@ -66,10 +62,27 @@ export default function SalesPage() {
     enabled: !!shift && shift.status === "open",
   });
 
-  const handleProductSelect = (product: Product) => {
+  const attemptAddToCart = useCallback((product: Product, isScan: boolean) => {
+    const activeTicket = getActiveTicket();
+    const itemInCart = activeTicket?.items.find((i) => i.id === product.id);
+    const currentQty = itemInCart ? itemInCart.quantity : 0;
+
+    if (currentQty + 1 > product.stock) {
+      playSound("error"); 
+      toast.error(`Stock insuficiente para: ${product.name}`);
+      return;
+    }
+
     addToCart(product);
-    playSound("success"); // Agregué sonido aquí también para feedback táctil
     toast.success(`Agregado: ${product.name}`);
+
+    if (isScan) {
+      playSound("success");
+    }
+  }, [getActiveTicket, addToCart]);
+
+  const handleProductSelect = (product: Product) => {
+    attemptAddToCart(product, false);
   };
 
   const handleAddProductByCode = useCallback(
@@ -80,21 +93,13 @@ export default function SalesPage() {
       );
 
       if (product) {
-        if (product.stock <= 0) {
-          playSound("error");
-          toast.error(`Stock insuficiente para: ${product.name}`);
-          return;
-        }
-
-        addToCart(product);
-        playSound("success");
-        toast.success(`Agregado: ${product.name}`);
+        attemptAddToCart(product, true);
       } else {
         playSound("error");
         toast.error(`Producto no encontrado: ${cleanCode}`);
       }
     },
-    [products, addToCart]
+    [products, attemptAddToCart]
   );
 
   useScanDetection({
@@ -112,6 +117,17 @@ export default function SalesPage() {
         <div className="shrink-0 bg-white rounded-lg p-1 shadow-sm border border-transparent transition-all">
           <CatalogSearch
             onSearch={setSearchTerm}
+            onEnter={(term) => {
+              const clean = term.trim();
+              const exactMatch = products.find(
+                  p => p.code === clean || p.barcode === clean
+              );
+              if (exactMatch) {
+                  attemptAddToCart(exactMatch, true);
+                  return true; 
+              }
+              return false; 
+          }}
             isLoading={isProductsLoading || isFetchingNextPage}
             className="w-full"
             placeholder="Buscar por nombre, código..."
@@ -232,37 +248,6 @@ export default function SalesPage() {
           >
             <Plus className="w-4 h-4" />
           </Button>
-        </div>
-
-        {/* Input Escáner Manual */}
-        <div
-          className={`p-3 border-b ${
-            !shift || shift.status !== "open"
-              ? "opacity-50 pointer-events-none"
-              : ""
-          }`}
-        >
-          <div className="relative">
-            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Escanear código..."
-              className="pl-9 bg-zinc-50 border-zinc-200 focus-visible:ring-[#480489]"
-              onChange={(e) => {
-                e.target.value = e.target.value.replace(/\s/g, "");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === " ") {
-                  e.preventDefault();
-                  return;
-                }
-                if (e.key === "Enter") {
-                  const val = e.currentTarget.value;
-                  if (val) handleAddProductByCode(val);
-                  e.currentTarget.value = "";
-                }
-              }}
-            />
-          </div>
         </div>
 
         {/* Lista de Items */}

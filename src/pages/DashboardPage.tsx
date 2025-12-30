@@ -90,7 +90,7 @@ export default function DashboardPage() {
               <Star
                 className={cn("w-4 h-4 mr-2", isWholesale && "fill-white")}
               />
-              {isWholesale ? "Mayoreo Activo" : "Mayoreo"}
+              Mayoreo
             </Button>
           )}
         </div>
