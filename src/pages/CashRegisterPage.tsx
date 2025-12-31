@@ -1,13 +1,17 @@
+
 import { useState } from "react";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
+import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
+import { PastShiftsList } from "@/features/cash-register/components/PastShiftsList";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function CashRegisterPage() {
   const { shift, closeShift, isLoading } = useCashRegisterStore();
@@ -26,6 +31,9 @@ export default function CashRegisterPage() {
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [finalCash, setFinalCash] = useState<string>("");
   const [isClosing, setIsClosing] = useState(false);
+
+  // Tab State
+  const [currentTab, setCurrentTab] = useState("current");
 
   const handleCloseShift = async () => {
     if (!user?.id || !shift) return;
@@ -53,117 +61,161 @@ export default function CashRegisterPage() {
     return <div className="p-8 flex items-center justify-center"><Loader2 className="animate-spin mr-2" /> Cargando información de caja...</div>;
   }
 
-  if (!shift || shift.status === 'closed') {
-    return (
-      <div className="p-8 max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Corte de Caja</h1>
-          <p className="text-muted-foreground">Administración de turnos y efectivo.</p>
-        </div>
-
-        <Card className="border-dashed">
-          <CardHeader className="text-center">
-            <CardTitle>Caja Cerrada</CardTitle>
-            <CardDescription>No hay un turno activo en este momento.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center py-6">
-            {can('cash_register:open') && (
-              <OpenShiftModal trigger={<Button size="lg">Abrir Nuevo Turno</Button>} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const tabs = [
+    { value: 'current', label: 'Caja Actual' },
+    { value: 'history', label: 'Reportes / Historial' }
+  ];
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Corte de Caja</h1>
-        <p className="text-muted-foreground">Turno {shift.code ? `#${shift.code}` : `#${shift.id}`} en curso.</p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalles del Turno</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Inicio de Turno</span>
-              <span className="font-medium">{new Date(shift.opening_date).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Fondo Inicial</span>
-              <span className="font-medium text-green-600">${shift.initial_cash.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Usuario Apertura</span>
-              <span className="font-medium">{shift.opening_user_id}</span> {/* Could fetch name if needed */}
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Estado</span>
-              <span className="font-bold text-green-600 uppercase">{shift.status}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Acciones</CardTitle>
-            <CardDescription>Opciones disponibles para el turno actual.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
-              {can('cash_register:close') && (
-                <DialogTrigger asChild>
-                  <Button variant="destructive" className="w-full">
-                    <Lock className="mr-2 h-4 w-4" /> Cerrar Caja
-                  </Button>
-                </DialogTrigger>
-              )}
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-zinc-900" />
-                    Cerrar Turno
-                  </DialogTitle>
-                  <DialogDescription>
-                    Ingrese el monto total de efectivo en caja para finalizar el turno.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="final-cash">Efectivo Final (Declarado)</Label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
-                      <Input
-                        id="final-cash"
-                        className="pl-8 text-lg font-medium"
-                        type="number"
-                        step="0.5"
-                        value={finalCash}
-                        onChange={(e) => setFinalCash(e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
+    <div className="flex flex-col h-full p-4 gap-1">
+      <div className="flex-none flex justify-between items-center">
+        <h1 className="text-3xl font-bold mt-2">Corte de Caja</h1>
+        {/* Action Buttons for Current Tab - Positioned Top Right */}
+        {currentTab === 'current' && shift && shift.status === 'open' && (
+          <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
+            {can('cash_register:close') && (
+              <DialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Lock className="mr-2 h-4 w-4" /> Realizar Corte
+                </Button>
+              </DialogTrigger>
+            )}
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-zinc-900" />
+                  Confirmar Cierre de Turno
+                </DialogTitle>
+                <DialogDescription>
+                  Ingrese el monto total de efectivo contado en caja.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="final-cash">Efectivo Final (Real)</Label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
+                    <Input
+                      id="final-cash"
+                      className="pl-8 text-lg font-medium"
+                      type="number"
+                      step="0.5"
+                      value={finalCash}
+                      onChange={(e) => setFinalCash(e.target.value)}
+                      placeholder="0.00"
+                      autoFocus
+                    />
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCloseDialogOpen(false)}>Cancelar</Button>
-                  <Button
-                    className="bg-[#480489] hover:bg-[#360368] text-white"
-                    onClick={handleCloseShift}
-                    disabled={isClosing}
-                  >
-                    {isClosing ? "Cerrando..." : "Confirmar Cierre"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCloseDialogOpen(false)}>Cancelar</Button>
+                <Button
+                  className="bg-[#480489] hover:bg-[#360368] text-white"
+                  onClick={handleCloseShift}
+                  disabled={isClosing || !finalCash}
+                >
+                  {isClosing ? "Cerrando..." : "Confirmar y Cerrar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
-    </div >
+
+      <div className="flex-none w-full">
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+          <TabsList
+            className="
+                  w-full 
+                  justify-start 
+                  rounded-none 
+                  bg-transparent 
+                  p-0 
+                  relative 
+                  after:content-[''] 
+                  after:absolute 
+                  after:bottom-0 
+                  after:left-0 
+                  after:w-full 
+                  after:h-[1px] 
+                  after:bg-gray-200 
+                  dark:after:bg-gray-700
+              "
+          >
+            {tabs.map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className={cn(
+                  "relative",
+                  "rounded-none",
+                  "bg-transparent",
+                  "px-4 pb-0 pt-1",
+                  "text-muted-foreground",
+                  "shadow-none",
+                  "border-b-2 border-transparent",
+                  "transition-colors duration-200",
+
+                  "data-[state=active]:border-[#480489]",
+                  "data-[state=active]:text-[#480489]",
+                  "data-[state=active]:font-bold",
+                  "data-[state=active]:shadow-none",
+
+                  "hover:text-[#818181]",
+                  "hover:border-[#818181]"
+                )}
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <div className="mt-4 h-[calc(100vh-140px)] overflow-hidden">
+            <TabsContent value="current" className="h-full overflow-hidden data-[state=inactive]:hidden border rounded-lg bg-white shadow-sm ring-1 ring-zinc-950/5">
+              {(!shift || shift.status === 'closed') ? (
+                <div className="h-full flex flex-col items-center justify-center p-8 bg-zinc-50/50">
+                  <div className="text-center max-w-sm space-y-4">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border shadow-sm">
+                      <Lock className="w-8 h-8 text-zinc-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-zinc-900">Caja Cerrada</h3>
+                    <p className="text-zinc-500">No hay un turno activo en este momento. Para ver información, inicia un nuevo turno o consulta el historial.</p>
+                    {can('cash_register:open') && (
+                      <OpenShiftModal trigger={<Button size="lg" className="mt-4 bg-[#480489] hover:bg-[#360368]">Abrir Nuevo Turno</Button>} />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col">
+                  <div className="px-6 py-4 border-b flex justify-between items-center bg-zinc-50/30">
+                    <div>
+                      <h3 className="font-semibold text-lg">Turno Activo #{shift.code || shift.id}</h3>
+                      <p className="text-sm text-muted-foreground">Detalle de movimientos y efectivo del turno actual.</p>
+                    </div>
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-200">
+                      En Curso
+                    </span>
+                  </div>
+                  <div className="flex-1 overflow-hidden p-6 bg-white">
+                    <ShiftSummary shiftId={shift.id} />
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="history" className="h-full overflow-hidden data-[state=inactive]:hidden border rounded-lg bg-white shadow-sm ring-1 ring-zinc-950/5 flex flex-col">
+              <div className="px-6 py-4 border-b bg-zinc-50/30">
+                <h3 className="font-semibold text-lg">Historial de Turnos</h3>
+                <p className="text-sm text-muted-foreground">Registro de cierres de caja anteriores.</p>
+              </div>
+              <div className="flex-1 overflow-auto p-6">
+                <PastShiftsList />
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
+    </div>
   );
 }

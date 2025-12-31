@@ -172,6 +172,7 @@ export default function SalesPage() {
               <Printer className="w-4 h-4 mr-2" /> Re-imprimir ticket
             </Button>
           </div>
+
         </div>
       </div>
 

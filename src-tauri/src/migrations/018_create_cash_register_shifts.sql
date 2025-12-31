@@ -6,8 +6,8 @@ DROP TABLE IF EXISTS cash_register_shifts;
 
 CREATE TABLE IF NOT EXISTS cash_register_shifts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  initial_cash REAL NOT NULL DEFAULT 0,
-  final_cash REAL,
+  initial_cash DECIMAL(10,2) NOT NULL DEFAULT 0,
+  final_cash DECIMAL(10,2),
   opening_date TEXT NOT NULL,
   closing_date TEXT,
   opening_user_id TEXT NOT NULL,
