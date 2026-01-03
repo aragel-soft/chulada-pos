@@ -216,6 +216,11 @@ pub fn create_kit(
   if payload.included_items.is_empty() {
     return Err("El kit debe tener al menos un producto de regalo.".to_string());
   }
+  for item in &payload.included_items {
+    if payload.trigger_product_ids.contains(&item.product_id) {
+      return Err("Un producto no puede ser 'Disparador' y 'Regalo' en el mismo kit.".to_string());
+    }
+  }
 
   let tx = conn.transaction().map_err(|e| format!("Error iniciando transacción: {}", e))?;
   {

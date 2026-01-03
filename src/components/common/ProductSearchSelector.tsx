@@ -41,7 +41,7 @@ interface ProductSearchSelectorProps {
   mode: "triggers" | "rewards";
   selectedItems: SelectorItem[];
   onItemsChange: (items: SelectorItem[]) => void;
-  excludeProductIds?: string[]; 
+  excludeProductIds?: string[];
 }
 
 export function ProductSearchSelector({
@@ -66,11 +66,16 @@ export function ProductSearchSelector({
         pageSize: 5,
         search: debouncedSearch,
       }),
-    enabled: debouncedSearch.length > 2,
     staleTime: 1000 * 60,
   });
 
   const productIdsToCheck = searchResults?.data.map((p) => p.id) || [];
+
+  const isProductBlocked = (productId: string) => {
+    const isBusy = mode === 'triggers' && busyProductIds?.includes(productId);
+    const isExcluded = excludeProductIds.includes(productId);
+    return isBusy || isExcluded;
+  };
 
   const { data: busyProductIds } = useQuery({
     queryKey: ["kits", "check-conflicts", productIdsToCheck],
@@ -81,6 +86,7 @@ export function ProductSearchSelector({
 
   const handleAdd = (product: Product) => {
     if (selectedItems.some((item) => item.product.id === product.id)) return;
+    if (isProductBlocked(product.id)) return;
     onItemsChange([...selectedItems, { product, quantity: 1 }]);
   };
 
@@ -127,10 +133,9 @@ export function ProductSearchSelector({
       {/* --- SECCIÓN SUPERIOR: BUSCADOR --- */}
       <div className="space-y-3 p-4 border rounded-md bg-muted/20">
         <div className="flex gap-2">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre, código o categoría..."
-            className="pl-9 bg-background focus-visible:ring-[#480489]"
+            className="bg-background focus-visible:ring-[#480489]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -168,9 +173,12 @@ export function ProductSearchSelector({
                   const isSelected = selectedItems.some(
                     (i) => i.product.id === product.id
                   );
-                  const isBlocked =
-                    excludeProductIds.includes(product.id) ||
-                    busyProductIds?.includes(product.id);
+                  const isBusyInBackend =
+                    busyProductIds?.includes(product.id) && mode === "triggers";
+                  const isExcludedByProps = excludeProductIds.includes(
+                    product.id
+                  );
+                  const isBlocked = isBusyInBackend || isExcludedByProps;
 
                   return (
                     <TableRow
@@ -183,10 +191,14 @@ export function ProductSearchSelector({
                       <TableCell className="text-sm">
                         <div className="flex flex-col">
                           <span>{product.name}</span>
-                          {isBlocked && (
+                          {isBusyInBackend && (
                             <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> Ocupado en
-                              otro kit activo
+                              <AlertCircle className="h-3 w-3" /> Ocupado en otro kit
+                            </span>
+                          )}
+                          {isExcludedByProps && !isBusyInBackend && (
+                            <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
+                              <AlertCircle className="h-3 w-3" /> Ya seleccionado en la otra lista
                             </span>
                           )}
                         </div>
@@ -195,14 +207,10 @@ export function ProductSearchSelector({
                         <Button
                           size="sm"
                           variant={isSelected ? "secondary" : "default"}
-                          disabled={
-                            isSelected || (isBlocked && mode === "triggers")
-                          } 
+                          disabled={ isSelected || (isBlocked) }
                           className={cn(
                             "h-7 text-xs transition-all",
-                            !isSelected && !isBlocked
-                              ? "bg-[#480489] hover:bg-[#480489]/90"
-                              : ""
+                            !isSelected ? "bg-[#480489] hover:bg-[#480489]/90" : ""
                           )}
                           onClick={() => handleAdd(product)}
                         >
@@ -282,7 +290,6 @@ export function ProductSearchSelector({
                       {item.product.name}
                     </TableCell>
 
-                  
                     {mode === "rewards" && (
                       <TableCell className="text-center">
                         <Input

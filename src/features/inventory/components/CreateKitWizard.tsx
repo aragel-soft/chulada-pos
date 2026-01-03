@@ -57,6 +57,9 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
   const [triggers, setTriggers] = useState<SelectorItem[]>([]);
   const [rewards, setRewards] = useState<SelectorItem[]>([]);
 
+  const triggerIds = triggers.map(t => t.product.id);
+  const rewardIds = rewards.map(r => r.product.id);
+
   const isStep1Valid = formData.name.trim().length >= 3;
   const isStep2Valid = triggers.length > 0;
   const isStep3Valid = rewards.length > 0;
@@ -210,12 +213,12 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                       htmlFor="name"
                       className="text-foreground font-medium"
                     >
-                      Nombre de la Promoción{" "}
+                      Nombre del Kit{" "}
                       <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="name"
-                      placeholder="Ej. Promo Verano 2x1"
+                      placeholder="Ej. Tinte + Shampoo de Regalo"
                       value={formData.name}
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
@@ -226,10 +229,10 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="desc">Descripción (Opcional)</Label>
+                    <Label htmlFor="desc">Descripción</Label>
                     <Textarea
                       id="desc"
-                      placeholder="Detalles sobre la vigencia, condiciones o reglas internas..."
+                      placeholder="Notas internas..."
                       value={formData.description}
                       onChange={(e) =>
                         setFormData({
@@ -239,9 +242,6 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                       }
                       className="focus-visible:ring-[#480489] min-h-[100px] resize-none"
                     />
-                    <p className="text-xs text-muted-foreground text-right">
-                      {formData.description.length}/255 caracteres recomendados
-                    </p>
                   </div>
 
                   <Separator className="my-2" />
@@ -258,7 +258,6 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                       onCheckedChange={(checked) =>
                         setFormData({ ...formData, isRequired: checked })
                       }
-                      className="data-[state=checked]:bg-[#480489]"
                     />
                   </div>
                 </div>
@@ -279,9 +278,11 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                 </div>
                 <div className="flex-1 min-h-0">
                   <ProductSearchSelector
+                    key="selector-triggers"
                     mode="triggers"
                     selectedItems={triggers}
                     onItemsChange={setTriggers}
+                    excludeProductIds={rewardIds}
                   />
                 </div>
               </div>
@@ -300,9 +301,11 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                 </div>
                 <div className="flex-1 min-h-0">
                   <ProductSearchSelector
+                    key="selector-rewards"
                     mode="rewards"
                     selectedItems={rewards}
                     onItemsChange={setRewards}
+                    excludeProductIds={triggerIds}
                   />
                 </div>
               </div>
@@ -311,25 +314,14 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
             // PASO 4: REVIEW 
             review: () => (
               <div className="max-w-3xl mx-auto w-full py-4 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="bg-muted/20 p-6 rounded-lg border flex flex-col items-center text-center">
-                  <h3 className="font-bold text-2xl text-[#480489] mb-2">
-                    {formData.name}
-                  </h3>
-                  {formData.description && (
-                    <p className="text-muted-foreground max-w-md">
-                      {formData.description}
-                    </p>
-                  )}
-                  <div className="mt-4">
-                    <Badge
-                      variant={formData.isRequired ? "default" : "secondary"}
-                      className={formData.isRequired ? "bg-[#480489] hover:bg-[#3a036e]" : ""}
-                    >
-                      {formData.isRequired
-                        ? "Regalo Obligatorio"
-                        : "Regalo Opcional"}
-                    </Badge>
-                  </div>
+                <div className="bg-muted/30 p-4 rounded-lg border">
+                    <h3 className="font-bold text-lg text-[#480489] mb-1">{formData.name}</h3>
+                    <p className="text-sm text-muted-foreground">{formData.description || "Sin descripción"}</p>
+                    <div className="mt-2 flex gap-2">
+                        <Badge variant="default" className="bg-[#480489]">
+                          {formData.isRequired ? "Obligatorio" : "Opcional"}
+                        </Badge>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -387,9 +379,8 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                 <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
                   <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
                   <p>
-                    Al guardar, esta promoción estará activa inmediatamente.
-                    Asegúrate de que los productos seleccionados tengan stock
-                    suficiente.
+                    Al guardar, este kit estará activo inmediatamente. 
+                    Asegúrate de que los productos seleccionados tengan stock suficiente.
                   </p>
                 </div>
               </div>
