@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/features/sales/stores/cartStore";
 import { CashMovementModal } from "@/features/cash-register/components/CashMovementModal";
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ export default function DashboardPage() {
             <Button variant="secondary" size="sm" className="bg-[#480489] text-white hover:bg-[#360368]">
               <Star className="w-4 h-4 mr-2" /> Mayoreo
             </Button>
-              <Button
+            <Button
               variant={isWholesale ? "default" : "secondary"}
               size="sm"
               onClick={toggleTicketPriceType}
