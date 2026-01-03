@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Trash2, AlertCircle, PackageOpen } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Trash2,
+  AlertCircle,
+  PackageOpen,
+  Loader2,
+  CheckCheck,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
+import { checkProductsInActiveKits } from "@/lib/api/inventory/kits";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +24,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 export interface SelectorItem {
   product: Product;
@@ -57,20 +67,27 @@ export function ProductSearchSelector({
         search: debouncedSearch,
       }),
     enabled: debouncedSearch.length > 2,
-    staleTime: 1000 * 60, 
+    staleTime: 1000 * 60,
+  });
+
+  const productIdsToCheck = searchResults?.data.map((p) => p.id) || [];
+
+  const { data: busyProductIds } = useQuery({
+    queryKey: ["kits", "check-conflicts", productIdsToCheck],
+    queryFn: () => checkProductsInActiveKits(productIdsToCheck),
+    enabled: mode === "triggers" && productIdsToCheck.length > 0,
+    staleTime: 0,
   });
 
   const handleAdd = (product: Product) => {
     if (selectedItems.some((item) => item.product.id === product.id)) return;
-
-    onItemsChange([
-      ...selectedItems,
-      { product, quantity: 1 },
-    ]);
+    onItemsChange([...selectedItems, { product, quantity: 1 }]);
   };
 
   const handleRemove = (productId: string) => {
-    onItemsChange(selectedItems.filter((item) => item.product.id !== productId));
+    onItemsChange(
+      selectedItems.filter((item) => item.product.id !== productId)
+    );
   };
 
   const handleQuantityChange = (productId: string, qty: number) => {
@@ -82,21 +99,54 @@ export function ProductSearchSelector({
     );
   };
 
+  const handleSelectAll = () => {
+    if (!searchResults?.data) return;
+    const newItems = searchResults.data
+      .filter((product) => {
+        const isAlreadySelected = selectedItems.some(
+          (i) => i.product.id === product.id
+        );
+        const isExcluded = excludeProductIds.includes(product.id);
+        const isBusy =
+          mode === "triggers" && busyProductIds?.includes(product.id);
+
+        return !isAlreadySelected && !isExcluded && !isBusy;
+      })
+      .map((product) => ({
+        product,
+        quantity: 1,
+      }));
+
+    if (newItems.length > 0) {
+      onItemsChange([...selectedItems, ...newItems]);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-4">
       {/* --- SECCIÓN SUPERIOR: BUSCADOR --- */}
       <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-        <div className="relative">
+        <div className="flex gap-2">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre, código o categoría..."
-            className="pl-9 bg-background"
+            className="pl-9 bg-background focus-visible:ring-[#480489]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchResults?.data && searchResults.data.length > 0 && (
+            <Button
+              variant="outline"
+              title="Agregar todos los resultados visibles"
+              onClick={handleSelectAll}
+              className="shrink-0 hover:bg-[#480489]/10 hover:text-[#480489]"
+            >
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Todos
+            </Button>
+          )}
         </div>
 
-        {/* Resultados de búsqueda flotantes o en lista corta */}
         <div className="min-h-[100px] max-h-[180px] overflow-y-auto rounded-md border bg-background">
           {debouncedSearch.length <= 2 ? (
             <div className="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground">
@@ -105,7 +155,7 @@ export function ProductSearchSelector({
             </div>
           ) : isSearching ? (
             <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-              Buscando...
+              <Loader2 className="h-6 w-6 animate-spin mr-2" /> Buscando...
             </div>
           ) : searchResults?.data?.length === 0 ? (
             <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
@@ -115,37 +165,54 @@ export function ProductSearchSelector({
             <Table>
               <TableBody>
                 {searchResults?.data.map((product) => {
-                  const isSelected = selectedItems.some((i) => i.product.id === product.id);
-                  const isBlocked = excludeProductIds.includes(product.id);
-                  
+                  const isSelected = selectedItems.some(
+                    (i) => i.product.id === product.id
+                  );
+                  const isBlocked =
+                    excludeProductIds.includes(product.id) ||
+                    busyProductIds?.includes(product.id);
+
                   return (
-                    <TableRow key={product.id} className="h-12">
-                      <TableCell className="font-medium text-xs">{product.code}</TableCell>
+                    <TableRow
+                      key={product.id}
+                      className="h-12 hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium text-xs w-[100px]">
+                        {product.code}
+                      </TableCell>
                       <TableCell className="text-sm">
                         <div className="flex flex-col">
-                            <span>{product.name}</span>
-                            {isBlocked && (
-                                <span className="text-[10px] text-destructive flex items-center gap-1">
-                                    <AlertCircle className="h-3 w-3" /> Ocupado en otro kit
-                                </span>
-                            )}
+                          <span>{product.name}</span>
+                          {isBlocked && (
+                            <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
+                              <AlertCircle className="h-3 w-3" /> Ocupado en
+                              otro kit activo
+                            </span>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right pr-4">
                         <Button
                           size="sm"
                           variant={isSelected ? "secondary" : "default"}
-                          disabled={isSelected || isBlocked}
-                          className="h-7 text-xs"
+                          disabled={
+                            isSelected || (isBlocked && mode === "triggers")
+                          } 
+                          className={cn(
+                            "h-7 text-xs transition-all",
+                            !isSelected && !isBlocked
+                              ? "bg-[#480489] hover:bg-[#480489]/90"
+                              : ""
+                          )}
                           onClick={() => handleAdd(product)}
                         >
                           {isSelected ? (
-                            <span className="flex items-center gap-1 text-green-600">
-                                <PackageOpen className="h-3 w-3"/> Agregado
+                            <span className="flex items-center gap-1 text-green-600 font-medium">
+                              <PackageOpen className="h-3 w-3" /> Agregado
                             </span>
                           ) : (
                             <>
-                                <Plus className="h-3 w-3 mr-1" /> Agregar
+                              <Plus className="h-3 w-3 mr-1" /> Agregar
                             </>
                           )}
                         </Button>
@@ -160,32 +227,36 @@ export function ProductSearchSelector({
       </div>
 
       {/* --- SECCIÓN INFERIOR: LISTA ACUMULADA --- */}
-      <div className="flex-1 flex flex-col min-h-0 border rounded-md">
+      <div className="flex-1 flex flex-col min-h-0 border rounded-md shadow-sm">
         <div className="flex items-center justify-between p-3 border-b bg-muted/40">
-          <h4 className="text-sm font-semibold flex items-center gap-2">
-            Productos Seleccionados 
-            <Badge variant="secondary" className="text-xs">
+          <h4 className="text-sm font-semibold flex items-center gap-2 text-[#480489]">
+            {mode === "triggers"
+              ? "Productos Activadores"
+              : "Productos de Regalo"}
+            <Badge className="bg-[#480489] text-white hover:bg-[#480489]/80 ml-1">
               {selectedItems.length}
             </Badge>
           </h4>
           {selectedItems.length > 0 && (
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => onItemsChange([])}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onItemsChange([])}
             >
-              Limpiar todo
+              <Trash2 className="h-3 w-3 mr-1" /> Limpiar todo
             </Button>
           )}
         </div>
 
         <ScrollArea className="flex-1 h-[250px]">
           {selectedItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center">
-              <PackageOpen className="h-10 w-10 mb-2 opacity-20" />
-              <p className="text-sm">Aún no hay productos seleccionados.</p>
-              <p className="text-xs opacity-70">Usa el buscador de arriba para agregar.</p>
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center bg-muted/5">
+              <PackageOpen className="h-10 w-10 mb-2 opacity-10" />
+              <p className="text-sm font-medium">La lista está vacía</p>
+              <p className="text-xs opacity-70 mt-1">
+                Usa el buscador para agregar items.
+              </p>
             </div>
           ) : (
             <Table>
@@ -193,25 +264,38 @@ export function ProductSearchSelector({
                 <TableRow>
                   <TableHead className="w-[100px]">Código</TableHead>
                   <TableHead>Producto</TableHead>
-                  {mode === "rewards" && <TableHead className="w-[100px]">Cantidad</TableHead>}
+                  {mode === "rewards" && (
+                    <TableHead className="w-[100px] text-center">
+                      Cantidad
+                    </TableHead>
+                  )}
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {selectedItems.map((item) => (
                   <TableRow key={item.product.id}>
-                    <TableCell className="font-medium text-xs">{item.product.code}</TableCell>
-                    <TableCell className="text-sm">{item.product.name}</TableCell>
-                    
-                    {/* Input de Cantidad (Solo modo Rewards) */}
+                    <TableCell className="font-medium text-xs">
+                      {item.product.code}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {item.product.name}
+                    </TableCell>
+
+                  
                     {mode === "rewards" && (
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Input
                           type="number"
                           min={1}
-                          className="h-8 w-16 text-center p-1"
+                          className="h-8 w-20 text-center p-1 mx-auto focus-visible:ring-[#480489]"
                           value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1)}
+                          onChange={(e) =>
+                            handleQuantityChange(
+                              item.product.id,
+                              parseInt(e.target.value) || 1
+                            )
+                          }
                         />
                       </TableCell>
                     )}
