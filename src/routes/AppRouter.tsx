@@ -30,6 +30,7 @@ import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 import CashRegisterPage from '@/pages/CashRegisterPage';
 import HardwarePage from '@/features/settings/pages/HardwarePage';
+import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage';
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -125,7 +126,7 @@ const router = createBrowserRouter([
           {
             path: "kits",
             element: (
-                <KitsPage />
+              <KitsPage />
             ),
           }
         ]
@@ -174,6 +175,15 @@ const router = createBrowserRouter([
               <ProtectedRoute module="profile:view">
                 {/* TODO: Change to 'hardware-settings:view' when permission is created */}
                 <HardwarePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "business-settings",
+            element: (
+              <ProtectedRoute module="profile:view">
+                {/* TODO: Change to 'business-settings:view' when permission is created */}
+                <BusinessSettingsPage />
               </ProtectedRoute>
             ),
           },

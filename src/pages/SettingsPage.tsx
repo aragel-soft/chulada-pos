@@ -11,8 +11,13 @@ const settingTabs = [
   },
   {
     value: 'hardware-settings',
-    label: 'Configuración de Hardware',
-    permission: 'profile:view',// TODO: Create a new permission for hardware settings (hardware-settings:view)
+    label: 'Hardware',
+    permission: 'profile:view',
+  },
+  {
+    value: 'business-settings',
+    label: 'Reglas de Negocio',
+    permission: 'profile:view', // Visible to admins/managers usually
   },
   {
     value: 'users',
