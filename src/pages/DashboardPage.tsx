@@ -78,9 +78,6 @@ export default function DashboardPage() {
                 </Button>
               } />
             )}
-            <Button variant="secondary" size="sm" className="bg-[#480489] text-white hover:bg-[#360368]">
-              <Star className="w-4 h-4 mr-2" /> Mayoreo
-            </Button>
             <Button
               variant={isWholesale ? "default" : "secondary"}
               size="sm"

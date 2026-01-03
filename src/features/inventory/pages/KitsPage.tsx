@@ -21,6 +21,7 @@ import { getKits } from "@/lib/api/inventory/kits";
 import { KitListItem } from "@/types/kits";
 import { PaginationParams } from "@/types/pagination";
 import { format } from "date-fns";
+import { CreateKitWizard } from "../components/CreateKitWizard";
 
 export default function KitsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -30,6 +31,7 @@ export default function KitsPage() {
   });
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState({});
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { can } = useAuthStore();
 
@@ -162,7 +164,7 @@ export default function KitsPage() {
               {can('kits:create') && (
                 <Button 
                   className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                  onClick={() => console.log("Abrir CreateKitDialog")}
+                  onClick={() => setIsCreateModalOpen(true)}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Agregar</span>
@@ -197,7 +199,11 @@ export default function KitsPage() {
             </div>
           )}
        />
-
+      <CreateKitWizard 
+        open={isCreateModalOpen} 
+        onOpenChange={setIsCreateModalOpen} 
+      />
+      
     </div>
   );
 }
