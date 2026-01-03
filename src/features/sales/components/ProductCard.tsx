@@ -83,7 +83,7 @@ export const ProductCard = ({ product, onClick }: ProductCardProps) => {
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>Mayoreo:</span>
               <span className="font-medium text-slate-600">
-                {formatCurrency(product.wholesale_price)}
+                {product.wholesale_price !== null && product.wholesale_price !== undefined && product.wholesale_price !== 0 ? formatCurrency(product.wholesale_price) : formatCurrency(product.retail_price)}
               </span>
             </div>
           </div>

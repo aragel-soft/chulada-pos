@@ -100,7 +100,7 @@ export const useCartStore = create<CartState>()(
               newItems[existingItemIndex].quantity += 1;
             }
           } else {
-            const priceToUse = targetPriceType === 'retail' ? product.retail_price : (product.wholesale_price ?? product.retail_price);
+            const priceToUse = targetPriceType === 'retail' ? product.retail_price : (product.wholesale_price !== null && product.wholesale_price !== undefined && product.wholesale_price !== 0 ? product.wholesale_price : product.retail_price);
             newItems.push({
               ...product,
               quantity: 1,
@@ -125,7 +125,7 @@ export const useCartStore = create<CartState>()(
           const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
 
           const newItems = currentTicket.items.map(item => {
-            const wholesale = item.wholesale_price ?? item.retail_price;
+            const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
             return {
               ...item,
               priceType: newType,

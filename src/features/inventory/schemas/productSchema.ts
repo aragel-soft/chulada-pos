@@ -27,7 +27,9 @@ export const productSchema = z.object({
     
   wholesale_price: z.coerce
     .number()
-    .positive("El precio debe ser mayor a 0"),
+    .nonnegative("El costo no puede ser negativo")
+    .optional()
+    .default(0),
     
   purchase_price: z.coerce
     .number()
