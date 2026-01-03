@@ -32,7 +32,6 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
         if (savedLevel && zoomEnabled) {
           const level = parseFloat(savedLevel);
           if (!isNaN(level)) {
-            console.log('[ZoomProvider] Restoring saved zoom level:', level);
             try {
               const webview = getCurrentWebview();
               await webview.setZoom(level);
@@ -44,7 +43,6 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
       } finally {
         setTimeout(() => {
           isRestoring.current = false;
-          console.log('[ZoomProvider] Restoration complete. Now tracking changes.');
         }, 500);
       }
     };
@@ -52,16 +50,12 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    console.log('[ZoomProvider] Applying zoom rules. Enabled:', zoomEnabled);
-
     const handleKeydown = (e: KeyboardEvent) => {
       const isZoomKey = (e.ctrlKey || e.metaKey) && ['=', '-', '0', '+'].includes(e.key);
 
       if (isZoomKey) {
         if (zoomEnabled) {
-          console.log('[ZoomProvider] Zoom Key allowed:', e.key);
         } else {
-          console.log('[ZoomProvider] Blocked Zoom Key:', e.key);
           e.preventDefault();
           e.stopPropagation();
         }
@@ -81,11 +75,9 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
     const handleResize = () => {
       if (zoomEnabled) {
         if (isRestoring.current) {
-          console.log('[ZoomProvider] Ignoring zoom change during restoration.');
           return;
         }
         const newZoom = window.devicePixelRatio;
-        console.log('[ZoomProvider] Detected Zoom Level Change:', newZoom);
         localStorage.setItem('zoom_level', String(newZoom));
       }
     };
