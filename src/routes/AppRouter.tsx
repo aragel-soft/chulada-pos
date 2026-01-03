@@ -31,6 +31,7 @@ import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatr
 import CashRegisterPage from '@/pages/CashRegisterPage';
 import HardwarePage from '@/features/settings/pages/HardwarePage';
 import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage';
+import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -192,6 +193,15 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute module="permissions:view">
                 <PermissionsMatrixPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "ticket-design",
+            element: (
+              <ProtectedRoute module="profile:view">
+                {/* TODO: Change to 'ticket-design:view' if specific perm is needed, sharing profile:view for now */}
+                <TicketDesignPage />
               </ProtectedRoute>
             ),
           },

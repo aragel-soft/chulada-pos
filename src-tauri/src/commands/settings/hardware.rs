@@ -17,6 +17,7 @@ pub struct HardwareConfig {
     pub cash_drawer_command: String,
     pub cash_drawer_port: Option<String>,
     pub zoom_level: Option<f32>,
+    pub padding_lines: Option<u32>,
 }
 
 impl Default for HardwareConfig {
@@ -32,6 +33,7 @@ impl Default for HardwareConfig {
             cash_drawer_command: "1B 70 00 19 FA".to_string(),
             cash_drawer_port: Some("COM1".to_string()),
             zoom_level: Some(1.0),
+            padding_lines: Some(0),
         }
     }
 }

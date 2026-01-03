@@ -140,22 +140,7 @@ export default function BusinessSettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="ticketFooter"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Pie de Ticket</FormLabel>
-                          <FormControl>
-                            <Input placeholder="¡Gracias por su compra!" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Mensaje al final de cada recibo.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
                   </CardContent>
                 </Card>
 

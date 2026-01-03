@@ -1,14 +1,16 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BusinessSettings {
     pub store_name: String,
     pub store_address: String,
+    pub ticket_header: String,
     pub ticket_footer: String,
     pub default_cash_fund: f64,
     pub max_cash_alert: f64,
@@ -57,6 +59,10 @@ pub fn get_business_settings(
             .get("store_address")
             .cloned()
             .unwrap_or_default(),
+        ticket_header: settings_map
+            .get("ticket_header")
+            .cloned()
+            .unwrap_or_default(),
         ticket_footer: settings_map
             .get("ticket_footer")
             .cloned()
@@ -101,6 +107,7 @@ pub fn update_business_settings(
     let params = vec![
         ("store_name", settings.store_name),
         ("store_address", settings.store_address),
+        ("ticket_header", settings.ticket_header),
         ("ticket_footer", settings.ticket_footer),
         ("default_cash_fund", settings.default_cash_fund.to_string()),
         ("max_cash_alert", settings.max_cash_alert.to_string()),
@@ -116,4 +123,33 @@ pub fn update_business_settings(
     conn.execute_batch("COMMIT;").map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_logo_image(
+    app_handle: AppHandle,
+    file_data: Vec<u8>,
+    file_name: String,
+) -> Result<String, String> {
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("No se pudo obtener directorio de datos: {}", e))?;
+
+    let images_dir = app_dir.join("images").join("settings");
+
+    if !images_dir.exists() {
+        fs::create_dir_all(&images_dir)
+            .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
+    }
+
+    // Sanitize filename but keep extension
+    let safe_name = file_name.replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
+    let final_name = format!("logo_{}", safe_name);
+    let file_path = images_dir.join(&final_name);
+
+    fs::write(&file_path, file_data).map_err(|e| format!("Error al guardar imagen: {}", e))?;
+
+    // Return the relative path that the frontend/backend can use
+    Ok(format!("images/settings/{}", final_name))
 }

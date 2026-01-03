@@ -20,6 +20,11 @@ const settingTabs = [
     permission: 'profile:view', // Visible to admins/managers usually
   },
   {
+    value: 'ticket-design',
+    label: 'Diseño de Ticket',
+    permission: 'profile:view',
+  },
+  {
     value: 'users',
     label: 'Usuarios',
     permission: 'users:view',

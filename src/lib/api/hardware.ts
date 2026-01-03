@@ -11,6 +11,7 @@ export interface HardwareConfig {
   cashDrawerCommand: string;
   cashDrawerPort?: string;
   zoomLevel?: number;
+  paddingLines?: number;
 }
 
 export const getSystemPrinters = async (): Promise<string[]> => {

@@ -40,6 +40,7 @@ fn main() {
             commands::settings::hardware::get_system_printers,
             commands::settings::hardware::test_printer_connection,
             commands::settings::hardware::test_cash_drawer,
+            commands::printer::test_print_ticket,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
@@ -68,6 +69,7 @@ fn main() {
             // Settings - Business
             commands::settings::business::get_business_settings,
             commands::settings::business::update_business_settings,
+            commands::settings::business::save_logo_image,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
