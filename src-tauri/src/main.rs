@@ -39,6 +39,7 @@ fn main() {
             commands::settings::hardware::load_settings,
             commands::settings::hardware::get_system_printers,
             commands::settings::hardware::test_printer_connection,
+            commands::settings::hardware::test_cash_drawer,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,

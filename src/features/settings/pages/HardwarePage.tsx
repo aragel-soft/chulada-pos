@@ -26,7 +26,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getSystemPrinters, loadSettings, saveSettings, testPrinterConnection } from "@/lib/api/hardware"
+import { getSystemPrinters, loadSettings, saveSettings, testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
 // Schema: Definimos que los inputs numéricos entran como strings (del input HTML) 
@@ -158,9 +158,7 @@ export default function HardwarePage() {
     })
   }
 
-  const handleTestDrawer = () => {
-    toast.info("Comando de apertura enviado")
-  }
+
 
   return (
     <ScrollArea className="h-full w-full bg-slate-50/50 dark:bg-transparent">
@@ -225,9 +223,21 @@ export default function HardwarePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Puerto / Interfaz</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ej. COM1, USB001" {...field} />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione puerto" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="COM1">COM1</SelectItem>
+                              <SelectItem value="COM2">COM2</SelectItem>
+                              <SelectItem value="COM3">COM3</SelectItem>
+                              <SelectItem value="COM4">COM4</SelectItem>
+                              <SelectItem value="LPT1">LPT1</SelectItem>
+                              <SelectItem value="USB001">USB001</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -237,23 +247,56 @@ export default function HardwarePage() {
                       name="cashDrawerCommand"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Comando HEX</FormLabel>
-                          <FormControl>
-                            <Input className="font-mono text-sm" placeholder="1B 70..." {...field} />
-                          </FormControl>
-                          <FormDescription className="text-[10px]">
-                            Código ESC/POS para apertura.
+                          <FormLabel>Protocolo de Apertura</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione protocolo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1B 70 00 19 FA">Epson Estándar (Pin 2)</SelectItem>
+                              <SelectItem value="1B 70 01 19 FA">Epson Alternativo (Pin 5)</SelectItem>
+                              <SelectItem value="1B 70 00 32 32">Epson Pulso Largo</SelectItem>
+                              <SelectItem value="07">Star Micronics</SelectItem>
+                              <SelectItem value="1B 37">IBM / POS Genérico</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-[10px] hidden">
+                            Código HEX enviado a la impresora.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/50 p-3 text-xs text-blue-900 dark:text-blue-200 flex gap-2 items-start mt-2">
+                      <Settings2 className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p>
+                        Si el cajón no abre, prueba con cada una de las opciones disponibles y pulsa "Probar Apertura".
+                        Si ninguno funciona, verifica que el cable RJ11 esté conectado a la impresora.
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="w-full mt-2"
-                      onClick={handleTestDrawer}
+                      onClick={() => {
+                        const cmd = form.getValues("cashDrawerCommand");
+                        const printer = form.getValues("printerName");
+
+                        if (!printer) {
+                          toast.error("Seleccione una impresora primero");
+                          return;
+                        }
+
+                        toast.promise(testCashDrawer(printer, cmd), {
+                          loading: `Enviando comando a ${printer}...`,
+                          success: (msg) => `Éxito: ${msg}`,
+                          error: (err) => `Error: ${err}`
+                        });
+                      }}
                     >
                       <Settings2 className="mr-2 h-3 w-3" />
                       Probar Apertura
@@ -295,7 +338,6 @@ export default function HardwarePage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="Generic Text Only">Generic Text Only</SelectItem>
                                 {printers.map((p) => (
                                   <SelectItem key={p} value={p}>{p}</SelectItem>
                                 ))}

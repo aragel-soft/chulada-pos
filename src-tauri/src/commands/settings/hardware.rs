@@ -97,7 +97,14 @@ pub fn test_printer_connection(printer_name: String) -> Result<String, String> {
     if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
         let now = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
 
-        // Ticket básico de prueba con comandos genéricos
+        // Comandos ESC/POS
+        // ESC @ = Inicializar impresora (Borra buffer, resetea modos)
+        let init_cmd = b"\x1B@";
+        // ESC 2 = Espaciado de línea por defecto (aprox 3.75mm o 1/6 pulgada)
+        // Fundamental para evitar que se encimen las líneas
+        let default_line_spacing = b"\x1B2";
+
+        // Ticket básico de prueba
         let test_ticket = format!(
             "\n\
             --------------------------------\n\
@@ -118,11 +125,48 @@ pub fn test_printer_connection(printer_name: String) -> Result<String, String> {
             printer_name, now
         );
 
-        match printer.print(test_ticket.as_bytes(), PrinterJobOptions::none()) {
+        // Construir el trabajo de impresión concatenando bytes
+        let mut job_content = Vec::new();
+        job_content.extend_from_slice(init_cmd);
+        job_content.extend_from_slice(default_line_spacing);
+        job_content.extend_from_slice(test_ticket.as_bytes());
+
+        match printer.print(&job_content, PrinterJobOptions::none()) {
             Ok(_) => Ok(format!("Ticket de prueba enviado a {}", printer_name)),
             Err(e) => Err(format!("Error al imprimir: {:?}", e)),
         }
     } else {
         Err(format!("Impresora '{}' no encontrada", printer_name))
+    }
+}
+
+fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
+    let clean_hex = hex.replace(" ", "");
+    if clean_hex.len() % 2 != 0 {
+        return Err("La cadena hexadecimal debe tener un número par de caracteres".to_string());
+    }
+
+    (0..clean_hex.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&clean_hex[i..i + 2], 16)
+                .map_err(|e| format!("Carácter hexadecimal inválido: {}", e))
+        })
+        .collect()
+}
+
+#[command]
+pub fn test_cash_drawer(printer_name: String, command_hex: String) -> Result<String, String> {
+    let printers = printers::get_printers();
+
+    if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
+        let bytes = hex_to_bytes(&command_hex)?;
+
+        match printer.print(&bytes, PrinterJobOptions::none()) {
+            Ok(_) => Ok(format!("Comando enviado a {}", printer_name)),
+            Err(e) => Err(format!("Error al enviar comando al cajón: {:?}", e)),
+        }
+    } else {
+        Err(format!("Impresora '{}' no encontrada. El cajón debe estar conectado a una impresora configurada.", printer_name))
     }
 }

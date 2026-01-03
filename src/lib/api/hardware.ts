@@ -28,3 +28,7 @@ export const loadSettings = async (): Promise<HardwareConfig> => {
 export const testPrinterConnection = async (printerName: string): Promise<string> => {
   return await invoke("test_printer_connection", { printerName });
 };
+
+export const testCashDrawer = async (printerName: string, commandHex: string): Promise<string> => {
+  return await invoke("test_cash_drawer", { printerName, commandHex });
+};
