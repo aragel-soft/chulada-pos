@@ -100,6 +100,9 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
         const errObj = JSON.parse(error);
         if (errObj.code === "CODE_EXISTS") {
           form.setError("code", { message: "Este código ya está en uso" });
+        }
+        if (errObj.code === "BARCODE_EXISTS") {
+          form.setError("barcode", { message: "Este código de barras ya está en uso" });
         } else {
           toast.error(errObj.message || "Error al crear producto");
         }
@@ -232,7 +235,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                   name="barcode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código de Barras</FormLabel>
+                      <FormLabel className="!text-foreground">Código de Barras</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="Escanea el código..." 
@@ -313,7 +316,7 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                 name="wholesale_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="!text-foreground">Precio Mayoreo <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>

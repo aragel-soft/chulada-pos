@@ -153,7 +153,7 @@ export default function CategoriesPage() {
               {isChild && <CornerDownRight className="h-4 w-4 text-muted-foreground" />}
               <Badge
                 variant="outline"
-                className="text-sm px-2 py-0.5 border-0"
+                className="px-2 py-0.5 border-0"
                 style={{
                   backgroundColor: (row.original.color || '#64748b') + '33',
                   color: row.original.color || '#64748b'

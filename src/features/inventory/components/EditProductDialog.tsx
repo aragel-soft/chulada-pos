@@ -169,21 +169,38 @@ export function EditProductDialog({
     },
     onError: (error: any) => {
       try {
-        const msg =
-          typeof error === "string"
-            ? error
-            : error.message || "Error desconocido";
-        if (msg.includes("CODE_EXISTS")) {
-          form.setError("code", { message: "Este código ya está en uso" });
-        } else if (msg.includes("BLOCKED_BY_HISTORY")) {
-          form.setError("code", {
-            message: "Código bloqueado por historial de ventas",
+        let errCode = "";
+        let errMsg = "Error desconocido";
+
+        if (typeof error === "string") {
+          try {
+            const parsed = JSON.parse(error);
+            errCode = parsed.code;
+            errMsg = parsed.message;
+          } catch {
+            errCode = error;
+            errMsg = error;
+          }
+        } else {
+          errCode = error.code;
+          errMsg = error.message || "Error desconocido";
+        }
+
+        if (errCode === "CODE_EXISTS") {
+          form.setError("code", { message: "Este código interno ya está en uso" });
+          
+        } else if (errCode === "BARCODE_EXISTS") {
+          form.setError("barcode", { message: "Este código de barras ya está en uso" });
+          
+        } else if (errCode === "BLOCKED_BY_HISTORY" || errMsg.includes("BLOCKED_BY_HISTORY")) {
+          form.setError("code", { 
+            message: "No se puede editar: Código bloqueado por historial de ventas" 
           });
         } else {
-          toast.error(msg);
+          toast.error(errMsg);
         }
       } catch (e) {
-        toast.error("Error inesperado al actualizar");
+        toast.error("Error inesperado al procesar la respuesta");
       }
     },
   });
@@ -374,7 +391,7 @@ export function EditProductDialog({
                       name="barcode"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Código de Barras</FormLabel>
+                          <FormLabel className="!text-foreground">Código de Barras</FormLabel>
                           <FormControl>
                             <Input 
                               placeholder="Escanea el código..." 
@@ -491,8 +508,7 @@ export function EditProductDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="!text-foreground">
-                        Precio Mayoreo{" "}
-                        <span className="text-destructive">*</span>
+                        Precio Mayoreo
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
