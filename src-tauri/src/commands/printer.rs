@@ -1,8 +1,115 @@
-use crate::commands::settings::{business::BusinessSettings, hardware::HardwareConfig};
-use chrono::Local;
-use image::GenericImageView;
+use crate::commands::settings::business::BusinessSettings;
+use crate::commands::settings::hardware::HardwareConfig;
+use image::imageops::FilterType;
+use image::{DynamicImage, GenericImageView};
 use printers::common::base::job::PrinterJobOptions;
+use std::path::Path;
+use std::thread;
+use std::time::Duration;
 use tauri::{command, AppHandle, Manager};
+
+/// Versión "Energy Saver" para impresoras viejitas
+fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<u8>, String> {
+    // 1. ANCHO SEGURO
+    let safe_width = if max_width > 400 { 512 } else { 384 };
+
+    // Ajustar a múltiplo de 8
+    let mut target_width = safe_width;
+    if target_width % 8 != 0 {
+        target_width -= target_width % 8;
+    }
+
+    // Redimensionar
+    let aspect_ratio = img.height() as f64 / img.width() as f64;
+    let target_height = (target_width as f64 * aspect_ratio) as u32;
+    let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
+
+    // Convertir a grises
+    let grayscale = resized.to_luma8();
+
+    // Detección de fondo (Tu lógica original)
+    let corners = [
+        grayscale.get_pixel(0, 0)[0],
+        grayscale.get_pixel(target_width - 1, 0)[0],
+        grayscale.get_pixel(0, target_height - 1)[0],
+        grayscale.get_pixel(target_width - 1, target_height - 1)[0],
+    ];
+    let avg_corner = corners.iter().map(|&x| x as u32).sum::<u32>() / 4;
+    let should_invert = avg_corner < 150;
+
+    // ---------------------------------------------------------
+    // ESTRATEGIA: MICRO-CHUNKS + AHORRO DE ENERGÍA
+    // ---------------------------------------------------------
+    // 1. Bajamos el tamaño del chunk a 16 líneas (menos memoria buffer)
+    let chunk_height = 16;
+    let width_bytes = (target_width / 8) as u8;
+
+    let mut final_command = Vec::new();
+
+    for y_start in (0..target_height).step_by(chunk_height as usize) {
+        let lines_remaining = target_height - y_start;
+        let current_chunk_h = if lines_remaining < chunk_height {
+            lines_remaining
+        } else {
+            chunk_height
+        };
+
+        // Header del Chunk
+        final_command.extend_from_slice(&[0x1D, 0x76, 0x30, 0x00]);
+        final_command.extend_from_slice(&[width_bytes, 0x00]);
+        final_command.extend_from_slice(&[(current_chunk_h as u8), 0x00]);
+
+        // Data del Chunk
+        for y in y_start..(y_start + current_chunk_h) {
+            let mut current_byte: u8 = 0;
+            for x in 0..target_width {
+                let pixel_val = grayscale.get_pixel(x, y)[0];
+
+                let is_dark_pixel = if should_invert {
+                    pixel_val > 150 // Invertido
+                } else {
+                    pixel_val < 128 // Normal
+                };
+
+                // --- AQUÍ ESTÁ EL TRUCO PARA IMPRESORAS VIEJAS ---
+                // Si el pixel debe ser negro, aplicamos un "Checkerboard" (Ajedrez).
+                // Solo imprimimos si (x + y) es par. Esto reduce la corriente al 50%.
+                // El logo se verá un poco más "tenue" (punteado), pero NO se trabará.
+                let save_energy_mask = (x + y) % 2 == 0;
+
+                // Condición final: Es pixel negro Y pasa la máscara de energía
+                if is_dark_pixel && save_energy_mask {
+                    let bit_index = 7 - (x % 8);
+                    current_byte |= 1 << bit_index;
+                }
+
+                if (x + 1) % 8 == 0 {
+                    final_command.push(current_byte);
+                    current_byte = 0;
+                }
+            }
+        }
+    }
+
+    Ok(final_command)
+}
+
+// NOTA IMPORTANTE EN LA FUNCIÓN test_print_ticket:
+// Asegúrate de que hardware_config.printer_width sea correcto.
+// Si es "58", la función de arriba forzará 384px.
+
+/// Helper: Cargar desde ruta y convertir
+pub fn image_to_escpos(path: &str, max_width: u32) -> Result<Vec<u8>, String> {
+    let img = image::open(path).map_err(|e| format!("Error abriendo imagen: {}", e))?;
+    convert_image_to_escpos(img, max_width)
+}
+
+/// Helper: Cargar desde bytes en memoria y convertir
+pub fn image_bytes_to_escpos(bytes: &[u8], max_width: u32) -> Result<Vec<u8>, String> {
+    let img = image::load_from_memory(bytes)
+        .map_err(|e| format!("Error leyendo bytes de imagen: {}", e))?;
+    convert_image_to_escpos(img, max_width)
+}
 
 #[command]
 pub fn test_print_ticket(
@@ -10,186 +117,120 @@ pub fn test_print_ticket(
     printer_name: String,
     settings: BusinessSettings,
     hardware_config: HardwareConfig,
+    logo_bytes: Option<Vec<u8>>,
 ) -> Result<String, String> {
-    let printers = printers::get_printers();
+    let printers_list = printers::get_printers();
+    let printer = printers_list
+        .iter()
+        .find(|p| p.name == printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
-    if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
-        let now = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
+    let mut job_content = Vec::new();
 
-        let init_cmd = b"\x1B@";
-        let align_center = b"\x1Ba\x01";
-        let align_left = b"\x1Ba\x00";
+    // Init & Align Center
+    job_content.extend_from_slice(b"\x1B\x40");
+    job_content.extend_from_slice(b"\x1B\x61\x01");
 
-        let mut job_content = Vec::new();
-        job_content.extend_from_slice(init_cmd);
-        job_content.extend_from_slice(align_center);
+    // --- 1. LOGO ---
+    // Determinar ancho objetivo según config de hardware (58mm o 80mm)
+    let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
+    // 58mm -> 384px, 80mm -> 512px (o 576px según modelo)
+    let max_width = if width_val == 58 { 384 } else { 512 };
 
-        // 1. Try to print logo if exists
-        if !settings.logo_path.is_empty() {
-            println!("Logo path configured: {}", settings.logo_path);
+    let mut logo_cmds: Option<Vec<u8>> = None;
+
+    // A. Prioridad: Usar bytes directos (si el usuario acaba de subir una imagen para probar)
+    if let Some(bytes) = logo_bytes {
+        match image_bytes_to_escpos(&bytes, max_width) {
+            Ok(cmds) => logo_cmds = Some(cmds),
+            Err(e) => println!("Warning: Failed to process provided logo bytes: {}", e),
+        }
+    }
+    // B. Fallback: Usar la ruta guardada en settings
+    else if !settings.logo_path.is_empty() {
+        // Resolver ruta absoluta si es necesario
+        let logo_path_str = if settings.logo_path.contains("images/settings") {
             if let Ok(app_dir) = app_handle.path().app_data_dir() {
-                let logo_path = app_dir.join(&settings.logo_path);
-                println!("Full logo path: {:?}", logo_path);
+                app_dir
+                    .join(&settings.logo_path)
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                settings.logo_path.clone()
+            }
+        } else {
+            settings.logo_path.clone()
+        };
 
-                if logo_path.exists() {
-                    // Start of image processing
-                    match image::open(&logo_path) {
-                        Ok(img) => {
-                            println!(
-                                "Image opened successfully. Dimensions: {:?}",
-                                img.dimensions()
-                            );
-                            // Determine max width (dots)
-                            let max_width = if hardware_config.printer_width == "58" {
-                                384
-                            } else {
-                                576
-                            };
-
-                            // Resize keeping aspect ratio
-                            let (width, height) = img.dimensions();
-                            let new_width = if width > max_width { max_width } else { width };
-                            let new_height =
-                                (height as f32 * (new_width as f32 / width as f32)) as u32;
-
-                            let resized = img.resize(
-                                new_width,
-                                new_height,
-                                image::imageops::FilterType::Nearest,
-                            );
-                            let (final_w, final_h) = resized.dimensions();
-
-                            // Convert to monochrome (threshold)
-                            let mut bit_buf = Vec::new();
-                            let mut byte = 0u8;
-                            let mut bit_idx = 0;
-
-                            // Width in bytes (padded if needed)
-                            let bytes_per_line = (final_w + 7) / 8;
-
-                            for y in 0..final_h {
-                                for x in 0..(bytes_per_line * 8) {
-                                    let pixel_black = if x < final_w {
-                                        let p = resized.get_pixel(x, y);
-                                        // Simple formatting: < 128 is black
-                                        let luma = 0.299 * p[0] as f32
-                                            + 0.587 * p[1] as f32
-                                            + 0.114 * p[2] as f32;
-                                        luma < 128.0 && p[3] > 10 // Checking alpha too
-                                    } else {
-                                        false
-                                    };
-
-                                    if pixel_black {
-                                        byte |= 1 << (7 - bit_idx);
-                                    }
-
-                                    bit_idx += 1;
-                                    if bit_idx == 8 {
-                                        bit_buf.push(byte);
-                                        byte = 0;
-                                        bit_idx = 0;
-                                    }
-                                }
-                            }
-
-                            // GS v 0 command
-                            // 1D 76 30 00 xL xH yL yH d1...dk
-                            job_content.extend_from_slice(b"\x1D\x76\x30\x00");
-                            job_content.push((bytes_per_line & 0xFF) as u8);
-                            job_content.push(((bytes_per_line >> 8) & 0xFF) as u8);
-                            job_content.push((final_h & 0xFF) as u8);
-                            job_content.push(((final_h >> 8) & 0xFF) as u8);
-                            job_content.extend_from_slice(&bit_buf);
-                            job_content.extend_from_slice(b"\n"); // Line break after image
-                            println!("Image processing complete. Added to job.");
-                        }
-                        Err(e) => println!("Failed to open image: {}", e),
-                    }
-                } else {
-                    println!("Logo file does not exist at path");
-                }
+        if Path::new(&logo_path_str).exists() {
+            match image_to_escpos(&logo_path_str, max_width) {
+                Ok(cmds) => logo_cmds = Some(cmds),
+                Err(e) => println!("Warning: Failed to process logo from path: {}", e),
             }
         }
+    }
 
-        // 2. Font Size Command (GS ! n)
-        // Default "12" = 0 (Normal).
-        // If > 12, use 0x01 (Double Height) or 0x11 (Double W/H) depending on logic.
-        // For simple testing, "14" or larger triggers Double Height.
-        let font_size_str = hardware_config
-            .font_size
-            .clone()
-            .unwrap_or("12".to_string());
-        let font_size_cmd = if font_size_str == "12" {
-            b"\x1D\x21\x00" // Normal
-        } else if font_size_str.parse::<i32>().unwrap_or(12) >= 14 {
-            b"\x1D\x21\x01" // Double Height just to show difference
-        } else {
-            b"\x1D\x21\x00"
-        };
-        job_content.extend_from_slice(font_size_cmd);
-
-        // 2. Header
-        if !settings.ticket_header.is_empty() {
-            job_content.extend_from_slice(settings.ticket_header.as_bytes());
-            job_content.extend_from_slice(b"\n\n");
-        }
-
-        job_content.extend_from_slice(settings.store_name.as_bytes());
+    if let Some(cmds) = logo_cmds {
+        job_content.extend_from_slice(&cmds);
+        // Pequeño salto después del logo para que no se pegue al texto
         job_content.extend_from_slice(b"\n");
-        job_content.extend_from_slice(settings.store_address.as_bytes());
+    }
+
+    // --- 2. HEADER ---
+    if !settings.ticket_header.is_empty() {
+        job_content.extend_from_slice(settings.ticket_header.as_bytes());
         job_content.extend_from_slice(b"\n");
+    }
 
-        // 3. Body
-        let cols = hardware_config.columns.unwrap_or(48) as usize;
-        let separator = "-".repeat(cols);
+    // --- 3. TEST BODY ---
+    job_content.extend_from_slice(b"\n*** TICKET DE PRUEBA ***\n");
+    let now = chrono::Local::now().format("%d/%m/%Y %H:%M").to_string();
+    job_content.extend_from_slice(format!("Fecha: {}\n", now).as_bytes());
+    job_content.extend_from_slice(b"Si puedes ver el logo bien,\nel sistema funciona.\n");
 
-        let mut ticket = String::new();
-        ticket.push_str(&separator);
-        ticket.push_str("\n");
-        ticket.push_str("        TICKET DE PRUEBA        \n");
-        ticket.push_str(&separator);
-        ticket.push_str("\n");
-        ticket.push_str(&format!("Fecha: {}\n\n", now));
-        ticket.push_str("Cant. Descripcion        Total\n");
-        ticket.push_str(&separator);
-        ticket.push_str("\n");
-        ticket.push_str("1.00  Producto Prueba    $10.00\n");
-        ticket.push_str("2.00  Otro Articulo      $25.00\n");
-        ticket.push_str(&separator);
-        ticket.push_str("\n");
-        ticket.push_str("TOTAL:                   $60.00\n");
-        ticket.push_str(&separator);
-        ticket.push_str("\n");
-
-        job_content.extend_from_slice(align_left);
-        job_content.extend_from_slice(ticket.as_bytes());
-
-        // 4. Footer
-        job_content.extend_from_slice(align_center);
+    // --- 4. FOOTER ---
+    if !settings.ticket_footer.is_empty() {
         job_content.extend_from_slice(b"\n");
-        if !settings.ticket_footer.is_empty() {
-            job_content.extend_from_slice(settings.ticket_footer.as_bytes());
-            job_content.extend_from_slice(b"\n");
-        }
+        job_content.extend_from_slice(settings.ticket_footer.as_bytes());
+        job_content.extend_from_slice(b"\n");
+    }
 
-        // 5. Padding (Extra Lines)
-        let padding = hardware_config.padding_lines.unwrap_or(0);
-        for _ in 0..padding {
-            job_content.extend_from_slice(b"\n");
-        }
-        // Base padding to clear cutter
-        job_content.extend_from_slice(b"\n\n\n");
+    // Cut
+    job_content.extend_from_slice(b"\n\n\n\x1D\x56\x42\x00");
 
-        // Cut paper command (GS V 66 0)
-        let cut_cmd = b"\x1D\x56\x42\x00";
-        job_content.extend_from_slice(cut_cmd);
+    // Send to Printer
+    printer
+        .print(&job_content, PrinterJobOptions::none())
+        .map_err(|e| format!("Error imprimiendo: {:?}", e))?;
 
-        match printer.print(&job_content, PrinterJobOptions::none()) {
-            Ok(_) => Ok(format!("Ticket de prueba enviado a {}", printer_name)),
-            Err(e) => Err(format!("Error al imprimir: {:?}", e)),
+    Ok("Ticket enviado correctamente".to_string())
+}
+
+#[command]
+pub fn print_business_logo(
+    _app_handle: AppHandle,
+    printer_name: String,
+    logo_path: String,
+) -> Result<String, String> {
+    let printers = printers::get_printers();
+    if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
+        let mut job_content = Vec::new();
+        job_content.extend_from_slice(b"\x1B\x40");
+        job_content.extend_from_slice(b"\x1B\x61\x01");
+
+        // Usamos 512 por defecto para testing rápido, o podrías pedir el ancho
+        match image_to_escpos(&logo_path, 512) {
+            Ok(img_bytes) => {
+                job_content.extend_from_slice(&img_bytes);
+                job_content.extend_from_slice(b"\nLogo Impreso\n\n\n\x1D\x56\x42\x00");
+                match printer.print(&job_content, PrinterJobOptions::none()) {
+                    Ok(_) => Ok("Logo enviado".to_string()),
+                    Err(e) => Err(format!("Error: {:?}", e)),
+                }
+            }
+            Err(e) => Err(e),
         }
     } else {
-        Err(format!("Impresora '{}' no encontrada", printer_name))
+        Err("Impresora no encontrada".to_string())
     }
 }

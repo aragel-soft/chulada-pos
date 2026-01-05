@@ -214,11 +214,23 @@ export default function TicketDesignPage() {
       columns: formVals.columns,
     };
 
+    // Prepare logo bytes if there is a NEW image file uploaded but not saved
+    let logoBytes: number[] | null = null;
+    if (imageFile) {
+      try {
+        const buffer = await imageFile.arrayBuffer();
+        logoBytes = Array.from(new Uint8Array(buffer));
+      } catch (e) {
+        console.error("Error reading image bytes:", e);
+      }
+    }
+
     toast.promise(
       invoke("test_print_ticket", {
         printerName: selectedPrinter,
         settings: tempBusiness,
-        hardwareConfig: tempHardware
+        hardwareConfig: tempHardware,
+        logoBytes: logoBytes
       }),
       {
         loading: "Generando ticket de prueba...",
