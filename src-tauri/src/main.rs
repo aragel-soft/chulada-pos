@@ -3,6 +3,7 @@
 
 mod commands;
 mod database;
+mod printer_utils;
 
 use std::sync::Mutex;
 use tauri::Manager;

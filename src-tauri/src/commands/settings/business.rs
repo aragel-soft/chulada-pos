@@ -1,3 +1,4 @@
+use crate::printer_utils;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -148,8 +149,17 @@ pub fn save_logo_image(
     let final_name = format!("logo_{}", safe_name);
     let file_path = images_dir.join(&final_name);
 
-    fs::write(&file_path, file_data).map_err(|e| format!("Error al guardar imagen: {}", e))?;
+    fs::write(&file_path, &file_data).map_err(|e| format!("Error al guardar imagen: {}", e))?;
 
-    // Return the relative path that the frontend/backend can use
+    let stem = file_path.file_stem().unwrap().to_string_lossy();
+    let cache_58_path = images_dir.join(format!("{}_58.bin", stem));
+    if let Ok(bytes_58) = printer_utils::image_bytes_to_escpos(&file_data, 384) {
+        let _ = fs::write(cache_58_path, bytes_58);
+    }
+
+    let cache_80_path = images_dir.join(format!("{}_80.bin", stem));
+    if let Ok(bytes_80) = printer_utils::image_bytes_to_escpos(&file_data, 512) {
+        let _ = fs::write(cache_80_path, bytes_80);
+    }
     Ok(format!("images/settings/{}", final_name))
 }
