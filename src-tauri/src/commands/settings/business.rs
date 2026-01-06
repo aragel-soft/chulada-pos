@@ -144,7 +144,6 @@ pub fn save_logo_image(
             .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
     }
 
-    // Sanitize filename but keep extension
     let safe_name = file_name.replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
     let final_name = format!("logo_{}", safe_name);
     let file_path = images_dir.join(&final_name);
