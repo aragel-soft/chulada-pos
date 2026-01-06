@@ -54,10 +54,7 @@ const ticketSettingsSchema = z.object({
 
   // Hardware Settings (Paper)
   printerWidth: z.enum(["58", "80"]),
-  margins: z.number().min(0).max(100),
   paddingLines: z.number().min(0).max(20).optional(),
-  fontSize: z.string().optional(), // "12"
-  columns: z.number().int().positive().optional(),
 });
 
 type TicketSettingsFormValues = z.infer<typeof ticketSettingsSchema>;
@@ -80,10 +77,7 @@ export default function TicketDesignPage() {
       ticketFooter: "",
       logoPath: "",
       printerWidth: "80",
-      margins: 0,
       paddingLines: 0,
-      fontSize: "12",
-      columns: 48,
     },
   });
 
@@ -123,10 +117,7 @@ export default function TicketDesignPage() {
           ticketFooter: businessData.ticketFooter || "",
           logoPath: businessData.logoPath || "",
           printerWidth: (hardwareData.printerWidth as "58" | "80") || "80",
-          margins: hardwareData.margins || 0,
           paddingLines: hardwareData.paddingLines || 0,
-          fontSize: hardwareData.fontSize || "12",
-          columns: hardwareData.columns || 48,
         });
 
         // Set test printer selection
@@ -174,10 +165,7 @@ export default function TicketDesignPage() {
       const newHardwareConfig: HardwareConfig = {
         ...fullHardwareConfig,
         printerWidth: values.printerWidth,
-        margins: values.margins,
         paddingLines: values.paddingLines,
-        fontSize: values.fontSize,
-        columns: values.columns,
       };
       await saveHardwareSettings(newHardwareConfig);
       setFullHardwareConfig(newHardwareConfig);
@@ -209,9 +197,6 @@ export default function TicketDesignPage() {
     const tempHardware = {
       ...fullHardwareConfig!,
       printerWidth: formVals.printerWidth,
-      margins: formVals.margins,
-      fontSize: formVals.fontSize,
-      columns: formVals.columns,
     };
 
     // Prepare logo bytes if there is a NEW image file uploaded but not saved
@@ -243,16 +228,17 @@ export default function TicketDesignPage() {
   // Auto-set columns based on width
   const handleWidthChange = (val: "58" | "80") => {
     form.setValue("printerWidth", val);
-    if (val === "58") {
-      form.setValue("columns", 32);
-    } else {
-      form.setValue("columns", 48);
-    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.match('image/jpeg')) {
+        toast.error("Solo se permiten imágenes JPG");
+        return;
+      }
+
       if (file.size > 2 * 1024 * 1024) {
         toast.error("La imagen es muy pesada (máx 2MB)");
         return;
@@ -322,10 +308,10 @@ export default function TicketDesignPage() {
                                 <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
                                   <Upload className="w-8 h-8 text-muted-foreground mb-2" />
                                   <span className="text-sm text-muted-foreground font-medium">Clic para subir logo</span>
-                                  <span className="text-xs text-muted-foreground/70 mt-1">JPG, PNG (Máx 2MB)</span>
+                                  <span className="text-xs text-muted-foreground/70 mt-1">Solo JPG (Máx 2MB)</span>
                                   <input
                                     type="file"
-                                    accept="image/*"
+                                    accept=".jpg, .jpeg"
                                     className="hidden"
                                     onChange={handleImageChange}
                                   />
@@ -444,39 +430,6 @@ export default function TicketDesignPage() {
 
                     <FormField
                       control={form.control}
-                      name="fontSize"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tamaño Fuente</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="margins"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Margen Izquierdo (px)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={0}
-                              {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
                       name="paddingLines"
                       render={({ field }) => (
                         <FormItem>
@@ -492,28 +445,6 @@ export default function TicketDesignPage() {
                           </FormControl>
                           <FormDescription>
                             Espacio extra para corte.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="columns"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Columnas (Caracteres)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={1}
-                              {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Estándar: 32 (58mm) o 48 (80mm).
                           </FormDescription>
                           <FormMessage />
                         </FormItem>

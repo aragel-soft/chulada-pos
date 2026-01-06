@@ -1,11 +1,9 @@
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use image::imageops::FilterType;
-use image::{DynamicImage, GenericImageView};
+use image::DynamicImage;
 use printers::common::base::job::PrinterJobOptions;
 use std::path::Path;
-use std::thread;
-use std::time::Duration;
 use tauri::{command, AppHandle, Manager};
 
 /// Versión "Energy Saver" para impresoras viejitas
