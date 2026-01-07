@@ -139,10 +139,8 @@ pub fn save_logo_image(
 
     let images_dir = app_dir.join("images").join("settings");
 
-    if !images_dir.exists() {
-        fs::create_dir_all(&images_dir)
-            .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
-    }
+    fs::create_dir_all(&images_dir)
+        .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
 
     let safe_name = file_name.replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
     let final_name = format!("logo_{}", safe_name);
@@ -160,5 +158,6 @@ pub fn save_logo_image(
     if let Ok(bytes_80) = printer_utils::image_bytes_to_escpos(&file_data, 512) {
         let _ = fs::write(cache_80_path, bytes_80);
     }
-    Ok(format!("images/settings/{}", final_name))
+
+    Ok(file_path.to_string_lossy().to_string())
 }

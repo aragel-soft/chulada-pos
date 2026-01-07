@@ -83,16 +83,24 @@ export default function TicketDesignPage() {
   });
 
   // Watch logo path for preview
-  // Watch logo path for preview (only if no new file selected)
   const logoPath = form.watch("logoPath");
+
+  // Unify preview logic using a single useEffect
   useEffect(() => {
-    if (logoPath && !imageFile) {
-      // Use convertFileSrc to generate a secure asset URL
-      const src = convertFileSrc(logoPath);
-      setLogoPreview(src);
-    } else if (!logoPath && !imageFile) {
+    let objectUrl: string | null = null;
+
+    if (imageFile) {
+      objectUrl = URL.createObjectURL(imageFile);
+      setLogoPreview(objectUrl);
+    } else if (logoPath) {
+      setLogoPreview(convertFileSrc(logoPath));
+    } else {
       setLogoPreview(null);
     }
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [logoPath, imageFile]);
 
 
@@ -161,6 +169,7 @@ export default function TicketDesignPage() {
       await updateBusinessSettings(newBusinessSettings);
       setFullBusinessSettings(newBusinessSettings);
       form.setValue("logoPath", finalLogoPath); // Update form with new path
+      setImageFile(null); // Clear pending file since it's saved
 
       // 2. Update Hardware Settings
       const newHardwareConfig: HardwareConfig = {
@@ -245,18 +254,12 @@ export default function TicketDesignPage() {
         return;
       }
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    form.setValue("logoPath", "");
-    setLogoPreview(null);
+    form.setValue("logoPath", "", { shouldDirty: true });
   };
 
 
@@ -301,97 +304,39 @@ export default function TicketDesignPage() {
                         <ImageIcon className="h-4 w-4" /> Logo del Negocio
                       </Label>
 
-                      <div className="flex flex-col gap-3 items-center">
-                        {/* Determine what to show: File Preview OR Saved Path Preview OR Upload Placeholder */}
-                        {(() => {
-                          // 1. New file uploaded?
-                          if (imageFile) {
-                            return (
-                              <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
-                                <img
-                                  src={URL.createObjectURL(imageFile)}
-                                  alt="New Logo Preview"
-                                  className="w-full h-full object-contain p-2"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      setImageFile(null);
-                                      // Keep existing path if we cancel new upload? Or clear all? 
-                                      // Usually users expect "Clear" to mean "No Logo". 
-                                      // So if they cancel a new upload, they might want to go back to previous, or empty.
-                                      // Let's assume explicitly removing means clearing.
-                                    }}
-                                  >
-                                    <X className="w-4 h-4 mr-2" /> Cancelar
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          }
-                          // 2. Existing path in form?
-                          else if (logoPath) { // logoPath comes from form.watch("logoPath")
-                            return (
-                              <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
-                                <img
-                                  src={convertFileSrc(logoPath)}
-                                  alt="Current Logo"
-                                  className="w-full h-full object-contain p-2"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      // Clear the form value
-                                      form.setValue("logoPath", "", { shouldDirty: true });
-                                    }}
-                                  >
-                                    <X className="w-4 h-4 mr-2" /> Eliminar
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          }
-                          // 3. Fallback: Upload Placeholder
-                          else {
-                            return (
-                              <label className="w-full border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
-                                <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                                <span className="text-sm text-muted-foreground font-medium">Clic para subir logo</span>
-                                <span className="text-xs text-muted-foreground/70 mt-1">Solo JPG (Máx 2MB)</span>
-                                <input
-                                  type="file"
-                                  accept=".jpg, .jpeg"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      if (!file.type.match('image/jpeg')) {
-                                        toast.error("Solo se permiten imágenes JPG");
-                                        return;
-                                      }
-                                      if (file.size > 2 * 1024 * 1024) {
-                                        toast.error("La imagen es muy pesada (máx 2MB)");
-                                        return;
-                                      }
-                                      setImageFile(file);
-                                      // Mark form as dirty so Save button enables? 
-                                      // We can trick it or handle it in the submit check. 
-                                      // Better to effectively "touch" a field or rely on imageFile !== null
-                                    }
-                                  }}
-                                />
-                              </label>
-                            );
-                          }
-                        })()}
-                      </div>
+                      {logoPreview ? (
+                        <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
+                          <img
+                            src={logoPreview}
+                            alt="Logo Preview"
+                            className="w-full h-full object-contain p-2"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={handleRemoveImage}
+                            >
+                              <X className="w-4 h-4 mr-2" /> Eliminar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="w-full border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
+                          <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                          <span className="text-sm text-muted-foreground font-medium">Clic para subir logo</span>
+                          <span className="text-xs text-muted-foreground/70 mt-1">Solo JPG (Máx 2MB)</span>
+                          <input
+                            type="file"
+                            accept=".jpg, .jpeg"
+                            className="hidden"
+                            onChange={handleImageChange}
+                          />
+                        </label>
+                      )}
                     </div>
+
                     <Separator />
 
                     {/* Encabezado */}
@@ -678,6 +623,6 @@ export default function TicketDesignPage() {
           </form>
         </Form>
       </div>
-    </ScrollArea>
+    </ScrollArea >
   );
 }
