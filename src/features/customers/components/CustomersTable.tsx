@@ -16,7 +16,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Customer } from "@/types/customers";
 import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "@/features/customers/components/columns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
 
 export default function CustomersTable() {
@@ -41,6 +41,7 @@ export default function CustomersTable() {
   const { data, isLoading } = useQuery({
     queryKey: ["customers", queryParams],
     queryFn: () => getCustomers(queryParams),
+    placeholderData: keepPreviousData,
   });
 
   const columns = useMemo<ColumnDef<Customer>[]>(() => [

@@ -17,7 +17,7 @@ export const columns: ColumnDef<Customer>[] = [
     accessorKey: "code",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Código" />,
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.getValue("code") || "-"}</span>
+      <span className="font-medium text-xs">{row.getValue("code") || "-"}</span>
     ),
   },
   {
@@ -53,48 +53,40 @@ export const columns: ColumnDef<Customer>[] = [
     accessorKey: "credit_limit",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Límite" />,
     cell: ({ row }) => (
-      <div className="font-medium">
+      <div className="font-medium text-gray-800">
         {formatCurrency(row.getValue("credit_limit"))}
       </div>
     ),
   },
   {
   accessorKey: "current_balance",
-  // Respetando tu header
   header: ({ column }) => <DataTableColumnHeader column={column} title="Saldo" />,
   cell: ({ row }) => {
     const balance = parseFloat(row.getValue("current_balance"));
     const limit = row.original.credit_limit;
-    
-    // Cálculo de porcentaje de deuda (evitar división por cero)
     const percentage = limit > 0 ? (balance / limit) : 0;
 
-    // Configuración por Estado
-    let statusColor = "text-muted-foreground"; // Default (Gris/Negro suave)
+    let statusColor = "text-muted-foreground";
     let dotClass = "bg-gray-400";
     let shouldPulse = false;
     let title = "Al corriente";
 
     if (balance < 0) {
-      // 🔵 Saldo a favor (Algo bueno, llamativo pero amigable)
       statusColor = "text-blue-600 font-bold";
       dotClass = "bg-blue-500";
       title = "Saldo a favor";
     } else if (balance > 0) {
         if (percentage >= 0.5 || balance > limit) {
-             // 🔴 Deuda Crítica (>50% o excedido)
             statusColor = "text-destructive font-extrabold";
             dotClass = "bg-destructive";
-            shouldPulse = true; // ¡Alerta!
+            shouldPulse = true; 
             title = "Deuda Crítica";
         } else {
-             // 🟡 Deuda Leve
             statusColor = "text-amber-600 font-medium";
             dotClass = "bg-amber-500";
             title = "Deuda Regular";
         }
     } else {
-        // 🟢 Saldo en 0 (Limpio)
         statusColor = "text-emerald-600 font-medium";
         dotClass = "bg-emerald-500";
     }
