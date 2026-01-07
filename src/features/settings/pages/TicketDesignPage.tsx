@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -281,7 +282,7 @@ export default function TicketDesignPage() {
               {/* Visual Designer Controls */}
               <div className="md:col-span-2 space-y-6">
 
-                {/* Apariencia General */}
+                {/* Content Card */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -293,56 +294,104 @@ export default function TicketDesignPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Logo Upload */}
-                    <FormField
-                      control={form.control}
-                      name="logoPath"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4" /> Logo del Negocio
-                          </FormLabel>
-                          <FormControl>
-                            <div className="flex flex-col gap-3">
-                              {!logoPreview ? (
-                                <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
-                                  <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                                  <span className="text-sm text-muted-foreground font-medium">Clic para subir logo</span>
-                                  <span className="text-xs text-muted-foreground/70 mt-1">Solo JPG (Máx 2MB)</span>
-                                  <input
-                                    type="file"
-                                    accept=".jpg, .jpeg"
-                                    className="hidden"
-                                    onChange={handleImageChange}
-                                  />
-                                </label>
-                              ) : (
-                                <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
-                                  <img
-                                    src={logoPreview}
-                                    alt="Logo Preview"
-                                    className="w-full h-full object-contain p-2"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Button
-                                      type="button"
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={handleRemoveImage}
-                                    >
-                                      <X className="w-4 h-4 mr-2" /> Quitar
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                              <input type="hidden" {...field} value={field.value || ""} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
+                    {/* Custom Image Upload Logic (No FormField wrapper) */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" /> Logo del Negocio
+                      </Label>
+
+                      <div className="flex flex-col gap-3 items-center">
+                        {/* Determine what to show: File Preview OR Saved Path Preview OR Upload Placeholder */}
+                        {(() => {
+                          // 1. New file uploaded?
+                          if (imageFile) {
+                            return (
+                              <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
+                                <img
+                                  src={URL.createObjectURL(imageFile)}
+                                  alt="New Logo Preview"
+                                  className="w-full h-full object-contain p-2"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      setImageFile(null);
+                                      // Keep existing path if we cancel new upload? Or clear all? 
+                                      // Usually users expect "Clear" to mean "No Logo". 
+                                      // So if they cancel a new upload, they might want to go back to previous, or empty.
+                                      // Let's assume explicitly removing means clearing.
+                                    }}
+                                  >
+                                    <X className="w-4 h-4 mr-2" /> Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          // 2. Existing path in form?
+                          else if (logoPath) { // logoPath comes from form.watch("logoPath")
+                            return (
+                              <div className="relative h-32 w-full max-w-xs mx-auto rounded-lg overflow-hidden border border-border group bg-white dark:bg-black/20">
+                                <img
+                                  src={convertFileSrc(logoPath)}
+                                  alt="Current Logo"
+                                  className="w-full h-full object-contain p-2"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Clear the form value
+                                      form.setValue("logoPath", "", { shouldDirty: true });
+                                    }}
+                                  >
+                                    <X className="w-4 h-4 mr-2" /> Eliminar
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          // 3. Fallback: Upload Placeholder
+                          else {
+                            return (
+                              <label className="w-full border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
+                                <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                                <span className="text-sm text-muted-foreground font-medium">Clic para subir logo</span>
+                                <span className="text-xs text-muted-foreground/70 mt-1">Solo JPG (Máx 2MB)</span>
+                                <input
+                                  type="file"
+                                  accept=".jpg, .jpeg"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (!file.type.match('image/jpeg')) {
+                                        toast.error("Solo se permiten imágenes JPG");
+                                        return;
+                                      }
+                                      if (file.size > 2 * 1024 * 1024) {
+                                        toast.error("La imagen es muy pesada (máx 2MB)");
+                                        return;
+                                      }
+                                      setImageFile(file);
+                                      // Mark form as dirty so Save button enables? 
+                                      // We can trick it or handle it in the submit check. 
+                                      // Better to effectively "touch" a field or rely on imageFile !== null
+                                    }
+                                  }}
+                                />
+                              </label>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
                     <Separator />
 
                     {/* Encabezado */}
@@ -454,48 +503,160 @@ export default function TicketDesignPage() {
                 </Card>
               </div>
 
-              {/* Print Test Controls */}
-              <div className="md:col-span-1">
-                <Card className="h-full border-dashed border-2 flex flex-col">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <Printer className="h-4 w-4" />
-                      Vista Previa Física
+              {/* Interactive Preview & Test Controls */}
+              <div className="md:col-span-1 space-y-6">
+
+                {/* Live Digital Preview */}
+                <Card className="overflow-hidden border-2 border-primary/10 bg-slate-50/50 dark:bg-black/20">
+                  <CardHeader className="pb-3 border-b bg-muted/40">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      Vista Previa Digital
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Envía un ticket de prueba para verificar el diseño.
+                      Simulación aproximada del resultado.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 flex-1">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium">Impresora de Prueba</label>
+                  <CardContent className="p-0 bg-slate-200/50 dark:bg-slate-900/50 min-h-[400px] flex items-center justify-center relative">
+
+                    {/* The Receipt Paper */}
+                    <div
+                      className={`
+                        bg-white text-black font-mono text-[10px] leading-tight shadow-xl 
+                        p-3 my-8 transition-all duration-300 ease-in-out
+                        ${form.watch("printerWidth") === "58" ? "w-[200px]" : "w-[280px]"}
+                      `}
+                      style={{
+                        boxShadow: "0 0 15px rgba(0,0,0,0.1)",
+                        minHeight: "300px"
+                      }}
+                    >
+                      {/* 1. Header Section */}
+                      <div className="flex flex-col items-center text-center space-y-1 mb-2">
+                        {/* Logo */}
+                        {logoPreview && (
+                          <div className="mb-2 w-full flex justify-center">
+                            <img
+                              src={logoPreview}
+                              alt="Logo"
+                              className="max-w-[80%] max-h-24 object-contain grayscale contrast-125"
+                              style={{ imageRendering: "pixelated" }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Store Info */}
+                        <div className="font-bold uppercase text-xs">
+                          {fullBusinessSettings?.storeName || "NOMBRE TIENDA"}
+                        </div>
+                        <div className="text-[9px] px-2 text-slate-600">
+                          {fullBusinessSettings?.storeAddress || "Dirección del negocio, Ciudad, CP."}
+                        </div>
+
+                        {/* Ticket Header Message */}
+                        {form.watch("ticketHeader") && (
+                          <div className="whitespace-pre-wrap mt-2 px-1 border-y border-dashed border-slate-300 py-1 w-full">
+                            {form.watch("ticketHeader")}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Body Simulation */}
+                      <div className="space-y-1 my-2 text-[9px]">
+                        <div className="text-center text-[8px] text-slate-500 mb-1">
+                          *** TICKET DE PRUEBA ***
+                        </div>
+                        <div className="flex justify-between border-b border-black pb-1 mb-1">
+                          <span>CANT. DESC</span>
+                          <span>IMPORTE</span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span>1  PRODUCTO A</span>
+                          <span>100.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>2  PRODUCTO B</span>
+                          <span>200.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>3  PRODUCTO C</span>
+                          <span>300.00</span>
+                        </div>
+                      </div>
+
+                      {/* 3. Totals */}
+                      <div className="border-t border-dashed border-black pt-1 mt-2 space-y-0.5">
+                        <div className="flex justify-between font-bold text-xs">
+                          <span>TOTAL:</span>
+                          <span>$720.00</span>
+                        </div>
+                        <div className="text-[8px] text-right text-slate-500">
+                          IVA INCLUIDO
+                        </div>
+                      </div>
+
+                      {/* 4. Footer */}
+                      {form.watch("ticketFooter") && (
+                        <div className="mt-4 pt-1 border-t border-slate-300 text-center whitespace-pre-wrap px-1">
+                          {form.watch("ticketFooter")}
+                        </div>
+                      )}
+
+                      {/* Cut Area Simulation */}
+                      <div className="mt-4 text-center text-[8px] text-slate-300">
+                        <div className="border-t border-slate-100 mb-1" />
+
+                        {/* Render padding lines */}
+                        {Array.from({ length: form.watch("paddingLines") || 0 }).map((_, i) => (
+                          <div key={i} className="h-3 w-full bg-slate-50/50 border-b border-dashed border-slate-100/50 flex items-center justify-center">
+                            <span className="opacity-20 text-[6px]">{i + 1}</span>
+                          </div>
+                        ))}
+
+                        <div className="mt-2">. . . corte . . .</div>
+                      </div>
+
+                    </div>
+
+                  </CardContent>
+                </Card>
+
+                {/* Physical Print Controls */}
+                <Card className="border-dashed border-2 flex flex-col bg-transparent shadow-none">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Printer className="h-4 w-4" />
+                      Prueba Física
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Envía un ticket real para validar márgenes y logo.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Impresora</label>
                       <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs">
                           <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
                           {printers.map((p) => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                            <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-3 text-xs text-yellow-800 dark:text-yellow-200">
-                      <p>
-                        La prueba usará los ajustes actuales del formulario (sin necesidad de guardar).
-                      </p>
-                    </div>
-
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
+                      variant="default" // Changed to default for better visibility
+                      className="w-full h-8 text-xs"
                       onClick={handleTestPrint}
                       disabled={!selectedPrinter}
                     >
                       <Printer className="mr-2 h-3 w-3" />
-                      Probar Impresión
+                      Imprimir Prueba
                     </Button>
                   </CardContent>
                 </Card>
@@ -503,7 +664,12 @@ export default function TicketDesignPage() {
             </div>
 
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[200px]">
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full md:w-auto min-w-[200px]"
+                disabled={(!form.formState.isDirty && !imageFile)}
+              >
                 <Save className="mr-2 h-4 w-4" />
                 Guardar Diseño
               </Button>
