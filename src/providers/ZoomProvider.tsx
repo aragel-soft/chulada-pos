@@ -13,13 +13,13 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('zoom_status');
     return saved !== null ? JSON.parse(saved) : true;
   });
-
+  // Use useRef to store the base pixel ratio
+  const basePixelRatio = useRef(window.devicePixelRatio);
   const isRestoring = useRef(true);
 
   const toggleZoom = () => {
     setZoomEnabled((prev: boolean) => {
       const newState = !prev;
-      console.log('[ZoomProvider] Saving new status:', newState);
       localStorage.setItem('zoom_status', JSON.stringify(newState));
       return newState;
     });
@@ -65,6 +65,7 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         if (zoomEnabled) {
+          // Allow default
         } else {
           e.preventDefault();
           e.stopPropagation();
@@ -77,8 +78,9 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
         if (isRestoring.current) {
           return;
         }
-        const newZoom = window.devicePixelRatio;
-        localStorage.setItem('zoom_level', String(newZoom));
+        const currentRatio = window.devicePixelRatio;
+        const relativeZoom = currentRatio / basePixelRatio.current;
+        localStorage.setItem('zoom_level', String(relativeZoom));
       }
     };
 
