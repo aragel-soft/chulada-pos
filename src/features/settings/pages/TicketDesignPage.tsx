@@ -534,7 +534,7 @@ export default function TicketDesignPage() {
                       <div className="border-t border-dashed border-black pt-1 mt-2 space-y-0.5">
                         <div className="flex justify-between font-bold text-xs">
                           <span>TOTAL:</span>
-                          <span>$720.00</span>
+                          <span>$1,400.00</span>
                         </div>
                         <div className="text-[8px] text-right text-slate-500">
                           IVA INCLUIDO
