@@ -18,7 +18,7 @@ pub struct Customer {
 #[derive(Debug, Serialize)]
 pub struct PaginatedResult<T> {
   pub data: Vec<T>,
-  pub total_count: i64,
+  pub total: i64,
   pub page: i64,
   pub page_size: i64,
   pub total_pages: i64, 
@@ -105,7 +105,7 @@ pub fn get_customers(
 
   Ok(PaginatedResult {
     data: customers,
-    total_count,
+    total: total_count,
     page,
     page_size,
     total_pages,
