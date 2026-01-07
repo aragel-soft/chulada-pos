@@ -1,7 +1,7 @@
 use image::imageops::FilterType;
 use image::DynamicImage;
 
-// Versión para guardar energía, Esto se podría quitar
+// TODO: CHECK IN A BETTER PRITER WITH LOGOS WITH ALOT OF BLACK IN IT
 pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<u8>, String> {
     let safe_width = if max_width > 400 { 512 } else { 384 };
 
@@ -38,7 +38,6 @@ pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<
             chunk_height
         };
 
-        // Header del Chunk
         final_command.extend_from_slice(&[0x1D, 0x76, 0x30, 0x00]);
         final_command.extend_from_slice(&[width_bytes, 0x00]);
         final_command.extend_from_slice(&[(current_chunk_h as u8), 0x00]);
@@ -49,13 +48,11 @@ pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<
                 let pixel_val = grayscale.get_pixel(x, y)[0];
 
                 let is_dark_pixel = if should_invert {
-                    pixel_val > 150 // Invertido
+                    pixel_val > 150
                 } else {
-                    pixel_val < 128 // Normal
+                    pixel_val < 128
                 };
-
                 let save_energy_mask = (x + y) % 2 == 0;
-
                 if is_dark_pixel && save_energy_mask {
                     let bit_index = 7 - (x % 8);
                     current_byte |= 1 << bit_index;
@@ -72,11 +69,11 @@ pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<
     Ok(final_command)
 }
 
-// Helpers
 pub fn image_to_escpos(path: &str, max_width: u32) -> Result<Vec<u8>, String> {
     let img = image::open(path).map_err(|e| format!("Error abriendo imagen: {}", e))?;
     convert_image_to_escpos(img, max_width)
 }
+
 pub fn image_bytes_to_escpos(bytes: &[u8], max_width: u32) -> Result<Vec<u8>, String> {
     let img = image::load_from_memory(bytes)
         .map_err(|e| format!("Error leyendo bytes de imagen: {}", e))?;
