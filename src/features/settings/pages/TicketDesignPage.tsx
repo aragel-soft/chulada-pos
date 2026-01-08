@@ -21,8 +21,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/text-area";
-
-// Import types and APIs
 import {
   getBusinessSettings,
   updateBusinessSettings,
@@ -33,9 +31,9 @@ import {
   getSystemPrinters,
   loadSettings as loadHardwareSettings,
   saveSettings as saveHardwareSettings,
+  testPrintTicket,
   HardwareConfig
 } from "@/lib/api/hardware";
-import { invoke } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import {
@@ -46,17 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Updated schema covering both sets of properties
-const ticketSettingsSchema = z.object({
-  // Business Settings
-  ticketHeader: z.string().optional(),
-  ticketFooter: z.string().optional(),
-  logoPath: z.string().optional(),
-
-  // Hardware Settings (Paper)
-  printerWidth: z.enum(["58", "80"]),
-  paddingLines: z.number().min(0).max(20).optional(),
-});
+import { ticketSettingsSchema } from "@/features/settings/schemas/ticketSchema";
 
 type TicketSettingsFormValues = z.infer<typeof ticketSettingsSchema>;
 
@@ -67,7 +55,6 @@ export default function TicketDesignPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // Keep full objects to preserve other fields when saving
   const [fullBusinessSettings, setFullBusinessSettings] = useState<BusinessSettings | null>(null);
   const [fullHardwareConfig, setFullHardwareConfig] = useState<HardwareConfig | null>(null);
 
@@ -82,10 +69,8 @@ export default function TicketDesignPage() {
     },
   });
 
-  // Watch logo path for preview
   const logoPath = form.watch("logoPath");
 
-  // Unify preview logic using a single useEffect
   useEffect(() => {
     let objectUrl: string | null = null;
 
@@ -108,19 +93,15 @@ export default function TicketDesignPage() {
     async function init() {
       try {
         setIsLoading(true);
-        // Load Business Settings
         const businessData = await getBusinessSettings();
         setFullBusinessSettings(businessData);
 
-        // Load Hardware Settings
         const hardwareData = await loadHardwareSettings();
         setFullHardwareConfig(hardwareData);
 
-        // Load Printers for testing
         const printerList = await getSystemPrinters().catch(() => []);
         setPrinters(printerList);
 
-        // Set form values
         form.reset({
           ticketHeader: businessData.ticketHeader || "",
           ticketFooter: businessData.ticketFooter || "",
@@ -129,7 +110,6 @@ export default function TicketDesignPage() {
           paddingLines: hardwareData.paddingLines || 0,
         });
 
-        // Set test printer selection
         if (hardwareData.printerName) {
           setSelectedPrinter(hardwareData.printerName);
         } else if (printerList.length > 0) {
@@ -146,44 +126,58 @@ export default function TicketDesignPage() {
     init();
   }, [form]);
 
+  // Handle form submission
   const onSubmit = async (values: TicketSettingsFormValues) => {
     if (!fullBusinessSettings || !fullHardwareConfig) return;
 
     try {
       let finalLogoPath = values.logoPath || "";
+      const dirtyFields = form.formState.dirtyFields;
+      const businessPatch: Partial<BusinessSettings> = {};
+      let hardwareChanged = false;
 
-      // 0. Upload Image if new file selected
       if (imageFile) {
         const arrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = Array.from(new Uint8Array(arrayBuffer));
         finalLogoPath = await saveLogoImage(uint8Array, imageFile.name);
+        businessPatch.logoPath = finalLogoPath;
       }
 
-      // 1. Update Business Settings
-      const newBusinessSettings: BusinessSettings = {
-        ...fullBusinessSettings,
-        ticketHeader: values.ticketHeader || "",
-        ticketFooter: values.ticketFooter || "",
-        logoPath: finalLogoPath,
-      };
-      await updateBusinessSettings(newBusinessSettings);
-      setFullBusinessSettings(newBusinessSettings);
-      form.setValue("logoPath", finalLogoPath); // Update form with new path
-      setImageFile(null); // Clear pending file since it's saved
+      if (dirtyFields.ticketHeader) businessPatch.ticketHeader = values.ticketHeader;
+      if (dirtyFields.ticketFooter) businessPatch.ticketFooter = values.ticketFooter;
 
-      // 2. Update Hardware Settings
-      const newHardwareConfig: HardwareConfig = {
-        ...fullHardwareConfig,
-        printerWidth: values.printerWidth,
-        paddingLines: values.paddingLines,
-      };
-      await saveHardwareSettings(newHardwareConfig);
-      setFullHardwareConfig(newHardwareConfig);
+      if (Object.keys(businessPatch).length > 0) {
+        await updateBusinessSettings(businessPatch);
+        setFullBusinessSettings(prev => prev ? ({ ...prev, ...businessPatch }) : null);
+        if (imageFile) {
+          form.setValue("logoPath", finalLogoPath);
+          setImageFile(null);
+        }
+      }
 
-      toast.success("Diseño actualizado", {
-        description: "Se han guardado los cambios de apariencia y hardware.",
+      if (dirtyFields.printerWidth || dirtyFields.paddingLines) {
+        const newHardwareConfig: HardwareConfig = {
+          ...fullHardwareConfig,
+          printerWidth: values.printerWidth,
+          paddingLines: values.paddingLines,
+        };
+        await saveHardwareSettings(newHardwareConfig);
+        setFullHardwareConfig(newHardwareConfig);
+        hardwareChanged = true;
+      }
+
+      if (Object.keys(businessPatch).length === 0 && !hardwareChanged && !imageFile) {
+        toast.info("No hay cambios para guardar");
+        return;
+      }
+
+      toast.success("Diseño actualizado correctamente", {
+        description: "Se han guardado los cambios.",
         icon: <CheckCircle2 className="h-4 w-4 text-green-600" />
       });
+
+      form.reset(values);
+
     } catch (error) {
       console.error("Failed to save settings:", error);
       toast.error("Error al guardar cambios");
@@ -209,7 +203,7 @@ export default function TicketDesignPage() {
       printerWidth: formVals.printerWidth,
     };
 
-    // Prepare logo bytes if there is a NEW image file uploaded but not saved
+    // Prepare logo bytes
     let logoBytes: number[] | null = null;
     if (imageFile) {
       try {
@@ -221,12 +215,12 @@ export default function TicketDesignPage() {
     }
 
     toast.promise(
-      invoke("test_print_ticket", {
-        printerName: selectedPrinter,
-        settings: tempBusiness,
-        hardwareConfig: tempHardware,
-        logoBytes: logoBytes
-      }),
+      testPrintTicket(
+        selectedPrinter,
+        tempBusiness,
+        tempHardware,
+        logoBytes
+      ),
       {
         loading: "Generando ticket de prueba...",
         success: "Ticket enviado a la impresora",
@@ -613,10 +607,14 @@ export default function TicketDesignPage() {
                 type="submit"
                 size="lg"
                 className="w-full md:w-auto min-w-[200px]"
-                disabled={(!form.formState.isDirty && !imageFile)}
+                disabled={!form.formState.isDirty && !imageFile || form.formState.isSubmitting}
               >
-                <Save className="mr-2 h-4 w-4" />
-                Guardar Diseño
+                {form.formState.isSubmitting ? "Guardando..." : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Guardar Diseño
+                  </>
+                )}
               </Button>
             </div>
 
