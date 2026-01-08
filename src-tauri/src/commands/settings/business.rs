@@ -13,10 +13,12 @@ pub struct BusinessSettings {
     pub store_address: String,
     pub ticket_header: String,
     pub ticket_footer: String,
+    pub ticket_footer_lines: String,
     pub default_cash_fund: f64,
-    pub max_cash_alert: f64,
+    pub max_cash_limit: f64,
     pub currency_symbol: String,
     pub tax_rate: f64,
+    pub apply_tax: bool,
     pub logo_path: String,
 }
 
@@ -68,12 +70,16 @@ pub fn get_business_settings(
             .get("ticket_footer")
             .cloned()
             .unwrap_or("Gracias por su compra".to_string()),
+        ticket_footer_lines: settings_map
+            .get("ticket_footer_lines")
+            .cloned()
+            .unwrap_or_default(),
         default_cash_fund: settings_map
             .get("default_cash_fund")
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.0),
-        max_cash_alert: settings_map
-            .get("max_cash_alert")
+        max_cash_limit: settings_map
+            .get("max_cash_limit")
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.0),
         currency_symbol: settings_map
@@ -84,14 +90,34 @@ pub fn get_business_settings(
             .get("tax_rate")
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.0),
+        apply_tax: settings_map
+            .get("apply_tax")
+            .map(|v| v == "true")
+            .unwrap_or(false),
         logo_path: settings_map.get("logo_path").cloned().unwrap_or_default(),
     })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BusinessSettingsPatch {
+    pub store_name: Option<String>,
+    pub store_address: Option<String>,
+    pub ticket_header: Option<String>,
+    pub ticket_footer: Option<String>,
+    pub ticket_footer_lines: Option<String>,
+    pub default_cash_fund: Option<f64>,
+    pub max_cash_limit: Option<f64>,
+    pub currency_symbol: Option<String>,
+    pub tax_rate: Option<f64>,
+    pub apply_tax: Option<bool>,
+    pub logo_path: Option<String>,
 }
 
 #[tauri::command]
 pub fn update_business_settings(
     state: State<'_, Mutex<Connection>>,
-    settings: BusinessSettings,
+    settings: BusinessSettingsPatch,
 ) -> Result<(), String> {
     let conn = state.lock().map_err(|e| e.to_string())?;
 
@@ -105,17 +131,38 @@ pub fn update_business_settings(
         )
         .map_err(|e| e.to_string())?;
 
-    let params = vec![
-        ("store_name", settings.store_name),
-        ("store_address", settings.store_address),
-        ("ticket_header", settings.ticket_header),
-        ("ticket_footer", settings.ticket_footer),
-        ("default_cash_fund", settings.default_cash_fund.to_string()),
-        ("max_cash_alert", settings.max_cash_alert.to_string()),
-        ("currency_symbol", settings.currency_symbol),
-        ("tax_rate", settings.tax_rate.to_string()),
-        ("logo_path", settings.logo_path),
-    ];
+    let mut params: Vec<(&str, String)> = Vec::new();
+
+    if let Some(v) = settings.store_name {
+        params.push(("store_name", v));
+    }
+    if let Some(v) = settings.store_address {
+        params.push(("store_address", v));
+    }
+    if let Some(v) = settings.ticket_header {
+        params.push(("ticket_header", v));
+    }
+    if let Some(v) = settings.ticket_footer {
+        params.push(("ticket_footer", v));
+    }
+    if let Some(v) = settings.ticket_footer_lines {
+        params.push(("ticket_footer_lines", v));
+    }
+    if let Some(v) = settings.default_cash_fund {
+        params.push(("default_cash_fund", v.to_string()));
+    }
+    if let Some(v) = settings.max_cash_limit {
+        params.push(("max_cash_limit", v.to_string()));
+    }
+    if let Some(v) = settings.tax_rate {
+        params.push(("tax_rate", v.to_string()));
+    }
+    if let Some(v) = settings.apply_tax {
+        params.push(("apply_tax", v.to_string()));
+    }
+    if let Some(v) = settings.logo_path {
+        params.push(("logo_path", v));
+    }
 
     for (key, value) in params {
         stmt.execute([key, &value]).map_err(|e| e.to_string())?;

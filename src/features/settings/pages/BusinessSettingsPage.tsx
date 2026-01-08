@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Store, Save, Coins, Receipt, Info } from "lucide-react";
+import { Store, Save, Coins, Receipt } from "lucide-react";
 
 import {
   Form,
@@ -27,21 +27,32 @@ import {
   updateBusinessSettings,
   BusinessSettings,
 } from "@/lib/api/business-settings";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function BusinessSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [showTaxConfirm, setShowTaxConfirm] = useState(false);
+  const [pendingTaxValue, setPendingTaxValue] = useState<boolean | null>(null);
 
   const form = useForm<BusinessSettingsFormValues>({
     resolver: zodResolver(businessSettingsSchema),
     defaultValues: {
       storeName: "",
       storeAddress: "",
-      ticketFooter: "",
       defaultCashFund: 500,
-      maxCashAlert: 2000,
-      currencySymbol: "$",
+      maxCashLimit: 2000,
       taxRate: 0,
-      logoPath: "",
+      applyTax: false,
     },
   });
 
@@ -49,16 +60,13 @@ export default function BusinessSettingsPage() {
     async function loadSettings() {
       try {
         const data = await getBusinessSettings();
-        // Reset form with fetched data
         form.reset({
           storeName: data.storeName,
           storeAddress: data.storeAddress,
-          ticketFooter: data.ticketFooter,
           defaultCashFund: data.defaultCashFund,
-          maxCashAlert: data.maxCashAlert,
-          currencySymbol: data.currencySymbol,
+          maxCashLimit: data.maxCashLimit,
           taxRate: data.taxRate,
-          logoPath: data.logoPath,
+          applyTax: data.applyTax,
         });
       } catch (error) {
         console.error("Failed to load business settings:", error);
@@ -70,12 +78,24 @@ export default function BusinessSettingsPage() {
     loadSettings();
   }, [form]);
 
-  const onSubmit = async (values: BusinessSettingsFormValues) => {
+  const onSubmit = async () => {
     try {
-      // Convert proper types for backend if needed, but schema matches typical use.
-      // Backend expects the same shape.
-      await updateBusinessSettings(values as BusinessSettings);
+      const patch: Partial<BusinessSettings> = {};
+      const formValues = form.getValues();
+      const dirtyFields = form.formState.dirtyFields;
+
+      (Object.keys(dirtyFields) as Array<keyof BusinessSettingsFormValues>).forEach((key) => {
+        if (dirtyFields[key]) {
+          // @ts-ignore
+          patch[key] = formValues[key];
+        }
+      });
+
+      await updateBusinessSettings(patch);
       toast.success("Reglas de negocio actualizadas correctamente");
+
+      form.reset(formValues);
+
     } catch (error) {
       console.error("Failed to save settings:", error);
       toast.error("Error al guardar los cambios");
@@ -144,30 +164,7 @@ export default function BusinessSettingsPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary">
-                      <Info className="h-5 w-5" />
-                      Personalización
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="currencySymbol"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Símbolo de Moneda</FormLabel>
-                          <FormControl>
-                            <Input className="w-24" placeholder="$" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {/* Logo Path Placeholder - User asked for customization but we stick to text for now unless file picker is needed */}
-                  </CardContent>
-                </Card>
+
               </div>
 
               {/* Reglas Operativas */}
@@ -192,6 +189,7 @@ export default function BusinessSettingsPage() {
                           <FormControl>
                             <Input
                               type="number"
+                              min={0}
                               {...field}
                               onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
@@ -205,13 +203,14 @@ export default function BusinessSettingsPage() {
                     />
                     <FormField
                       control={form.control}
-                      name="maxCashAlert"
+                      name="maxCashLimit"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Alerta de Límite de Efectivo</FormLabel>
+                          <FormLabel>Máximo de Efectivo permitido al iniciar turno</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
+                              min={0}
                               {...field}
                               onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
@@ -234,33 +233,85 @@ export default function BusinessSettingsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+
                     <FormField
                       control={form.control}
-                      name="taxRate"
+                      name="applyTax"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tasa de Impuesto Global (%)</FormLabel>
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Aplicar Impuestos</FormLabel>
+                            <FormDescription>
+                              Habilitar el cálculo de impuestos en las ventas.
+                            </FormDescription>
+                          </div>
                           <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                setPendingTaxValue(checked);
+                                setShowTaxConfirm(true);
+                              }}
                             />
                           </FormControl>
-                          <FormDescription>
-                            Se aplicará a productos configurados con impuesto default.
-                          </FormDescription>
-                          <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {form.watch("applyTax") && (
+                      <FormField
+                        control={form.control}
+                        name="taxRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tasa de Impuesto Global (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                {...field}
+                                onChange={e => field.onChange(e.target.valueAsNumber)}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Se aplicará a productos configurados con impuesto default.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </div>
             </div>
 
+            <AlertDialog open={showTaxConfirm} onOpenChange={setShowTaxConfirm}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro de cambiar la configuración de impuestos?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esto afectará el cálculo de precios en todas las ventas futuras. Asegúrate de que esta acción es intencional.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => {
+                    setPendingTaxValue(null);
+                    setShowTaxConfirm(false);
+                  }}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    if (pendingTaxValue !== null) {
+                      form.setValue("applyTax", pendingTaxValue, { shouldDirty: true });
+                    }
+                    setShowTaxConfirm(false);
+                  }}>Confirmar Cambio</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button type="submit" disabled={form.formState.isSubmitting} className="min-w-[150px]">
+              <Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting} className="min-w-[150px]">
                 {form.formState.isSubmitting ? (
                   <>Guardando...</>
                 ) : (

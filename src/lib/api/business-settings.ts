@@ -6,10 +6,12 @@ export interface BusinessSettings {
   storeAddress: string;
   ticketHeader: string;
   ticketFooter: string;
+  ticketFooterLines: string;
   defaultCashFund: number;
-  maxCashAlert: number;
+  maxCashLimit: number;
   currencySymbol: string;
   taxRate: number;
+  applyTax: boolean;
   logoPath: string;
 }
 
@@ -17,7 +19,7 @@ export const getBusinessSettings = async (): Promise<BusinessSettings> => {
   return await invoke("get_business_settings");
 };
 
-export const updateBusinessSettings = async (settings: BusinessSettings): Promise<void> => {
+export const updateBusinessSettings = async (settings: Partial<BusinessSettings>): Promise<void> => {
   return await invoke("update_business_settings", { settings });
 };
 
