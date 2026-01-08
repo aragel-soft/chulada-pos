@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,93 +22,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getSystemPrinters, loadSettings, saveSettings, testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
-import { getCurrentWindow } from "@tauri-apps/api/window"
 
 // Schema: Definimos que los inputs numéricos entran como strings (del input HTML) 
 // pero se validan y transforman a números.
 const hardwareFormSchema = z.object({
   terminalId: z.string().min(1, "El ID de la terminal es requerido"),
   printerName: z.string().min(1, "Seleccione una impresora"),
-  printerWidth: z.enum(["58", "80"]),
-  fontSize: z.string().optional(),
-  fontType: z.string().optional(),
-  // Coerce convierte el string del input a número automáticamente
-  columns: z.number().int().positive().optional(),
-  margins: z.number().int().nonnegative().optional(),
   cashDrawerCommand: z.string().min(1, "El comando es requerido"),
   cashDrawerPort: z.string().optional(),
 })
 
 type HardwareFormValues = z.infer<typeof hardwareFormSchema>
 
-// Valores por defecto iniciales (vacíos o genéricos)
 const defaultValues: HardwareFormValues = {
   terminalId: "",
   printerName: "",
-  printerWidth: "80",
-  fontSize: "12",
-  fontType: "Arial",
-  columns: 48,
-  margins: 0,
   cashDrawerCommand: "1B 70 00 19 FA",
   cashDrawerPort: "COM1",
 }
 
+// Import HardwareConfig type
+import { HardwareConfig } from "@/lib/api/hardware";
+
 export default function HardwarePage() {
   const [printers, setPrinters] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fullConfig, setFullConfig] = useState<HardwareConfig | null>(null)
 
   const form = useForm<HardwareFormValues>({
     resolver: zodResolver(hardwareFormSchema),
     defaultValues,
-    mode: "onChange", // Importante para detectar cambios en tiempo real
+    mode: "onChange",
   })
 
-  // Destructuramos isDirty para saber si el formulario ha cambiado
   const { isDirty } = form.formState
 
   useEffect(() => {
     const init = async () => {
       setIsLoading(true)
       try {
-        // 1. Cargar Impresoras
         const printerList = await getSystemPrinters().catch(() => [])
         setPrinters(printerList)
 
-        // 2. Cargar Configuración Guardada
         const savedSettings = await loadSettings()
+        setFullConfig(savedSettings); // Store full config
 
         if (savedSettings) {
-          // Preparamos los datos para que coincidan con el formato del formulario
-          // Es vital resetear el formulario con estos datos para que 'isDirty' funcione bien
-          // al comparar contra estos valores y no contra los defaultValues vacíos.
           form.reset({
             terminalId: savedSettings.terminalId || "CAJA-01",
             printerName: savedSettings.printerName || "",
-            printerWidth: (savedSettings.printerWidth as "58" | "80") || "80",
-            fontSize: savedSettings.fontSize || "12",
-            fontType: savedSettings.fontType || "Arial",
-            columns: savedSettings.columns ?? 48,
-            margins: savedSettings.margins ?? 0,
             cashDrawerCommand: savedSettings.cashDrawerCommand || "1B 70 00 19 FA",
             cashDrawerPort: savedSettings.cashDrawerPort || "COM1",
           })
-
-          // Aplicar Zoom si existe
-          if (savedSettings.zoomLevel) {
-            const win = getCurrentWindow() as any;
-            if (typeof win.setZoom === 'function') {
-              await win.setZoom(savedSettings.zoomLevel);
-            } else {
-              (document.body.style as any).zoom = savedSettings.zoomLevel;
-            }
-          }
         } else {
-          // Si no hay configuración guardada, reseteamos a los defaults "duros"
           form.reset(defaultValues)
         }
       } catch (error) {
@@ -120,25 +89,28 @@ export default function HardwarePage() {
       }
     }
     init()
-  }, [form]) // Form es estable, esto se ejecuta una vez al montar
+  }, [form])
 
   async function onSubmit(data: HardwareFormValues) {
-    try {
-      const zoomLevel = window.devicePixelRatio;
+    if (!fullConfig) return;
 
-      const configToSave = {
-        ...data,
-        zoomLevel,
+    try {
+      // Merge form data with preserved full config (paddingLines, width, etc)
+      const configToSave: HardwareConfig = {
+        ...fullConfig,
+        terminalId: data.terminalId,
+        printerName: data.printerName,
+        cashDrawerCommand: data.cashDrawerCommand,
+        cashDrawerPort: data.cashDrawerPort,
       }
 
       await saveSettings(configToSave)
+      setFullConfig(configToSave)
 
-      // CRÍTICO: Reseteamos el formulario con los NUEVOS datos guardados.
-      // Esto hace que 'isDirty' vuelva a ser false y el botón se deshabilite.
       form.reset(data)
 
       toast.success("Configuración guardada", {
-        description: "Los cambios se han aplicado correctamente.",
+        description: "Dispositivos actualizados correctamente.",
         icon: <CheckCircle2 className="h-4 w-4 text-green-600" />
       })
     } catch (error) {
@@ -177,46 +149,92 @@ export default function HardwarePage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* COLUMNA IZQUIERDA: Terminal y Cajón */}
-              <div className="space-y-6 lg:col-span-1">
-
-                {/* 1. Terminal ID */}
-                <Card>
-                  <CardHeader className="pb-3">
+              {/* GRUPO PRINCIPAL: Terminal e Impresora */}
+              <div className="space-y-6">
+                <Card className="h-full">
+                  <CardHeader className="pb-3 border-b bg-muted/20">
                     <CardTitle className="text-base font-medium flex items-center gap-2">
                       <Monitor className="h-4 w-4 text-primary" />
-                      Terminal
+                      Conexión y Terminal
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-6 pt-6">
+                    {/* Terminal ID */}
                     <FormField
                       control={form.control}
                       name="terminalId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Identificador</FormLabel>
+                          <FormLabel>ID Terminal</FormLabel>
                           <FormControl>
                             <Input placeholder="Ej. CAJA-01" {...field} />
                           </FormControl>
-                          <FormDescription>Nombre único de esta caja.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Separator className="my-2" />
+
+                    {/* Printer Selection */}
+                    <FormField
+                      control={form.control}
+                      name="printerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Printer className="h-3 w-3" /> Impresora Térmica
+                          </FormLabel>
+                          <div className="flex flex-col">
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              disabled={isLoading}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {printers.map((p) => (
+                                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleTestPrinter}
+                              disabled={!field.value}
+                              className="w-full mt-2"
+                            >
+                              <Printer className="mr-2 h-4 w-4" />
+                              Probar conexión
+                            </Button>
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </CardContent>
                 </Card>
+              </div>
 
-                {/* 2. Cajón de Dinero */}
-                <Card>
-                  <CardHeader className="pb-3">
+              {/* GRUPO SECUNDARIO: Cajón de Dinero */}
+              <div className="space-y-6">
+                <Card className="h-full">
+                  <CardHeader className="pb-3 border-b bg-muted/20">
                     <CardTitle className="text-base font-medium flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-primary" />
                       Cajón de Dinero
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-6">
                     <FormField
                       control={form.control}
                       name="cashDrawerPort"
@@ -247,7 +265,7 @@ export default function HardwarePage() {
                       name="cashDrawerCommand"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Protocolo de Apertura</FormLabel>
+                          <FormLabel>Protocolo (Comando HEX)</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -262,103 +280,34 @@ export default function HardwarePage() {
                               <SelectItem value="1B 37">IBM / POS Genérico</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormDescription className="text-[10px] hidden">
-                            Código HEX enviado a la impresora.
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/50 p-3 text-xs text-blue-900 dark:text-blue-200 flex gap-2 items-start mt-2">
-                      <Settings2 className="h-4 w-4 shrink-0 mt-0.5" />
-                      <p>
-                        Si el cajón no abre, prueba con cada una de las opciones disponibles y pulsa "Probar Apertura".
-                        Si ninguno funciona, verifica que el cable RJ11 esté conectado a la impresora.
-                      </p>
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200 mt-2">
+                      <p>Si el cajón no abre automáticamente al imprimir, verifique la conexión RJ11 a la impresora y pruebe distintos protocolos.</p>
                     </div>
+
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       className="w-full mt-2"
                       onClick={() => {
                         const cmd = form.getValues("cashDrawerCommand");
                         const printer = form.getValues("printerName");
-
-                        if (!printer) {
-                          toast.error("Seleccione una impresora primero");
-                          return;
-                        }
+                        if (!printer) return toast.error("Seleccione una impresora primero");
 
                         toast.promise(testCashDrawer(printer, cmd), {
-                          loading: `Enviando comando a ${printer}...`,
-                          success: (msg) => `Éxito: ${msg}`,
-                          error: (err) => `Error: ${err}`
+                          loading: `Probando apertura...`,
+                          success: "Comando enviado",
+                          error: "Error de comunicación"
                         });
                       }}
                     >
                       <Settings2 className="mr-2 h-3 w-3" />
                       Probar Apertura
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* COLUMNA DERECHA: Impresora (Ocupa más espacio) */}
-              <div className="lg:col-span-2">
-                <Card className="h-full flex flex-col">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Printer className="h-5 w-5 text-primary" />
-                      Configuración de Impresión
-                    </CardTitle>
-                    <CardDescription>
-                      Selecciona la impresora térmica predeterminada y ajusta los márgenes.
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="space-y-6 flex-1">
-                    {/* Selección de Impresora */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="printerName"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel>Dispositivo de Impresión</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                              disabled={isLoading}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar dispositivo..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {printers.map((p) => (
-                                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-
-                  <CardContent className="bg-muted/20 border-t p-4 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={handleTestPrinter}
-                      disabled={!form.getValues("printerName")}
-                    >
-                      <Printer className="mr-2 h-4 w-4" />
-                      Probar conexión
                     </Button>
                   </CardContent>
                 </Card>
