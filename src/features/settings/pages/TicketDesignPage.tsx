@@ -1,3 +1,4 @@
+// Imports
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,18 +23,15 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/text-area";
 import {
-  getBusinessSettings,
-  updateBusinessSettings,
   saveLogoImage,
   BusinessSettings,
 } from "@/lib/api/business-settings";
 import {
-  getSystemPrinters,
-  loadSettings as loadHardwareSettings,
-  saveSettings as saveHardwareSettings,
   testPrintTicket,
   HardwareConfig
 } from "@/lib/api/hardware";
+import { useHardwareStore } from "@/stores/hardwareStore";
+import { useBusinessStore } from "@/stores/businessStore";
 import { z } from "zod";
 
 import {
@@ -48,16 +46,19 @@ import { ticketSettingsSchema } from "@/features/settings/schemas/ticketSchema";
 
 type TicketSettingsFormValues = z.infer<typeof ticketSettingsSchema>;
 
+// Component
 export default function TicketDesignPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [printers, setPrinters] = useState<string[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
-  const [fullBusinessSettings, setFullBusinessSettings] = useState<BusinessSettings | null>(null);
-  const [fullHardwareConfig, setFullHardwareConfig] = useState<HardwareConfig | null>(null);
+  // Stores
+  const { settings: fullBusinessSettings, updateSettings: updateBusiness, isLoading: isBusinessLoading } = useBusinessStore();
+  const { config: fullHardwareConfig, updateSettings: updateHardware, printers: storePrinters, isLoading: isHardwareLoading } = useHardwareStore();
 
+  const isLoading = isBusinessLoading || isHardwareLoading;
+
+  // Form
   const form = useForm<TicketSettingsFormValues>({
     resolver: zodResolver(ticketSettingsSchema),
     defaultValues: {
@@ -71,6 +72,8 @@ export default function TicketDesignPage() {
 
   const logoPath = form.watch("logoPath");
 
+  // Effects
+  // Handle Logo Preview & Memory Cleanup
   useEffect(() => {
     let objectUrl: string | null = null;
 
@@ -88,43 +91,33 @@ export default function TicketDesignPage() {
     };
   }, [logoPath, imageFile]);
 
-
+  // Sync Form with Store Data
   useEffect(() => {
-    async function init() {
-      try {
-        setIsLoading(true);
-        const businessData = await getBusinessSettings();
-        setFullBusinessSettings(businessData);
+    if (fullBusinessSettings && fullHardwareConfig) {
+      // Validate width to ensure it matches Select options
+      const rawWidth = fullHardwareConfig.printerWidth;
+      const validWidth = (rawWidth === "58" || rawWidth === "80") ? rawWidth : "80";
 
-        const hardwareData = await loadHardwareSettings();
-        setFullHardwareConfig(hardwareData);
+      form.reset({
+        ticketHeader: (fullBusinessSettings.ticketHeader || "").trim(),
+        ticketFooter: (fullBusinessSettings.ticketFooter || "").trim(),
+        logoPath: (fullBusinessSettings.logoPath || "").trim(),
+        printerWidth: validWidth.trim() as "58" | "80",
+        paddingLines: fullHardwareConfig.paddingLines || 0, // Number doesn't need trim
+      });
+    }
+  }, [fullBusinessSettings, fullHardwareConfig, form]);
 
-        const printerList = await getSystemPrinters().catch(() => []);
-        setPrinters(printerList);
-
-        form.reset({
-          ticketHeader: businessData.ticketHeader || "",
-          ticketFooter: businessData.ticketFooter || "",
-          logoPath: businessData.logoPath || "",
-          printerWidth: (hardwareData.printerWidth as "58" | "80") || "80",
-          paddingLines: hardwareData.paddingLines || 0,
-        });
-
-        if (hardwareData.printerName) {
-          setSelectedPrinter(hardwareData.printerName);
-        } else if (printerList.length > 0) {
-          setSelectedPrinter(printerList[0]);
-        }
-
-      } catch (error) {
-        console.error("Failed to load settings:", error);
-        toast.error("Error al cargar configuración");
-      } finally {
-        setIsLoading(false);
+  // Initialize Test Printer Preference
+  useEffect(() => {
+    if (!selectedPrinter) {
+      if (fullHardwareConfig?.printerName) {
+        setSelectedPrinter(fullHardwareConfig.printerName);
+      } else if (storePrinters.length > 0) {
+        setSelectedPrinter(storePrinters[0]);
       }
     }
-    init();
-  }, [form]);
+  }, [fullHardwareConfig?.printerName, storePrinters, selectedPrinter]);
 
   // Handle form submission
   const onSubmit = async (values: TicketSettingsFormValues) => {
@@ -147,8 +140,7 @@ export default function TicketDesignPage() {
       if (dirtyFields.ticketFooter) businessPatch.ticketFooter = values.ticketFooter;
 
       if (Object.keys(businessPatch).length > 0) {
-        await updateBusinessSettings(businessPatch);
-        setFullBusinessSettings(prev => prev ? ({ ...prev, ...businessPatch }) : null);
+        await updateBusiness(businessPatch);
         if (imageFile) {
           form.setValue("logoPath", finalLogoPath);
           setImageFile(null);
@@ -157,12 +149,11 @@ export default function TicketDesignPage() {
 
       if (dirtyFields.printerWidth || dirtyFields.paddingLines) {
         const newHardwareConfig: HardwareConfig = {
-          ...fullHardwareConfig,
+          ...fullHardwareConfig!,
           printerWidth: values.printerWidth,
           paddingLines: values.paddingLines,
         };
-        await saveHardwareSettings(newHardwareConfig);
-        setFullHardwareConfig(newHardwareConfig);
+        await updateHardware(newHardwareConfig);
         hardwareChanged = true;
       }
 
@@ -179,7 +170,6 @@ export default function TicketDesignPage() {
       form.reset(values);
 
     } catch (error) {
-      console.error("Failed to save settings:", error);
       toast.error("Error al guardar cambios");
     }
   };
@@ -210,7 +200,6 @@ export default function TicketDesignPage() {
         const buffer = await imageFile.arrayBuffer();
         logoBytes = Array.from(new Uint8Array(buffer));
       } catch (e) {
-        console.error("Error reading image bytes:", e);
       }
     }
 
@@ -229,10 +218,7 @@ export default function TicketDesignPage() {
     );
   };
 
-  // Auto-set columns based on width
-  const handleWidthChange = (val: "58" | "80") => {
-    form.setValue("printerWidth", val);
-  };
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -257,7 +243,7 @@ export default function TicketDesignPage() {
   };
 
 
-  if (isLoading) {
+  if (isLoading && !fullBusinessSettings) {
     return <div className="p-6">Cargando diseñador...</div>;
   }
 
@@ -292,7 +278,7 @@ export default function TicketDesignPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
 
-                    {/* Custom Image Upload Logic (No FormField wrapper) */}
+                    {/* Custom Image Upload Logic*/}
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" /> Logo del Negocio
@@ -333,7 +319,7 @@ export default function TicketDesignPage() {
 
                     <Separator />
 
-                    {/* Encabezado */}
+                    {/* Header */}
                     <FormField
                       control={form.control}
                       name="ticketHeader"
@@ -355,7 +341,7 @@ export default function TicketDesignPage() {
                       )}
                     />
 
-                    {/* Pie de Página */}
+                    {/* Footer */}
                     <FormField
                       control={form.control}
                       name="ticketFooter"
@@ -379,7 +365,7 @@ export default function TicketDesignPage() {
                   </CardContent>
                 </Card>
 
-                {/* Ajustes de Papel */}
+                {/* Paper Settings */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -398,8 +384,9 @@ export default function TicketDesignPage() {
                         <FormItem>
                           <FormLabel>Ancho de Papel</FormLabel>
                           <Select
-                            onValueChange={(val) => handleWidthChange(val as "58" | "80")}
-                            value={field.value}
+                            key={field.value}
+                            onValueChange={field.onChange}
+                            value={field.value || "80"}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -461,16 +448,16 @@ export default function TicketDesignPage() {
                     {/* The Receipt Paper */}
                     <div
                       className={`
-                        bg-white text-black font-mono text-[10px] leading-tight shadow-xl 
-                        p-3 my-8 transition-all duration-300 ease-in-out
-                        ${form.watch("printerWidth") === "58" ? "w-[200px]" : "w-[280px]"}
-                      `}
+                          bg-white text-black font-mono text-[10px] leading-tight shadow-xl 
+                          p-3 my-8 transition-all duration-300 ease-in-out
+                          ${form.watch("printerWidth") === "58" ? "w-[200px]" : "w-[280px]"}
+                        `}
                       style={{
                         boxShadow: "0 0 15px rgba(0,0,0,0.1)",
                         minHeight: "300px"
                       }}
                     >
-                      {/* 1. Header Section */}
+                      {/* Header Section */}
                       <div className="flex flex-col items-center text-center space-y-1 mb-2">
                         {/* Logo */}
                         {logoPreview && (
@@ -500,7 +487,7 @@ export default function TicketDesignPage() {
                         )}
                       </div>
 
-                      {/* 2. Body Simulation */}
+                      {/* Body Simulation */}
                       <div className="space-y-1 my-2 text-[9px]">
                         <div className="text-center text-[8px] text-slate-500 mb-1">
                           *** TICKET DE PRUEBA ***
@@ -524,7 +511,7 @@ export default function TicketDesignPage() {
                         </div>
                       </div>
 
-                      {/* 3. Totals */}
+                      {/* Totals */}
                       <div className="border-t border-dashed border-black pt-1 mt-2 space-y-0.5">
                         <div className="flex justify-between font-bold text-xs">
                           <span>TOTAL:</span>
@@ -535,7 +522,7 @@ export default function TicketDesignPage() {
                         </div>
                       </div>
 
-                      {/* 4. Footer */}
+                      {/* Footer */}
                       {form.watch("ticketFooter") && (
                         <div className="mt-4 pt-1 border-t border-slate-300 text-center whitespace-pre-wrap px-1">
                           {form.watch("ticketFooter")}
@@ -575,12 +562,12 @@ export default function TicketDesignPage() {
                   <CardContent className="space-y-3">
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground">Impresora</label>
-                      <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
+                      <Select key={selectedPrinter} value={selectedPrinter} onValueChange={setSelectedPrinter}>
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {printers.map((p) => (
+                          {storePrinters.map((p) => (
                             <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
                           ))}
                         </SelectContent>

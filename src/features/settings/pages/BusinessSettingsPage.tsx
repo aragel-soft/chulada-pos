@@ -1,7 +1,9 @@
+
+// Imports
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+
 import { Store, Save, Coins, Receipt } from "lucide-react";
 
 import {
@@ -23,10 +25,9 @@ import {
   businessSettingsSchema,
 } from "@/features/settings/schemas/businessRulesSchema";
 import {
-  getBusinessSettings,
-  updateBusinessSettings,
   BusinessSettings,
 } from "@/lib/api/business-settings";
+import { useBusinessStore } from "@/stores/businessStore";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -40,7 +41,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function BusinessSettingsPage() {
-  const [isLoading, setIsLoading] = useState(true);
   const [showTaxConfirm, setShowTaxConfirm] = useState(false);
   const [pendingTaxValue, setPendingTaxValue] = useState<boolean | null>(null);
 
@@ -56,27 +56,20 @@ export default function BusinessSettingsPage() {
     },
   });
 
+  const { settings, updateSettings, isLoading: isStoreLoading } = useBusinessStore();
+
   useEffect(() => {
-    async function loadSettings() {
-      try {
-        const data = await getBusinessSettings();
-        form.reset({
-          storeName: data.storeName,
-          storeAddress: data.storeAddress,
-          defaultCashFund: data.defaultCashFund,
-          maxCashLimit: data.maxCashLimit,
-          taxRate: data.taxRate,
-          applyTax: data.applyTax,
-        });
-      } catch (error) {
-        console.error("Failed to load business settings:", error);
-        toast.error("Error al cargar la configuración");
-      } finally {
-        setIsLoading(false);
-      }
+    if (settings) {
+      form.reset({
+        storeName: settings.storeName,
+        storeAddress: settings.storeAddress,
+        defaultCashFund: settings.defaultCashFund,
+        maxCashLimit: settings.maxCashLimit,
+        taxRate: settings.taxRate,
+        applyTax: settings.applyTax,
+      });
     }
-    loadSettings();
-  }, [form]);
+  }, [settings, form]);
 
   const onSubmit = async () => {
     try {
@@ -84,27 +77,22 @@ export default function BusinessSettingsPage() {
       const formValues = form.getValues();
       const dirtyFields = form.formState.dirtyFields;
 
-      (Object.keys(dirtyFields) as Array<keyof BusinessSettingsFormValues>).forEach((key) => {
-        if (dirtyFields[key]) {
-          // @ts-ignore
-          patch[key] = formValues[key];
-        }
-      });
+      if (dirtyFields.storeName) patch.storeName = formValues.storeName;
+      if (dirtyFields.storeAddress) patch.storeAddress = formValues.storeAddress;
+      if (dirtyFields.defaultCashFund) patch.defaultCashFund = formValues.defaultCashFund;
+      if (dirtyFields.maxCashLimit) patch.maxCashLimit = formValues.maxCashLimit;
+      if (dirtyFields.taxRate) patch.taxRate = formValues.taxRate;
+      if (dirtyFields.applyTax) patch.applyTax = formValues.applyTax;
 
-      await updateBusinessSettings(patch);
-      toast.success("Reglas de negocio actualizadas correctamente");
+      await updateSettings(patch);
 
       form.reset(formValues);
 
     } catch (error) {
-      console.error("Failed to save settings:", error);
-      toast.error("Error al guardar los cambios");
     }
   };
 
-  if (isLoading) {
-    return <div className="p-6">Cargando configuración...</div>;
-  }
+
 
   return (
     <ScrollArea className="h-full w-full bg-slate-50/50 dark:bg-transparent">
@@ -167,7 +155,7 @@ export default function BusinessSettingsPage() {
 
               </div>
 
-              {/* Reglas Operativas */}
+              {/* Cash Control */}
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -311,7 +299,7 @@ export default function BusinessSettingsPage() {
             </AlertDialog>
 
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting} className="min-w-[150px]">
+              <Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting || isStoreLoading} className="min-w-[150px]">
                 {form.formState.isSubmitting ? (
                   <>Guardando...</>
                 ) : (

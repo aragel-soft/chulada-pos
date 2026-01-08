@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react"
+// Imports
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Printer, Save, Monitor, CreditCard, Settings2, CheckCircle2 } from "lucide-react"
+import { Printer, Save, Monitor, CreditCard, Settings2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -25,16 +26,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getSystemPrinters, loadSettings, saveSettings, testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
-
-// Schema: Definimos que los inputs numéricos entran como strings (del input HTML) 
-// pero se validan y transforman a números.
-const hardwareFormSchema = z.object({
-  terminalId: z.string().min(1, "El ID de la terminal es requerido"),
-  printerName: z.string().min(1, "Seleccione una impresora"),
-  cashDrawerCommand: z.string().min(1, "El comando es requerido"),
-  cashDrawerPort: z.string().optional(),
-})
+import { testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
+import { useHardwareStore } from "@/stores/hardwareStore"
+import { hardwareFormSchema } from "@/features/settings/schemas/hardwareSchema"
 
 type HardwareFormValues = z.infer<typeof hardwareFormSchema>
 
@@ -45,13 +39,15 @@ const defaultValues: HardwareFormValues = {
   cashDrawerPort: "COM1",
 }
 
-// Import HardwareConfig type
 import { HardwareConfig } from "@/lib/api/hardware";
 
 export default function HardwarePage() {
-  const [printers, setPrinters] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [fullConfig, setFullConfig] = useState<HardwareConfig | null>(null)
+  const {
+    printers: storePrinters,
+    config: fullConfig,
+    isLoading: isStoreLoading,
+    updateSettings
+  } = useHardwareStore()
 
   const form = useForm<HardwareFormValues>({
     resolver: zodResolver(hardwareFormSchema),
@@ -59,43 +55,23 @@ export default function HardwarePage() {
     mode: "onChange",
   })
 
-  const { isDirty } = form.formState
-
+  // Sync form with store data
   useEffect(() => {
-    const init = async () => {
-      setIsLoading(true)
-      try {
-        const printerList = await getSystemPrinters().catch(() => [])
-        setPrinters(printerList)
-
-        const savedSettings = await loadSettings()
-        setFullConfig(savedSettings); // Store full config
-
-        if (savedSettings) {
-          form.reset({
-            terminalId: savedSettings.terminalId || "CAJA-01",
-            printerName: savedSettings.printerName || "",
-            cashDrawerCommand: savedSettings.cashDrawerCommand || "1B 70 00 19 FA",
-            cashDrawerPort: savedSettings.cashDrawerPort || "COM1",
-          })
-        } else {
-          form.reset(defaultValues)
-        }
-      } catch (error) {
-        console.error("Error initializing:", error)
-        toast.error("Error al cargar configuración")
-      } finally {
-        setIsLoading(false)
-      }
+    if (fullConfig) {
+      form.reset({
+        terminalId: (fullConfig.terminalId || "CAJA-01").trim(),
+        printerName: (fullConfig.printerName || "").trim(),
+        cashDrawerCommand: (fullConfig.cashDrawerCommand || "1B 70 00 19 FA").trim(),
+        cashDrawerPort: (fullConfig.cashDrawerPort || "COM1").trim(),
+      })
     }
-    init()
-  }, [form])
+  }, [fullConfig, form])
 
+  // Handle form submission
   async function onSubmit(data: HardwareFormValues) {
     if (!fullConfig) return;
 
     try {
-      // Merge form data with preserved full config (paddingLines, width, etc)
       const configToSave: HardwareConfig = {
         ...fullConfig,
         terminalId: data.terminalId,
@@ -104,18 +80,10 @@ export default function HardwarePage() {
         cashDrawerPort: data.cashDrawerPort,
       }
 
-      await saveSettings(configToSave)
-      setFullConfig(configToSave)
-
-      form.reset(data)
-
-      toast.success("Configuración guardada", {
-        description: "Dispositivos actualizados correctamente.",
-        icon: <CheckCircle2 className="h-4 w-4 text-green-600" />
-      })
+      await updateSettings(configToSave)
+      form.reset(data) // Reset dirty state
     } catch (error) {
       console.error("Error saving:", error)
-      toast.error("Error al guardar configuración")
     }
   }
 
@@ -151,7 +119,7 @@ export default function HardwarePage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* GRUPO PRINCIPAL: Terminal e Impresora */}
+              {/* Printer and Terminal */}
               <div className="space-y-6">
                 <Card className="h-full">
                   <CardHeader className="pb-3 border-b bg-muted/20">
@@ -189,9 +157,10 @@ export default function HardwarePage() {
                           </FormLabel>
                           <div className="flex flex-col">
                             <Select
+                              key={field.value}
                               onValueChange={field.onChange}
-                              value={field.value}
-                              disabled={isLoading}
+                              value={field.value || ""}
+                              disabled={isStoreLoading}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -199,12 +168,13 @@ export default function HardwarePage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {printers.map((p) => (
-                                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                                {storePrinters.map((p) => (
+                                  <SelectItem key={p} value={p}>
+                                    {p}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-
                             <Button
                               type="button"
                               variant="secondary"
@@ -225,7 +195,7 @@ export default function HardwarePage() {
                 </Card>
               </div>
 
-              {/* GRUPO SECUNDARIO: Cajón de Dinero */}
+              {/* Cash Drawer */}
               <div className="space-y-6">
                 <Card className="h-full">
                   <CardHeader className="pb-3 border-b bg-muted/20">
@@ -241,7 +211,11 @@ export default function HardwarePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Puerto / Interfaz</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            key={field.value}
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Seleccione puerto" />
@@ -266,7 +240,11 @@ export default function HardwarePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Protocolo (Comando HEX)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            key={field.value}
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Seleccione protocolo" />
@@ -321,10 +299,10 @@ export default function HardwarePage() {
                 size="lg"
                 className="w-full md:w-48 shadow-lg transition-all"
                 // Aquí está la magia: isDirty detecta si hay cambios reales vs lo cargado inicialmente
-                disabled={!isDirty || isLoading}
+                disabled={!form.formState.isDirty || isStoreLoading}
               >
                 <Save className="mr-2 h-4 w-4" />
-                {isDirty ? "Guardar Cambios" : "Sincronizado"}
+                {form.formState.isDirty ? "Guardar Cambios" : "Sincronizado"}
               </Button>
             </div>
 
