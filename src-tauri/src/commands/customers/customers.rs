@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager};
 use serde::{Serialize, Deserialize};
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension, Transaction};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Customer {
@@ -15,6 +16,18 @@ pub struct Customer {
   pub is_active: bool,
 }
 
+// Estructura de entrada para Crear/Editar (Lo que manda el Frontend)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CustomerInput {
+  pub id: Option<String>, // Null al crear, String al editar
+  pub name: String,
+  pub phone: String,      // Requerido y validado
+  pub email: Option<String>,
+  pub address: Option<String>,
+  pub credit_limit: f64,
+  pub is_active: Option<bool>, 
+}
+
 #[derive(Debug, Serialize)]
 pub struct PaginatedResult<T> {
   pub data: Vec<T>,
@@ -22,6 +35,171 @@ pub struct PaginatedResult<T> {
   pub page: i64,
   pub page_size: i64,
   pub total_pages: i64, 
+}
+
+// --- CONFIGURACIÓN (Hardcoded fallbacks por ahora) ---
+const MAX_CREDIT_LIMIT_FALLBACK: f64 = 10000.0;
+// const DEFAULT_CREDIT_LIMIT_FALLBACK: f64 = 500.0; // Se usará en el frontend como default value
+
+// --- COMANDOS ---
+
+#[tauri::command]
+pub fn upsert_customer(
+  app_handle: AppHandle,
+  customer: CustomerInput
+) -> Result<Customer, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let db_path = app_dir.join("database.db");
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+
+    // Validar Configuración (Max Limit)
+    // TODO: En el futuro leer de la tabla system_config
+    if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
+        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
+    }
+
+    // Iniciar Transacción
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    // 1. Verificar Duplicados (Teléfono)
+    // Buscamos si existe algun cliente con ese teléfono, excluyendo al propio cliente si es una edición.
+    let duplicate_check_sql = if let Some(ref _id) = customer.id {
+        "SELECT id, name, deleted_at FROM customers WHERE phone = ?1 AND id != ?2"
+    } else {
+        "SELECT id, name, deleted_at FROM customers WHERE phone = ?1"
+    };
+
+    let params: Vec<&dyn rusqlite::ToSql> = if let Some(ref id) = customer.id {
+        vec![&customer.phone, id]
+    } else {
+        vec![&customer.phone]
+    };
+
+    let duplicate_result: Option<(String, String, Option<String>)> = tx.query_row(
+        duplicate_check_sql,
+        rusqlite::params_from_iter(params),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+    ).optional().map_err(|e| e.to_string())?;
+
+    if let Some((existing_id, existing_name, deleted_at)) = duplicate_result {
+        if deleted_at.is_some() {
+            // Caso Soft Delete: El cliente existe pero está eliminado.
+            // Retornamos un error especial formateado como JSON para que el frontend lo parsee.
+            let error_payload = serde_json::json!({
+                "id": existing_id,
+                "name": existing_name
+            });
+            return Err(format!("RESTORE_REQUIRED:{}", error_payload.to_string()));
+        } else {
+            // Caso Duplicado Activo
+            return Err(format!("El teléfono ya está registrado con el cliente: {}", existing_name));
+        }
+    }
+
+    // 2. Preparar Datos
+    let customer_id = customer.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+    let is_new = customer.id.is_none();
+    
+    // Generar Código solo si es nuevo
+    let code = if is_new {
+        Some(generate_next_code(&tx)?)
+    } else {
+        None // No cambiamos el código en update
+    };
+
+    // 3. Ejecutar Insert o Update
+    if is_new {
+        let code_val = code.as_ref().unwrap();
+        tx.execute(
+            "INSERT INTO customers (id, code, name, phone, email, address, credit_limit, is_active) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)",
+            rusqlite::params![
+                customer_id,
+                code_val,
+                customer.name.trim(),
+                customer.phone.trim(),
+                customer.email,
+                customer.address,
+                customer.credit_limit
+            ]
+        ).map_err(|e| e.to_string())?;
+    } else {
+        tx.execute(
+            "UPDATE customers SET 
+                name = ?1, 
+                phone = ?2, 
+                email = ?3, 
+                address = ?4, 
+                credit_limit = ?5, 
+                is_active = ?6,
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?7",
+            rusqlite::params![
+                customer.name.trim(),
+                customer.phone.trim(),
+                customer.email,
+                customer.address,
+                customer.credit_limit,
+                customer.is_active.unwrap_or(true), // Default a true si falta
+                customer_id
+            ]
+        ).map_err(|e| e.to_string())?;
+    }
+
+    // 4. Recuperar el registro completo para devolverlo
+    let result = fetch_customer_by_id(&tx, &customer_id)?;
+    
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn restore_customer(
+    app_handle: AppHandle,
+    id: String,
+    customer: CustomerInput
+) -> Result<Customer, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let db_path = app_dir.join("database.db");
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    // Validar Config (Max Limit) nuevamente por seguridad
+    if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
+        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
+    }
+
+    // Reactivar cliente y actualizar datos con la nueva información del formulario
+    let rows_affected = tx.execute(
+        "UPDATE customers SET 
+            deleted_at = NULL,
+            name = ?1,
+            phone = ?2,
+            email = ?3,
+            address = ?4,
+            credit_limit = ?5,
+            is_active = 1,
+            updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?6",
+        rusqlite::params![
+            customer.name.trim(),
+            customer.phone.trim(),
+            customer.email,
+            customer.address,
+            customer.credit_limit,
+            id
+        ]
+    ).map_err(|e| e.to_string())?;
+
+    if rows_affected == 0 {
+        return Err("No se encontró el cliente para restaurar".to_string());
+    }
+
+    let result = fetch_customer_by_id(&tx, &id)?;
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -112,6 +290,15 @@ pub fn get_customers(
   })
 }
 
+fn fetch_customer_by_id(tx: &Connection, id: &str) -> Result<Customer, String> {
+    tx.query_row(
+        "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active 
+         FROM customers WHERE id = ?1",
+        [id],
+        |row| map_customer_row(row)
+    ).map_err(|e| format!("Error recuperando cliente: {}", e))
+}
+
 fn map_customer_row(row: &rusqlite::Row) -> rusqlite::Result<Customer> {
   Ok(Customer {
     id: row.get(0)?,
@@ -124,4 +311,31 @@ fn map_customer_row(row: &rusqlite::Row) -> rusqlite::Result<Customer> {
     current_balance: row.get(7)?,
     is_active: row.get(8)?,
   })
+}
+
+/// Genera el siguiente código de cliente en formato C-XXXX
+fn generate_next_code(tx: &Transaction) -> Result<String, String> {
+    // Buscar el último código que coincida con el patrón C-%
+    // Ordenamos por longitud primero para que C-10 no sea "mayor" que C-2
+    let last_code: Option<String> = tx.query_row(
+        "SELECT code FROM customers 
+         WHERE code LIKE 'C-%' 
+         ORDER BY length(code) DESC, code DESC 
+         LIMIT 1",
+        [],
+        |row| row.get(0)
+    ).optional().map_err(|e| e.to_string())?;
+
+    match last_code {
+        Some(code) => {
+            // Intentar extraer la parte numérica: "C-0049" -> 49
+            let number_part = code.strip_prefix("C-").unwrap_or("0");
+            let next_num = number_part.parse::<i32>().unwrap_or(0) + 1;
+            Ok(format!("C-{:04}", next_num))
+        },
+        None => {
+            // Primer cliente del sistema
+            Ok("C-0001".to_string())
+        }
+    }
 }

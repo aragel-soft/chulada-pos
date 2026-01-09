@@ -61,6 +61,8 @@ fn main() {
             commands::cash_register::details::get_closed_shifts,
             // Customers
             commands::customers::customers::get_customers,
+            commands::customers::customers::upsert_customer,
+            commands::customers::customers::restore_customer,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
