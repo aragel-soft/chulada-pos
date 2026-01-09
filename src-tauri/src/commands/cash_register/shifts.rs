@@ -42,23 +42,47 @@ pub fn get_active_shift(db: State<Mutex<Connection>>) -> Result<Option<ShiftDto>
 
     Ok(shift)
 }
-const STORE_ID: &str = "store-main";
-const MAX_INITIAL_CASH: f64 = 5000.0; // Estos se tienen configurar para que se administren desde el frontend
+
+fn get_current_store_id(conn: &Connection) -> Result<String, String> {
+    let mut stmt = conn
+        .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+        .map_err(|e| e.to_string())?;
+    let store_id: String = stmt
+        .query_row([], |row| row.get(0))
+        .unwrap_or_else(|_| "store-main".to_string());
+    Ok(store_id)
+}
+
 #[tauri::command]
 pub fn open_shift(
     db: State<Mutex<Connection>>,
     initial_cash: f64,
     user_id: String,
 ) -> Result<ShiftDto, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    // Get Business Settings
+    let store_id = get_current_store_id(&conn)?;
+
+    let max_cash: f64 = conn
+        .query_row(
+            "SELECT value FROM system_settings WHERE key = 'max_cash_limit'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .map(|v| v.parse().unwrap_or(5000.0))
+        .unwrap_or(5000.0);
+
     // Validation
     if initial_cash < 0.0 {
         return Err("El fondo inicial no puede ser negativo.".to_string());
     }
-    if initial_cash > MAX_INITIAL_CASH {
-        return Err("El fondo inicial es demasiado alto. Verifique el monto.".to_string());
+    if initial_cash > max_cash {
+        return Err(format!(
+            "El fondo inicial es demasiado alto (Máx: ${:.2}).",
+            max_cash
+        ));
     }
-
-    let conn = db.lock().map_err(|e| e.to_string())?;
 
     // Revisa si ya existe un turno abierto
     let count: i64 = conn
@@ -88,7 +112,7 @@ pub fn open_shift(
         .map_err(|e| e.to_string())?;
 
     let sequence = count + 1;
-    let code = format!("{}-{}-{:03}", STORE_ID, date_part, sequence);
+    let code = format!("{}-{}-{:03}", store_id, date_part, sequence);
 
     conn.execute(
         "INSERT INTO cash_register_shifts (initial_cash, opening_date, opening_user_id, status, code)

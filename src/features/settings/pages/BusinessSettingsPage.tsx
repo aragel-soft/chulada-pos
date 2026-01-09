@@ -48,6 +48,7 @@ export default function BusinessSettingsPage() {
     resolver: zodResolver(businessSettingsSchema),
     defaultValues: {
       storeName: "",
+      logicalStoreName: "store-main",
       storeAddress: "",
       defaultCashFund: 500,
       maxCashLimit: 2000,
@@ -62,6 +63,7 @@ export default function BusinessSettingsPage() {
     if (settings) {
       form.reset({
         storeName: settings.storeName,
+        logicalStoreName: settings.logicalStoreName || "store-main",
         storeAddress: settings.storeAddress,
         defaultCashFund: settings.defaultCashFund,
         maxCashLimit: settings.maxCashLimit,
@@ -78,6 +80,7 @@ export default function BusinessSettingsPage() {
       const dirtyFields = form.formState.dirtyFields;
 
       if (dirtyFields.storeName) patch.storeName = formValues.storeName;
+      if (dirtyFields.logicalStoreName) patch.logicalStoreName = formValues.logicalStoreName;
       if (dirtyFields.storeAddress) patch.storeAddress = formValues.storeAddress;
       if (dirtyFields.defaultCashFund) patch.defaultCashFund = formValues.defaultCashFund;
       if (dirtyFields.maxCashLimit) patch.maxCashLimit = formValues.maxCashLimit;
@@ -135,6 +138,7 @@ export default function BusinessSettingsPage() {
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={form.control}
                       name="storeAddress"
@@ -149,6 +153,44 @@ export default function BusinessSettingsPage() {
                       )}
                     />
 
+                  </CardContent>
+                </Card>
+
+                {/* Identidad del Sistema */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                      <Save className="h-5 w-5" />
+                      Identidad del Sistema
+                    </CardTitle>
+                    <CardDescription>
+                      Configuración técnica de la sucursal.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="logicalStoreName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID de Sucursal (Lógico)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="store-main"
+                              {...field}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^a-zA-Z0-9-_]/g, "");
+                                field.onChange(value);
+                              }}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Identificador único para el inventario (sin espacios).
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </CardContent>
                 </Card>
 

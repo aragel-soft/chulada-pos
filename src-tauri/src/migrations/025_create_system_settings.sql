@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 
 -- Seed Data (Defaults)
 INSERT OR IGNORE INTO system_settings (key, value) VALUES ('store_name', 'Mi Tienda');
+INSERT OR IGNORE INTO system_settings (key, value) VALUES ('logical_store_name', 'store-main');
 INSERT OR IGNORE INTO system_settings (key, value) VALUES ('store_address', '');
 INSERT OR IGNORE INTO system_settings (key, value) VALUES ('ticket_header', '');
 INSERT OR IGNORE INTO system_settings (key, value) VALUES ('ticket_footer', 'Gracias por su compra');

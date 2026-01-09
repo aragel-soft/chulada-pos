@@ -13,6 +13,7 @@ export interface BusinessSettings {
   taxRate: number;
   applyTax: boolean;
   logoPath: string;
+  logicalStoreName: string;
 }
 
 export const getBusinessSettings = async (): Promise<BusinessSettings> => {

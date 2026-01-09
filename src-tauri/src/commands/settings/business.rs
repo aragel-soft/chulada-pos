@@ -1,5 +1,5 @@
 use crate::printer_utils;
-use rusqlite::Connection;
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager, State};
 #[serde(rename_all = "camelCase")]
 pub struct BusinessSettings {
     pub store_name: String,
+    pub logical_store_name: String,
     pub store_address: String,
     pub ticket_header: String,
     pub ticket_footer: String,
@@ -58,6 +59,10 @@ pub fn get_business_settings(
             .get("store_name")
             .cloned()
             .unwrap_or("Mi Tienda".to_string()),
+        logical_store_name: settings_map
+            .get("logical_store_name")
+            .cloned()
+            .unwrap_or("store-main".to_string()),
         store_address: settings_map
             .get("store_address")
             .cloned()
@@ -102,6 +107,7 @@ pub fn get_business_settings(
 #[serde(rename_all = "camelCase")]
 pub struct BusinessSettingsPatch {
     pub store_name: Option<String>,
+    pub logical_store_name: Option<String>,
     pub store_address: Option<String>,
     pub ticket_header: Option<String>,
     pub ticket_footer: Option<String>,
@@ -136,6 +142,9 @@ pub fn update_business_settings(
     if let Some(v) = settings.store_name {
         params.push(("store_name", v));
     }
+    if let Some(v) = &settings.logical_store_name {
+        params.push(("logical_store_name", v.clone()));
+    }
     if let Some(v) = settings.store_address {
         params.push(("store_address", v));
     }
@@ -164,8 +173,49 @@ pub fn update_business_settings(
         params.push(("logo_path", v));
     }
 
-    for (key, value) in params {
-        stmt.execute([key, &value]).map_err(|e| e.to_string())?;
+    // Check for logical_store_name change to migrate inventory
+    let old_store_id: Option<String> = if settings.logical_store_name.is_some() {
+        let mut stmt_get = conn
+            .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+            .map_err(|e| e.to_string())?;
+        stmt_get
+            .query_row([], |row| row.get(0))
+            .optional()
+            .map_err(|e| e.to_string())?
+    } else {
+        None
+    };
+
+    for (key, value) in &params {
+        stmt.execute([*key, value]).map_err(|e| e.to_string())?;
+    }
+
+    // Identify if migration is needed
+    if let Some(new_store_id) = &settings.logical_store_name {
+        let current_id = old_store_id.unwrap_or_else(|| "store-main".to_string());
+        if current_id != *new_store_id {
+            conn.execute(
+                "UPDATE store_inventory SET store_id = ?1 WHERE store_id = ?2",
+                [new_store_id, &current_id],
+            )
+            .map_err(|e| format!("Error migrando inventario: {}", e))?;
+
+            // Update shifts code prefix
+            let old_pattern = format!("{}%", current_id);
+            let length_to_cut = current_id.len() as i32 + 1; // +1 for the dash
+
+            conn.execute(
+                "UPDATE cash_register_shifts 
+                 SET code = ?1 || SUBSTR(code, ?2) 
+                 WHERE code LIKE ?3",
+                params![
+                    format!("{}-", new_store_id),
+                    length_to_cut + 1, // SQLite SUBSTR is 1-indexed
+                    old_pattern
+                ],
+            )
+            .map_err(|e| format!("Error migrando turnos: {}", e))?;
+        }
     }
 
     conn.execute_batch("COMMIT;").map_err(|e| e.to_string())?;

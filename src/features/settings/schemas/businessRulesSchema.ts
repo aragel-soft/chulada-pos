@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const businessSettingsSchema = z.object({
   storeName: z.string().trim().min(1, "El nombre de la tienda es obligatorio"),
+  logicalStoreName: z.string().trim().min(1, "El ID de sucursal es requerido").regex(/^[a-zA-Z0-9-_]+$/, "Solo letras, números, guiones y guiones bajos"),
   storeAddress: z.string().trim(),
   defaultCashFund: z
     .number()
