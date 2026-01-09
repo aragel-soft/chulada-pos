@@ -103,7 +103,7 @@ export default function TicketDesignPage() {
         ticketFooter: (fullBusinessSettings.ticketFooter || "").trim(),
         logoPath: (fullBusinessSettings.logoPath || "").trim(),
         printerWidth: validWidth.trim() as "58" | "80",
-        paddingLines: fullHardwareConfig.paddingLines || 0, // Number doesn't need trim
+        paddingLines: fullHardwareConfig.paddingLines || 0,
       });
     }
   }, [fullBusinessSettings, fullHardwareConfig, form]);
@@ -576,7 +576,7 @@ export default function TicketDesignPage() {
 
                     <Button
                       type="button"
-                      variant="default" // Changed to default for better visibility
+                      variant="default"
                       className="w-full h-8 text-xs"
                       onClick={handleTestPrint}
                       disabled={!selectedPrinter}
