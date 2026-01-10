@@ -129,7 +129,7 @@ export function ProductSearchSelector({
   };
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full min-h-[500px] gap-4">
       {/* --- SECCIÓN SUPERIOR: BUSCADOR --- */}
       <div className="space-y-3 p-4 border rounded-md bg-muted/20">
         <div className="flex gap-2">
@@ -235,7 +235,7 @@ export function ProductSearchSelector({
       </div>
 
       {/* --- SECCIÓN INFERIOR: LISTA ACUMULADA --- */}
-      <div className="flex-1 flex flex-col min-h-0 border rounded-md shadow-sm">
+      <div className="flex-1 flex flex-col min-h-[250px] border rounded-md shadow-sm">
         <div className="flex items-center justify-between p-3 border-b bg-muted/40">
           <h4 className="text-sm font-semibold flex items-center gap-2 text-[#480489]">
             {mode === "triggers"
@@ -257,7 +257,7 @@ export function ProductSearchSelector({
           )}
         </div>
 
-        <ScrollArea className="flex-1 h-[250px]">
+        <ScrollArea className="flex-1 p-0">
           {selectedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center bg-muted/5">
               <PackageOpen className="h-10 w-10 mb-2 opacity-10" />
