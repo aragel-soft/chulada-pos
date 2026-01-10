@@ -226,6 +226,11 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                       className="focus-visible:ring-[#480489]"
                       autoFocus
                     />
+                    {formData.name.length > 0 && formData.name.length < 3 && (
+                      <p className="text-[0.8rem] font-medium text-destructive flex items-center gap-2 animate-in slide-in-from-top-1">
+                        El nombre debe tener al menos 3 caracteres.
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-2">
