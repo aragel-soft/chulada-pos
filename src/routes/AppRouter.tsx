@@ -173,8 +173,7 @@ const router = createBrowserRouter([
           {
             path: "hardware-settings",
             element: (
-              <ProtectedRoute module="profile:view">
-                {/* TODO: Change to 'hardware-settings:view' when permission is created */}
+              <ProtectedRoute module="hardware_settings:view">
                 <HardwarePage />
               </ProtectedRoute>
             ),
@@ -182,8 +181,7 @@ const router = createBrowserRouter([
           {
             path: "business-settings",
             element: (
-              <ProtectedRoute module="profile:view">
-                {/* TODO: Change to 'business-settings:view' when permission is created */}
+              <ProtectedRoute module="business_settings:view">
                 <BusinessSettingsPage />
               </ProtectedRoute>
             ),
@@ -199,8 +197,7 @@ const router = createBrowserRouter([
           {
             path: "ticket-design",
             element: (
-              <ProtectedRoute module="profile:view">
-                {/* TODO: Change to 'ticket-design:view' if specific perm is needed, sharing profile:view for now */}
+              <ProtectedRoute module="ticket_settings:view">
                 <TicketDesignPage />
               </ProtectedRoute>
             ),

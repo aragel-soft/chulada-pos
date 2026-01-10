@@ -12,17 +12,17 @@ const settingTabs = [
   {
     value: 'hardware-settings',
     label: 'Hardware',
-    permission: 'profile:view',
+    permission: 'hardware_settings:view',
   },
   {
     value: 'business-settings',
     label: 'Reglas de Negocio',
-    permission: 'profile:view', // Visible to admins/managers usually
+    permission: 'business_settings:view', // Visible to admins/managers usually
   },
   {
     value: 'ticket-design',
     label: 'Diseño de Ticket',
-    permission: 'profile:view',
+    permission: 'ticket_settings:view',
   },
   {
     value: 'users',

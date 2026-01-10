@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select";
 
 import { ticketSettingsSchema } from "@/features/settings/schemas/ticketSchema";
+import { useAuthStore } from "@/stores/authStore";
 
 type TicketSettingsFormValues = z.infer<typeof ticketSettingsSchema>;
 
@@ -51,6 +52,9 @@ export default function TicketDesignPage() {
   const [selectedPrinter, setSelectedPrinter] = useState<string>("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Hooks de Zustand
+  const { can } = useAuthStore();
 
   // Stores
   const { settings: fullBusinessSettings, updateSettings: updateBusiness, isLoading: isBusinessLoading } = useBusinessStore();
@@ -574,7 +578,7 @@ export default function TicketDesignPage() {
                       </Select>
                     </div>
 
-                    <Button
+                    {can('ticket_settings:print') && (<Button
                       type="button"
                       variant="default"
                       className="w-full h-8 text-xs"
@@ -583,14 +587,14 @@ export default function TicketDesignPage() {
                     >
                       <Printer className="mr-2 h-3 w-3" />
                       Imprimir Prueba
-                    </Button>
+                    </Button>)}
                   </CardContent>
                 </Card>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button
+              {can('ticket_settings:edit') && (<Button
                 type="submit"
                 size="lg"
                 className="w-full md:w-auto min-w-[200px]"
@@ -602,7 +606,7 @@ export default function TicketDesignPage() {
                     Guardar Diseño
                   </>
                 )}
-              </Button>
+              </Button>)}
             </div>
 
           </form>

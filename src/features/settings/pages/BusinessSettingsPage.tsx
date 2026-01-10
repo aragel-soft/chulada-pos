@@ -39,10 +39,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function BusinessSettingsPage() {
   const [showTaxConfirm, setShowTaxConfirm] = useState(false);
   const [pendingTaxValue, setPendingTaxValue] = useState<boolean | null>(null);
+
+  // Hooks de Zustand
+  const { can } = useAuthStore();
 
   const form = useForm<BusinessSettingsFormValues>({
     resolver: zodResolver(businessSettingsSchema),
@@ -57,7 +61,7 @@ export default function BusinessSettingsPage() {
     },
   });
 
-  const { settings, updateSettings, isLoading: isStoreLoading } = useBusinessStore();
+  const { settings, updateSettings } = useBusinessStore();
 
   useEffect(() => {
     if (settings) {
@@ -341,7 +345,7 @@ export default function BusinessSettingsPage() {
             </AlertDialog>
 
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting || isStoreLoading} className="min-w-[150px]">
+              {can('business_settings:edit') && (<Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <>Guardando...</>
                 ) : (
@@ -350,7 +354,7 @@ export default function BusinessSettingsPage() {
                     Guardar Cambios
                   </>
                 )}
-              </Button>
+              </Button>)}
             </div>
 
           </form>

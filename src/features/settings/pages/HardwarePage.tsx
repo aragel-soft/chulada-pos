@@ -29,6 +29,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
 import { useHardwareStore } from "@/stores/hardwareStore"
 import { hardwareFormSchema } from "@/features/settings/schemas/hardwareSchema"
+import { HardwareConfig } from "@/lib/api/hardware";
+import { useAuthStore } from "@/stores/authStore"
 
 type HardwareFormValues = z.infer<typeof hardwareFormSchema>
 
@@ -39,7 +41,7 @@ const defaultValues: HardwareFormValues = {
   cashDrawerPort: "COM1",
 }
 
-import { HardwareConfig } from "@/lib/api/hardware";
+
 
 export default function HardwarePage() {
   const {
@@ -48,7 +50,10 @@ export default function HardwarePage() {
     isLoading: isStoreLoading,
     updateSettings
   } = useHardwareStore()
+  // Hooks de Zustand
+  const { can } = useAuthStore();
 
+  // Initialize form
   const form = useForm<HardwareFormValues>({
     resolver: zodResolver(hardwareFormSchema),
     defaultValues,
@@ -175,6 +180,7 @@ export default function HardwarePage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            {can('hardware_settings:edit') && (
                             <Button
                               type="button"
                               variant="secondary"
@@ -186,6 +192,7 @@ export default function HardwarePage() {
                               <Printer className="mr-2 h-4 w-4" />
                               Probar conexión
                             </Button>
+                            )}
                           </div>
                           <FormMessage />
                         </FormItem>
