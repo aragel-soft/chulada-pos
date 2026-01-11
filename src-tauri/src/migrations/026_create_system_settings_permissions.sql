@@ -6,7 +6,7 @@
 INSERT INTO permissions (id, name, display_name, description, module, sequence)
 VALUES 
 ('perm_hardware_view', 'hardware_settings:view', 'Ver Hardware', 'Permite visualizar el listado de hardware', 'hardware', 1),
-('perm_hardware_create_edit', 'hardware_settings:create', 'Crear Hardware', 'Permite Modificar  dispositivos de hardware', 'hardware', 2),
+('perm_hardware_edit', 'hardware_settings:edit', 'Crear Hardware', 'Permite Modificar  dispositivos de hardware', 'hardware', 2),
 ('perm_business_settings_view', 'business_settings:view', 'Ver Configuración del Negocio', 'Permite visualizar la configuración del negocio', 'business_settings', 1),
 ('perm_business_settings_edit', 'business_settings:edit', 'Editar Configuración del Negocio', 'Permite modificar la configuración del negocio', 'business_settings', 2),
 ('perm_ticket_settings_view', 'ticket_settings:view', 'Ver Configuración de Tickets', 'Permite visualizar la configuración de tickets', 'ticket_settings', 1),
@@ -22,9 +22,7 @@ SELECT
 FROM permissions 
 WHERE id IN (
   'perm_hardware_view', 
-  'perm_hardware_create_edit', 
   'perm_hardware_edit', 
-  'perm_hardware_delete',
   'perm_business_settings_view',
   'perm_business_settings_edit',
   'perm_ticket_settings_view',

@@ -579,7 +579,7 @@ export default function TicketDesignPage() {
                     {can('ticket_settings:print') && (<Button
                       type="button"
                       variant="default"
-                      className="w-full h-8 text-xs"
+                      className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                       onClick={handleTestPrint}
                       disabled={!selectedPrinter}
                     >
@@ -595,7 +595,7 @@ export default function TicketDesignPage() {
               {can('ticket_settings:edit') && (<Button
                 type="submit"
                 size="lg"
-                className="w-full md:w-auto min-w-[200px]"
+                className="w-full md:w-auto min-w-[200px] rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                 disabled={!form.formState.isDirty && !imageFile || form.formState.isSubmitting}
               >
                 {form.formState.isSubmitting ? "Guardando..." : (

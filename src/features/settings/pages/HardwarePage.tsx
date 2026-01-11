@@ -180,14 +180,13 @@ export default function HardwarePage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            {can('hardware_settings:edit') && (
+                            {can('hardware_settings:view') && (
                             <Button
                               type="button"
-                              variant="secondary"
                               size="sm"
+                              className="w-full mt-2 rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                               onClick={handleTestPrinter}
                               disabled={!field.value}
-                              className="w-full mt-2"
                             >
                               <Printer className="mr-2 h-4 w-4" />
                               Probar conexión
@@ -274,11 +273,10 @@ export default function HardwarePage() {
                       <p>Si el cajón no abre automáticamente al imprimir, verifique la conexión RJ11 a la impresora y pruebe distintos protocolos.</p>
                     </div>
 
-                    <Button
+                    {can("hardware_settings:view") && (<Button
                       type="button"
-                      variant="secondary"
                       size="sm"
-                      className="w-full mt-2"
+                      className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                       onClick={() => {
                         const cmd = form.getValues("cashDrawerCommand");
                         const printer = form.getValues("printerName");
@@ -293,7 +291,7 @@ export default function HardwarePage() {
                     >
                       <Settings2 className="mr-2 h-3 w-3" />
                       Probar Apertura
-                    </Button>
+                    </Button>)}
                   </CardContent>
                 </Card>
               </div>
@@ -301,16 +299,16 @@ export default function HardwarePage() {
 
             {/* Barra de Guardado Flotante o Estática al final */}
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              <Button
+              {can("hardware_settings:edit") && (<Button
                 type="submit"
                 size="lg"
-                className="w-full md:w-48 shadow-lg transition-all"
+                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                 // Aquí está la magia: isDirty detecta si hay cambios reales vs lo cargado inicialmente
                 disabled={!form.formState.isDirty || isStoreLoading}
               >
                 <Save className="mr-2 h-4 w-4" />
-                {form.formState.isDirty ? "Guardar Cambios" : "Sincronizado"}
-              </Button>
+                "Guardar Cambios"
+              </Button>)}
             </div>
 
           </form>

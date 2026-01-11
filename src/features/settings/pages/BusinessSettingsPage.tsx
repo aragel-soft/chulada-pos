@@ -1,4 +1,3 @@
-
 // Imports
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -345,7 +344,10 @@ export default function BusinessSettingsPage() {
             </AlertDialog>
 
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              {can('business_settings:edit') && (<Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting}>
+              {can('business_settings:edit') && (<Button 
+              type="submit" 
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              disabled={!form.formState.isDirty || form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <>Guardando...</>
                 ) : (
