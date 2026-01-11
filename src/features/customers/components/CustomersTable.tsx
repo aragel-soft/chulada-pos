@@ -31,7 +31,7 @@ export default function CustomersTable() {
   const { can } = useAuthStore();
 
   const queryParams: PaginationParams = useMemo(() => ({
-    page: pagination.pageIndex + 1, // API usa base-1
+    page: pagination.pageIndex + 1,
     pageSize: pagination.pageSize,
     search: globalFilter,
     sortBy: sorting.length > 0 ? sorting[0].id : undefined,

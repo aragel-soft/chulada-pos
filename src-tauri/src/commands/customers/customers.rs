@@ -1,6 +1,7 @@
-use tauri::{AppHandle, Manager};
+use tauri::State;
 use serde::{Serialize, Deserialize};
 use rusqlite::Connection;
+use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Customer {
@@ -26,17 +27,14 @@ pub struct PaginatedResult<T> {
 
 #[tauri::command]
 pub fn get_customers(
-  app_handle: AppHandle,
+  db_state: State<'_, Mutex<Connection>>,
   search: Option<String>,
   page: i64,
   page_size: i64,
   sort_by: Option<String>,
   sort_order: Option<String>,
 ) -> Result<PaginatedResult<Customer>, String> {
-    
-  let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-  let db_path = app_dir.join("database.db");
-  let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+  let conn = db_state.lock().unwrap();
 
   let search_term = search.as_ref().map(|s| format!("%{}%", s.trim().to_lowercase()));
   let has_search = search.is_some() && !search.as_ref().unwrap().trim().is_empty();
@@ -59,6 +57,7 @@ pub fn get_customers(
   let sort_column = match sort_by.as_deref() {
     Some("code") => "code",
     Some("name") => "name",
+    Some("phone") => "phone",
     Some("credit_limit") => "credit_limit",
     Some("current_balance") => "current_balance",
     Some("is_active") => "is_active",
