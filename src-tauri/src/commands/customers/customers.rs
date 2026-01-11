@@ -16,12 +16,11 @@ pub struct Customer {
   pub is_active: bool,
 }
 
-// Estructura de entrada para Crear/Editar (Lo que manda el Frontend)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CustomerInput {
-  pub id: Option<String>, // Null al crear, String al editar
+  pub id: Option<String>, 
   pub name: String,
-  pub phone: String,      // Requerido y validado
+  pub phone: String, 
   pub email: Option<String>,
   pub address: Option<String>,
   pub credit_limit: f64,
@@ -37,11 +36,7 @@ pub struct PaginatedResult<T> {
   pub total_pages: i64, 
 }
 
-// --- CONFIGURACIÓN (Hardcoded fallbacks por ahora) ---
 const MAX_CREDIT_LIMIT_FALLBACK: f64 = 10000.0;
-// const DEFAULT_CREDIT_LIMIT_FALLBACK: f64 = 500.0; // Se usará en el frontend como default value
-
-// --- COMANDOS ---
 
 #[tauri::command]
 pub fn upsert_customer(
@@ -52,17 +47,13 @@ pub fn upsert_customer(
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    // Validar Configuración (Max Limit)
-    // TODO: En el futuro leer de la tabla system_config
+    // TODO: Cuando se haya implementado la configuración, leer de la tabla system_config
     if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
         return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
     }
 
-    // Iniciar Transacción
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // 1. Verificar Duplicados (Teléfono)
-    // Buscamos si existe algun cliente con ese teléfono, excluyendo al propio cliente si es una edición.
     let duplicate_check_sql = if let Some(ref _id) = customer.id {
         "SELECT id, name, deleted_at FROM customers WHERE phone = ?1 AND id != ?2"
     } else {
@@ -83,31 +74,25 @@ pub fn upsert_customer(
 
     if let Some((existing_id, existing_name, deleted_at)) = duplicate_result {
         if deleted_at.is_some() {
-            // Caso Soft Delete: El cliente existe pero está eliminado.
-            // Retornamos un error especial formateado como JSON para que el frontend lo parsee.
             let error_payload = serde_json::json!({
                 "id": existing_id,
                 "name": existing_name
             });
             return Err(format!("RESTORE_REQUIRED:{}", error_payload.to_string()));
         } else {
-            // Caso Duplicado Activo
             return Err(format!("El teléfono ya está registrado con el cliente: {}", existing_name));
         }
     }
 
-    // 2. Preparar Datos
     let customer_id = customer.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
     let is_new = customer.id.is_none();
     
-    // Generar Código solo si es nuevo
     let code = if is_new {
         Some(generate_next_code(&tx)?)
     } else {
-        None // No cambiamos el código en update
+        None
     };
 
-    // 3. Ejecutar Insert o Update
     if is_new {
         let code_val = code.as_ref().unwrap();
         tx.execute(
@@ -140,15 +125,13 @@ pub fn upsert_customer(
                 customer.email,
                 customer.address,
                 customer.credit_limit,
-                customer.is_active.unwrap_or(true), // Default a true si falta
+                customer.is_active.unwrap_or(true), 
                 customer_id
             ]
         ).map_err(|e| e.to_string())?;
     }
 
-    // 4. Recuperar el registro completo para devolverlo
     let result = fetch_customer_by_id(&tx, &customer_id)?;
-    
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(result)
@@ -165,12 +148,10 @@ pub fn restore_customer(
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // Validar Config (Max Limit) nuevamente por seguridad
     if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
         return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
     }
 
-    // Reactivar cliente y actualizar datos con la nueva información del formulario
     let rows_affected = tx.execute(
         "UPDATE customers SET 
             deleted_at = NULL,
@@ -313,10 +294,7 @@ fn map_customer_row(row: &rusqlite::Row) -> rusqlite::Result<Customer> {
   })
 }
 
-/// Genera el siguiente código de cliente en formato C-XXXX
 fn generate_next_code(tx: &Transaction) -> Result<String, String> {
-    // Buscar el último código que coincida con el patrón C-%
-    // Ordenamos por longitud primero para que C-10 no sea "mayor" que C-2
     let last_code: Option<String> = tx.query_row(
         "SELECT code FROM customers 
          WHERE code LIKE 'C-%' 
@@ -328,13 +306,11 @@ fn generate_next_code(tx: &Transaction) -> Result<String, String> {
 
     match last_code {
         Some(code) => {
-            // Intentar extraer la parte numérica: "C-0049" -> 49
             let number_part = code.strip_prefix("C-").unwrap_or("0");
             let next_num = number_part.parse::<i32>().unwrap_or(0) + 1;
             Ok(format!("C-{:04}", next_num))
         },
         None => {
-            // Primer cliente del sistema
             Ok("C-0001".to_string())
         }
     }
