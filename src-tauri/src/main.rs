@@ -61,6 +61,11 @@ fn main() {
             commands::cash_register::movements::register_cash_movement,
             commands::cash_register::details::get_shift_details,
             commands::cash_register::details::get_closed_shifts,
+            commands::cash_register::sales::process_sale,
+            // Settings - Business
+            commands::settings::business::get_business_settings,
+            commands::settings::business::update_business_settings,
+            commands::settings::business::save_logo_image,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
