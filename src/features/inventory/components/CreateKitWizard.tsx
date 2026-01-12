@@ -202,7 +202,7 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
         </div>
 
         {/* --- BODY --- */}
-        <div className="flex-1 p-6 overflow-hidden flex flex-col bg-background">
+        <div className="flex-1 p-6 flex flex-col bg-background overflow-y-auto">
           {stepper.switch({
             // PASO 1: INFO
             info: () => (
@@ -226,6 +226,11 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
                       className="focus-visible:ring-[#480489]"
                       autoFocus
                     />
+                    {formData.name.length > 0 && formData.name.length < 3 && (
+                      <p className="text-[0.8rem] font-medium text-destructive flex items-center gap-2 animate-in slide-in-from-top-1">
+                        El nombre debe tener al menos 3 caracteres.
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-2">
@@ -266,7 +271,7 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
 
             // PASO 2: TRIGGERS
             triggers: () => (
-              <div className="h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="min-h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="mb-4">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                     ¿Qué deben comprar?
@@ -290,7 +295,7 @@ export function CreateKitWizard({ open, onOpenChange }: CreateKitWizardProps) {
 
             // PASO 3: REWARDS
             rewards: () => (
-              <div className="h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="min-h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="mb-4">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                     ¿Qué se llevan de regalo?
