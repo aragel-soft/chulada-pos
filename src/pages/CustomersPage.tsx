@@ -27,7 +27,7 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col h-full p-4 gap-1">
       <div className="flex-none flex justify-between items-center">
-        <h1 className="text-3xl font-bold mt-2">Inventario</h1>
+        <h1 className="text-3xl font-bold mt-2">Clientes</h1>
       </div>
 
       <div className="flex-none w-full">
