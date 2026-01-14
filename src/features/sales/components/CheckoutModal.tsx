@@ -8,7 +8,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2 } from "lucide-react";
+import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -20,12 +20,15 @@ interface CheckoutModalProps {
   onProcessSale: (
     method: string,
     cashAmount: number,
-    cardAmount: number
+    cardAmount: number,
+    shouldPrint: boolean
   ) => Promise<void>;
   isProcessing: boolean;
 }
 
 type PaymentMethod = "cash" | "card_transfer" | "mixed" | "credit";
+
+const QUICK_CASH_AMOUNTS = [20, 50, 100, 200, 500, 1000];
 
 export function CheckoutModal({
   isOpen,
@@ -45,29 +48,48 @@ export function CheckoutModal({
   useEffect(() => {
     if (isOpen) {
       setMethod("cash");
-      setCashAmount("");
+      setCashAmount(total.toString());
       setCardAmount("");
       // Autofocus logic is handled by Radix Dialog typically, but we force it
       setTimeout(() => cashInputRef.current?.focus(), 100);
     }
-  }, [isOpen]);
+  }, [isOpen, total]);
 
   // Derived state
   const numericCash = parseFloat(cashAmount) || 0;
   const numericCard = parseFloat(cardAmount) || 0;
 
-  // Update card amount automatically if Card method is selected
+  // Update logic based on method
   useEffect(() => {
     if (method === "card_transfer") {
       setCardAmount(total.toString());
       setCashAmount("0");
-    } else if (method === "mixed") {
-        // Just clear or keep? Let's keep logic simple
-    } else {
-        // Cash
+    } else if (method == "cash") {
         setCardAmount("0");
+        // Ensure cash amount matches total if we switch back to cash? 
+        // User might want to keep what they typed. But let's check requirement: "Si se abre la modal automaticamente se pone en total".
+        // Switching methods isn't "opening the modal", so we leave it as is or reset?
+        // Let's leave it to user input unless it's startup. 
     }
   }, [method, total]);
+
+  // Auto-calculate Card amount in Mixed mode
+  useEffect(() => {
+    if (method === "mixed") {
+        const currentCash = parseFloat(cashAmount) || 0;
+        const remaining = Math.max(0, total - currentCash);
+        
+        const newCardVal = remaining > 0 ? remaining.toFixed(2) : "0";
+        setCardAmount(newCardVal);
+    }
+  }, [cashAmount, method, total]);
+
+  const handleNumericInput = (value: string, setter: (val: string) => void) => {
+      // Allow empty string, or positive numbers/decimals only
+      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+          setter(value);
+      }
+  };
 
   const methods: PaymentMethod[] = ["cash", "card_transfer", "mixed", "credit"];
 
@@ -92,8 +114,12 @@ export function CheckoutModal({
       if(isOpen) handlePrevMethod();
   }, [isOpen, method]);
 
-  useHotkeys("Enter", () => {
-      if(isOpen) handleConfirm();
+  useHotkeys("F1", () => {
+      if(isOpen) handleConfirm(true);
+  }, [isOpen, method, numericCash, numericCard, total]);
+
+    useHotkeys("F2", () => {
+      if(isOpen) handleConfirm(false);
   }, [isOpen, method, numericCash, numericCard, total]);
   
   useHotkeys("Escape", () => {
@@ -122,7 +148,7 @@ export function CheckoutModal({
       return false;
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = (shouldPrint: boolean) => {
       if (isProcessing) return;
       
       if (method === "credit") {
@@ -135,13 +161,21 @@ export function CheckoutModal({
           return;
       }
       
-      onProcessSale(method, numericCash, numericCard);
+      onProcessSale(method, numericCash, numericCard, shouldPrint);
+  };
+
+  const addQuickCash = (amount: number) => {
+      // Logic: Replace value (as requested, and common behavior)
+      setCashAmount(amount.toString());
+      if (cashInputRef.current) {
+          cashInputRef.current.focus();
+      }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-zinc-50 gap-0">
-        <DialogHeader className="p-6 bg-white border-b">
+        <DialogHeader className="p-6 bg-white border-b pr-20">
           <DialogTitle className="flex justify-between items-center">
             <span className="text-2xl font-bold flex items-center gap-2">
               <Wallet className="w-6 h-6 text-[#480489]" />
@@ -156,7 +190,7 @@ export function CheckoutModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex h-[450px]">
+        <div className="flex h-[480px]">
           {/* Left: Payment Method Selection */}
           <div className="w-1/3 bg-zinc-100/50 border-r p-4 space-y-3">
             <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Forma de Pago</p>
@@ -194,22 +228,38 @@ export function CheckoutModal({
           </div>
 
           {/* Right: Inputs & Details */}
-          <div className="flex-1 p-8 bg-white flex flex-col justify-center space-y-8">
+          <div className="flex-1 p-8 bg-white flex flex-col justify-center space-y-6">
             
             {method === "cash" && (
-                <div className="space-y-4">
-                    <label className="text-lg font-medium block">¿Con cuánto paga?</label>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-bold text-zinc-400">$</span>
-                        <Input
-                            ref={cashInputRef}
-                            className="pl-12 h-20 text-4xl font-bold shadow-sm"
-                            value={cashAmount}
-                            onChange={(e) => setCashAmount(e.target.value)} // TODO: Input validation
-                            onFocus={(e) => e.target.select()}
-                            placeholder="0.00"
-                            autoFocus
-                        />
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <label className="text-lg font-medium block">¿Con cuánto paga?</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-6xl font-bold text-zinc-400">$</span>
+                            <Input
+                                ref={cashInputRef}
+                                className="pl-16 h-32 !text-7xl font-bold shadow-sm"
+                                value={cashAmount}
+                                onChange={(e) => handleNumericInput(e.target.value, setCashAmount)}
+                                onFocus={(e) => e.target.select()}
+                                placeholder="0.00"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    {/* Quick Cash Buttons */}
+                    <div className="grid grid-cols-3 gap-3">
+                        {QUICK_CASH_AMOUNTS.map((amount) => (
+                            <Button 
+                                key={amount} 
+                                variant="outline" 
+                                className="h-12 text-xl font-bold border-zinc-300 text-zinc-600 hover:text-[#480489] hover:border-[#480489] hover:bg-purple-50"
+                                onClick={() => addQuickCash(amount)}
+                            >
+                                ${amount}
+                            </Button>
+                        ))}
                     </div>
                 </div>
             )}
@@ -228,30 +278,46 @@ export function CheckoutModal({
                         <div className="space-y-2">
                              <label className="text-sm font-medium">Efectivo</label>
                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</span>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-4xl">$</span>
                                 <Input
                                     ref={cashInputRef}
-                                    className="pl-8 text-xl font-bold"
+                                    className="pl-12 h-24 !text-5xl font-bold"
                                     value={cashAmount}
-                                    onChange={(e) => setCashAmount(e.target.value)}
+                                    onChange={(e) => handleNumericInput(e.target.value, setCashAmount)} // Validation
                                     placeholder="0.00"
                                     autoFocus
                                 />
                              </div>
                         </div>
                         <div className="space-y-2">
-                             <label className="text-sm font-medium">Tarjeta</label>
+                             <label className="text-sm font-medium">Tarjeta (Automático)</label>
                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</span>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-4xl">$</span>
                                 <Input
                                     ref={cardInputRef}
-                                    className="pl-8 text-xl font-bold"
+                                    className="pl-12 h-24 !text-5xl font-bold bg-zinc-50"
                                     value={cardAmount}
-                                    onChange={(e) => setCardAmount(e.target.value)}
+                                    readOnly // Auto-calculated
+                                    tabIndex={-1}
                                     placeholder="0.00"
                                 />
                              </div>
                         </div>
+                    </div>
+
+                    {/* Quick Cash Buttons for Mixed Mode too */}
+                    <div className="grid grid-cols-6 gap-2">
+                        {QUICK_CASH_AMOUNTS.map((amount) => (
+                            <Button 
+                                key={amount} 
+                                variant="outline" 
+                                size="sm"
+                                className="h-12 text-xl font-bold border-zinc-300 text-zinc-600 hover:text-[#480489] hover:border-[#480489] hover:bg-purple-50"
+                                onClick={() => addQuickCash(amount)}
+                            >
+                                ${amount}
+                            </Button>
+                        ))}
                     </div>
                     
                     {missing > 0.01 && (
@@ -277,19 +343,33 @@ export function CheckoutModal({
           </div>
         </div>
 
-        <div className="p-4 bg-zinc-50 border-t flex justify-end gap-3">
-             <Button variant="outline" size="lg" onClick={onClose}>
+        <div className="p-6 bg-zinc-50 border-t flex justify-end gap-4">
+             <Button variant="ghost" size="lg" onClick={onClose} className="mr-auto text-zinc-500 text-lg">
                  Cancelar (Esc)
              </Button>
-             <Button 
-                size="lg" 
-                className="bg-[#480489] hover:bg-[#360368] px-8 text-lg min-w-[200px]"
-                onClick={handleConfirm}
-                disabled={!isValid() || isProcessing}
-             >
-                 {isProcessing ? <Loader2 className="animate-spin mr-2" /> : null}
-                 Cobrar (Enter)
-             </Button>
+
+             <div className="flex gap-4">
+                <Button 
+                    variant="outline"
+                    size="lg" 
+                    className="h-14 text-xl border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-semibold min-w-[200px]"
+                    onClick={() => handleConfirm(false)}
+                    disabled={!isValid() || isProcessing}
+                >
+                    {isProcessing ? <Loader2 className="animate-spin mr-2" /> : <XCircle className="w-6 h-6 mr-2 opacity-50"/>}
+                    Cobrar sin Ticket (F2)
+                </Button>
+
+                <Button 
+                    size="lg" 
+                    className="h-14 text-xl bg-[#480489] hover:bg-[#360368] px-10 font-bold min-w-[240px] shadow-md transition-all active:scale-[0.98]"
+                    onClick={() => handleConfirm(true)}
+                    disabled={!isValid() || isProcessing}
+                >
+                    {isProcessing ? <Loader2 className="animate-spin mr-2" /> : <Printer className="w-6 h-6 mr-2" />}
+                    Cobrar e Imprimir (F1)
+                </Button>
+             </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -328,7 +408,7 @@ function MethodButton({
     >
       <div className="flex items-center gap-3">
         {icon}
-        <span className="font-medium">{label}</span>
+        <span className="font-medium text-lg">{label}</span>
       </div>
       {shortcut && <span className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded">{shortcut}</span>}
     </button>

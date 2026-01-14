@@ -130,7 +130,7 @@ export default function SalesPage() {
     if (tickets.length === 0) createTicket();
   }, [tickets.length, createTicket]);
 
-  const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number) => {
+  const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number, shouldPrint: boolean) => {
       if (!user?.id || !shift?.id || !activeTicket) return;
 
       const result = await processSale(
@@ -140,7 +140,7 @@ export default function SalesPage() {
           cashAmount,
           cardAmount,
           user.id,
-          shift.id
+          shift.id.toString()
       );
 
       if (result) {
@@ -149,15 +149,17 @@ export default function SalesPage() {
               description: `Folio: ${result.folio} | Cambio: ${formatCurrency(result.change)}`
           });
           
+          if (shouldPrint) {
+              toast.info("Imprimiendo ticket...", { duration: 2000 });
+              // await printTicket(result.id); 
+          }
+
           setLastSaleInfo({
               total: result.total,
               paid: cashAmount + cardAmount,
               change: result.change,
               method
           });
-          
-          // Print logic (placeholder)
-          // await printTicket(result.id); 
 
           setIsCheckoutOpen(false);
           clearTicket();
