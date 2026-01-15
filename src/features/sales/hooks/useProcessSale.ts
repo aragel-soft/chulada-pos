@@ -85,17 +85,8 @@ export function useProcessSale() {
         items: saleItems,
       };
 
-      // MOCK BACKEND for frontend testing
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return {
-          id: "mock-sale-id",
-          folio: "MOCK-FOLIO-123",
-          total: total,
-          change: (cashAmount + cardAmount) - total
-      };
-      
-      // const response = await invoke<SaleResponse>('process_sale', { payload });
-      // return response;
+      const response = await invoke<SaleResponse>('process_sale', { payload });
+      return response;
     } catch (error) {
       console.error('Sale Error:', error);
       toast.error('Error al procesar venta', {

@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
@@ -44,15 +44,29 @@ pub struct SaleResponse {
     pub change: f64,
 }
 
-fn get_daily_sequence(conn: &Connection, date_str: &str) -> Result<i64, String> {
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sales WHERE sale_date LIKE ?1",
-            params![format!("{}%", date_str)],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    Ok(count + 1)
+fn get_daily_sequence(conn: &Connection, store_prefix: &str, date_str: &str) -> Result<i64, String> {
+    let pattern = format!("{}-{}-%", store_prefix, date_str);
+    let last_folio: Option<String> = conn.query_row(
+        "SELECT folio FROM sales WHERE folio LIKE ?1 ORDER BY folio DESC LIMIT 1",
+        params![pattern],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| e.to_string())?;
+
+    match last_folio {
+        Some(folio) => {
+             // Extract last part
+             let parts: Vec<&str> = folio.rsplit('-').collect();
+             if let Some(last_part) = parts.first() {
+                 if let Ok(seq) = last_part.parse::<i64>() {
+                     return Ok(seq + 1);
+                 }
+             }
+             Ok(1)
+        },
+        None => Ok(1),
+    }
 }
 
 fn generate_smart_folio(
@@ -60,7 +74,7 @@ fn generate_smart_folio(
     store_prefix: &str,
     date_str: &str, // YYYY-MM-DD
 ) -> Result<String, String> {
-    let sequence = get_daily_sequence(conn, date_str)?;
+    let sequence = get_daily_sequence(conn, store_prefix, date_str)?;
     Ok(format!("{}-{}-{:04}", store_prefix, date_str, sequence))
 }
 
@@ -84,95 +98,39 @@ pub fn process_sale(
     if payload.items.is_empty() {
         return Err("No hay items en la venta.".to_string());
     }
-    // "Credit" check as per requirements: If logic blocks it in frontend, reinforce here.
-    if payload.payment_method != "credit" {
-        let total_paid = payload.cash_amount + payload.card_transfer_amount;
-        // Float comparison tolerance
-        if total_paid < payload.total - 0.01 {
-             return Err(format!("Pago insuficiente. Faltan ${:.2}", payload.total - total_paid));
-        }
+    
+    // Strict block for Credit as per current requirements
+    if payload.payment_method == "credit" {
+        return Err("Módulo de Crédito no disponible actualmente.".to_string());
+    }
+
+    // Payment sufficiency check
+    let total_paid = payload.cash_amount + payload.card_transfer_amount;
+    // Float comparison tolerance
+    if total_paid < payload.total - 0.01 {
+            return Err(format!("Pago insuficiente. Faltan ${:.2}", payload.total - total_paid));
     }
 
     // 2. Prepare Data
     let sale_id = Uuid::new_v4().to_string();
     let now = chrono::Local::now();
     let date_str = now.format("%Y-%m-%d").to_string(); // For folio
-    // let datetime_str = now.format("%Y-%m-%d %H:%M:%S").to_string(); // Database defaults to CURRENT_TIMESTAMP usually, but let's be explicit if needed or let DB handle it. 
-    // The user schema says `sale_date timestamp [default: CURRENT_TIMESTAMP]`, so we can skip inserting it or insert explicitly.
-    // I will insert explicitly to ensure sync between folio date and stored date.
     
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let mut tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // 3. Generate Folio
     let store_prefix = get_store_prefix(&tx);
     let folio = generate_smart_folio(&tx, &store_prefix, &date_str)?;
 
-    // 4. Update Inventory & Insert Items
-    for item in &payload.items {
-        // Decrease stock
-        // "UPDATE store_inventory SET stock = stock - ? WHERE product_id = ? AND store_id = ?"
-        // We need store_id. Usually strictly tied to the running instance/user. 
-        // Assuming single store execution context or retrieving store_id from settings.
-        // Actually the USER REQUEST execution says: "UPDATE store_inventory SET stock = stock - ? WHERE product_id = ? AND store_id = ?"
-        // We need that store_id parameter.
-        // Let's reuse `get_store_prefix` logic or similar if `store_id` is the same concept, 
-        // BUT usually `store_inventory` has a specific UUID for store_id. 
-        // I'll assume we fetch the "current store id" helper logic if available, or just query it.
-        // I'll grab it from settings "store_id" if it exists, otherwise "store-main" as fallback found in `shifts.rs`.
-        
-        let inventory_store_id: String = tx.query_row(
-            "SELECT value FROM system_settings WHERE key = 'current_store_id'",
-            [],
-            |row| row.get(0)
-        ).unwrap_or_else(|_| "store-main".to_string());
+    // Prepare store_id for inventory update (Fetching once)
+    let inventory_store_id: String = tx.query_row(
+        "SELECT value FROM system_settings WHERE key = 'current_store_id'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or_else(|_| "store-main".to_string());
 
-
-        let rows_mod = tx.execute(
-            "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
-            params![item.quantity, item.product_id, inventory_store_id],
-        ).map_err(|e| format!("Error actualizando inventario para {}: {}", item.product_name, e))?;
-
-        if rows_mod == 0 {
-             // Maybe product not in inventory table? We should probably warn or ignore, but robust POS usually errors or creates generic record.
-             // For this task, let's proceed but maybe log? Or just strict error?
-             // "Criterios de Aceptación: IMPORTANTE: Descontar de la tabla store_inventory el stock."
-             // If it fails, we should probably rollback? 
-             // Let's error for safety.
-             return Err(format!("Producto no encontrado en inventario: {}", item.product_name));
-        }
-
-        // Insert Sale Item
-        // id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, ...
-        let item_id = Uuid::new_v4().to_string();
-        tx.execute(
-            "INSERT INTO sale_items (
-                id, sale_id, product_id, product_name, product_code, quantity, 
-                unit_price, price_type, discount_percentage, discount_amount, 
-                subtotal, is_kit_item, parent_sale_item_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                item_id,
-                sale_id,
-                item.product_id,
-                item.product_name,
-                item.product_code,
-                item.quantity,
-                item.unit_price,
-                item.price_type,
-                item.discount_percentage,
-                item.discount_amount,
-                item.subtotal,
-                item.is_kit_item,
-                item.parent_sale_item_id
-            ],
-        ).map_err(|e| format!("Error insertando item {}: {}", item.product_name, e))?;
-    }
-
-    // 5. Insert Sale Header
-    // "sale_type: Se guarda 'cash' para Efectivo, Tarjeta y Combinado. (Solo sería 'credit' si fuera venta a crédito)."
-    let db_sale_type = if payload.payment_method == "credit" { "credit" } else { "cash" };
-    
-    // Calculate final boolean has_discount
+    // 4. Insert Sale Header (Moved UP because sale_items FK needs sales row to exist)
+    let db_sale_type = "cash"; // Since credit is blocked, always cash-like for now.
     let has_discount = payload.discount_amount > 0.0;
 
     tx.execute(
@@ -198,6 +156,45 @@ pub fn process_sale(
             has_discount
         ],
     ).map_err(|e| format!("Error insertando venta: {}", e))?;
+
+    // 5. Update Inventory & Insert Items
+    for item in &payload.items {
+        // Decrease stock
+        let rows_mod = tx.execute(
+            "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
+            params![item.quantity, item.product_id, inventory_store_id],
+        ).map_err(|e| format!("Error actualizando inventario para {}: {}", item.product_name, e))?;
+
+        if rows_mod == 0 {
+             // Rollback implicit if we return error
+             return Err(format!("Producto no encontrado en inventario (o sin stock inicializado): {}", item.product_name));
+        }
+
+        // Insert Sale Item
+        let item_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO sale_items (
+                id, sale_id, product_id, product_name, product_code, quantity, 
+                unit_price, price_type, discount_percentage, discount_amount, 
+                subtotal, is_kit_item, parent_sale_item_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params![
+                item_id,
+                sale_id,
+                item.product_id,
+                item.product_name,
+                item.product_code,
+                item.quantity,
+                item.unit_price,
+                item.price_type,
+                item.discount_percentage,
+                item.discount_amount,
+                item.subtotal,
+                item.is_kit_item,
+                item.parent_sale_item_id
+            ],
+        ).map_err(|e| format!("Error insertando item {}: {}", item.product_name, e))?;
+    }
 
     // 6. Commit
     tx.commit().map_err(|e| e.to_string())?;
