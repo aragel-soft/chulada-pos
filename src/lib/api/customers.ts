@@ -47,3 +47,12 @@ export async function restoreCustomer(id: string, customer: CustomerInput): Prom
     throw error;
   }
 }
+
+export async function deleteCustomers(ids: string[]): Promise<void> {
+  try {
+    return await invoke("delete_customers", { ids });
+  } catch (error) {
+    console.error("Error deleting customers:", error);
+    throw error;
+  }
+}
