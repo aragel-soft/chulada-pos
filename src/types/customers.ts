@@ -7,6 +7,7 @@ export interface Customer {
   address: string | null;
   credit_limit: number;
   current_balance: number;
+  created_at: string;
   is_active: boolean;
 }
 

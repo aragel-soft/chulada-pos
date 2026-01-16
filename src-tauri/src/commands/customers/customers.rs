@@ -14,6 +14,7 @@ pub struct Customer {
   pub credit_limit: f64,
   pub current_balance: f64,
   pub is_active: bool,
+  pub created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -240,7 +241,7 @@ pub fn get_customers(
   let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
 
   let data_sql = format!(
-    "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active 
+    "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active, created_at
      FROM customers 
      {} 
      {} 
@@ -273,7 +274,7 @@ pub fn get_customers(
 
 fn fetch_customer_by_id(tx: &Connection, id: &str) -> Result<Customer, String> {
     tx.query_row(
-        "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active 
+        "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active
          FROM customers WHERE id = ?1",
         [id],
         |row| map_customer_row(row)
@@ -291,6 +292,7 @@ fn map_customer_row(row: &rusqlite::Row) -> rusqlite::Result<Customer> {
     credit_limit: row.get(6)?,
     current_balance: row.get(7)?,
     is_active: row.get(8)?,
+    created_at: row.get(9)?,
   })
 }
 

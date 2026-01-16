@@ -18,7 +18,7 @@ import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "@/features/customers/components/columns";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
-import { CustomerFormDialog } from "./CustomerFormDialog"; // <--- IMPORTANTE
+import { CustomerFormDialog } from "./CustomerFormDialog";
 
 export default function CustomersTable() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -29,7 +29,6 @@ export default function CustomersTable() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState({});
 
-  // Estados para el Dialog
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
@@ -49,35 +48,14 @@ export default function CustomersTable() {
     placeholderData: keepPreviousData,
   });
 
-  // Manejadores de acciones
   const handleCreate = () => {
     setEditingCustomer(null);
     setIsDialogOpen(true);
   };
 
-  const handleEdit = () => {
-    const selectedRows = Object.keys(rowSelection);
-    if (selectedRows.length !== 1) return; // Solo permitir editar uno a la vez por ahora
-    
-    // Buscar el objeto cliente completo en la data actual
-    // Nota: TanStack table usa el índice como ID en rowSelection si no se configura rowId,
-    // pero aquí asumimos que el data contiene los objetos.
-    // La forma más segura es obtenerlo del modelo de la tabla, pero como tenemos acceso a `data.data`:
-    
-    // Necesitamos el ID real. En DataTable, rowSelection suele ser { [id]: true } si getRowId está configurado,
-    // o { [index]: true } si no.
-    // Vamos a asumir que necesitamos pasar el objeto.
-    
-    // Estrategia: Obtener el cliente seleccionado del array de datos
-    // Como rowSelection es un mapa de indices (o ids), buscamos el primero
-    // NOTA: Para producción robusta, DataTable debería exponer las rows seleccionadas directamente.
-    // Aquí simplificamos buscando en la data cargada.
-    
-    // Hack rápido: Usar la data visible. 
-    // Si rowSelection usa ID (lo ideal), buscamos por ID.
-    // Si usa index, buscamos por index.
-    
-    // Vamos a pasar esto en el `actions` prop donde tenemos acceso a `table`.
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setIsDialogOpen(true);
   };
 
   const columns = useMemo<ColumnDef<Customer>[]>(() => [
@@ -112,12 +90,14 @@ export default function CustomersTable() {
         data={data?.data || []}
         isLoading={isLoading}
         searchPlaceholder="Buscar por nombre, código o teléfono..."
+        initialColumnVisibility={{created_at: false}}
         columnTitles={{
           code: "Código",
           name: "Nombre",
           phone: "Teléfono",
           credit_limit: "Límite",
           current_balance: "Saldo",
+          created_at: "Fecha de Creación",
           is_active: "Estado"
         }}
         manualPagination={true}
@@ -132,13 +112,12 @@ export default function CustomersTable() {
         onGlobalFilterChange={(val) => setGlobalFilter(String(val))} 
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
-        // Pasamos getRowId para que la selección use el ID del cliente y no el índice
         getRowId={(row) => row.id} 
         
         actions={(table) => {
-          // Lógica segura para obtener el cliente seleccionado
           const selectedRows = table.getFilteredSelectedRowModel().rows;
           const selectedCustomer = selectedRows.length === 1 ? selectedRows[0].original : null;
+          const hasSelection = selectedRows.length > 0;
 
           return (
             <div className="flex items-center gap-2 w-full md:w-auto">
@@ -155,25 +134,18 @@ export default function CustomersTable() {
               {can('customers:edit') && (
                 <Button 
                   className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-                  disabled={selectedRows.length !== 1} // Solo 1 para editar
-                  onClick={() => {
-                    if (selectedCustomer) {
-                      setEditingCustomer(selectedCustomer);
-                      setIsDialogOpen(true);
-                    }
-                  }}
+                  disabled={!selectedCustomer} 
+                  onClick={() => selectedCustomer && handleEdit(selectedCustomer)}
                 >
                   <Pencil className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    Modificar
-                  </span>
+                  <span className="hidden sm:inline">Modificar</span>
                 </Button>
               )}
 
               {can('customers:delete') && (
                 <Button
                   variant="destructive"
-                  disabled={selectedRows.length === 0}
+                  disabled={!hasSelection}
                   onClick={() => console.log("Abrir DeleteDialog - Pendiente")}
                 >
                   <Trash className="mr-2 h-4 w-4" />
@@ -185,12 +157,11 @@ export default function CustomersTable() {
         }}
       />
 
-      {/* Renderizado del Modal */}
       <CustomerFormDialog 
         open={isDialogOpen}
         onOpenChange={(open) => {
           setIsDialogOpen(open);
-          if (!open) setEditingCustomer(null); // Limpiar al cerrar
+          if (!open) setEditingCustomer(null);
         }}
         customerToEdit={editingCustomer}
       />
