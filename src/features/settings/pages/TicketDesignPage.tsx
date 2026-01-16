@@ -266,22 +266,6 @@ export default function TicketDesignPage() {
               Personaliza el encabezado, logo, pie de página y ajustes físicos del papel.
             </p>
           </div>
-          {can('ticket_settings:edit') && (
-            <Button
-              type="submit"
-              form="ticket-design-form"
-              size="default"
-              className="bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap min-w-[140px]"
-              disabled={(!form.formState.isDirty && !imageFile) || form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? "Guardando..." : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar Cambios
-                </>
-              )}
-            </Button>
-          )}
         </div>
         <Separator />
 
@@ -612,7 +596,26 @@ export default function TicketDesignPage() {
                       Imprimir Prueba
                     </Button>)}
                   </CardContent>
+                  
                 </Card>
+                {can('ticket_settings:edit') && (
+                  <div className="flex justify-center w-full">
+                    <Button
+                      type="submit"
+                      form="ticket-design-form"
+                      size="default"
+                      className="bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap min-w-[140px]"
+                      disabled={(!form.formState.isDirty && !imageFile) || form.formState.isSubmitting}
+                    >
+                      {form.formState.isSubmitting ? "Guardando..." : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Guardar Cambios
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )} 
               </div>
             </div>
 
