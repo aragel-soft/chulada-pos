@@ -135,7 +135,6 @@ export default function SalesPage() {
 
       const result = await processSale(
           activeTicket.items,
-          ticketTotal,
           method,
           cashAmount,
           cardAmount,

@@ -11,12 +11,11 @@ CREATE TABLE IF NOT EXISTS sales (
     discount_percentage DECIMAL(5,2) DEFAULT 0,
     discount_amount DECIMAL(10,2) DEFAULT 0,
     total DECIMAL(10,2) NOT NULL,
-    sale_type TEXT NOT NULL, -- 'cash', 'credit'
     status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'cancelled', 'pending'
     customer_id TEXT,
     user_id TEXT NOT NULL,
     cash_register_shift_id TEXT,
-    payment_method TEXT, -- 'cash', 'card_transfer', 'credit', 'mixed'
+    payment_method TEXT NOT NULL, -- 'cash', 'card_transfer', 'credit', 'mixed'
     cash_amount DECIMAL(10,2) DEFAULT 0,
     card_transfer_amount DECIMAL(10,2) DEFAULT 0,
     notes TEXT,
