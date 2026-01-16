@@ -8,7 +8,23 @@ const settingTabs = [
     value: 'profile',
     label: 'Perfil',
     permission: 'profile:view',
-  }, {
+  },
+  {
+    value: 'hardware-settings',
+    label: 'Hardware',
+    permission: 'hardware_settings:view',
+  },
+  {
+    value: 'business-settings',
+    label: 'Reglas de Negocio',
+    permission: 'business_settings:view', // Visible to admins/managers usually
+  },
+  {
+    value: 'ticket-design',
+    label: 'Diseño de Ticket',
+    permission: 'ticket_settings:view',
+  },
+  {
     value: 'users',
     label: 'Usuarios',
     permission: 'users:view',
