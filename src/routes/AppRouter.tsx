@@ -16,6 +16,7 @@ import HistoryPage from '@/features/dashboard/pages/HistoryPage';
 import AddInventoryPage from '@/features/dashboard/pages/AddInventoryPage';
 import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
+import CustomersTable from '@/features/customers/components/CustomersTable';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
@@ -139,6 +140,20 @@ const router = createBrowserRouter([
             <CustomersPage />
           </ProtectedRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="customers/" replace />,
+          },
+          {
+            path: "customers",
+            element: (
+              <ProtectedRoute module="customers:view">
+                <CustomersTable />
+              </ProtectedRoute>
+            ),
+          }
+        ],
       },
       {
         path: "reports",
