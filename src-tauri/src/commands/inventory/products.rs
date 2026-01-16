@@ -129,6 +129,16 @@ pub struct BulkUpdateProductsPayload {
   pub tags_to_add: Option<Vec<String>>,
 }
 
+fn get_current_store_id(conn: &Connection) -> Result<String, String> {
+    let mut stmt = conn
+        .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+        .map_err(|e| e.to_string())?;
+    let store_id: String = stmt
+        .query_row([], |row| row.get(0))
+        .unwrap_or_else(|_| "store-main".to_string());
+    Ok(store_id)
+}
+
 #[tauri::command]
 pub fn get_products(
   db_state: State<'_, Mutex<Connection>>,
@@ -180,8 +190,10 @@ pub fn get_products(
     _ => default_direction,
   };
 
-  // TODO: Cambiar 'store-main' por un store_id dinámico cuando existan varias sucursales
-  let base_sql = "
+  let store_id = get_current_store_id(&conn)?;
+
+  let base_sql = format!(
+"
     SELECT 
       p.id, 
       p.code, 
@@ -200,9 +212,11 @@ pub fn get_products(
       p.created_at
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = 'store-main' 
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = '{}' 
     WHERE p.deleted_at IS NULL
-  ";
+  ",
+        store_id
+    );
 
   let final_sql = if has_search {
     format!("{} AND (p.name LIKE ?1 OR p.description LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
@@ -371,7 +385,10 @@ pub async fn create_product(
   let inventory_id = Uuid::new_v4().to_string();
   let initial_stock = payload.stock.unwrap_or(0);
   let min_stock = payload.min_stock.unwrap_or(5);
-  let store_id = "store-main"; //TODO: Hacer dinámico cuando existan varias sucursales
+    let store_id = get_current_store_id(&conn).map_err(|e| InventoryError {
+        code: "STORE_ID_ERROR".to_string(),
+        message: e,
+    })?;
 
   let tx = conn.transaction().map_err(|e| InventoryError {
     code: "DB_TX_ERROR".to_string(),
@@ -664,19 +681,23 @@ pub fn get_product_by_id(
   let conn = db.lock().map_err(|e| e.to_string())?;
   let app_dir = app_handle.path().app_data_dir().unwrap();
 
-  // TODO: Cambiar 'store-main' por un store_id dinámico cuando existan varias sucursales
-  let sql = "
+    let store_id = get_current_store_id(&conn)?;
+
+    let sql = format!(
+        "
     SELECT 
       p.id, p.code, p.barcode, p.name, p.description, p.category_id,
       p.retail_price, p.wholesale_price, p.purchase_price, p.image_url, p.is_active,
       COALESCE(si.stock, 0) as stock,
       COALESCE(si.minimum_stock, 5) as min_stock
     FROM products p
-    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = 'store-main'
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = '{}'
     WHERE p.id = ?1
-  ";
+  ",
+        store_id
+    );
 
-  let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+  let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     
   let mut product_detail = stmt.query_row([&id], |row| {
     let raw_image: Option<String> = row.get(9)?;
