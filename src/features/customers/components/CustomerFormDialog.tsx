@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, UserPlus, UserPen } from "lucide-react";
 
 import {
   Dialog,
@@ -44,16 +44,24 @@ import { upsertCustomer, restoreCustomer } from "@/lib/api/customers";
 import { CUSTOMER_CONFIG } from "@/config/constants";
 import { Label } from "@/components/ui/label";
 
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+
 interface CustomerFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customerToEdit?: Customer | null;
+  onSuccess?: (mode: 'create' | 'update' | 'restore') => void;
 }
 
 export function CustomerFormDialog({ 
   open, 
   onOpenChange, 
-  customerToEdit 
+  customerToEdit ,
+  onSuccess,
 }: CustomerFormDialogProps) {
   const queryClient = useQueryClient();
   const [restoreError, setRestoreError] = useState<RestoreRequiredError["payload"] | null>(null);
@@ -71,6 +79,11 @@ export function CustomerFormDialog({
       is_active: true,
     },
   });
+
+  const watchedCreditLimit = form.watch("credit_limit");
+  const isRiskyLimit = isEditing && 
+    customerToEdit && 
+    (watchedCreditLimit < customerToEdit.current_balance)
 
   useEffect(() => {
     if (open) {
@@ -110,6 +123,10 @@ export function CustomerFormDialog({
       toast.success(isEditing ? "Cliente actualizado" : "Cliente registrado exitosamente");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+
+      if (onSuccess) {
+        onSuccess(isEditing ? 'update' : 'create');
+      }
     },
     onError: (error: any) => {
       if (isRestoreError(error)) {
@@ -137,6 +154,10 @@ export function CustomerFormDialog({
       setRestoreError(null);
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+
+      if (onSuccess) {
+        onSuccess('restore');
+      }
     },
     onError: (error: any) => {
       toast.error(`Error al restaurar: ${error.message}`);
@@ -144,9 +165,6 @@ export function CustomerFormDialog({
   });
 
   const onSubmit = (values: CustomerFormValues) => {
-    if (isEditing && values.credit_limit < (customerToEdit.current_balance || 0)) {
-        toast.warning("Atención: El nuevo límite es menor a la deuda actual.");
-    }
     upsertMutation.mutate(values);
   };
 
@@ -155,7 +173,16 @@ export function CustomerFormDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {isEditing ? (
+                <UserPen className="h-5 w-5 text-primary" />
+              ) : (
+                <UserPlus className="h-5 w-5 text-primary" />
+              )}
+              <span>
+                {isEditing ? "Editar Cliente" : "Nuevo Cliente"}
+              </span>
+            </DialogTitle>
             <DialogDescription>
               {isEditing 
                 ? "Modifique los datos del cliente. El código no puede ser cambiado." 
@@ -203,6 +230,11 @@ export function CustomerFormDialog({
                         <Input 
                           placeholder="(000) 000-0000" 
                           {...field} 
+                          onChange={(e) => {
+                            const rawValue = e.target.value;
+                            const filteredValue = rawValue.replace(/[^0-9+\-\s()]/g, '');
+                            field.onChange(filteredValue);
+                          }}
                           onBlur={(e) => {
                             const clean = e.target.value.replace(/\D/g, '');
                             if(clean) field.onChange(clean);
@@ -252,7 +284,7 @@ export function CustomerFormDialog({
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Límite de Crédito */}
                 <FormField
                   control={form.control}
@@ -278,21 +310,37 @@ export function CustomerFormDialog({
                     control={form.control}
                     name="is_active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg p-3">
-                        <div className="space-y-0.5 mr-4">
-                          <FormLabel>Activo</FormLabel>
-                        </div>
+                      <FormItem> {/* 2. Quitamos mt-2 para que se alinee con el vecino */}
+                        <FormLabel>Estatus</FormLabel> {/* 3. Quitamos px-3 para alinear con el label de crédito */}
                         <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
+                          {/* 4. Contenedor que simula un Input: h-10, bordes, etc. */}
+                          <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                            <span className="text-muted-foreground">
+                              {field.value ? "Activo" : "Inactivo"}
+                            </span>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </div>
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 )}
               </div>
+
+              {isRiskyLimit && (
+                <Alert variant="destructive" className="bg-amber-50 text-amber-900 border-amber-200 mt-4">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle className="text-amber-800 font-semibold">¡Atención: Límite Insuficiente!</AlertTitle>
+                  <AlertDescription className="text-amber-700">
+                    El nuevo límite (${watchedCreditLimit}) es menor a la deuda actual del cliente (${customerToEdit.current_balance}). 
+                    Esto bloqueará sus compras futuras inmediatamente.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

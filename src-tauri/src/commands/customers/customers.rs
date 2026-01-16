@@ -222,6 +222,7 @@ pub fn get_customers(
     Some("credit_limit") => "credit_limit",
     Some("current_balance") => "current_balance",
     Some("is_active") => "is_active",
+    Some("created_at") => "created_at",
     _ => "default_debt_priority", 
   };
 

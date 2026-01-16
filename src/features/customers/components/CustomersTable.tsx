@@ -58,6 +58,15 @@ export default function CustomersTable() {
     setIsDialogOpen(true);
   };
 
+  const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
+    if (mode === 'create' || mode === 'restore') {
+      setGlobalFilter("");      
+      setPagination(prev => ({ ...prev, pageIndex: 0 }));
+      
+      setSorting([{ id: 'created_at', desc: true }]);
+    }
+  };
+
   const columns = useMemo<ColumnDef<Customer>[]>(() => [
     {
       id: "select",
@@ -164,6 +173,7 @@ export default function CustomersTable() {
           if (!open) setEditingCustomer(null);
         }}
         customerToEdit={editingCustomer}
+        onSuccess={handleSuccess}
       />
     </div>
   );
