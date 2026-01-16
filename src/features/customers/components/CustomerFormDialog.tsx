@@ -131,8 +131,20 @@ export function CustomerFormDialog({
     onError: (error: any) => {
       if (isRestoreError(error)) {
         setRestoreError(error.payload);
+        return;
+      }
+
+      const errorMessage = typeof error === 'string' 
+        ? error 
+        : (error instanceof Error ? error.message : "Ocurrió un error desconocido");
+
+      if (errorMessage.toLowerCase().includes("teléfono") || errorMessage.toLowerCase().includes("registrado")) {
+        form.setError("phone", {
+          type: "manual",
+          message: errorMessage 
+        });
       } else {
-        toast.error(`Error: ${error.message || "Ocurrió un error inesperado"}`);
+        toast.error(`Error: ${errorMessage}`);
       }
     },
   });
