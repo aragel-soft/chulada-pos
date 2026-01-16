@@ -186,7 +186,7 @@ export const useCartStore = create<CartState>()(
           const newItems = state.tickets[ticketIndex].items.map(item => {
             if (item.id === productId) {
               const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
-              const wholesale = item.wholesale_price ?? item.retail_price;
+              const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
 
               return {
                 ...item,
