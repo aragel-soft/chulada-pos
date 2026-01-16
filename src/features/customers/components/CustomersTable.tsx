@@ -18,6 +18,7 @@ import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "@/features/customers/components/columns";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
+import { CustomerFormDialog } from "./CustomerFormDialog";
 
 export default function CustomersTable() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -27,6 +28,9 @@ export default function CustomersTable() {
   });
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState({});
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   const { can } = useAuthStore();
 
@@ -43,6 +47,25 @@ export default function CustomersTable() {
     queryFn: () => getCustomers(queryParams),
     placeholderData: keepPreviousData,
   });
+
+  const handleCreate = () => {
+    setEditingCustomer(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setIsDialogOpen(true);
+  };
+
+  const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
+    if (mode === 'create' || mode === 'restore') {
+      setGlobalFilter("");      
+      setPagination(prev => ({ ...prev, pageIndex: 0 }));
+      
+      setSorting([{ id: 'created_at', desc: true }]);
+    }
+  };
 
   const columns = useMemo<ColumnDef<Customer>[]>(() => [
     {
@@ -76,12 +99,14 @@ export default function CustomersTable() {
         data={data?.data || []}
         isLoading={isLoading}
         searchPlaceholder="Buscar por nombre, código o teléfono..."
+        initialColumnVisibility={{created_at: false}}
         columnTitles={{
           code: "Código",
           name: "Nombre",
           phone: "Teléfono",
           credit_limit: "Límite",
           current_balance: "Saldo",
+          created_at: "Fecha de Creación",
           is_active: "Estado"
         }}
         manualPagination={true}
@@ -96,45 +121,59 @@ export default function CustomersTable() {
         onGlobalFilterChange={(val) => setGlobalFilter(String(val))} 
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
-        actions={(table) => (
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            {can('customers:create') && (
-              <Button 
-                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                onClick={() => console.log("Abrir CreateCustomerDialog")}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Agregar</span>
-              </Button>
-            )}
+        getRowId={(row) => row.id} 
+        
+        actions={(table) => {
+          const selectedRows = table.getFilteredSelectedRowModel().rows;
+          const selectedCustomer = selectedRows.length === 1 ? selectedRows[0].original : null;
+          const hasSelection = selectedRows.length > 0;
 
-            {can('customers:edit') && (
-              <Button 
-                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() => console.log("Abrir BulkEdit o EditDialog")}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {table.getFilteredSelectedRowModel().rows.length > 1 
-                    ? `Modificar (${table.getFilteredSelectedRowModel().rows.length})` 
-                    : "Modificar"}
-                </span>
-              </Button>
-            )}
+          return (
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              {can('customers:create') && (
+                <Button 
+                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                  onClick={handleCreate}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Agregar</span>
+                </Button>
+              )}
 
-            {can('customers:delete') && (
-              <Button
-                variant="destructive"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() => console.log("Abrir DeleteDialog")}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({table.getFilteredSelectedRowModel().rows.length})
-              </Button>
-            )}
-          </div>
-        )}
+              {can('customers:edit') && (
+                <Button 
+                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+                  disabled={!selectedCustomer} 
+                  onClick={() => selectedCustomer && handleEdit(selectedCustomer)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Modificar</span>
+                </Button>
+              )}
+
+              {can('customers:delete') && (
+                <Button
+                  variant="destructive"
+                  disabled={!hasSelection}
+                  onClick={() => console.log("Abrir DeleteDialog - Pendiente")}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Eliminar ({selectedRows.length})
+                </Button>
+              )}
+            </div>
+          );
+        }}
+      />
+
+      <CustomerFormDialog 
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) setEditingCustomer(null);
+        }}
+        customerToEdit={editingCustomer}
+        onSuccess={handleSuccess}
       />
     </div>
   );
