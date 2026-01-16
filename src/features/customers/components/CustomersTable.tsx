@@ -19,6 +19,7 @@ import { columns as baseColumns } from "@/features/customers/components/columns"
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
 import { CustomerFormDialog } from "./CustomerFormDialog";
+import { DeleteCustomersDialog } from "./DeleteCustomersDialog";
 
 export default function CustomersTable() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -30,6 +31,7 @@ export default function CustomersTable() {
   const [rowSelection, setRowSelection] = useState({});
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   const { can } = useAuthStore();
@@ -58,6 +60,10 @@ export default function CustomersTable() {
     setIsDialogOpen(true);
   };
 
+  const handleDelete = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
   const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
     if (mode === 'create' || mode === 'restore') {
       setGlobalFilter("");      
@@ -66,6 +72,8 @@ export default function CustomersTable() {
       setSorting([{ id: 'created_at', desc: true }]);
     }
   };
+
+  const selectedIds = useMemo(() => Object.keys(rowSelection), [rowSelection]);
 
   const columns = useMemo<ColumnDef<Customer>[]>(() => [
     {
@@ -155,7 +163,7 @@ export default function CustomersTable() {
                 <Button
                   variant="destructive"
                   disabled={!hasSelection}
-                  onClick={() => console.log("Abrir DeleteDialog - Pendiente")}
+                  onClick={handleDelete}
                 >
                   <Trash className="mr-2 h-4 w-4" />
                   Eliminar ({selectedRows.length})
@@ -174,6 +182,13 @@ export default function CustomersTable() {
         }}
         customerToEdit={editingCustomer}
         onSuccess={handleSuccess}
+      />
+
+      <DeleteCustomersDialog 
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        customerIds={selectedIds}
+        onSuccess={() => setRowSelection({})}
       />
     </div>
   );
