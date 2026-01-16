@@ -1,6 +1,7 @@
-use tauri::State;
+use tauri::{AppHandle, State, Manager};
 use serde::{Serialize, Deserialize};
 use rusqlite::{Connection, OptionalExtension, Transaction};
+use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -315,4 +316,71 @@ fn generate_next_code(tx: &Transaction) -> Result<String, String> {
             Ok("C-0001".to_string())
         }
     }
+}
+
+#[tauri::command]
+pub fn delete_customers(
+  app_handle: AppHandle,
+  ids: Vec<String>
+) -> Result<(), String> {
+    if ids.is_empty() {
+        return Ok(()); 
+    }
+
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let db_path = app_dir.join("database.db");
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    let placeholders: String = (0..ids.len())
+        .map(|i| format!("?{}", i + 1))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let check_sql = format!(
+        "SELECT name, current_balance 
+         FROM customers 
+         WHERE id IN ({}) AND current_balance != 0 AND deleted_at IS NULL", 
+        placeholders
+    );
+
+    let mut debtor_list = Vec::new();
+    {
+        let mut stmt = tx.prepare(&check_sql).map_err(|e| e.to_string())?;
+        
+        let debtors = stmt.query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+            let name: String = row.get(0)?;
+            let balance: f64 = row.get(1)?;
+            Ok((name, balance))
+        }).map_err(|e| e.to_string())?;
+
+        for debtor in debtors {
+            if let Ok((name, balance)) = debtor {
+                debtor_list.push(format!("{} (${:.2})", name, balance));
+            }
+        }
+    }
+
+    if !debtor_list.is_empty() {
+        let error_msg = format!(
+            "Operación cancelada. Los siguientes clientes tienen saldo pendiente: {}", 
+            debtor_list.join(", ")
+        );
+        return Err(error_msg);
+    }
+    
+    let delete_sql = format!(
+        "UPDATE customers 
+         SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 
+         WHERE id IN ({})", 
+        placeholders
+    );
+
+    tx.execute(&delete_sql, rusqlite::params_from_iter(ids.iter()))
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(())
 }

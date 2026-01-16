@@ -65,6 +65,7 @@ fn main() {
             commands::customers::customers::get_customers,
             commands::customers::customers::upsert_customer,
             commands::customers::customers::restore_customer,
+            commands::customers::customers::delete_customers,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
