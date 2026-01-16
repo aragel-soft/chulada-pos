@@ -129,22 +129,50 @@ export function CustomerFormDialog({
       }
     },
     onError: (error: any) => {
+      let restorePayload: RestoreRequiredError["payload"] | null = null;
+      
       if (isRestoreError(error)) {
-        setRestoreError(error.payload);
+        restorePayload = error.payload;
+      } else {
+        const errorMsg = typeof error === "string" 
+          ? error 
+          : (error instanceof Error ? error.message : String(error));
+
+        if (errorMsg.includes("RESTORE_REQUIRED:")) {
+          try {
+            const jsonPart = errorMsg.split("RESTORE_REQUIRED:")[1];
+            restorePayload = JSON.parse(jsonPart);
+          } catch (e) {
+            console.error("Error parseando payload", e);
+          }
+        }
+      }
+
+      if (restorePayload) {
+        if (isEditing) {
+          form.setError("phone", {
+            type: "manual",
+            message: `Este número pertenece al cliente eliminado "${restorePayload.name}". No es posible asignarlo.`
+          });
+          toast.error("Conflicto de identidad: El teléfono pertenece a otro registro histórico.");
+          return; 
+        }
+
+        setRestoreError(restorePayload);
         return;
       }
 
-      const errorMessage = typeof error === 'string' 
+      const finalMsg = typeof error === "string" 
         ? error 
-        : (error instanceof Error ? error.message : "Ocurrió un error desconocido");
+        : (error instanceof Error ? error.message : String(error));
 
-      if (errorMessage.toLowerCase().includes("teléfono") || errorMessage.toLowerCase().includes("registrado")) {
+      if (finalMsg.toLowerCase().includes("teléfono") || finalMsg.toLowerCase().includes("registrado")) {
         form.setError("phone", {
           type: "manual",
-          message: errorMessage 
+          message: finalMsg
         });
       } else {
-        toast.error(`Error: ${errorMessage}`);
+        toast.error(`Error: ${finalMsg}`);
       }
     },
   });
@@ -378,7 +406,7 @@ export function CustomerFormDialog({
       <AlertDialog open={!!restoreError} onOpenChange={(open) => !open && setRestoreError(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <div className="flex items-center gap-2 text-amber-600">
+            <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 <AlertDialogTitle>Cliente Eliminado Encontrado</AlertDialogTitle>
             </div>
@@ -395,10 +423,21 @@ export function CustomerFormDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-                onClick={() => restoreMutation.mutate()}
+                onClick={(e) => {
+                  e.preventDefault(); 
+                  restoreMutation.mutate();
+                }}
+                disabled={restoreMutation.isPending}
                 className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              {restoreMutation.isPending ? "Restaurando..." : "Sí, Restaurar Historial"}
+              {restoreMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Restaurando...
+                </>
+              ) : (
+                "Sí, Restaurar Historial"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
