@@ -16,6 +16,7 @@ import HistoryPage from '@/features/dashboard/pages/HistoryPage';
 import AddInventoryPage from '@/features/dashboard/pages/AddInventoryPage';
 import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
+import CustomersTable from '@/features/customers/components/CustomersTable';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
@@ -29,6 +30,9 @@ import ProtectedRoute from './ProtectedRoute';
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 import CashRegisterPage from '@/pages/CashRegisterPage';
+import HardwarePage from '@/features/settings/pages/HardwarePage';
+import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage';
+import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
 
 // --- Componentes de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -124,7 +128,7 @@ const router = createBrowserRouter([
           {
             path: "kits",
             element: (
-                <KitsPage />
+              <KitsPage />
             ),
           }
         ]
@@ -136,6 +140,20 @@ const router = createBrowserRouter([
             <CustomersPage />
           </ProtectedRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="customers/" replace />,
+          },
+          {
+            path: "customers",
+            element: (
+              <ProtectedRoute module="customers:view">
+                <CustomersTable />
+              </ProtectedRoute>
+            ),
+          }
+        ],
       },
       {
         path: "reports",
@@ -168,10 +186,34 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: "hardware-settings",
+            element: (
+              <ProtectedRoute module="hardware_settings:view">
+                <HardwarePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "business-settings",
+            element: (
+              <ProtectedRoute module="business_settings:view">
+                <BusinessSettingsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
             path: "permissions",
             element: (
               <ProtectedRoute module="permissions:view">
                 <PermissionsMatrixPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "ticket-design",
+            element: (
+              <ProtectedRoute module="ticket_settings:view">
+                <TicketDesignPage />
               </ProtectedRoute>
             ),
           },

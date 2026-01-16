@@ -12,8 +12,9 @@ export const bulkEditSchema = z.object({
     
   wholesale_price: z.coerce
     .number()
-    .positive("El precio debe ser mayor a 0")
-    .optional(),
+    .nonnegative("El costo no puede ser negativo")
+    .optional()
+    .default(0),
 
 tags: z.array(z.string()).optional(), 
 }).superRefine((data, ctx) => {

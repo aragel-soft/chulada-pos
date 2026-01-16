@@ -26,6 +26,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { ProductImagePreview } from "../components/ProductImageHover";
+import { format } from "date-fns";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
@@ -79,7 +80,6 @@ export default function ProductsPage() {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
   }
 
-  // Columnas
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
       {
@@ -193,11 +193,19 @@ export default function ProductsPage() {
       {
         accessorKey: "wholesale_price",
         header: ({ column }) => <DataTableColumnHeader column={column} title="P. Mayoreo" />,
-        cell: ({ row }) => (
-          <div className="font-medium">
-            {formatCurrency(row.getValue("wholesale_price"))}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const price = row.getValue("wholesale_price") as number;
+          
+          return (
+            <div className="font-medium">
+              {price === 0 ? (
+                <span className="text-muted-foreground">-</span>
+              ) : (
+                formatCurrency(price)
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "stock",
@@ -215,6 +223,15 @@ export default function ProductsPage() {
             </div>
           );
         },
+      },
+      {
+        accessorKey: "created_at",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Fecha de Creación" />
+        ),
+        cell: ({ row }) => (
+          <div>{(format(row.getValue("created_at") as string, 'yyyy-MM-dd HH:mm'))}</div>
+        ),
       },
       {
         accessorKey: "is_active",
@@ -248,12 +265,16 @@ export default function ProductsPage() {
       isLoading={isLoading}
       searchPlaceholder="Buscar por nombre, código o categoría..."
       initialSorting={[]}
+      initialColumnVisibility={{ created_at: false }}
       columnTitles={{
         image_url: "Imagen",
         code: "Código",
         name: "Producto",
-        retail_price: "Precio",
+        purchase_price: "Costo Compra",
+        retail_price: "P. Menudeo",
+        wholesale_price: "P. Mayoreo",
         stock: "Existencia",
+        created_at: "Fecha de Creación",
         is_active: "Estado"
       }}
       manualPagination={true}
