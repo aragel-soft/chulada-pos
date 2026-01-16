@@ -22,6 +22,7 @@ pub struct ProductView {
   min_stock: i64,
   image_url: Option<String>,
   is_active: bool,
+  created_at: String,
 }
 
 #[derive(Serialize)]
@@ -207,7 +208,8 @@ pub fn get_products(
       COALESCE(si.stock, 0) as stock, 
       COALESCE(si.minimum_stock, 0) as min_stock,
       p.image_url, 
-      p.is_active
+      p.is_active,
+      p.created_at
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = '{}' 
@@ -285,6 +287,7 @@ fn map_product_row(
     min_stock: row.get(11)?,
     image_url: resolved_image,
     is_active: row.get(13)?,
+    created_at: row.get(14)?,
   })
 }
 
@@ -353,6 +356,29 @@ pub async fn create_product(
       message: format!("El código '{}' ya está en uso", payload.code),
     }
     .into());
+  }
+
+  if let Some(barcode) = &payload.barcode {
+    if !barcode.trim().is_empty() {
+      let barcode_exists: bool = conn
+        .query_row(
+          "SELECT EXISTS(SELECT 1 FROM products WHERE barcode = ? AND deleted_at IS NULL)",
+          [barcode],
+          |row| row.get(0),
+        )
+        .map_err(|e| InventoryError {
+          code: "DB_QUERY_ERROR".to_string(),
+          message: format!("Error al verificar código de barras: {}", e),
+        })?;
+
+      if barcode_exists {
+        return Err(InventoryError {
+          code: "BARCODE_EXISTS".to_string(),
+          message: format!("El código de barras '{}' ya está en uso", barcode),
+        }
+        .into());
+      }
+    }
   }
 
   let product_id = Uuid::new_v4().to_string();
@@ -461,10 +487,10 @@ pub async fn update_product(
 
   let mut conn = db.lock().map_err(|e| e.to_string())?;
 
-  let current_code: String = conn.query_row(
-    "SELECT code FROM products WHERE id = ?",
+  let (current_code, current_barcode): (String, Option<String>) = conn.query_row(
+    "SELECT code, barcode FROM products WHERE id = ?",
     [&payload.id],
-    |row| row.get(0),
+    |row| Ok((row.get(0)?, row.get(1)?)),
   ).map_err(|_| "Producto no encontrado".to_string())?;
 
   if current_code != payload.code {
@@ -489,6 +515,25 @@ pub async fn update_product(
         code: "CODE_EXISTS".to_string(),
         message: format!("El código '{}' ya está en uso por otro producto", payload.code),
       }.into());
+    }
+  }
+
+  if current_barcode != payload.barcode {    
+    if let Some(new_barcode) = &payload.barcode {
+      if !new_barcode.trim().is_empty() {
+        let exists: bool = conn.query_row(
+          "SELECT EXISTS(SELECT 1 FROM products WHERE barcode = ? AND id != ? AND deleted_at IS NULL)",
+          [new_barcode, &payload.id],
+          |row| row.get(0),
+        ).map_err(|e| e.to_string())?;
+
+        if exists {
+          return Err(InventoryError {
+            code: "BARCODE_EXISTS".to_string(),
+            message: format!("El código de barras '{}' ya está en uso por otro producto", new_barcode),
+          }.into());
+        }
+      }
     }
   }
 
