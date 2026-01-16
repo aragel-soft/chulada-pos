@@ -274,7 +274,7 @@ pub fn get_customers(
 
 fn fetch_customer_by_id(tx: &Connection, id: &str) -> Result<Customer, String> {
     tx.query_row(
-        "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active
+        "SELECT id, code, name, phone, email, address, credit_limit, current_balance, is_active, created_at
          FROM customers WHERE id = ?1",
         [id],
         |row| map_customer_row(row)

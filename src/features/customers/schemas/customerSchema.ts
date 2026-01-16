@@ -27,11 +27,16 @@ export const customerSchema = z.object({
 
   address: z.string().optional(),
 
-  credit_limit: z.coerce.number()
-    .min(0, "El crédito no puede ser negativo")
-    .max(
-      CUSTOMER_CONFIG.MAX_CREDIT_LIMIT, 
-      `El límite máximo permitido es $${CUSTOMER_CONFIG.MAX_CREDIT_LIMIT}`
+  credit_limit: z.union([z.string(), z.number()]) 
+    .refine((val) => val !== "", "El límite es requerido") 
+    .pipe(z.coerce.number()) 
+    .pipe(
+      z.number()
+        .min(0, "El crédito no puede ser negativo")
+        .max(
+          CUSTOMER_CONFIG.MAX_CREDIT_LIMIT, 
+          `El límite máximo permitido es $${CUSTOMER_CONFIG.MAX_CREDIT_LIMIT}`
+        )
     ),
 
   is_active: z.boolean().default(true),

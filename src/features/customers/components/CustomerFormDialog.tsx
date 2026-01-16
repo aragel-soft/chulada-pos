@@ -72,7 +72,6 @@ export function CustomerFormDialog({
     },
   });
 
-  // Resetear formulario al abrir/cerrar o cambiar cliente
   useEffect(() => {
     if (open) {
       if (customerToEdit) {
@@ -99,13 +98,11 @@ export function CustomerFormDialog({
     }
   }, [open, customerToEdit, form]);
 
-  // Mutación principal (Crear/Editar)
   const upsertMutation = useMutation({
     mutationFn: (values: CustomerFormValues) => {
-      // Convertir a CustomerInput
       const payload: CustomerInput = {
         ...values,
-        id: customerToEdit?.id || null, // Asegurar null si es nuevo
+        id: customerToEdit?.id || null,
       };
       return upsertCustomer(payload);
     },
@@ -116,7 +113,6 @@ export function CustomerFormDialog({
     },
     onError: (error: any) => {
       if (isRestoreError(error)) {
-        // No cerramos el modal, mostramos la alerta de restauración
         setRestoreError(error.payload);
       } else {
         toast.error(`Error: ${error.message || "Ocurrió un error inesperado"}`);
@@ -124,7 +120,6 @@ export function CustomerFormDialog({
     },
   });
 
-  // Mutación de Restauración
   const restoreMutation = useMutation({
     mutationFn: () => {
       if (!restoreError) throw new Error("No hay datos para restaurar");
@@ -132,7 +127,7 @@ export function CustomerFormDialog({
       const currentValues = form.getValues();
       const payload: CustomerInput = {
         ...currentValues,
-        id: restoreError.id, // Usamos el ID del cliente eliminado
+        id: restoreError.id, 
       };
       
       return restoreCustomer(restoreError.id, payload);
@@ -149,7 +144,6 @@ export function CustomerFormDialog({
   });
 
   const onSubmit = (values: CustomerFormValues) => {
-    // Advertencia visual si baja el límite (solo lógica UI, Zod ya validó max)
     if (isEditing && values.credit_limit < (customerToEdit.current_balance || 0)) {
         toast.warning("Atención: El nuevo límite es menor a la deuda actual.");
     }
@@ -173,7 +167,7 @@ export function CustomerFormDialog({
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Código (Solo Lectura) */}
+                {/* Código */}
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">Código</Label>
                   <Input 
@@ -189,9 +183,9 @@ export function CustomerFormDialog({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre Completo *</FormLabel>
+                      <FormLabel className="!text-foreground">Nombre Completo <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej. Pepe Perez" {...field} />
+                        <Input placeholder="Ej. Juan López" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,12 +198,11 @@ export function CustomerFormDialog({
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Teléfono *</FormLabel>
+                      <FormLabel className="!text-foreground">Teléfono <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="(000) 000-0000" 
                           {...field} 
-                          // Pequeño hack UX: al perder foco limpiar visualmente aunque Zod lo haga al enviar
                           onBlur={(e) => {
                             const clean = e.target.value.replace(/\D/g, '');
                             if(clean) field.onChange(clean);
@@ -266,7 +259,7 @@ export function CustomerFormDialog({
                   name="credit_limit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Límite de Crédito *</FormLabel>
+                      <FormLabel className="!text-foreground">Límite de Crédito <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <MoneyInput 
                           value={field.value}
@@ -285,7 +278,7 @@ export function CustomerFormDialog({
                     control={form.control}
                     name="is_active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg p-3">
                         <div className="space-y-0.5 mr-4">
                           <FormLabel>Activo</FormLabel>
                         </div>
