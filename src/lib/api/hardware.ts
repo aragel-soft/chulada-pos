@@ -34,7 +34,7 @@ export const testPrintTicket = async (
   printerName: string,
   settings: any,
   hardwareConfig: any,
-  logoBytes: number[] | null
+  logoBytes: number[] | Uint8Array | null
 ): Promise<string> => {
   return await invoke("test_print_ticket", { printerName, settings, hardwareConfig, logoBytes });
 };

@@ -127,55 +127,62 @@ export default function TicketDesignPage() {
   const onSubmit = async (values: TicketSettingsFormValues) => {
     if (!fullBusinessSettings || !fullHardwareConfig) return;
 
-    try {
-      let finalLogoPath = values.logoPath || "";
-      const dirtyFields = form.formState.dirtyFields;
-      const businessPatch: Partial<BusinessSettings> = {};
-      let hardwareChanged = false;
+    // Check for changes
+    const { dirtyFields } = form.formState;
+    const hasChanges = Object.keys(dirtyFields).length > 0 || !!imageFile;
 
+    if (!hasChanges) {
+      toast.info("No hay cambios para guardar");
+      return;
+    }
+
+    const saveOperation = async () => {
+      // Work with a copy of values to update logo path
+      const finalValues = { ...values };
+
+      // 1. Image Processing
       if (imageFile) {
-        const arrayBuffer = await imageFile.arrayBuffer();
-        const uint8Array = Array.from(new Uint8Array(arrayBuffer));
-        finalLogoPath = await saveLogoImage(uint8Array, imageFile.name);
-        businessPatch.logoPath = finalLogoPath;
+        const buffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(buffer);
+        const savedPath = await saveLogoImage(uint8Array, imageFile.name);
+        finalValues.logoPath = savedPath;
       }
 
-      if (dirtyFields.ticketHeader) businessPatch.ticketHeader = values.ticketHeader;
-      if (dirtyFields.ticketFooter) businessPatch.ticketFooter = values.ticketFooter;
+      // 2. Business Settings
+      const businessPatch: Partial<BusinessSettings> = {};
+      if (dirtyFields.ticketHeader) businessPatch.ticketHeader = finalValues.ticketHeader;
+      if (dirtyFields.ticketFooter) businessPatch.ticketFooter = finalValues.ticketFooter;
+      if (dirtyFields.logoPath || imageFile) businessPatch.logoPath = finalValues.logoPath;
 
       if (Object.keys(businessPatch).length > 0) {
         await updateBusiness(businessPatch);
-        if (imageFile) {
-          form.setValue("logoPath", finalLogoPath);
-          setImageFile(null);
-        }
       }
 
+      // 3. Hardware
       if (dirtyFields.printerWidth || dirtyFields.paddingLines) {
-        const newHardwareConfig: HardwareConfig = {
+        const newHardware: HardwareConfig = {
           ...fullHardwareConfig!,
-          printerWidth: values.printerWidth,
-          paddingLines: values.paddingLines,
+          printerWidth: finalValues.printerWidth,
+          paddingLines: finalValues.paddingLines,
         };
-        await updateHardware(newHardwareConfig);
-        hardwareChanged = true;
+        await updateHardware(newHardware);
       }
 
-      if (Object.keys(businessPatch).length === 0 && !hardwareChanged && !imageFile) {
-        toast.info("No hay cambios para guardar");
-        return;
-      }
+      return finalValues;
+    };
 
-      toast.success("Diseño actualizado correctamente", {
-        description: "Se han guardado los cambios.",
-        icon: <CheckCircle2 className="h-4 w-4 text-green-600" />
-      });
+    const promise = saveOperation();
+    toast.promise(promise, {
+      loading: 'Guardando cambios...',
+      success: (finalValues) => {
+        form.reset(finalValues);
+        setImageFile(null);
+        return "Diseño actualizado correctamente";
+      },
+      error: "Error al guardar cambios"
+    });
 
-      form.reset(values);
-
-    } catch (error) {
-      toast.error("Error al guardar cambios");
-    }
+    await promise;
   };
 
   const handleTestPrint = async () => {
@@ -198,11 +205,11 @@ export default function TicketDesignPage() {
     };
 
     // Prepare logo bytes
-    let logoBytes: number[] | null = null;
+    let logoBytes: number[] | Uint8Array | null = null;
     if (imageFile) {
       try {
         const buffer = await imageFile.arrayBuffer();
-        logoBytes = Array.from(new Uint8Array(buffer));
+        logoBytes = new Uint8Array(buffer);
       } catch (e) {
       }
     }
@@ -252,16 +259,34 @@ export default function TicketDesignPage() {
   return (
     <ScrollArea className="h-full w-full bg-slate-50/50 dark:bg-transparent">
       <div className="max-w-5xl mx-auto p-6 space-y-8 pb-20">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold tracking-tight">Diseño de Ticket</h2>
-          <p className="text-muted-foreground">
-            Personaliza el encabezado, logo, pie de página y ajustes físicos del papel.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-bold tracking-tight">Diseño de Ticket</h2>
+            <p className="text-muted-foreground">
+              Personaliza el encabezado, logo, pie de página y ajustes físicos del papel.
+            </p>
+          </div>
+          {can('ticket_settings:edit') && (
+            <Button
+              type="submit"
+              form="ticket-design-form"
+              size="default"
+              className="bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap min-w-[140px]"
+              disabled={(!form.formState.isDirty && !imageFile) || form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? "Guardando..." : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar Cambios
+                </>
+              )}
+            </Button>
+          )}
         </div>
         <Separator />
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form id="ticket-design-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Visual Designer Controls */}
@@ -591,21 +616,7 @@ export default function TicketDesignPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              {can('ticket_settings:edit') && (<Button
-                type="submit"
-                size="lg"
-                className="w-full md:w-auto min-w-[200px] rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                disabled={!form.formState.isDirty && !imageFile || form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? "Guardando..." : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Guardar Diseño
-                  </>
-                )}
-              </Button>)}
-            </div>
+
 
           </form>
         </Form>

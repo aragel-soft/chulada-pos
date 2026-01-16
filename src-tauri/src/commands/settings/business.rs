@@ -224,7 +224,7 @@ pub fn update_business_settings(
 }
 
 #[tauri::command]
-pub fn save_logo_image(
+pub async fn save_logo_image(
     app_handle: AppHandle,
     file_data: Vec<u8>,
     file_name: String,
@@ -236,8 +236,10 @@ pub fn save_logo_image(
 
     let images_dir = app_dir.join("images").join("settings");
 
-    fs::create_dir_all(&images_dir)
-        .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
+    if !images_dir.exists() {
+        fs::create_dir_all(&images_dir)
+            .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
+    }
 
     let safe_name = file_name.replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
     let final_name = format!("logo_{}", safe_name);
@@ -245,16 +247,30 @@ pub fn save_logo_image(
 
     fs::write(&file_path, &file_data).map_err(|e| format!("Error al guardar imagen: {}", e))?;
 
-    let stem = file_path.file_stem().unwrap().to_string_lossy();
+    let stem = file_path.file_stem().unwrap().to_string_lossy().to_string();
+    
+    // Process images in async to avoid blocking
+    
+    let file_data_clone_58 = file_data.clone();
     let cache_58_path = images_dir.join(format!("{}_58.bin", stem));
-    if let Ok(bytes_58) = printer_utils::image_bytes_to_escpos(&file_data, 384) {
-        let _ = fs::write(cache_58_path, bytes_58);
-    }
-
+    
+    let file_data_clone_80 = file_data.clone();
     let cache_80_path = images_dir.join(format!("{}_80.bin", stem));
-    if let Ok(bytes_80) = printer_utils::image_bytes_to_escpos(&file_data, 512) {
-        let _ = fs::write(cache_80_path, bytes_80);
-    }
+
+    let handle_58 = tauri::async_runtime::spawn_blocking(move || {
+        if let Ok(bytes_58) = printer_utils::image_bytes_to_escpos(&file_data_clone_58, 384) {
+             let _ = std::fs::write(cache_58_path, bytes_58);
+        }
+    });
+
+    let handle_80 = tauri::async_runtime::spawn_blocking(move || {
+        if let Ok(bytes_80) = printer_utils::image_bytes_to_escpos(&file_data_clone_80, 512) {
+            let _ = std::fs::write(cache_80_path, bytes_80);
+        }
+    });
+
+    let _ = handle_58.await;
+    let _ = handle_80.await;
 
     Ok(file_path.to_string_lossy().to_string())
 }

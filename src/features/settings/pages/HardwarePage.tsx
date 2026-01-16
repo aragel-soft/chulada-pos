@@ -307,7 +307,7 @@ export default function HardwarePage() {
                 disabled={!form.formState.isDirty || isStoreLoading}
               >
                 <Save className="mr-2 h-4 w-4" />
-                "Guardar Cambios"
+                Guardar Cambios
               </Button>)}
             </div>
 

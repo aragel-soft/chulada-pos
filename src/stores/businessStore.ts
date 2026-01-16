@@ -34,19 +34,16 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     set({ isLoading: true });
     try {
       await updateBusinessSettings(patch);
-      // Optimistic update or refetch? simpler to merge locally for now
+      // Optimistic update
       const current = get().settings;
       if (current) {
         set({ settings: { ...current, ...patch }, isLoading: false });
       } else {
-        // Should retry fetch if current is null, but let's just fetch
         const refreshed = await getBusinessSettings();
         set({ settings: refreshed, isLoading: false });
       }
-      toast.success("Configuración de negocio actualizada");
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
-      toast.error("Error actualizando negocio");
       throw err;
     }
   },
