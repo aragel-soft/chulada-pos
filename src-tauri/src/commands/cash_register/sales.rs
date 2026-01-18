@@ -22,6 +22,7 @@ pub struct SaleRequest {
     pub card_transfer_amount: f64,
     pub notes: Option<String>,
     pub items: Vec<SaleItemRequest>,
+    pub should_print: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,6 +88,7 @@ fn get_store_prefix(conn: &Connection) -> String {
 
 #[tauri::command]
 pub fn process_sale(
+    app_handle: tauri::AppHandle,
     db: State<Mutex<Connection>>,
     payload: SaleRequest,
 ) -> Result<SaleResponse, String> {
@@ -166,6 +168,7 @@ pub fn process_sale(
     let sale_id = Uuid::new_v4().to_string();
     let now = chrono::Local::now();
     let date_str = now.format("%Y-%m-%d").to_string();
+    // time_str removed
     let store_prefix = get_store_prefix(&tx);
     let folio = generate_smart_folio(&tx, &store_prefix, &date_str)?;
 
@@ -186,7 +189,7 @@ pub fn process_sale(
         params![
             sale_id,
             folio,
-            total_gross, // Subtotal is Gross (before any discount)
+            total_gross,
             payload.discount_percentage, // This is explicitly the global discount percentage // To Do: Isn't working 
             total_item_discounts,// To Do: Isn't working,
             final_total,
@@ -201,7 +204,7 @@ pub fn process_sale(
     ).map_err(|e| format!("Error insertando venta: {}", e))?;
 
     // Update Inventory & Insert Items
-    for data in final_items {
+    for data in &final_items {
         let item = data.original_req;
         
         // Decrease stock
@@ -241,9 +244,22 @@ pub fn process_sale(
 
     // Commit
     tx.commit().map_err(|e| e.to_string())?;
-
+    
     // Calculate change
     let change = if total_paid > final_total { total_paid - final_total } else { 0.0 };
+    
+    let app_handle_clone = app_handle.clone();
+
+    // PRINTING LOGIC
+    if payload.should_print {
+        let sale_id_clone = sale_id.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(e) = crate::printer_utils::print_sale_from_db(app_handle_clone, sale_id_clone) {
+                // We log the error but we don't return it because the sale is already committed.
+                println!("Error imprimiendo ticket de venta: {}", e);
+            }
+        });
+    }
 
     Ok(SaleResponse {
         id: sale_id,

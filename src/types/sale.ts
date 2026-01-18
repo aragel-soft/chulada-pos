@@ -14,6 +14,7 @@ export interface SaleRequest {
   card_transfer_amount: number;
   notes: string | null;
   items: SaleItemRequest[];
+  should_print: boolean;
 }
 
 export interface SaleResponse {

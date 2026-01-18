@@ -18,6 +18,8 @@ import { MAX_OPEN_TICKETS } from "@/config/constants";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
 import { useHotkeys } from "@/hooks/use-hotkeys";
+import { printSaleTicket } from "@/lib/api/cash-register/sales";
+import { useSalesStore } from "@/features/sales/stores/salesStore";
 
 import {
   AlertDialog,
@@ -57,12 +59,7 @@ export default function SalesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [lastSaleInfo, setLastSaleInfo] = useState<{
-      total: number;
-      paid: number;
-      change: number;
-      method: string;
-  } | null>(null);
+  const { lastSale, setLastSale } = useSalesStore();
 
   // F12 Trigger
   useHotkeys('f12', () => {
@@ -139,7 +136,8 @@ export default function SalesPage() {
           cashAmount,
           cardAmount,
           user.id,
-          shift.id.toString()
+          shift.id.toString(),
+          shouldPrint
       );
 
       if (result) {
@@ -149,19 +147,31 @@ export default function SalesPage() {
           });
           
           if (shouldPrint) {
-              toast.info("Imprimiendo ticket...", { duration: 2000 });
-              // await printTicket(result.id); 
+              toast.info("Ticket enviado a imprimir");
           }
 
-          setLastSaleInfo({
+          setLastSale({
+              id: result.id,
               total: result.total,
               paid: cashAmount + cardAmount,
               change: result.change,
-              method
+              method,
+              folio: result.folio
           });
 
           setIsCheckoutOpen(false);
           clearTicket();
+      }
+  };
+
+  const handleReprint = async () => {
+      if (!lastSale?.id) return;
+      try {
+          toast.info("Imprimiendo copia de ticket...");
+          await printSaleTicket(lastSale.id);
+          toast.success("Ticket reimpreso correctamente");
+      } catch (error) {
+          toast.error("Error al reimprimir ticket", { description: String(error) });
       }
   };
 
@@ -214,25 +224,26 @@ export default function SalesPage() {
           <div>
             <span className="text-xs text-muted-foreground block">Total (Anterior)</span>
             <span className="text-xl font-bold text-zinc-500">
-              {lastSaleInfo ? formatCurrency(lastSaleInfo.total) : "$0.00"}
+              {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
             </span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">
               Pagó con
             </span>
-            <span className="text-xl font-bold">{lastSaleInfo ? formatCurrency(lastSaleInfo.paid) : "$0.00"}</span>
+            <span className="text-xl font-bold">{lastSale ? formatCurrency(lastSale.paid) : "$0.00"}</span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">Cambio</span>
-            <span className="text-xl font-bold text-green-600">{lastSaleInfo ? formatCurrency(lastSaleInfo.change) : "$0.00"}</span>
+            <span className="text-xl font-bold text-green-600">{lastSale ? formatCurrency(lastSale.change) : "$0.00"}</span>
           </div>
           <div className="flex justify-end items-center">
             <Button
               variant="outline"
               size="sm"
               className="border-[#480489] text-[#480489] hover:bg-purple-50"
-              onClick={() => toast.info("Reimpresión no implementada aún")} 
+              onClick={handleReprint}
+              disabled={!lastSale}
             >
               <Printer className="w-4 h-4 mr-2" /> Re-imprimir ticket
             </Button>

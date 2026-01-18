@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { CartItem } from '../stores/cartStore';
 import { SaleItemRequest, SaleRequest, SaleResponse } from '@/types/sale';
+import { processSale as processSaleApi } from '@/lib/api/cash-register/sales';
 
 export function useProcessSale() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -13,7 +13,8 @@ export function useProcessSale() {
     cashAmount: number,
     cardAmount: number,
     userId: string,
-    shiftId: string
+    shiftId: string,
+    shouldPrint: boolean
   ): Promise<SaleResponse | null> => {
     setIsProcessing(true);
     try {
@@ -33,14 +34,12 @@ export function useProcessSale() {
         card_transfer_amount: cardAmount,
         notes: null,
         items: saleItems,
+        should_print: shouldPrint,
       };
-      console.log('Sale Payload:', payload);
 
-      const response = await invoke<SaleResponse>('process_sale', { payload });
-      console.log('Sale Response:', response);
+      const response = await processSaleApi(payload);
       return response;
     } catch (error) {
-      console.error('Sale Error:', error);
       toast.error('Error al procesar venta', {
         description: String(error),
       });

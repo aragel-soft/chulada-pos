@@ -34,7 +34,10 @@ pub fn get_business_settings(
     state: State<'_, Mutex<Connection>>,
 ) -> Result<BusinessSettings, String> {
     let conn = state.lock().map_err(|e| e.to_string())?;
+    fetch_business_settings(&conn)
+}
 
+pub fn fetch_business_settings(conn: &Connection) -> Result<BusinessSettings, String> {
     let mut stmt = conn
         .prepare("SELECT key, value FROM system_settings")
         .map_err(|e| e.to_string())?;
