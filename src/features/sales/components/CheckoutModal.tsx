@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle } from "lucide-react";
@@ -25,7 +25,7 @@ interface CheckoutModalProps {
   ) => Promise<void>;
   isProcessing: boolean;
 }
-
+// Payment methods
 type PaymentMethod = "cash" | "card_transfer" | "mixed" | "credit";
 
 const QUICK_CASH_AMOUNTS = [20, 50, 100, 200, 500, 1000];
@@ -50,7 +50,6 @@ export function CheckoutModal({
       setMethod("cash");
       setCashAmount(total.toString());
       setCardAmount("");
-      // Autofocus logic is handled by Radix Dialog typically, but we force it
       setTimeout(() => cashInputRef.current?.focus(), 100);
     }
   }, [isOpen, total]);
@@ -66,10 +65,6 @@ export function CheckoutModal({
       setCashAmount("0");
     } else if (method == "cash") {
         setCardAmount("0");
-        // Ensure cash amount matches total if we switch back to cash? 
-        // User might want to keep what they typed. But let's check requirement: "Si se abre la modal automaticamente se pone en total".
-        // Switching methods isn't "opening the modal", so we leave it as is or reset?
-        // Let's leave it to user input unless it's startup. 
     }
   }, [method, total]);
 
@@ -85,7 +80,6 @@ export function CheckoutModal({
   }, [cashAmount, method, total]);
 
   const handleNumericInput = (value: string, setter: (val: string) => void) => {
-      // Allow empty string, or positive numbers/decimals only
       if (value === "" || /^\d*\.?\d*$/.test(value)) {
           setter(value);
       }
@@ -165,7 +159,6 @@ export function CheckoutModal({
   };
 
   const addQuickCash = (amount: number) => {
-      // Logic: Replace value (as requested, and common behavior)
       setCashAmount(amount.toString());
       if (cashInputRef.current) {
           cashInputRef.current.focus();
@@ -227,7 +220,7 @@ export function CheckoutModal({
             />
           </div>
 
-          {/* Right: Inputs & Details */}
+          {/*Inputs & Details */}
           <div className="flex-1 p-8 bg-white flex flex-col justify-center space-y-6">
             
             {method === "cash" && (
@@ -235,10 +228,10 @@ export function CheckoutModal({
                     <div className="space-y-4">
                         <label className="text-lg font-medium block">¿Con cuánto paga?</label>
                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-6xl font-bold text-zinc-400">$</span>
-                            <Input
+                            <MoneyInput
                                 ref={cashInputRef}
                                 className="pl-16 h-32 !text-7xl font-bold shadow-sm"
+                                symbolClassName="left-4 top-1/2 -translate-y-1/2 text-6xl text-zinc-400"
                                 value={cashAmount}
                                 onChange={(e) => handleNumericInput(e.target.value, setCashAmount)}
                                 onFocus={(e) => e.target.select()}
@@ -278,10 +271,10 @@ export function CheckoutModal({
                         <div className="space-y-2">
                              <label className="text-sm font-medium">Efectivo</label>
                              <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-4xl">$</span>
-                                <Input
+                                <MoneyInput
                                     ref={cashInputRef}
                                     className="pl-12 h-24 !text-5xl font-bold"
+                                    symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                                     value={cashAmount}
                                     onChange={(e) => handleNumericInput(e.target.value, setCashAmount)} // Validation
                                     placeholder="0.00"
@@ -292,12 +285,12 @@ export function CheckoutModal({
                         <div className="space-y-2">
                              <label className="text-sm font-medium">Tarjeta (Automático)</label>
                              <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-4xl">$</span>
-                                <Input
+                                <MoneyInput
                                     ref={cardInputRef}
                                     className="pl-12 h-24 !text-5xl font-bold bg-zinc-50"
+                                    symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                                     value={cardAmount}
-                                    readOnly // Auto-calculated
+                                    readOnly
                                     tabIndex={-1}
                                     placeholder="0.00"
                                 />
