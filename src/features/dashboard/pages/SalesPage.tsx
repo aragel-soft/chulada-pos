@@ -63,7 +63,7 @@ export default function SalesPage() {
 
   // F12 Trigger
   useHotkeys('f12', () => {
-       if (ticketTotal > 0 && shift?.status === 'open' && !isCheckoutOpen) {
+       if (ticketTotal > 0 && shift?.status === 'open' && !isCheckoutOpen && can("sales:create")) {
            setIsCheckoutOpen(true);
        }
   }, [ticketTotal, shift, isCheckoutOpen]);
@@ -369,7 +369,8 @@ export default function SalesPage() {
             </span>
           </div>
 
-          <Button
+          {can("sales:create") && (
+            <Button
             className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
             disabled={!shift || shift.status !== "open" || ticketTotal === 0}
             onClick={() => setIsCheckoutOpen(true)}
@@ -377,7 +378,8 @@ export default function SalesPage() {
             <Wallet className="w-5 h-5 mr-2" />
             Cobrar (F12)
           </Button>
-        </div>
+          )}
+          </div>
       </div>
 
       {/* Dialog de Confirmación para Cerrar Ticket con Productos */}
