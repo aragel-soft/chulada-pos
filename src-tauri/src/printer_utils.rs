@@ -1,5 +1,7 @@
 use image::imageops::FilterType;
 use image::DynamicImage;
+use std::sync::Mutex;
+use tauri::State;
 
 // TODO: CHECK IN A BETTER PRITER WITH LOGOS WITH ALOT OF BLACK IN IT
 pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<u8>, String> {
@@ -93,7 +95,7 @@ pub struct TicketData {
     pub date: String,
     pub items: Vec<TicketItem>,
     pub subtotal: f64,
-    pub discount: f64, // Global discount
+    pub discount: f64,
     pub total: f64,
     pub paid_amount: f64,
     pub change: f64,
@@ -108,11 +110,7 @@ pub struct TicketItem {
     pub total: f64,
 }
 
-// ... imports
-use std::sync::Mutex;
-use tauri::State;
 
-// ... existing code ...
 
 pub fn print_sale_from_db(
     app_handle: tauri::AppHandle,
@@ -125,13 +123,13 @@ pub fn print_sale_from_db(
     let db_state: State<Mutex<Connection>> = app_handle.state();
     let conn = db_state.lock().map_err(|e| e.to_string())?;
 
-    // 1. Fetch Sale Data & Settings from DB
+    // Fetch Sale Data & Settings from DB
     let (sale_info, items, business_settings) = {
         // Fetch Settings
         let settings = fetch_business_settings(&conn)
              .unwrap_or_else(|_| crate::commands::settings::business::BusinessSettings {
                 store_name: "Error loading settings".to_string(),
-                logical_store_name: "store".to_string(),
+                logical_store_name: "store-main".to_string(),
                 store_address: "".to_string(),
                 ticket_header: "".to_string(),
                 ticket_footer: "".to_string(),
@@ -214,7 +212,7 @@ pub fn print_ticket(
     data: TicketData,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-// ... existing print_ticket implementation ...
+
     let printers_list = printers::get_printers();
     let printer = printers_list
         .iter()
@@ -223,13 +221,13 @@ pub fn print_ticket(
 
     let mut job_content = Vec::new();
 
-    // Init
-    job_content.extend_from_slice(b"\x1B\x40");
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    // Init configuration
+    job_content.extend_from_slice(b"\x1B\x40"); // Initialize
+    job_content.extend_from_slice(b"\x1B\x74\x00"); // Code table PC437
 
-    // --- 1. LOGO ---
+    // LOGO
     let width_val = data.hardware_config.printer_width.parse::<u32>().unwrap_or(80);
-    let max_width = if width_val == 58 { 384 } else { 512 };
+    let (max_width, max_chars) = if width_val == 58 { (384, 32) } else { (512, 48) };
 
     let mut logo_cmds: Option<Vec<u8>> = None;
     let settings = &data.business_settings;
@@ -252,7 +250,6 @@ pub fn print_ticket(
              let suffix = if max_width <= 384 { "_58.bin" } else { "_80.bin" };
              let path_obj = Path::new(&logo_path_str);
              
-             // Try cached bin
              if let Some(stem) = path_obj.file_stem() {
                  let parent = path_obj.parent().unwrap_or(Path::new(""));
                  let bin_path = parent.join(format!("{}{}", stem.to_string_lossy(), suffix));
@@ -263,7 +260,6 @@ pub fn print_ticket(
                  }
              }
 
-             // Convert if no cache
              if logo_cmds.is_none() {
                  match image_to_escpos(&logo_path_str, max_width) {
                      Ok(cmds) => logo_cmds = Some(cmds),
@@ -274,44 +270,105 @@ pub fn print_ticket(
     }
 
     if let Some(cmds) = logo_cmds {
+        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
         job_content.extend_from_slice(&cmds);
         job_content.extend_from_slice(b"\n");
     }
 
-    // --- 2. HEADER ---
+    // STORE INFO
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    
+    // Store Name
+    if !settings.store_name.is_empty() {
+        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
+        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    }
+
+    // Store Address
+    if !settings.store_address.is_empty() {
+        job_content.extend_from_slice(format!("{}\n", settings.store_address).as_bytes());
+    }
+    
+    job_content.extend_from_slice(b"\n");
+
+    // HEADER
     if !settings.ticket_header.is_empty() {
         job_content.extend_from_slice(settings.ticket_header.as_bytes());
         job_content.extend_from_slice(b"\n\n");
     }
 
-    // --- 3. BODY ---
+    // TICKET INFO
     job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
     job_content.extend_from_slice(format!("Folio: {}\n", data.folio).as_bytes());
     job_content.extend_from_slice(format!("Fecha: {}\n", data.date).as_bytes());
     if let Some(cust) = data.customer_name {
         job_content.extend_from_slice(format!("Cliente: {}\n", cust).as_bytes());
     }
-    job_content.extend_from_slice(b"--------------------------------\n");
-    job_content.extend_from_slice(b"CANT  DESCRIPCION       IMPORTE\n");
-    job_content.extend_from_slice(b"--------------------------------\n");
+
+    // ITEMS
+    
+    let qty_w = 4;
+    let total_w = 9; 
+    let sp = 1;
+    let desc_w = max_chars as usize - qty_w - total_w - (sp * 2);
+    
+    // Separator line
+    let separator = "-".repeat(max_chars as usize);
+    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+    
+    // Headers
+    let header_qty = "CANT";
+    let header_desc = "DESCRIPCION";
+    let header_imp = "IMPORTE";
+    
+    let header_line = format!(
+        "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n", 
+        header_qty, header_desc, header_imp,
+        w_qty = qty_w, w_desc = desc_w, w_tot = total_w
+    );
+    // Truncate if header labels are too long
+    if header_line.len() > max_chars as usize + 1 {
+         job_content.extend_from_slice(b"CANT DESCRIPCION IMPORTE\n");
+    } else {
+         job_content.extend_from_slice(header_line.as_bytes());
+    }
+
+    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
 
     for item in data.items {
-        // Simple formatting: Quantity (5 chars) | Desc (Truncated) | Total
-        // This is a basic implementation, can be improved for proper column alignment
-        let desc = if item.description.len() > 18 {
-            format!("{}...", &item.description[0..15])
+        let quantity_str = format!("{:<.2}", item.quantity);
+        let quantity_display = if quantity_str.len() > qty_w {
+             &quantity_str[0..qty_w]
         } else {
-             format!("{:<18}", item.description)
+             &quantity_str
         };
-        
-        // 1.00  Coca Cola...      25.00
-        let line = format!("{:<5.2} {} {:>8.2}\n", item.quantity, desc, item.total);
-        job_content.extend_from_slice(line.as_bytes());
+
+        let total_str = format!("{:.2}", item.total);
+
+        let clean_desc = remove_accents(&item.description);
+        let desc_display = if clean_desc.chars().count() > desc_w {
+            clean_desc.chars().take(desc_w).collect::<String>()
+        } else {
+            clean_desc
+        };
+
+        job_content.extend_from_slice(
+             format!(
+                 "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
+                 quantity_display,
+                 desc_display,
+                 total_str,
+                 w_qty = qty_w, 
+                 w_desc = desc_w, 
+                 w_tot = total_w
+             ).as_bytes()
+        );
     }
     
-    job_content.extend_from_slice(b"--------------------------------\n");
+    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
     
-    // Totals
+    // TOTALS
     job_content.extend_from_slice(b"\x1B\x61\x02"); // Right align
     job_content.extend_from_slice(format!("SUBTOTAL: {:>10.2}\n", data.subtotal).as_bytes());
     if data.discount > 0.0 {
@@ -324,15 +381,13 @@ pub fn print_ticket(
     job_content.extend_from_slice(format!("EFECTIVO/PAGO: {:>10.2}\n", data.paid_amount).as_bytes());
     job_content.extend_from_slice(format!("CAMBIO: {:>10.2}\n", data.change).as_bytes());
 
-    // --- 4. FOOTER ---
+    // FOOTER
     job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
     if !settings.ticket_footer.is_empty() {
         job_content.extend_from_slice(b"\n");
         job_content.extend_from_slice(settings.ticket_footer.as_bytes());
         job_content.extend_from_slice(b"\n");
     }
-
-    job_content.extend_from_slice(b"\nGracias por su compra!\n");
 
     // Cut
     job_content.extend_from_slice(b"\n\n\n\x1D\x56\x42\x00");
@@ -343,4 +398,19 @@ pub fn print_ticket(
         .map_err(|e| format!("Error imprimiendo: {:?}", e))?;
 
     Ok(())
+}
+
+fn remove_accents(s: &str) -> String {
+   // Remove accents from string for alignment purposes
+    s.chars()
+        .map(|c| match c {
+            'á' | 'Á' => 'a',
+            'é' | 'É' => 'e',
+            'í' | 'Í' => 'i',
+            'ó' | 'Ó' => 'o',
+            'ú' | 'Ú' => 'u',
+            'ñ' | 'Ñ' => 'n',
+            _ => if c.is_ascii() { c } else { '?' },
+        })
+        .collect()
 }

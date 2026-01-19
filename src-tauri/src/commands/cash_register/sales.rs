@@ -83,7 +83,7 @@ fn get_store_prefix(conn: &Connection) -> String {
         [],
         |row| row.get(0),
     )
-    .unwrap_or_else(|_| "STORE".to_string())
+    .unwrap_or_else(|_| "store-main".to_string())
 }
 
 #[tauri::command]
@@ -173,11 +173,11 @@ pub fn process_sale(
     let folio = generate_smart_folio(&tx, &store_prefix, &date_str)?;
 
     let inventory_store_id: String = tx.query_row(
-        "SELECT value FROM system_settings WHERE key = 'current_store_id'",
+        "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
         [],
         |row| row.get(0)
     ).unwrap_or_else(|_| "store-main".to_string());
-
+    println!("Inventory Store ID: {}", inventory_store_id);
     let has_discount = total_item_discounts > 0.0; // ToDo: Discount is not implemented
 
     tx.execute(
