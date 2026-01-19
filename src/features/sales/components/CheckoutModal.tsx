@@ -106,11 +106,11 @@ export function CheckoutModal({
   };
 
   // Keyboard navigation
-  useHotkeys("ArrowRight", () => {
+  useHotkeys("ArrowDown", () => {
       if(isOpen) handleNextMethod();
   }, [isOpen, method]);
   
-  useHotkeys("ArrowLeft", () => {
+  useHotkeys("ArrowUp", () => {
       if(isOpen) handlePrevMethod();
   }, [isOpen, method]);
 
@@ -200,7 +200,7 @@ export function CheckoutModal({
               onClick={() => setMethod("cash")}
               icon={<Banknote className="w-6 h-6" />}
               label="Efectivo"
-              shortcut="←/→"
+              shortcut="↑/↓"
             />
             <MethodButton
               active={method === "card_transfer"}
