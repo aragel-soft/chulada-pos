@@ -62,6 +62,8 @@ fn main() {
             commands::inventory::kits::get_kits,
             commands::inventory::kits::check_products_in_active_kits,
             commands::inventory::kits::create_kit,
+            // Inventory - Promotions
+            commands::inventory::promotions::get_promotions,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
