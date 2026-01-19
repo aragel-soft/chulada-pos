@@ -42,6 +42,7 @@ fn main() {
             commands::settings::hardware::test_printer_connection,
             commands::settings::hardware::test_cash_drawer,
             commands::printer::test_print_ticket,
+            commands::printer::print_sale_ticket,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
@@ -69,6 +70,7 @@ fn main() {
             commands::cash_register::movements::register_cash_movement,
             commands::cash_register::details::get_shift_details,
             commands::cash_register::details::get_closed_shifts,
+            commands::cash_register::sales::process_sale,
             // Settings - Business
             commands::settings::business::get_business_settings,
             commands::settings::business::update_business_settings,
