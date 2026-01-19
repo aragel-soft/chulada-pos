@@ -67,6 +67,7 @@ pub fn get_promotions(
     Some("start_date") => "p.start_date",
     Some("end_date") => "p.end_date",
     Some("status") => "p.end_date", 
+    Some("items_summary") => "items_summary",
     _ => "p.created_at",
   };
 
