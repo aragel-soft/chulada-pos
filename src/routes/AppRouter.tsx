@@ -22,6 +22,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
 import CategoriesPage from '@/features/inventory/pages/CategoriesPage';
 import KitsPage from '@/features/inventory/pages/KitsPage';
+import PromotionsPage from '@/features/inventory/pages/PromotionsPage';
 
 // --- Ruta Protegida ---
 import ProtectedRoute from './ProtectedRoute';
@@ -128,7 +129,17 @@ const router = createBrowserRouter([
           {
             path: "kits",
             element: (
-              <KitsPage />
+              <ProtectedRoute module="kits:view">
+                <KitsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "promotions",
+            element: (
+              <ProtectedRoute module="promotions:view">
+                <PromotionsPage />
+              </ProtectedRoute>
             ),
           }
         ]
