@@ -18,6 +18,11 @@ const inventoryTabs = [
     value: 'kits',
     label: 'Kits',
     permission: 'kits:view',
+  },
+  {
+    value: 'promotions',
+    label: 'Promociones',
+    permission: 'promotions:view',
   }
 ];
 
