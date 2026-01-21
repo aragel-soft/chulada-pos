@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, FilterX, CalendarIcon } from "lucide-react";
+import { Search, FilterX, CalendarIcon, Check, ChevronsUpDown,  } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,6 +19,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { es } from "date-fns/locale";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { useQuery } from "@tanstack/react-query";
+import { getUsersList } from "@/lib/api/users";
+import { useEffect, useState } from "react";
 
 interface FiltersPanelProps {
   filters: SalesHistoryFilter;
@@ -35,6 +46,26 @@ export function FiltersPanel({
   isCollapsed,
   onToggleCollapse,
 }: FiltersPanelProps) {
+  const [openUserSelect, setOpenUserSelect] = useState(false);
+
+  const { data: users = [] } = useQuery({
+    queryKey: ["users-list-filter"],
+    queryFn: () => getUsersList({ include_deleted: true }),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  useEffect(() => {
+    if (filters.start_date && filters.end_date) {
+      const start = new Date(filters.start_date + "T00:00:00");
+      const end = new Date(filters.end_date + "T00:00:00");
+      if (start > end) {
+        actions.setDateRange(end, start);
+      }
+    }
+  }, [filters.start_date, filters.end_date]);
+
+  const selectedUser = users.find((u: any) => u.id === filters.user_id);
+
   if (isCollapsed) {
     return (
       <div
@@ -86,20 +117,32 @@ export function FiltersPanel({
         <Label>Rango de Fechas</Label>
         <div className="grid gap-2">
           <DateSelector
-            date={filters.start_date ? new Date((filters.start_date + "T00:00:00")) : undefined}
+            date={
+              filters.start_date
+                ? new Date(filters.start_date + "T00:00:00")
+                : undefined
+            }
             onSelect={(d) =>
               actions.setDateRange(
                 d,
-                filters.end_date ? new Date((filters.end_date + "T00:00:00")) : null,
+                filters.end_date
+                  ? new Date(filters.end_date + "T00:00:00")
+                  : null,
               )
             }
             placeholder="Inicio"
           />
           <DateSelector
-            date={filters.end_date ? new Date((filters.end_date + "T00:00:00")) : undefined}
+            date={
+              filters.end_date
+                ? new Date(filters.end_date + "T00:00:00")
+                : undefined
+            }
             onSelect={(d) =>
               actions.setDateRange(
-                filters.start_date ? new Date((filters.start_date + "T00:00:00")) : null,
+                filters.start_date
+                  ? new Date(filters.start_date + "T00:00:00")
+                  : null,
                 d,
               )
             }
@@ -144,6 +187,76 @@ export function FiltersPanel({
             <SelectItem value="credit">Crédito</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Vendedor</Label>
+        <Popover open={openUserSelect} onOpenChange={setOpenUserSelect}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={openUserSelect}
+              className="w-full justify-between font-normal"
+            >
+              {selectedUser
+                ? selectedUser.full_name || selectedUser.username
+                : "Todos los usuarios"}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-0">
+            <Command>
+              <CommandInput placeholder="Buscar vendedor..." />
+              <CommandList>
+                <CommandEmpty>No encontrado.</CommandEmpty>
+                <CommandGroup>
+                  {/* Opción para limpiar filtro */}
+                  <CommandItem
+                    value="all_users_reset"
+                    onSelect={() => {
+                      actions.setUserId(null); // Asegúrate que tu action soporte esto
+                      setOpenUserSelect(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        !filters.user_id ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    Todos los usuarios
+                  </CommandItem>
+
+                  {/* Lista de usuarios */}
+                  {users.map((user: any) => (
+                    <CommandItem
+                      key={user.id}
+                      value={user.full_name || user.username} // Esto se usa para el filtrado interno del command
+                      onSelect={() => {
+                        // Si ya estaba seleccionado, lo quitamos (toggle), si no, lo ponemos
+                        actions.setUserId(
+                          user.id === filters.user_id ? null : user.id,
+                        );
+                        setOpenUserSelect(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          filters.user_id === user.id
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {user.full_name || user.username}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Advanced Product Search */}
@@ -207,7 +320,7 @@ function DateSelector({
           mode="single"
           selected={date}
           onSelect={onSelect}
-          className="rounded-lg border" 
+          className="rounded-lg border"
         />
       </PopoverContent>
     </Popover>

@@ -52,6 +52,8 @@ export const useSalesHistory = () => {
     setPaymentMethod: (method: string) => setFilters((prev) => ({ ...prev, payment_method: method, page: 1 })),
     
     resetFilters: () => setFilters(INITIAL_FILTER),
+
+    setUserId: (id: string | null) => setFilters((prev) => ({ ...prev, user_id: id, page: 1 })),
   };
 
   return {

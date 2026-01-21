@@ -119,7 +119,7 @@ pub fn get_sales_history(
   if let Some(folio) = &filter.folio {
     if !folio.is_empty() {
       where_clauses.push("s.folio LIKE ?".to_string());
-      params.push(Box::new(format!("{}%", folio)));
+      params.push(Box::new(format!("%{}%", folio)));
     }
   }
 
