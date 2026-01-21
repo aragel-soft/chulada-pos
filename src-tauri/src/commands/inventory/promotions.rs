@@ -66,7 +66,13 @@ pub fn get_promotions(
     Some("combo_price") => "p.combo_price",
     Some("start_date") => "p.start_date",
     Some("end_date") => "p.end_date",
-    Some("status") => "p.end_date", 
+    Some("status") => "
+          CASE 
+            WHEN p.is_active = 0 THEN 'inactive'
+            WHEN p.end_date < date('now', 'localtime') THEN 'expired'
+            WHEN p.start_date > date('now', 'localtime') THEN 'scheduled'
+            ELSE 'active'
+          END",
     Some("items_summary") => "items_summary",
     _ => "p.created_at",
   };

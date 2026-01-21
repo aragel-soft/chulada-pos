@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatCurrency } from "@/lib/utils";
 
 export const columns: ColumnDef<Promotion>[] = [
 {
@@ -70,12 +71,8 @@ export const columns: ColumnDef<Promotion>[] = [
       <DataTableColumnHeader column={column} title="Precio" />
     ),
     cell: ({ row }) => {
-      const price = parseFloat(row.getValue("combo_price"));
-      const formatted = new Intl.NumberFormat("es-MX", {
-        style: "currency",
-        currency: "MXN",
-      }).format(price);
-      return <div className="font-medium">{formatted}</div>;
+      const price = row.getValue("combo_price") as number;
+      return <div className="font-medium">{formatCurrency(price)}</div>;
     },
   },
   {
