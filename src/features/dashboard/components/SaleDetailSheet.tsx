@@ -9,6 +9,13 @@ import { Loader2, Package, Gift, Tag, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AppAvatar } from "@/components/ui/app-avatar";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
 
 interface SaleDetailSheetProps {
   saleId: string | null;
@@ -29,6 +36,12 @@ export function SaleDetailSheet({ saleId, isOpen, onClose }: SaleDetailSheetProp
             <div className="flex items-center justify-between">
                 <SheetTitle className="text-2xl font-mono">{sale?.folio || 'Cargando...'}</SheetTitle>
                 {sale?.status === 'cancelled' && <Badge variant="destructive">CANCELADA</Badge>}
+                {sale?.is_credit && (<Badge className="bg-indigo-600 hover:bg-indigo-700 text-white border-none">A CRÉDITO</Badge>)}
+                {(sale?.has_discount || (sale?.discount_global_percent ?? 0) > 0) && (
+                    <Badge className="bg-orange-600 hover:bg-orange-700 text-white border-none flex items-center gap-1">
+                        <Tag className="w-3 h-3 text-white" />CON DESCUENTO
+                    </Badge>
+                    )}
             </div>
             <SheetDescription>
                 {sale ? format(new Date(sale.sale_date), "PPP 'a las' p", { locale: es }) : '...'}
@@ -137,31 +150,69 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
     return (
         <tr className="group">
             <td className="py-3 pr-2">
-                <div className="flex flex-col">
-                    <span className="font-medium text-gray-900">{item.product_name}</span>
-                    
-                    {/* BADGES */}
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                        {item.price_type === 'wholesale' && (
-                            <Badge variant="outline" className="h-5 px-1 text-[10px] bg-blue-50 text-blue-700 border-blue-200">
-                                MAYOREO
-                            </Badge>
+                <div className="flex items-center gap-3">
+                    {/* IMAGE */}
+                    <div className="flex items-center justify-center shrink-0">
+                        <HoverCard>
+                        <HoverCardTrigger asChild>
+                            <div className="cursor-pointer">
+                            <AppAvatar 
+                                name={item.product_name} 
+                                path={item.product_image} 
+                                className="h-9 w-9 border border-zinc-200" 
+                                variant="muted"
+                            />
+                            </div>
+                        </HoverCardTrigger>
+                        
+                        {item.product_image && (
+                            <HoverCardContent 
+                            className="w-64 p-0 overflow-hidden border-2 z-50 bg-white" 
+                            side="right" 
+                            align="start"
+                            >
+                            <ProductImagePreview 
+                                path={item.product_image} 
+                                alt={item.product_name} 
+                            />
+                            </HoverCardContent>
                         )}
-                        {item.price_type === 'promo' && (
-                            <Badge variant="outline" className="h-5 px-1 text-[10px] bg-purple-50 text-purple-700 border-purple-200">
-                                <Tag className="w-3 h-3 mr-1"/> PROMO
-                            </Badge>
-                        )}
-                        {item.is_kit_item && item.is_gift && (
-                            <Badge className="h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100">
-                                <Gift className="w-3 h-3 mr-1"/> REGALO
-                            </Badge>
-                        )}
-                         {item.is_kit_item && !item.is_gift && (
-                            <Badge variant="secondary" className="h-5 px-1 text-[10px]">
-                                <Package className="w-3 h-3 mr-1"/> KIT
-                            </Badge>
-                        )}
+                        </HoverCard>
+                    </div>
+
+                    <div className="flex flex-col items-start gap-0.5">
+                        {/* NAME */}
+                        <span className="font-medium text-gray-900 line-clamp-1">
+                            {item.product_name}
+                        </span>
+
+                        {/* BADGES */}
+                        <div className="flex gap-1 flex-wrap">
+                            {item.price_type === 'wholesale' && (
+                                <Badge variant="outline" className="h-5 px-1 text-[10px] bg-amber-100 text-amber-700 border-amber-200 font-bold">
+                                    MAYOREO
+                                </Badge>
+                            )}
+                            {item.price_type === 'promo' && (
+                                <Badge variant="outline" className="h-5 px-1 text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                                    <Tag className="w-3 h-3 mr-1"/> 
+                                    {item.promotion_name 
+                                        ? `PROMO: ${item.promotion_name.toUpperCase()}` 
+                                        : 'PROMO'
+                                    }
+                                </Badge>
+                            )}
+                            {item.is_kit_item && item.is_gift && (
+                                <Badge className="h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100">
+                                    <Gift className="w-3 h-3 mr-1"/> REGALO
+                                </Badge>
+                            )}
+                            {item.is_kit_item && !item.is_gift && (
+                                <Badge variant="secondary" className="h-5 px-1 text-[10px]">
+                                    <Package className="w-3 h-3 mr-1"/> KIT
+                                </Badge>
+                            )}
+                        </div>
                     </div>
                 </div>
             </td>

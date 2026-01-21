@@ -71,6 +71,7 @@ pub struct SaleItemView {
   pub is_kit_item: bool,
   pub is_gift: bool, // quantity > 0 && price == 0
   pub product_image: Option<String>,
+  pub promotion_name: Option<String>,
 }
 
 #[tauri::command]
@@ -153,8 +154,8 @@ pub fn get_sales_history(
 
   let list_sql = format!(
     "SELECT 
-        s.id, s.folio, s.sale_date, s.status, s.payment_method, s.total, 
-        u.username as user_name, s.has_discount
+      s.id, s.folio, s.sale_date, s.status, s.payment_method, s.total, 
+      u.username as user_name, s.has_discount
      FROM sales s
      LEFT JOIN users u ON s.user_id = u.id
      WHERE {}
@@ -266,9 +267,10 @@ pub fn get_sale_details(
     SELECT 
       si.id, si.product_name, si.quantity, si.unit_price, si.subtotal,
       si.price_type, si.is_kit_item,
-      p.image_url
+      p.image_url, pr.name as promotion_name
     FROM sale_items si
     LEFT JOIN products p ON si.product_id = p.id
+    LEFT JOIN promotions pr ON si.promotion_id = pr.id
     WHERE si.sale_id = ?
     ORDER BY si.is_kit_item ASC, si.product_name ASC
   ";
@@ -297,6 +299,7 @@ pub fn get_sale_details(
           is_kit_item: row.get(6).unwrap_or(false),
           is_gift: unit_price == 0.0,
           product_image: resolved_img,
+          promotion_name: row.get(8)?,
       })
     })
     .map_err(|e| e.to_string())?;

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
     quantity DECIMAL(10,3) NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     price_type TEXT NOT NULL, -- 'retail', 'wholesale'
+    promotion_id TEXT,
     discount_percentage DECIMAL(5,2) DEFAULT 0,
     discount_amount DECIMAL(10,2) DEFAULT 0,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id), -- Assuming products table exists
+    FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE SET NULL,
     FOREIGN KEY (parent_sale_item_id) REFERENCES sale_items(id)
 );
 
