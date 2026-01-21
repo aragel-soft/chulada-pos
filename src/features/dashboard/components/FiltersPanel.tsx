@@ -81,20 +81,6 @@ export function FiltersPanel({
         </Button>
       </div>
 
-      {/* Folio Search */}
-      <div className="space-y-2">
-        <Label>Buscar Folio</Label>
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="XAL1-..."
-            className="pl-8"
-            value={filters.folio || ""}
-            onChange={(e) => actions.setSearch("folio", e.target.value)}
-          />
-        </div>
-      </div>
-
       {/* Date Range */}
       <div className="space-y-2">
         <Label>Rango de Fechas</Label>
@@ -136,7 +122,6 @@ export function FiltersPanel({
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="completed">Completadas</SelectItem>
             <SelectItem value="cancelled">Canceladas</SelectItem>
-            <SelectItem value="pending">Pendientes</SelectItem>
           </SelectContent>
         </Select>
       </div>

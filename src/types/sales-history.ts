@@ -14,7 +14,7 @@ export interface SaleMaster {
   id: string;
   folio: string;
   sale_date: string;
-  status: 'completed' | 'cancelled' | 'pending' | 'partial_return' | 'fully_returned';
+  status: 'completed' | 'cancelled' | 'partial_return' | 'fully_returned';
   payment_method: 'cash' | 'card_transfer' | 'credit' | 'mixed';
   total: number;
   user_name: string;

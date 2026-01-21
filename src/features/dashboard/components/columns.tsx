@@ -36,20 +36,27 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
     cell: ({ row }) => {
       const status = row.getValue('status') as string;
       const variants: Record<string, string> = {
-        completed: 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200',
-        cancelled: 'bg-red-100 text-red-800 hover:bg-red-200 border-red-200',
-        pending: 'bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200',
-        partial_return: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
+        completed: 'bg-green-600 text-white hover:bg-green-600/80',
+        cancelled: 'bg-destructive text-destructive-foreground hover:bg-destructive/80',
+        partial_return: 'bg-orange-500 text-white hover:bg-orange-600/80',
       };
       
       const labels: Record<string, string> = {
         completed: 'Completada',
         cancelled: 'Cancelada',
-        pending: 'Pendiente',
         partial_return: 'Dev. Parcial'
       };
 
-      return <Badge className={variants[status] || 'bg-gray-100 text-gray-800'} variant="outline">{labels[status] || status}</Badge>;
+      const badgeClass = variants[status] || 'bg-slate-500 text-white';
+      const label = labels[status] || status;
+
+      return (
+        <Badge 
+            className={`capitalize min-w-[90px] justify-center shadow-none ${badgeClass}`}
+        >
+            {label}
+        </Badge>
+      );
     },
   },
   {

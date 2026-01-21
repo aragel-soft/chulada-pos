@@ -1,11 +1,11 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { SaleDetail, SaleHistoryItem } from '@/types/sales-history';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { SaleHistoryItem } from '@/types/sales-history';
 import { useSaleDetail } from '@/hooks/use-sales-history';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Package, Gift, Tag, User, CreditCard } from 'lucide-react';
+import { Loader2, Package, Gift, Tag, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
