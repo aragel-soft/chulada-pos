@@ -100,20 +100,20 @@ export function FiltersPanel({
         <Label>Rango de Fechas</Label>
         <div className="grid gap-2">
           <DateSelector
-            date={filters.start_date ? new Date(filters.start_date) : undefined}
+            date={filters.start_date ? new Date((filters.start_date + "T00:00:00")) : undefined}
             onSelect={(d) =>
               actions.setDateRange(
                 d,
-                filters.end_date ? new Date(filters.end_date) : null,
+                filters.end_date ? new Date((filters.end_date + "T00:00:00")) : null,
               )
             }
             placeholder="Inicio"
           />
           <DateSelector
-            date={filters.end_date ? new Date(filters.end_date) : undefined}
+            date={filters.end_date ? new Date((filters.end_date + "T00:00:00")) : undefined}
             onSelect={(d) =>
               actions.setDateRange(
-                filters.start_date ? new Date(filters.start_date) : null,
+                filters.start_date ? new Date((filters.start_date + "T00:00:00")) : null,
                 d,
               )
             }
@@ -222,7 +222,7 @@ function DateSelector({
           mode="single"
           selected={date}
           onSelect={onSelect}
-          initialFocus
+          className="rounded-lg border" 
         />
       </PopoverContent>
     </Popover>
