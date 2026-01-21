@@ -154,7 +154,7 @@ pub fn get_sales_history(
   let list_sql = format!(
     "SELECT 
         s.id, s.folio, s.sale_date, s.status, s.payment_method, s.total, 
-        u.name as user_name, s.has_discount
+        u.username as user_name, s.has_discount
      FROM sales s
      LEFT JOIN users u ON s.user_id = u.id
      WHERE {}
@@ -216,7 +216,7 @@ pub fn get_sale_details(
       s.subtotal, s.discount_percentage, s.discount_amount, s.total,
       s.cash_amount, s.card_transfer_amount, s.notes,
       s.cancellation_reason, s.cancelled_at,
-      u.name, u.avatar_url
+      u.username, u.avatar_url
     FROM sales s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
