@@ -82,7 +82,6 @@ export function CheckoutModal({
     } else if (method == "cash") {
         setCardAmount("0");
     }
-    // For credit, amounts are handled in render/logic, usually effectively 0 cash/card but tracked as debt
   }, [method, total]);
 
   // Auto-calculate Card amount in Mixed mode
