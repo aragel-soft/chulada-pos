@@ -20,6 +20,10 @@ import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { printSaleTicket } from "@/lib/api/cash-register/sales";
 import { useSalesStore } from "@/features/sales/stores/salesStore";
+import { KitSelectionModal } from "@/features/sales/components/KitSelectionModal";
+import { useKitLogic } from "@/features/sales/hooks/useKitLogic";
+import { useKitStore } from "@/features/sales/stores/kitStore";
+
 
 import {
   AlertDialog,
@@ -31,12 +35,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// import { usePrinter } from "@/hooks/usePrinter"; // TODO: Implement printer hook usage
 
 export default function SalesPage() {
   const { shift } = useCashRegisterStore();
   const { can, user } = useAuthStore();
   const { processSale, isProcessing } = useProcessSale();
+  const { fetchKits } = useKitStore();
+
+  useEffect(() => {
+    if (shift?.status === 'open') {
+      fetchKits();
+    }
+  }, [shift?.status, fetchKits]);
 
   const {
     tickets,
@@ -61,12 +71,29 @@ export default function SalesPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { lastSale, setLastSale } = useSalesStore();
 
-  // F12 Trigger
-  useHotkeys('f12', () => {
+  // Kit Logic Hook
+  const {
+      kitModalOpen,
+      pendingKit,
+      validateKitsForCheckout,
+      handleKitConfirm, 
+      handleKitCancel
+  } = useKitLogic();
+  
+  const handleCheckoutRequest = async () => {
        if (ticketTotal > 0 && shift?.status === 'open' && !isCheckoutOpen && can("sales:create")) {
-           setIsCheckoutOpen(true);
+          const activeTicket = getActiveTicket();
+          if (!activeTicket) return;
+          
+          const isBlocked = await validateKitsForCheckout(activeTicket.items);
+          if (isBlocked) return;
+          
+          setIsCheckoutOpen(true);
        }
-  }, [ticketTotal, shift, isCheckoutOpen]);
+  };
+
+  // F12 Trigger
+  useHotkeys('f12', handleCheckoutRequest, [ticketTotal, shift, isCheckoutOpen, activeTicket]);
 
   const {
     products,
@@ -79,27 +106,9 @@ export default function SalesPage() {
     enabled: !!shift && shift.status === "open",
   });
 
-  const attemptAddToCart = useCallback((product: Product, isScan: boolean) => {
-    const activeTicket = getActiveTicket();
-    const itemInCart = activeTicket?.items.find((i) => i.id === product.id);
-    const currentQty = itemInCart ? itemInCart.quantity : 0;
-
-    if (currentQty + 1 > product.stock) {
-      playSound("error"); 
-      toast.error(`Stock insuficiente para: ${product.name}`);
-      return;
-    }
-
+  const handleProductSelect = (product: Product) => {
     addToCart(product);
     toast.success(`Agregado: ${product.name}`);
-
-    if (isScan) {
-      playSound("success");
-    }
-  }, [getActiveTicket, addToCart]);
-
-  const handleProductSelect = (product: Product) => {
-    attemptAddToCart(product, false);
   };
 
   const handleAddProductByCode = useCallback(
@@ -110,13 +119,15 @@ export default function SalesPage() {
       );
 
       if (product) {
-        attemptAddToCart(product, true);
+        addToCart(product);
+        playSound("success");
+        toast.success(`Agregado: ${product.name}`);
       } else {
         playSound("error");
         toast.error(`Producto no encontrado: ${cleanCode}`);
       }
     },
-    [products, attemptAddToCart]
+    [products, addToCart]
   );
 
   useScanDetection({
@@ -187,6 +198,15 @@ export default function SalesPage() {
          onProcessSale={handleProcessSale}
       />
 
+      <KitSelectionModal
+        isOpen={kitModalOpen}
+        kit={pendingKit?.kit || null}
+        triggerQuantity={pendingKit?.triggerProduct.quantity || 1}
+        alreadySelectedCount={pendingKit?.alreadySelectedCount || 0}
+        onConfirm={handleKitConfirm}
+        onCancel={handleKitCancel}
+      />
+
       {/* --- COLUMNA IZQUIERDA: GRID DE PRODUCTOS --- */}
       <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
         <div className="shrink-0 bg-white rounded-lg p-1 shadow-sm border border-transparent transition-all">
@@ -198,7 +218,8 @@ export default function SalesPage() {
                   p => p.code === clean || p.barcode === clean
               );
               if (exactMatch) {
-                  attemptAddToCart(exactMatch, true);
+                  addToCart(exactMatch);
+                  playSound("success");
                   return true; 
               }
               return false; 
@@ -338,11 +359,11 @@ export default function SalesPage() {
           ) : (
             activeTicket.items.map((item) => (
               <CartItemRow
-                key={item.id}
+                key={item.uuid}
                 item={item}
-                onUpdateQuantity={(id, qty) => updateQuantity(id, qty)}
-                onRemove={(id) => removeFromCart(id)}
-                onTogglePriceType={() => toggleItemPriceType(item.id)}
+                onUpdateQuantity={updateQuantity}
+                onRemove={(uuid) => removeFromCart(uuid)}
+                onTogglePriceType={() => toggleItemPriceType(item.uuid)}
               />
             ))
           )}
@@ -374,7 +395,7 @@ export default function SalesPage() {
             <Button
             className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
             disabled={!shift || shift.status !== "open" || ticketTotal === 0}
-            onClick={() => setIsCheckoutOpen(true)}
+            onClick={handleCheckoutRequest}
           >
             <Wallet className="w-5 h-5 mr-2" />
             Cobrar (F12)

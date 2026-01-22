@@ -13,6 +13,36 @@ interface CartItemRowProps {
   onTogglePriceType: () => void;
 }
 
+// --- Style Configuration ---
+interface PriceTypeStyle {
+    container: string;
+    badge: string;
+    label?: string; // Additional text like "Mayoreo" or "Regalo"
+    isInteractive: boolean;
+    labelClass?: string; // Style for the label text
+}
+
+const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
+    kit_item: {
+        container: 'ml-0 bg-purple-50/50 border-purple-100',
+        badge: 'bg-purple-100 text-purple-700 font-medium',
+        label: 'Regalo',
+        labelClass: 'font-bold tracking-wider',
+        isInteractive: false // TODO: Implement kit item interaction in the future
+    },
+    wholesale: {
+        container: 'bg-amber-50/50 border-amber-200',
+        badge: 'bg-amber-100 text-amber-700 font-bold ring-1 ring-amber-200',
+        label: 'Mayoreo',
+        isInteractive: true
+    },
+    retail: { // Default
+        container: 'bg-white border-zinc-100 hover:border-zinc-300',
+        badge: 'bg-zinc-100 text-muted-foreground group-hover/price:bg-zinc-200',
+        isInteractive: true
+    }
+};
+
 export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceType }: CartItemRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempQty, setTempQty] = useState(item.quantity.toString());
@@ -35,9 +65,9 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
       if (val > item.stock) {
         toast.warning(`Stock máximo disponible: ${item.stock}`);
         setTempQty(item.stock.toString());
-        onUpdateQuantity(item.id, item.stock);
+        onUpdateQuantity(item.uuid, item.stock);
       } else {
-        onUpdateQuantity(item.id, val);
+        onUpdateQuantity(item.uuid, val);
       }
     } else {
       setTempQty(item.quantity.toString()); 
@@ -52,31 +82,31 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
     }
   };
 
+  // Resolve Styles
+  const validPriceType = PRICE_TYPE_STYLES[item.priceType] ? item.priceType : 'retail';
+  const style = PRICE_TYPE_STYLES[validPriceType];
+
   return (
-    <div className={`flex items-center justify-between p-2 rounded-lg border shadow-sm transition-all group ${
-      item.priceType === 'wholesale' 
-        ? 'bg-amber-50/50 border-amber-200'
-        : 'bg-white border-zinc-100 hover:border-zinc-300'
-    }`}>
+    <div className={`flex items-center justify-between p-2 rounded-lg border shadow-sm transition-all group ${style.container}`}>
       
       <div className="flex-1 min-w-0 pr-3 flex flex-col justify-center">
-        <div className="font-medium text-sm truncate text-zinc-700" title={item.name}>
+        <div className="font-medium text-sm truncate text-zinc-700 flex items-center gap-2" title={item.name}>
           {item.name}
         </div>
         
         <div 
-          onClick={onTogglePriceType}
-          className="flex items-center gap-2 mt-1 cursor-pointer w-fit select-none group/price"
-          title="Clic para cambiar tipo de precio"
+          onClick={style.isInteractive ? onTogglePriceType : undefined}
+          className={`flex items-center gap-2 mt-1 w-fit select-none group/price ${style.isInteractive ? "cursor-pointer" : "cursor-default opacity-80"}`}
+          title={style.isInteractive ? "Clic para cambiar tipo de precio" : "Precio fijo"}
         >
-          <div className={`text-xs flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
-             item.priceType === 'wholesale' 
-                ? 'bg-amber-100 text-amber-700 font-bold ring-1 ring-amber-200' 
-                : 'bg-zinc-100 text-muted-foreground group-hover/price:bg-zinc-200'
-          }`}>
+          <div className={`text-xs flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${style.badge}`}>
              <Tag size={10} />
              <span>{formatCurrency(item.finalPrice)}</span>
-             {item.priceType === 'wholesale' && <span className="text-[9px] ml-1 uppercase">Mayoreo</span>}
+             {style.label && (
+                 <span className={`text-[9px] ml-1 uppercase ${style.labelClass || ''}`}>
+                     {style.label}
+                 </span>
+             )}
           </div>
         </div>
       </div>
@@ -88,9 +118,9 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
           className="h-7 w-7 rounded-full border-zinc-200 hover:bg-zinc-100 hover:text-red-500"
           onClick={() => {
             if (item.quantity > 1) {
-              onUpdateQuantity(item.id, item.quantity - 1);
+              onUpdateQuantity(item.uuid, item.quantity - 1);
             } else {
-               onRemove(item.id); 
+               onRemove(item.uuid); 
             }
           }}
         >
@@ -98,7 +128,7 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
         </Button>
         
         <div className="w-12 text-center relative">
-          {isEditing ? (
+          {(style.isInteractive && isEditing) ? (
             <Input
               ref={inputRef}
               value={tempQty}
@@ -109,9 +139,9 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
             />
           ) : (
             <span 
-              className="block text-sm font-bold tabular-nums cursor-text hover:bg-zinc-100 rounded px-1 select-none"
+              className="block text-sm font-bold tabular-nums rounded px-1 select-none cursor-text hover:bg-zinc-100"
               onDoubleClick={() => setIsEditing(true)}
-              title="Doble clic para editar manual"
+              title={style.isInteractive ? "Doble clic para editar manual" : undefined}
             >
               {item.quantity}
             </span>
@@ -122,7 +152,7 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
           variant="outline" 
           size="icon" 
           className="h-7 w-7 rounded-full border-zinc-200 hover:bg-zinc-100 hover:text-green-600"
-          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+          onClick={() => onUpdateQuantity(item.uuid, item.quantity + 1)}
           disabled={item.quantity >= item.stock} 
         >
           <Plus className="h-3 w-3" />
@@ -138,7 +168,7 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
             variant="ghost"
             size="icon"
             className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 -mr-1"
-            onClick={() => onRemove(item.id)}
+            onClick={() => onRemove(item.uuid)}
             title="Eliminar del carrito"
         >
             <Trash2 className="w-3.5 h-3.5" />

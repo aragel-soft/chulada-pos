@@ -11,7 +11,7 @@ pub struct SaleItemRequest {
     pub parent_item_id: Option<String>,
     pub product_id: String,
     pub quantity: f64,
-    pub price_type: String, // 'retail', 'wholesale', 'kit_gift'
+    pub price_type: String, // 'retail', 'wholesale', 'kit_item'
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -175,7 +175,7 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
 
     if kit_rules.is_empty() {
         for item in items {
-            if item.price_type == "kit_gift" {
+            if item.price_type == "kit_item" {
                  return Err(format!("El producto '{}' está marcado como regalo pero no activa ningún kit.", item.product_id));
             }
         }
@@ -200,7 +200,7 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
         .collect();
 
     for item in items {
-        if item.price_type == "kit_gift" {
+        if item.price_type == "kit_item" {
             let mut found_credit = false;
             // look for a kit that has credits
             for (kit_id, rule) in &kit_rules {
@@ -314,7 +314,7 @@ fn calculate_sale_items<'a>(
         };
 
         // Select Price
-        let unit_price = if item.price_type == "kit_gift" {
+        let unit_price = if item.price_type == "kit_item" {
             0.0
         } else if item.price_type == "wholesale" { 
             wholesale 
@@ -461,7 +461,7 @@ pub fn process_sale(
                 payload.discount_percentage, // ToDo: Discount is not implemented
                 data.item_discount_amt, // ToDo: Discount is not implemented
                 data.item_subtotal,
-                if item.price_type == "kit_gift" { 1 } else { 0 },
+                if item.price_type == "kit_item" { 1 } else { 0 },
                 parent_db_id
             ],
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;

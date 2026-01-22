@@ -20,6 +20,8 @@ export function useProcessSale() {
     setIsProcessing(true);
     try {
       const saleItems: SaleItemRequest[] = items.map((item) => ({
+        id: item.uuid, 
+        parent_item_id: item.priceType === 'kit_item' ? item.kitTriggerId : undefined, 
         product_id: item.id,
         quantity: item.quantity,
         price_type: item.priceType,
