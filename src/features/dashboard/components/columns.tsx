@@ -1,30 +1,19 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { SaleMaster } from '@/types/sales-history';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 
 export const historyColumns: ColumnDef<SaleMaster>[] = [
   {
     accessorKey: 'folio',
-    header: 'Folio',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Folio" />,
     cell: ({ row }) => <span className="font-mono font-medium">{row.getValue('folio')}</span>,
   },
   {
     accessorKey: 'sale_date',
-    header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Fecha
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-    },
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Fecha" />,
     cell: ({ row }) => {
       const date = new Date(row.getValue('sale_date'));
       return <span className="text-sm">{format(date, 'dd/MM/yyyy HH:mm', { locale: es })}</span>;
@@ -32,7 +21,7 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
   },
   {
     accessorKey: 'status',
-    header: 'Estado',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
     cell: ({ row }) => {
       const status = row.getValue('status') as string;
       const variants: Record<string, string> = {
@@ -61,7 +50,7 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
   },
   {
     accessorKey: 'payment_method',
-    header: 'Pago',
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Método" />,
     cell: ({ row }) => {
         const method = row.getValue('payment_method') as string;
         const map: Record<string, string> = {
@@ -75,14 +64,14 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
   },
   {
     accessorKey: 'total',
-    header: () => <div className="text-right">Total</div>,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue('total'));
       const formatted = new Intl.NumberFormat('es-MX', {
         style: 'currency',
         currency: 'MXN',
       }).format(amount);
-      return <div className="text-right font-bold">{formatted}</div>;
+      return <div className="font-bold">{formatted}</div>;
     },
   },
 ];

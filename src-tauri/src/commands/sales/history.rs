@@ -14,6 +14,8 @@ pub struct SalesFilter {
   pub user_id: Option<String>,
   pub folio: Option<String>,         
   pub product_search: Option<String>, 
+  pub sort_by: Option<String>, 
+  pub sort_order: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -149,6 +151,20 @@ pub fn get_sales_history(
     )
     .map_err(|e| format!("Error contando ventas: {}", e))?;
 
+  let sort_column = match filter.sort_by.as_deref().unwrap_or("folio") {
+    "sale_date" => "s.sale_date",
+    "total" => "s.total",
+    "status" => "s.status",
+    "payment_method" => "s.payment_method",
+    "user_name" => "u.username", 
+    _ => "s.folio", 
+  };
+
+  let sort_direction = match filter.sort_order.as_deref().unwrap_or("desc") {
+    "asc" => "ASC",
+    _ => "DESC",
+  };
+
   let limit = filter.page_size;
   let offset = (filter.page - 1) * filter.page_size;
 
@@ -159,9 +175,9 @@ pub fn get_sales_history(
      FROM sales s
      LEFT JOIN users u ON s.user_id = u.id
      WHERE {}
-     ORDER BY s.sale_date DESC
+     ORDER BY {} {}
      LIMIT {} OFFSET {}",
-    where_sql, limit, offset
+    where_sql, sort_column, sort_direction, limit, offset
   );
 
   let mut stmt = conn.prepare(&list_sql).map_err(|e| e.to_string())?;

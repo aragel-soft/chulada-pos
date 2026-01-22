@@ -8,6 +8,8 @@ export interface SalesHistoryFilter {
   user_id?: string | null;
   folio?: string | null;        
   product_search?: string | null;  
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc'; 
 }
 
 export interface SaleMaster {

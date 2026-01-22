@@ -13,7 +13,9 @@ const INITIAL_FILTER: SalesHistoryFilter = {
   payment_method: 'all',
   user_id: null,
   folio: '',
-  product_search: ''
+  product_search: '',
+  sort_by: 'folio',
+  sort_order: 'desc'
 };
 
 export const useSalesHistory = () => {
@@ -35,7 +37,7 @@ export const useSalesHistory = () => {
         ...prev,
         start_date: start ? format(start, 'yyyy-MM-dd') : null,
         end_date: end ? format(end, 'yyyy-MM-dd') : null,
-        page: 1, // 
+        page: 1
       }));
     },
 
@@ -54,6 +56,15 @@ export const useSalesHistory = () => {
     resetFilters: () => setFilters(INITIAL_FILTER),
 
     setUserId: (id: string | null) => setFilters((prev) => ({ ...prev, user_id: id, page: 1 })),
+
+    setSorting: (sortBy: string, sortOrder: 'asc' | 'desc') => {
+      setFilters((prev) => ({
+        ...prev,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        page: 1 
+      }));
+    },
   };
 
   return {
