@@ -1,15 +1,16 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { SaleHistoryItem } from '@/types/sales-history';
 import { useSaleDetail } from '@/hooks/use-sales-history';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Package, Gift, Tag, User } from 'lucide-react';
+import { Loader2, Package, Gift, Tag, User, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AppAvatar } from "@/components/ui/app-avatar";
+import { Button } from "@/components/ui/button";
 import {
   HoverCard,
   HoverCardContent,
@@ -17,130 +18,158 @@ import {
 } from "@/components/ui/hover-card";
 import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
 
-interface SaleDetailSheetProps {
+interface SaleDetailPanelProps {
   saleId: string | null;
-  isOpen: boolean;
   onClose: () => void;
 }
 
-export function SaleDetailSheet({ saleId, isOpen, onClose }: SaleDetailSheetProps) {
+export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
   const { data: sale, isLoading } = useSaleDetail(saleId);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-xl w-full flex flex-col p-0 bg-white">
-        
-        {/* HEADER */}
-        <div className="p-6 border-b bg-muted/5">
-            <SheetHeader className="mb-4">
-            <div className="flex items-center justify-between">
-                <SheetTitle className="text-2xl font-mono">{sale?.folio || 'Cargando...'}</SheetTitle>
+    <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
+      
+      {/* HEADER */}
+      <div className="p-6 border-b bg-muted/5 relative shrink-0">
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute right-4 top-4 h-8 w-8 text-muted-foreground hover:text-foreground z-10"
+            onClick={onClose}
+        >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Cerrar</span>
+        </Button>
+
+        <div className="mb-4 pr-10"> 
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-2xl font-mono font-semibold tracking-tight">
+                {sale?.folio || 'Cargando...'}
+            </h2>
+            
+            <div className="flex gap-2">
                 {sale?.status === 'cancelled' && <Badge variant="destructive">CANCELADA</Badge>}
                 {sale?.is_credit && (<Badge className="bg-indigo-600 hover:bg-indigo-700 text-white border-none">A CRÉDITO</Badge>)}
                 {(sale?.has_discount || (sale?.discount_global_percent ?? 0) > 0) && (
                     <Badge className="bg-orange-600 hover:bg-orange-700 text-white border-none flex items-center gap-1">
                         <Tag className="w-3 h-3 text-white" />CON DESCUENTO
                     </Badge>
-                    )}
+                )}
             </div>
-            <SheetDescription>
-                {sale ? format(new Date(sale.sale_date), "PPP 'a las' p", { locale: es }) : '...'}
-            </SheetDescription>
-            </SheetHeader>
-
-            {sale && (
-                <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
-                    <Avatar className="h-10 w-10">
-                        <AvatarImage src={sale.user_avatar} />
-                        <AvatarFallback><User /></AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="text-sm font-medium">Vendedor</p>
-                        <p className="text-xs text-muted-foreground">{sale.user_name}</p>
-                    </div>
-                    <div className="ml-auto flex gap-2">
-                        {sale.payment_method === 'credit' && <Badge className="bg-purple-600">A CRÉDITO</Badge>}
-                        {sale.has_discount && <Badge variant="secondary" className="text-orange-600 border-orange-200 bg-orange-50">DESCUENTO</Badge>}
-                    </div>
-                </div>
-            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {sale ? format(new Date(sale.sale_date), "PPP 'a las' p", { locale: es }) : '...'}
+          </p>
         </div>
 
-        {/* BODY  */}
-        <ScrollArea className="flex-1 p-6">
-            {isLoading ? (
-                <div className="flex h-full items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : sale ? (
-                <div className="space-y-6">
-                    {/* ITEMS */}
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="text-muted-foreground border-b">
-                                <th className="text-left pb-2 font-medium">Producto</th>
-                                <th className="text-right pb-2 font-medium">Cant.</th>
-                                <th className="text-right pb-2 font-medium">Precio</th>
-                                <th className="text-right pb-2 font-medium">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {sale.items.map((item) => (
-                                <ItemRow key={item.id} item={item} />
-                            ))}
-                        </tbody>
-                    </table>
-
-                    {sale.notes && (
-                        <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
-                            <span className="font-semibold">Nota:</span> {sale.notes}
-                        </div>
-                    )}
-                     {sale.cancellation_reason && (
-                        <div className="bg-red-50 p-3 rounded-md border border-red-200 text-sm text-red-800">
-                            <span className="font-semibold">Motivo Cancelación:</span> {sale.cancellation_reason}
-                        </div>
-                    )}
-                </div>
-            ) : null}
-        </ScrollArea>
-
-        {/* FOOTER */}
         {sale && (
-            <div className="p-6 border-t bg-muted/5 space-y-3">
-                <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(sale.subtotal)}</span>
-                </div>
-                
-                {sale.discount_global_amount > 0 && (
-                    <div className="flex justify-between text-sm text-red-600 font-medium">
-                        <span>Descuento Global ({sale.discount_global_percent}%)</span>
-                        <span>- {formatCurrency(sale.discount_global_amount)}</span>
-                    </div>
-                )}
-
-                <Separator />
-
-                <div className="flex justify-between text-xl font-bold">
-                    <span>Total</span>
-                    <span>{formatCurrency(sale.total)}</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground">
-                    <div className="flex flex-col">
-                        <span>Efectivo</span>
-                        <span className="font-mono text-black">{formatCurrency(sale.cash_amount)}</span>
-                    </div>
-                    {(sale.card_amount > 0 || sale.payment_method === 'mixed') && (
-                        <div className="flex flex-col text-right">
-                            <span>Tarjeta / Transf</span>
-                            <span className="font-mono text-black">{formatCurrency(sale.card_amount)}</span>
-                        </div>
-                    )}
-                </div>
+          <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={sale.user_avatar} />
+              <AvatarFallback><User /></AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-medium">Vendedor</p>
+              <p className="text-xs text-muted-foreground">{sale.user_name}</p>
             </div>
+            <div className="ml-auto flex gap-2">
+              {sale.payment_method === 'credit' && <Badge className="bg-purple-600">A CRÉDITO</Badge>}
+              {sale.has_discount && <Badge variant="secondary" className="text-orange-600 border-orange-200 bg-orange-50">DESCUENTO</Badge>}
+            </div>
+          </div>
         )}
+      </div>
+
+      {/* BODY */}
+      <ScrollArea className="flex-1 p-6">
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center min-h-[200px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : sale ? (
+          <div className="space-y-6">
+            {/* ITEMS TABLE */}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b">
+                  <th className="text-left pb-2 font-medium pl-1">Producto</th>
+                  <th className="text-right pb-2 font-medium">Cant.</th>
+                  <th className="text-right pb-2 font-medium">Precio</th>
+                  <th className="text-right pb-2 font-medium pr-1">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {sale.items.map((item) => (
+                  <ItemRow key={item.id} item={item} />
+                ))}
+              </tbody>
+            </table>
+
+            {/* NOTAS Y RAZONES */}
+            <div className="space-y-2">
+                {sale.notes && (
+                <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
+                    <span className="font-semibold">Nota:</span> {sale.notes}
+                </div>
+                )}
+                {sale.cancellation_reason && (
+                <div className="bg-red-50 p-3 rounded-md border border-red-200 text-sm text-red-800">
+                    <span className="font-semibold">Motivo Cancelación:</span> {sale.cancellation_reason}
+                </div>
+                )}
+            </div>
+          </div>
+        ) : null}
+      </ScrollArea>
+
+      {/* FOOTER */}
+      {sale && (
+        <div className="p-6 border-t bg-muted/5 space-y-3 shrink-0">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span>{formatCurrency(sale.subtotal)}</span>
+          </div>
+          
+          {sale.discount_global_amount > 0 && (
+            <div className="flex justify-between text-sm text-red-600 font-medium">
+              <span>Descuento Global ({sale.discount_global_percent}%)</span>
+              <span>- {formatCurrency(sale.discount_global_amount)}</span>
+            </div>
+          )}
+
+          <Separator />
+
+          <div className="flex justify-between text-xl font-bold">
+            <span>Total</span>
+            <span>{formatCurrency(sale.total)}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground">
+            <div className="flex flex-col">
+              <span>Efectivo</span>
+              <span className="font-mono text-black">{formatCurrency(sale.cash_amount)}</span>
+            </div>
+            {(sale.card_amount > 0 || sale.payment_method === 'mixed') && (
+              <div className="flex flex-col text-right">
+                <span>Tarjeta / Transf</span>
+                <span className="font-mono text-black">{formatCurrency(sale.card_amount)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+interface SaleDetailSheetProps extends SaleDetailPanelProps {
+  isOpen: boolean;
+}
+
+export function SaleDetailSheet({ isOpen, ...props }: SaleDetailSheetProps) {
+  return (
+    <Sheet open={isOpen} onOpenChange={props.onClose}>
+      <SheetContent className="sm:max-w-xl w-full p-0 gap-0 [&>button]:hidden border-l-0">
+        <SaleDetailPanel {...props} />
       </SheetContent>
     </Sheet>
   );
@@ -149,7 +178,7 @@ export function SaleDetailSheet({ saleId, isOpen, onClose }: SaleDetailSheetProp
 function ItemRow({ item }: { item: SaleHistoryItem }) {
     return (
         <tr className="group">
-            <td className="py-3 pr-2">
+            <td className="py-3 pr-2 pl-1">
                 <div className="flex items-center gap-3">
                     {/* IMAGE */}
                     <div className="flex items-center justify-center shrink-0">
@@ -182,7 +211,7 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
 
                     <div className="flex flex-col items-start gap-0.5">
                         {/* NAME */}
-                        <span className="font-medium text-gray-900 line-clamp-1">
+                        <span className="font-medium text-gray-900 line-clamp-1 break-all">
                             {item.product_name}
                         </span>
 
@@ -224,7 +253,7 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
                     formatCurrency(item.unit_price)
                 )}
             </td>
-            <td className="py-3 text-right align-top font-medium">
+            <td className="py-3 text-right align-top font-medium pr-1">
                 {item.is_gift ? (
                     <span className="text-green-600 font-bold">GRATIS</span>
                 ) : (
