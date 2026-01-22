@@ -8,10 +8,15 @@ import {
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle } from "lucide-react";
+import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle, Search, User, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useHotkeys } from "@/hooks/use-hotkeys";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getCustomers } from "@/lib/api/customers";
+import { Customer } from "@/types/customers";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -21,7 +26,8 @@ interface CheckoutModalProps {
     method: string,
     cashAmount: number,
     cardAmount: number,
-    shouldPrint: boolean
+    shouldPrint: boolean,
+    customerId?: string
   ) => Promise<void>;
   isProcessing: boolean;
 }
@@ -40,6 +46,14 @@ export function CheckoutModal({
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [cashAmount, setCashAmount] = useState<string>("");
   const [cardAmount, setCardAmount] = useState<string>("");
+  
+  // Credit / Customer State
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+  const debouncedSearch = useDebounce(customerSearchQuery, 300);
 
   const cashInputRef = useRef<HTMLInputElement>(null);
   const cardInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +64,8 @@ export function CheckoutModal({
       setMethod("cash");
       setCashAmount(total.toString());
       setCardAmount("");
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
       setTimeout(() => cashInputRef.current?.focus(), 100);
     }
   }, [isOpen, total]);
@@ -79,6 +95,34 @@ export function CheckoutModal({
     }
   }, [cashAmount, method, total]);
 
+  // Search Customers
+  useEffect(() => {
+    async function searchCustomers() {
+        if (!isOpen || method !== "credit") return;
+        
+        setIsSearchingCustomers(true);
+        try {
+            const result = await getCustomers({
+                page: 1,
+                pageSize: 10,
+                search: debouncedSearch,
+                sortBy: "name",
+                sortOrder: "asc"
+            });
+            setCustomers(result.data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSearchingCustomers(false);
+        }
+    }
+    
+    if (method === "credit") {
+        searchCustomers();
+    }
+  }, [debouncedSearch, method, isOpen]);
+
+
   const handleNumericInput = (value: string, setter: (val: string) => void) => {
       if (value === "" || /^\d*\.?\d*$/.test(value)) {
           setter(value);
@@ -101,24 +145,27 @@ export function CheckoutModal({
 
   // Keyboard navigation
   useHotkeys("ArrowDown", () => {
-      if(isOpen) handleNextMethod();
-  }, [isOpen, method]);
+      if(isOpen && !customerSearchOpen) handleNextMethod();
+  }, [isOpen, method, customerSearchOpen]);
   
   useHotkeys("ArrowUp", () => {
-      if(isOpen) handlePrevMethod();
-  }, [isOpen, method]);
+      if(isOpen && !customerSearchOpen) handlePrevMethod();
+  }, [isOpen, method, customerSearchOpen]);
 
   useHotkeys("F1", () => {
       if(isOpen) handleConfirm(true);
-  }, [isOpen, method, numericCash, numericCard, total]);
+  }, [isOpen, method, numericCash, numericCard, total, selectedCustomer]);
 
-    useHotkeys("F2", () => {
+  useHotkeys("F2", () => {
       if(isOpen) handleConfirm(false);
-  }, [isOpen, method, numericCash, numericCard, total]);
+  }, [isOpen, method, numericCash, numericCard, total, selectedCustomer]);
   
   useHotkeys("Escape", () => {
-      if(isOpen) onClose();
-  }, [isOpen]);
+      if(isOpen) {
+          if (customerSearchOpen) setCustomerSearchOpen(false);
+          else onClose();
+      }
+  }, [isOpen, customerSearchOpen]);
 
 
   const calculateChange = () => {
@@ -134,8 +181,15 @@ export function CheckoutModal({
   const change = calculateChange();
   const missing = total - (numericCash + numericCard);
   
+  const isCreditLimitExceeded = () => {
+      if (!selectedCustomer) return false;
+      return (selectedCustomer.current_balance + total) > selectedCustomer.credit_limit;
+  };
+
   const isValid = () => {
-      if (method === "credit") return false; // Blocked per requirements
+      if (method === "credit") {
+          return !!selectedCustomer && !isCreditLimitExceeded();
+      }
       if (method === "card_transfer") return true; 
       if (method === "cash") return numericCash >= total - 0.01; // tolerance
       if (method === "mixed") return (numericCash + numericCard) >= total - 0.01;
@@ -145,17 +199,17 @@ export function CheckoutModal({
   const handleConfirm = (shouldPrint: boolean) => {
       if (isProcessing) return;
       
-      if (method === "credit") {
-          toast.error("Módulo de Crédito no disponible");
-          return;
-      }
-
       if (!isValid()) {
-          toast.error("Monto insuficiente para cubrir el total");
+          if (method === "credit") {
+             if (!selectedCustomer) toast.error("Seleccione un cliente");
+             else if (isCreditLimitExceeded()) toast.error("Límite de crédito excedido");
+          } else {
+             toast.error("Monto insuficiente para cubrir el total");
+          }
           return;
       }
       
-      onProcessSale(method, numericCash, numericCard, shouldPrint);
+      onProcessSale(method, numericCash, numericCard, shouldPrint, selectedCustomer?.id);
   };
 
   const addQuickCash = (amount: number) => {
@@ -209,19 +263,136 @@ export function CheckoutModal({
             />
             <MethodButton
               active={method === "credit"}
-              onClick={() => {
-                  setMethod("credit");
-                  toast.error("Módulo de Crédito no disponible");
-              }}
+              onClick={() => setMethod("credit")}
               icon={<Lock className="w-5 h-5" />}
-              label="Crédito (No disponible)"
-              disabled
-              className="opacity-50"
+              label="Crédito a Cliente"
             />
           </div>
 
           {/*Inputs & Details */}
           <div className="flex-1 p-8 bg-white flex flex-col justify-center space-y-6">
+            
+            {method === "credit" && (
+                <div className="flex flex-col h-full justify-start space-y-6 pt-4">
+                     <div className="space-y-4">
+                        <label className="text-lg font-medium block">Cliente para Crédito</label>
+                        <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen} modal={true}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={customerSearchOpen}
+                                    className="w-full justify-between h-14 text-lg"
+                                >
+                                    {selectedCustomer ? (
+                                        <div className="flex items-center gap-2">
+                                            <User className="w-5 h-5 text-[#480489]" />
+                                            <span className="font-semibold">{selectedCustomer.name}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-muted-foreground">Buscar cliente...</span>
+                                    )}
+                                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <Command shouldFilter={false} className="rounded-lg border-0">
+                                    <CommandInput 
+                                        placeholder="Buscar por nombre..." 
+                                        value={customerSearchQuery}
+                                        onValueChange={setCustomerSearchQuery}
+                                    />
+                                    <CommandList>
+                                        <div className="max-h-[300px] overflow-y-auto">
+                                            {isSearchingCustomers && <div className="p-4 text-center text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin inline mr-2"/> Buscando...</div>}
+                                            {!isSearchingCustomers && customers.length === 0 && <CommandEmpty>No se encontraron clientes.</CommandEmpty>}
+                                            <CommandGroup>
+                                                {customers.map((customer) => (
+                                                    <CommandItem
+                                                        key={customer.id}
+                                                        value={customer.name}
+                                                        onSelect={() => {
+                                                            setSelectedCustomer(customer);
+                                                            setCustomerSearchOpen(false);
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <span>{customer.name}</span>
+                                                            <span className="text-xs text-muted-foreground">Saldo: {formatCurrency(customer.current_balance)} / Lim: {formatCurrency(customer.credit_limit)}</span>
+                                                        </div>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </div>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                     </div>
+
+                     {/* Credit Status Card */}
+                     {selectedCustomer ? (
+                         <div className={cn(
+                             "rounded-xl p-6 border-2 transition-all",
+                             isCreditLimitExceeded() 
+                                ? "bg-red-50 border-red-200" 
+                                : "bg-blue-50 border-blue-200"
+                         )}>
+                             <div className="flex justify-between items-start mb-4">
+                                 <div>
+                                     <h4 className="font-bold text-lg">{selectedCustomer.name}</h4>
+                                     <p className="text-sm text-muted-foreground">Estado de Cuenta</p>
+                                 </div>
+                                 {isCreditLimitExceeded() ? (
+                                     <AlertCircle className="w-8 h-8 text-red-500" />
+                                 ) : (
+                                     <Check className="w-8 h-8 text-blue-500" />
+                                 )}
+                             </div>
+
+                             <div className="space-y-3">
+                                 <div className="flex justify-between text-sm">
+                                     <span>Saldo Actual:</span>
+                                     <span className="font-medium">{formatCurrency(selectedCustomer.current_balance)}</span>
+                                 </div>
+                                 <div className="flex justify-between text-sm">
+                                     <span>+ Esta Venta:</span>
+                                     <span className="font-bold">{formatCurrency(total)}</span>
+                                 </div>
+                                 <div className="h-px bg-black/10 my-2" />
+                                 <div className="flex justify-between text-base font-bold">
+                                     <span>Nuevo Saldo:</span>
+                                     <span className={isCreditLimitExceeded() ? "text-red-600" : "text-zinc-900"}>
+                                         {formatCurrency(selectedCustomer.current_balance + total)}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between text-sm pt-2 text-muted-foreground">
+                                     <span>Límite de Crédito:</span>
+                                     <span>{formatCurrency(selectedCustomer.credit_limit)}</span>
+                                 </div>
+                             </div>
+
+                             {isCreditLimitExceeded() && (
+                                 <div className="mt-4 bg-red-100 text-red-800 p-3 rounded-md text-sm font-semibold flex items-center gap-2">
+                                     <XCircle className="w-4 h-4" />
+                                     Límite de crédito excedido por {formatCurrency((selectedCustomer.current_balance + total) - selectedCustomer.credit_limit)}
+                                 </div>
+                             )}
+                         </div>
+                     ) : (
+                         <div className="flex flex-col items-center justify-center flex-1 text-zinc-400 border-2 border-dashed rounded-xl border-zinc-200">
+                             <Search className="w-12 h-12 mb-2 opacity-20" />
+                             <p>Busca un cliente para asignar el crédito</p>
+                         </div>
+                     )}
+                </div>
+            )}
             
             {method === "cash" && (
                 <div className="space-y-6">

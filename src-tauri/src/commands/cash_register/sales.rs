@@ -86,6 +86,96 @@ fn get_store_prefix(conn: &Connection) -> String {
     .unwrap_or_else(|_| "store-main".to_string())
 }
 
+fn calculate_sale_items<'a>(
+    tx: &Connection,
+    items: &'a [SaleItemRequest],
+    discount_percentage: f64
+) -> Result<(f64, f64, Vec<FinalItemData<'a>>), String> {
+    let mut total_gross = 0.0;
+    let mut total_item_discounts = 0.0;
+    let mut final_items = Vec::new();
+
+    let mut stmt = tx.prepare("SELECT code, name, retail_price, wholesale_price FROM products WHERE id = ?")
+        .map_err(|e| e.to_string())?;
+
+    for item in items {
+            let product_row = stmt.query_row([&item.product_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // code
+                row.get::<_, String>(1)?, // name
+                row.get::<_, f64>(2)?,    // retail
+                row.get::<_, f64>(3)?,    // wholesale
+            ))
+        }).optional().map_err(|e| e.to_string())?;
+
+        let (db_code, db_name, retail, wholesale) = match product_row {
+            Some(r) => r,
+            None => return Err(format!("Producto ID {} no encontrado en base de datos. Posible desincronización.", item.product_id)),
+        };
+
+        // Select Price
+        let unit_price = if item.price_type == "wholesale" { wholesale } else { retail };
+        
+        // ToDo: Discount is not implemented
+        let gross_amount = unit_price * item.quantity;
+        let item_discount_val = gross_amount * (discount_percentage / 100.0);
+        let net_amount = gross_amount - item_discount_val;
+
+        total_gross += gross_amount;
+        total_item_discounts += item_discount_val;
+
+        final_items.push(FinalItemData {
+            original_req: item,
+            db_name,
+            db_code,
+            unit_price,
+            item_discount_amt: item_discount_val,
+            item_subtotal: net_amount,
+        });
+    }
+
+    Ok((total_gross, total_item_discounts, final_items))
+}
+
+fn validate_credit_sale(
+    tx: &Connection,
+    payment_method: &str,
+    customer_id: &Option<String>,
+    total_amount: f64
+) -> Result<Option<String>, String> {
+    let sale_type = if payment_method == "credit" { "credit" } else { "cash" };
+    
+    if sale_type == "credit" {
+        let cid = customer_id.as_ref().ok_or("Se requiere un cliente para ventas a crédito.".to_string())?;
+        
+        // Check Limit & Balance
+        let (current_balance, credit_limit, _customer_name): (f64, f64, String) = tx.query_row(
+            "SELECT current_balance, credit_limit, name FROM customers WHERE id = ?",
+            [cid],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        ).map_err(|_| "Cliente no encontrado.".to_string())?;
+
+        let new_balance = current_balance + total_amount;
+
+        if new_balance > credit_limit {
+            return Err(format!(
+                "Límite de crédito excedido. Disponible: ${:.2}. Saldo tras venta: ${:.2}", 
+                credit_limit - current_balance, new_balance
+            ));
+        }
+
+        // Update Customer Balance
+        tx.execute(
+            "UPDATE customers SET current_balance = ?1 WHERE id = ?2",
+            params![new_balance, cid]
+        ).map_err(|e| format!("Error actualizando saldo cliente: {}", e))?;
+
+        Ok(Some(cid.clone()))
+    } else {
+        Ok(None)
+    }
+}
+
 #[tauri::command]
 pub fn process_sale(
     app_handle: tauri::AppHandle,
@@ -98,77 +188,26 @@ pub fn process_sale(
         return Err("No hay items en la venta.".to_string());
     }
     
-    // Strict block for Credit as per current requirements // ToDo: Remove when Credit module is ready
-    if payload.payment_method == "credit" {
-        return Err("Módulo de Crédito no disponible actualmente.".to_string());
-    }
-
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // 1. Total Calculation
-    
-    let mut total_gross = 0.0;
-    let mut total_item_discounts = 0.0; // ToDo: Discount is not implemented
-
-
-    let mut final_items = Vec::new();
-
-    // Product lookup
-    {
-        let mut stmt = tx.prepare("SELECT code, name, retail_price, wholesale_price FROM products WHERE id = ?")
-            .map_err(|e| e.to_string())?;
-
-        for item in &payload.items {
-             let product_row = stmt.query_row([&item.product_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?, // code
-                    row.get::<_, String>(1)?, // name
-                    row.get::<_, f64>(2)?,    // retail
-                    row.get::<_, f64>(3)?,    // wholesale
-                ))
-            }).optional().map_err(|e| e.to_string())?;
-
-            let (db_code, db_name, retail, wholesale) = match product_row {
-                Some(r) => r,
-                None => return Err(format!("Producto ID {} no encontrado en base de datos. Posible desincronización.", item.product_id)),
-            };
-
-            // Select Price
-            let unit_price = if item.price_type == "wholesale" { wholesale } else { retail };
-            
-            // ToDo: Discount is not implemented
-            let gross_amount = unit_price * item.quantity;
-            let item_discount_val = gross_amount * (payload.discount_percentage / 100.0);
-            let net_amount = gross_amount - item_discount_val;
-
-            total_gross += gross_amount;
-            total_item_discounts += item_discount_val;
-
-            final_items.push(FinalItemData {
-                original_req: item,
-                db_name,
-                db_code,
-                unit_price,
-                item_discount_amt: item_discount_val,
-                item_subtotal: net_amount,
-            });
-        }
-    }
+    // 1. Calculate Items & Totals
+    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &payload.items, payload.discount_percentage)?;
     
     let final_total = total_gross - total_item_discounts;
 
     // Validate Payment
     let total_paid = payload.cash_amount + payload.card_transfer_amount;
-
     if total_paid < final_total - 0.01 {
       return Err(format!("Pago insuficiente. Total calculado: ${:.2}, Pagado: ${:.2}", final_total, total_paid));
     }
+
+    // Credit Validation
+    let customer_id_opt = validate_credit_sale(&tx, &payload.payment_method, &payload.customer_id, final_total)?;
 
     // Prepare Data for Insertion
     let sale_id = Uuid::new_v4().to_string();
     let now = chrono::Local::now();
     let date_str = now.format("%Y-%m-%d").to_string();
-    // time_str removed
     let store_prefix = get_store_prefix(&tx);
     let folio = generate_smart_folio(&tx, &store_prefix, &date_str)?;
 
@@ -184,8 +223,9 @@ pub fn process_sale(
         "INSERT INTO sales (
             id, folio, subtotal, discount_percentage, discount_amount, total,
             status, user_id, cash_register_shift_id, payment_method,
-            cash_amount, card_transfer_amount, notes, has_discount
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'completed', ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            cash_amount, card_transfer_amount, notes, has_discount,
+            customer_id
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'completed', ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             sale_id,
             folio,
@@ -199,7 +239,8 @@ pub fn process_sale(
             payload.cash_amount,
             payload.card_transfer_amount,
             payload.notes,
-            has_discount
+            has_discount,
+            customer_id_opt
         ],
     ).map_err(|e| format!("Error insertando venta: {}", e))?;
 
