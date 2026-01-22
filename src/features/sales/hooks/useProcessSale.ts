@@ -14,7 +14,8 @@ export function useProcessSale() {
     cardAmount: number,
     userId: string,
     shiftId: string,
-    shouldPrint: boolean
+    shouldPrint: boolean,
+    customerId?: string
   ): Promise<SaleResponse | null> => {
     setIsProcessing(true);
     try {
@@ -26,7 +27,7 @@ export function useProcessSale() {
 
       const payload: SaleRequest = {
         discount_percentage: 0,
-        customer_id: null,
+        customer_id: customerId || null,
         user_id: userId,
         cash_register_shift_id: shiftId,
         payment_method: paymentMethod, // 'cash', 'card_transfer', 'credit', 'mixed'
