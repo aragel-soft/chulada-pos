@@ -65,6 +65,8 @@ export default function CustomersTable() {
   };
 
   const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
+    setRowSelection({});
+    
     if (mode === 'create' || mode === 'restore') {
       setGlobalFilter("");      
       setPagination(prev => ({ ...prev, pageIndex: 0 }));

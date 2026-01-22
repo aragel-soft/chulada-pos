@@ -8,6 +8,8 @@ export const customerSchema = z.object({
     .min(3, "El nombre debe tener al menos 3 caracteres")
     .transform((val) => {
       return val
+        .trim()
+        .replace(/\s+/g, ' ')
         .toLowerCase()
         .split(" ")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
