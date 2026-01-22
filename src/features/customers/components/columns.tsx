@@ -5,13 +5,7 @@ import {  Copy, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { format } from "date-fns";
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-  }).format(amount);
-};
+import { formatCurrency } from "@/lib/utils";
 
 export const columns: ColumnDef<Customer>[] = [
   {

@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 
 export interface MoneyInputProps
   extends InputHTMLAttributes<HTMLInputElement> {
+  symbolClassName?: string;
 }
 
 const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, symbolClassName, ...props }, ref) => {
     return (
       <div className="relative flex items-center">
-        <span className="absolute left-3 text-gray-500 font-bold">$</span>
+        <span className={cn("absolute left-3 text-gray-500 font-bold", symbolClassName)}>$</span>
         <Input
           type="number"
           step="0.5"

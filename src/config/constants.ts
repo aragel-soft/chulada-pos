@@ -1,6 +1,12 @@
+import { useBusinessStore } from "@/stores/businessStore";
+
 export const CASH_REGISTER_CONFIG = {
-  DEFAULT_INITIAL_CASH: 500,
-  MAX_INITIAL_CASH: 5000,
+  get DEFAULT_INITIAL_CASH() {
+    return useBusinessStore.getState().settings?.defaultCashFund ?? 500;
+  },
+  get MAX_INITIAL_CASH() {
+    return useBusinessStore.getState().settings?.maxCashLimit ?? 5000;
+  },
 };
 
 export const CUSTOMER_CONFIG = {

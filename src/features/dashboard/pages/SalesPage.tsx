@@ -15,6 +15,12 @@ import { useScanDetection } from "@/hooks/use-scan-detection";
 import { playSound } from "@/lib/sounds";
 import { CartItemRow } from "@/features/sales/components/CardItemRow";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
+import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
+import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import { printSaleTicket } from "@/lib/api/cash-register/sales";
+import { useSalesStore } from "@/features/sales/stores/salesStore";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+// import { usePrinter } from "@/hooks/usePrinter"; // TODO: Implement printer hook usage
 
 export default function SalesPage() {
   const { shift } = useCashRegisterStore();
-  const { can } = useAuthStore();
+  const { can, user } = useAuthStore();
+  const { processSale, isProcessing } = useProcessSale();
 
   const {
     tickets,
@@ -50,6 +58,15 @@ export default function SalesPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const { lastSale, setLastSale } = useSalesStore();
+
+  // F12 Trigger
+  useHotkeys('f12', () => {
+       if (ticketTotal > 0 && shift?.status === 'open' && !isCheckoutOpen && can("sales:create")) {
+           setIsCheckoutOpen(true);
+       }
+  }, [ticketTotal, shift, isCheckoutOpen]);
 
   const {
     products,
@@ -110,8 +127,66 @@ export default function SalesPage() {
     if (tickets.length === 0) createTicket();
   }, [tickets.length, createTicket]);
 
+  const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number, shouldPrint: boolean, customerId?: string) => {
+      if (!user?.id || !shift?.id || !activeTicket) return;
+
+      const result = await processSale(
+          activeTicket.items,
+          method,
+          cashAmount,
+          cardAmount,
+          user.id,
+          shift.id.toString(),
+          shouldPrint,
+          customerId
+      );
+
+      if (result) {
+          playSound("success");
+          toast.success("Venta completada", {
+              description: `Folio: ${result.folio} | Cambio: ${formatCurrency(result.change)}`
+          });
+          
+          if (shouldPrint) {
+              toast.info("Ticket enviado a imprimir");
+          }
+
+          setLastSale({
+              id: result.id,
+              total: result.total,
+              paid: cashAmount + cardAmount,
+              change: result.change,
+              method,
+              folio: result.folio
+          });
+
+          setIsCheckoutOpen(false);
+          clearTicket();
+      }
+  };
+
+  const handleReprint = async () => {
+      if (!lastSale?.id) return;
+      try {
+          toast.info("Imprimiendo copia de ticket...");
+          await printSaleTicket(lastSale.id);
+          toast.success("Ticket reimpreso correctamente");
+      } catch (error) {
+          toast.error("Error al reimprimir ticket", { description: String(error) });
+      }
+  };
+
   return (
     <div className="flex-1 flex overflow-hidden gap-4 h-full">
+      {/* Checkout Modal */}
+      <CheckoutModal 
+         isOpen={isCheckoutOpen}
+         onClose={() => setIsCheckoutOpen(false)}
+         total={ticketTotal}
+         isProcessing={isProcessing}
+         onProcessSale={handleProcessSale}
+      />
+
       {/* --- COLUMNA IZQUIERDA: GRID DE PRODUCTOS --- */}
       <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
         <div className="shrink-0 bg-white rounded-lg p-1 shadow-sm border border-transparent transition-all">
@@ -127,7 +202,7 @@ export default function SalesPage() {
                   return true; 
               }
               return false; 
-          }}
+            }}
             isLoading={isProductsLoading || isFetchingNextPage}
             className="w-full"
             placeholder="Buscar por nombre, código..."
@@ -148,26 +223,28 @@ export default function SalesPage() {
         {/* Resumen Izquierdo - Parte Inferior */}
         <div className="bg-white rounded-lg border p-4 shrink-0 grid grid-cols-4 gap-4">
           <div>
-            <span className="text-xs text-muted-foreground block">Total</span>
-            <span className="text-xl font-bold text-[#480489]">
-              {formatCurrency(ticketTotal)}
+            <span className="text-xs text-muted-foreground block">Total (Anterior)</span>
+            <span className="text-xl font-bold text-zinc-500">
+              {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
             </span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">
               Pagó con
             </span>
-            <span className="text-xl font-bold">$0.00</span>
+            <span className="text-xl font-bold">{lastSale ? formatCurrency(lastSale.paid) : "$0.00"}</span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">Cambio</span>
-            <span className="text-xl font-bold">$0.00</span>
+            <span className="text-xl font-bold text-green-600">{lastSale ? formatCurrency(lastSale.change) : "$0.00"}</span>
           </div>
           <div className="flex justify-end items-center">
             <Button
               variant="outline"
               size="sm"
               className="border-[#480489] text-[#480489] hover:bg-purple-50"
+              onClick={handleReprint}
+              disabled={!lastSale}
             >
               <Printer className="w-4 h-4 mr-2" /> Re-imprimir ticket
             </Button>
@@ -293,18 +370,17 @@ export default function SalesPage() {
             </span>
           </div>
 
-          <Button
+          {can("sales:create") && (
+            <Button
             className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
             disabled={!shift || shift.status !== "open" || ticketTotal === 0}
-            onClick={() => {
-              // TODO: ABRIR MODAL DE COBRO
-              console.log("Abrir modal de cobro");
-            }}
+            onClick={() => setIsCheckoutOpen(true)}
           >
             <Wallet className="w-5 h-5 mr-2" />
             Cobrar (F12)
           </Button>
-        </div>
+          )}
+          </div>
       </div>
 
       {/* Dialog de Confirmación para Cerrar Ticket con Productos */}

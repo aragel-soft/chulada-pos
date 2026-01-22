@@ -3,6 +3,7 @@
 
 mod commands;
 mod database;
+mod printer_utils;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -34,6 +35,14 @@ fn main() {
             commands::settings::permissions::get_all_permissions,
             commands::settings::permissions::get_role_permissions,
             commands::settings::permissions::update_role_permissions,
+            // Settings - Hardware
+            commands::settings::hardware::save_settings,
+            commands::settings::hardware::load_settings,
+            commands::settings::hardware::get_system_printers,
+            commands::settings::hardware::test_printer_connection,
+            commands::settings::hardware::test_cash_drawer,
+            commands::printer::test_print_ticket,
+            commands::printer::print_sale_ticket,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
@@ -54,6 +63,8 @@ fn main() {
             commands::inventory::kits::get_kits,
             commands::inventory::kits::check_products_in_active_kits,
             commands::inventory::kits::create_kit,
+            // Inventory - Promotions
+            commands::inventory::promotions::get_promotions,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
@@ -61,6 +72,11 @@ fn main() {
             commands::cash_register::movements::register_cash_movement,
             commands::cash_register::details::get_shift_details,
             commands::cash_register::details::get_closed_shifts,
+            commands::cash_register::sales::process_sale,
+            // Settings - Business
+            commands::settings::business::get_business_settings,
+            commands::settings::business::update_business_settings,
+            commands::settings::business::save_logo_image,
             // Customers
             commands::customers::customers::get_customers,
             commands::customers::customers::upsert_customer,
