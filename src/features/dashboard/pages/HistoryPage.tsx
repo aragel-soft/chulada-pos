@@ -7,13 +7,10 @@ import {
 } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { Card } from "@/components/ui/card";
 import { useSalesHistory } from "@/hooks/use-sales-history";
 import { FiltersPanel } from "@/features/dashboard/components/FiltersPanel";
 import { historyColumns } from "@/features/dashboard/components/columns";
-// 🔥 Importamos la versión Panel si la creaste separada, o usa la misma si lograste adaptarla
-// Si hiciste el refactor del paso 1, importa SaleDetailPanel.
-import { SaleDetailPanel } from "@/features/dashboard/components/SaleDetailSheet"; 
+import { SaleDetailPanel } from "@/features/dashboard/components/SaleDetailSheet";
 import { SaleMaster } from "@/types/sales-history";
 
 export default function HistoryPage() {
@@ -61,12 +58,15 @@ export default function HistoryPage() {
     pageSize: filters.page_size,
   };
 
-  const sortingState: SortingState = useMemo(() => [
-    {
-      id: filters.sort_by || "folio",
-      desc: filters.sort_order === "desc",
-    },
-  ], [filters.sort_by, filters.sort_order]);
+  const sortingState: SortingState = useMemo(
+    () => [
+      {
+        id: filters.sort_by || "folio",
+        desc: filters.sort_order === "desc",
+      },
+    ],
+    [filters.sort_by, filters.sort_order],
+  );
 
   const handlePaginationChange = (updaterOrValue: any) => {
     const newPagination =
@@ -79,9 +79,8 @@ export default function HistoryPage() {
   };
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
-    const newSorting = typeof updater === "function"
-      ? updater(sortingState)
-      : updater;
+    const newSorting =
+      typeof updater === "function" ? updater(sortingState) : updater;
 
     const sort = newSorting[0];
 
@@ -93,7 +92,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="flex h-full w-full bg-muted/10 overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       {/* LEFT SIDE PANEL (FILTERS) */}
       <FiltersPanel
         filters={filters}
@@ -104,58 +103,58 @@ export default function HistoryPage() {
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex min-w-0 transition-all duration-300">
-        
-        <div className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-          selectedSaleId ? "w-[65%] border-r" : "w-full"
-        }`}>
-          <main className="flex-1 p-6 overflow-hidden flex flex-col">
-            <Card className="flex-1 overflow-hidden border-none shadow-sm flex flex-col bg-white">
-              <div className="flex-1 overflow-auto p-1">
-                <DataTable
-                  columns={columns}
-                  data={data?.data || []}
-                  isLoading={isLoading}
-                  rowCount={data?.total || 0}
-                  manualPagination={true}
-                  manualFiltering={true}
-                  manualSorting={true}
-                  pagination={paginationState}
-                  onPaginationChange={handlePaginationChange}
-                  sorting={sortingState}
-                  onSortingChange={handleSortingChange}
-                  rowSelection={rowSelection}
-                  onRowSelectionChange={setRowSelection}
-                  globalFilter={filters.folio || ""}
-                  onGlobalFilterChange={(val) =>
-                    actions.setSearch("folio", String(val))
-                  }
-                  searchPlaceholder="Buscar por Folio..."
-                  columnTitles={{
-                    folio: "Folio",
-                    sale_date: "Fecha",
-                    status: "Estado",
-                    payment_method: "Método Pago",
-                    total: "Total",
-                  }}
-                  onRowClick={(row) => setSelectedSaleId(
-                      selectedSaleId === row.original.id ? null : row.original.id
-                  )}
-                  showColumnFilters={false}
-                />
-              </div>
-            </Card>
+        <div
+          className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+            selectedSaleId ? "w-[65%] border-r" : "w-full"
+          }`}
+        >
+          <main className="flex-1 pl-4 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-auto p-1">
+              <DataTable
+                columns={columns}
+                data={data?.data || []}
+                isLoading={isLoading}
+                rowCount={data?.total || 0}
+                manualPagination={true}
+                manualFiltering={true}
+                manualSorting={true}
+                pagination={paginationState}
+                onPaginationChange={handlePaginationChange}
+                sorting={sortingState}
+                onSortingChange={handleSortingChange}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                globalFilter={filters.folio || ""}
+                onGlobalFilterChange={(val) =>
+                  actions.setSearch("folio", String(val))
+                }
+                searchPlaceholder="Buscar por Folio..."
+                columnTitles={{
+                  folio: "Folio",
+                  sale_date: "Fecha",
+                  status: "Estado",
+                  payment_method: "Método Pago",
+                  total: "Total",
+                }}
+                onRowClick={(row) =>
+                  setSelectedSaleId(
+                    selectedSaleId === row.original.id ? null : row.original.id,
+                  )
+                }
+                showColumnFilters={false}
+              />
+            </div>
           </main>
         </div>
 
         {selectedSaleId && (
-          <div className="w-[35%] bg-white h-full overflow-hidden shadow-xl animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
-             <SaleDetailPanel 
-                saleId={selectedSaleId} 
-                onClose={() => setSelectedSaleId(null)} 
-             />
+          <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+            <SaleDetailPanel
+              saleId={selectedSaleId}
+              onClose={() => setSelectedSaleId(null)}
+            />
           </div>
         )}
-
       </div>
     </div>
   );
