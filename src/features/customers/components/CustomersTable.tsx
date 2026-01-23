@@ -68,7 +68,7 @@ export default function CustomersTable() {
   };
 
   const handleViewStatement = (customer: Customer) => {
-    navigate(`/customers/${customer.id}`);
+    navigate(`/customers/${customer.id}`, { state: { customer } });
   };
 
   const handleSuccess = (mode: 'create' | 'update' | 'restore') => {

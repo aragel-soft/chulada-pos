@@ -1,14 +1,11 @@
-// MALR: Importaciones
 import {
   createBrowserRouter,
   RouterProvider,
-  Navigate
+  Navigate,
+  Outlet
 } from 'react-router-dom';
-
-// --- Layouts ---
+import ProtectedRoute from './ProtectedRoute';
 import { RootLayout } from '@/components/layouts/RootLayout';
-
-// --- Tus Páginas Principales ---
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import SalesPage from '@/features/dashboard/pages/SalesPage';
@@ -16,18 +13,12 @@ import HistoryPage from '@/features/dashboard/pages/HistoryPage';
 import AddInventoryPage from '@/features/dashboard/pages/AddInventoryPage';
 import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
-import CustomersTable from '@/features/customers/components/CustomersTable';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import ProductsPage from '@/features/inventory/pages/ProductsPage';
 import CategoriesPage from '@/features/inventory/pages/CategoriesPage';
 import KitsPage from '@/features/inventory/pages/KitsPage';
 import PromotionsPage from '@/features/inventory/pages/PromotionsPage';
-
-// --- Ruta Protegida ---
-import ProtectedRoute from './ProtectedRoute';
-
-// --- Settings
 import { UsersListPage } from '@/features/settings/pages/UsersListPage';
 import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatrixPage';
 import CashRegisterPage from '@/pages/CashRegisterPage';
@@ -36,10 +27,8 @@ import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage
 import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
 import CustomerDetailPage from '@/features/customers/pages/CustomerDetailPages';
 
-// --- Componentes de ejemplo para settings ---
+// --- Componente de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
-const BillingPage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Facturación</h2><p>Aquí irían tus datos de facturación...</p></div>;
-
 
 const router = createBrowserRouter([
   // --- Ruta Pública ---
@@ -149,21 +138,13 @@ const router = createBrowserRouter([
         path: "customers",
         element: (
           <ProtectedRoute module="customers:view">
-            <CustomersPage />
+            <Outlet />
           </ProtectedRoute>
         ),
         children: [
           {
             index: true,
-            element: <Navigate to="customers/" replace />,
-          },
-          {
-            path: "customers",
-            element: (
-              <ProtectedRoute module="customers:view">
-                <CustomersTable />
-              </ProtectedRoute>
-            ),
+            element: <CustomersPage />
           },
           {
             path: ":id", 
@@ -242,14 +223,6 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute module="profile:view">
                 <ProfilePage />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: "billing",
-            element: (
-              <ProtectedRoute module="billing:view">
-                <BillingPage />
               </ProtectedRoute>
             ),
           },

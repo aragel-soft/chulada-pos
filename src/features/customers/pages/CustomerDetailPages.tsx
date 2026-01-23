@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query"; 
 import { 
   ArrowLeft, 
   Receipt, 
@@ -25,66 +25,52 @@ import {
 } from "@/components/ui/table";
 import { getCustomerAccountStatement } from "@/lib/api/account";
 import { getCustomers } from "@/lib/api/customers";
-import { AccountStatement } from "@/types/account";
-import { Customer } from "@/types/customers";
 import { formatCurrency } from "@/lib/utils";
 import { CopyablePhone } from "@/components/ui/copyable-phone";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
-  const [statement, setStatement] = useState<AccountStatement | null>(null);
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const initialCustomer = location.state?.customer;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        setLoading(true);
-        const stmtData = await getCustomerAccountStatement(id);
-        setStatement(stmtData);
+  const { data: customerData, isLoading: isLoadingCustomer } = useQuery({
+    queryKey: ["customer", id],
+    queryFn: async () => {
+      const response = await getCustomers({ page: 1, pageSize: 1, search: id });
+      return response.data[0] || null;
+    },
+    initialData: initialCustomer,
+    enabled: !!id,
+  });
 
-        const customersResponse = await getCustomers({ 
-            page: 1, 
-            pageSize: 1, 
-            search: id 
-        });
-        
-        console.log("Estado de cuenta del cliente:", statement);
-        console.log("Datos del cliente:", customersResponse);
-        if (customersResponse.data.length > 0) {
-            setCustomer(customersResponse.data[0]);
-        }
-      } catch (error) {
-        console.error("Error cargando detalle del cliente:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: statement, isLoading: isLoadingStatement } = useQuery({
+    queryKey: ["account-statement", id],
+    queryFn: () => getCustomerAccountStatement(id!),
+    enabled: !!id,
+  });
 
-    fetchData();
-  }, [id]);
+  const customer = customerData;
+  if (!customer && isLoadingCustomer) {
+      return <CustomerDetailSkeleton />;
+  }
 
-  if (loading) return <CustomerDetailSkeleton />;
-
-  if (!statement || !customer) {
+  if (!customer) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <AlertCircle className="h-12 w-12 mb-4 opacity-20" />
             <p>No se encontró información del cliente.</p>
-            <Button variant="link" onClick={() => navigate(-1)}>Regresar</Button>
+            <Button variant="link" onClick={() => navigate("/customers")}>Regresar</Button>
         </div>
     );
   }
 
-  const currentBalance = statement.current_balance;
+  const currentBalance = statement?.current_balance ?? customer.current_balance;
   const isDebt = currentBalance > 0;
   const balanceColorClass = isDebt ? "text-orange-600" : "text-emerald-600";
 
   return (
-    <div className="flex flex-col h-full space-y-6 p-6 bg-gray-50/50 min-h-screen">
+    <div className="flex flex-col h-full space-y-6 p-6 bg-gray-50/50 min-h-screen animate-in fade-in duration-300">
       
       {/* Navigation */}
       <div className="flex items-center gap-2">
@@ -153,49 +139,64 @@ export default function CustomerDetailPage() {
         </div>
 
         <TabsContent value="ledger" className="mt-4 flex-1">
-            <Card className="h-full border shadow-sm">
-                <Table>
-                    <TableHeader className="bg-gray-50">
-                        <TableRow>
-                            <TableHead className="w-[180px]">Fecha</TableHead>
-                            <TableHead>Folio / Concepto</TableHead>
-                            <TableHead className="text-right">Cargo (+)</TableHead>
-                            <TableHead className="text-right">Abono (-)</TableHead>
-                            <TableHead className="text-right bg-gray-100/50 font-bold">Saldo</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {statement.movements.map((mov) => {
-                            const isCharge = mov.movement_type === 'charge';
-                            return (
-                                <TableRow key={mov.id} className="hover:bg-gray-50/50">
-                                    <TableCell className="text-muted-foreground text-xs font-mono">
-                                        {format(new Date(mov.date), "dd/MM/yyyy HH:mm", { locale: es })}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-sm">
-                                                {isCharge ? "Compra a Crédito" : "Abono a Cuenta"}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {mov.reference} {mov.notes && `• ${mov.notes}`}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium text-gray-900">
-                                        {isCharge ? formatCurrency(mov.amount) : "-"}
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium text-emerald-600">
-                                        {!isCharge ? formatCurrency(mov.amount) : "-"}
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold text-gray-800 bg-gray-50/30 tabular-nums">
-                                        {formatCurrency(mov.balance_after)}
+            <Card className="h-full border shadow-sm min-h-[400px]">
+                {isLoadingStatement ? (
+                    <div className="p-8 space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader className="bg-gray-50">
+                            <TableRow>
+                                <TableHead className="w-[180px]">Fecha</TableHead>
+                                <TableHead>Folio / Concepto</TableHead>
+                                <TableHead className="text-right">Cargo (+)</TableHead>
+                                <TableHead className="text-right">Abono (-)</TableHead>
+                                <TableHead className="text-right bg-gray-100/50 font-bold">Saldo</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {statement?.movements.map((mov) => {
+                                const isCharge = mov.movement_type === 'charge';
+                                return (
+                                    <TableRow key={mov.id} className="hover:bg-gray-50/50">
+                                        <TableCell className="text-muted-foreground text-xs font-mono">
+                                            {format(new Date(mov.date), "dd/MM/yyyy HH:mm", { locale: es })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-sm">
+                                                    {isCharge ? "Compra a Crédito" : "Abono a Cuenta"}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {mov.reference} {mov.notes && `• ${mov.notes}`}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium text-gray-900">
+                                            {isCharge ? formatCurrency(mov.amount) : "-"}
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium text-emerald-600">
+                                            {!isCharge ? formatCurrency(mov.amount) : "-"}
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-gray-800 bg-gray-50/30 tabular-nums">
+                                            {formatCurrency(mov.balance_after)}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                            {statement?.movements.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                                        Sin movimientos registrados.
                                     </TableCell>
                                 </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
             </Card>
         </TabsContent>
 
