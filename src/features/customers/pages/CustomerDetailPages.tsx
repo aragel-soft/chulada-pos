@@ -5,7 +5,6 @@ import {
   Receipt, 
   ShoppingBag, 
   Calendar,
-  Phone,
   User,
   AlertCircle
 } from "lucide-react";
@@ -29,6 +28,7 @@ import { getCustomers } from "@/lib/api/customers";
 import { AccountStatement } from "@/types/account";
 import { Customer } from "@/types/customers";
 import { formatCurrency } from "@/lib/utils";
+import { CopyablePhone } from "@/components/ui/copyable-phone";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -116,8 +116,7 @@ export default function CustomerDetailPage() {
                                 </Badge>
                             </span>
                             <span className="flex items-center gap-1">
-                                <Phone className="h-3 w-3" />
-                                {customer.phone || "Sin teléfono"}
+                                <CopyablePhone phone={customer.phone} />
                             </span>
                         </div>
                     </div>
