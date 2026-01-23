@@ -88,7 +88,7 @@ export function DataTablePagination<TData>({
   }, [currentPage, pageCount]);
 
   return (
-    <div className="flex flex-col-reverse gap-4 p-2 sm:flex-row sm:items-center sm:justify-between w-full">
+    <div className="flex flex-col-reverse gap-4 px-4 pb-2 sm:flex-row sm:items-center sm:justify-between w-full">
       <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
         <div className="flex items-center space-x-2">
           <p className="text-sm font-medium whitespace-nowrap">

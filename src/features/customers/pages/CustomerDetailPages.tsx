@@ -1,37 +1,32 @@
+import { useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query"; 
+import { ColumnDef } from "@tanstack/react-table";
 import { 
   ArrowLeft, 
-  Receipt, 
-  ShoppingBag, 
-  Calendar,
   User,
-  AlertCircle
+  AlertCircle, 
+  Calendar,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { CopyablePhone } from "@/components/ui/copyable-phone";
+import { DataTable } from "@/components/ui/data-table/data-table"; 
 import { getCustomerAccountStatement } from "@/lib/api/account";
 import { getCustomers } from "@/lib/api/customers";
-import { formatCurrency } from "@/lib/utils";
-import { CopyablePhone } from "@/components/ui/copyable-phone";
+import { formatCurrency, cn } from "@/lib/utils";
+import { AccountMovement } from "@/types/account";
+import { Card } from "@/components/ui/card";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+
   const initialCustomer = location.state?.customer;
 
   const { data: customerData, isLoading: isLoadingCustomer } = useQuery({
@@ -51,6 +46,76 @@ export default function CustomerDetailPage() {
   });
 
   const customer = customerData;
+  const columns = useMemo<ColumnDef<AccountMovement>[]>(
+    () => [
+      {
+        accessorKey: "date",
+        header: "Fecha",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-xs font-mono">
+            {format(new Date(row.getValue("date")), "dd/MM/yyyy HH:mm", { locale: es })}
+          </span>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "reference",
+        header: "Folio / Concepto",
+        cell: ({ row }) => {
+          const isCharge = row.original.movement_type === 'charge';
+          return (
+            <div className="flex flex-col">
+              <span className="font-medium text-sm">
+                {isCharge ? "Compra a Crédito" : "Abono a Cuenta"}
+              </span>
+              <span className="text-xs text-muted-foreground uppercase">
+                {row.original.reference} {row.original.notes && `• ${row.original.notes}`}
+              </span>
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+      {
+        id: "charge",
+        header: () => <div className="text-right">Cargo (+)</div>,
+        cell: ({ row }) => {
+          const isCharge = row.original.movement_type === 'charge';
+          return (
+            <div className="text-right font-medium text-gray-900">
+              {isCharge ? formatCurrency(row.original.amount) : "-"}
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+      {
+        id: "payment",
+        header: () => <div className="text-right">Abono (-)</div>,
+        cell: ({ row }) => {
+          const isCharge = row.original.movement_type === 'charge';
+          return (
+            <div className="text-right font-medium text-emerald-600">
+              {!isCharge ? formatCurrency(row.original.amount) : "-"}
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+      {
+        accessorKey: "balance_after",
+        header: () => <div className="text-right">Saldo</div>,
+        cell: ({ row }) => (
+          <div className="text-right font-bold text-gray-800 tabular-nums">
+            {formatCurrency(row.getValue("balance_after"))}
+          </div>
+        ),
+        enableSorting: false,
+      },
+    ],
+    []
+  );
+
   if (!customer && isLoadingCustomer) {
       return <CustomerDetailSkeleton />;
   }
@@ -67,141 +132,94 @@ export default function CustomerDetailPage() {
 
   const currentBalance = statement?.current_balance ?? customer.current_balance;
   const isDebt = currentBalance > 0;
-  const balanceColorClass = isDebt ? "text-orange-600" : "text-emerald-600";
+  const balanceColorClass = isDebt ? "text-destructive" : "text-emerald-600";
 
   return (
-    <div className="flex flex-col h-full space-y-6 p-6 bg-gray-50/50 min-h-screen animate-in fade-in duration-300">
+    <div className="flex flex-col h-full p-4 mt-2 gap-4 bg-background animate-in fade-in duration-300">
       
-      {/* Navigation */}
-      <div className="flex items-center gap-2">
-        <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-muted-foreground hover:text-foreground"
-            onClick={() => navigate("/customers")}
-        >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Clientes
-        </Button>
-      </div>
-
-      {/* Hero Header */}
-      <Card className="border-none shadow-sm bg-white overflow-hidden">
-        <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-start gap-4">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <User className="h-8 w-8" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-                        <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                                <Badge variant="outline" className="font-mono text-xs text-gray-500">
-                                    {customer.code || "S/C"}
-                                </Badge>
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <CopyablePhone phone={customer.phone} />
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="text-right">
-                    <p className="text-sm font-medium text-muted-foreground mb-1 uppercase tracking-wide">
-                        Saldo Actual
-                    </p>
-                    <div className={`text-4xl font-extrabold tracking-tight ${balanceColorClass}`}>
-                        {formatCurrency(currentBalance)}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        {isDebt ? "Saldo Pendiente de Pago" : "Cuenta al corriente"}
-                    </p>
-                </div>
-            </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs */}
-      <Tabs defaultValue="ledger" className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between">
-            <TabsList className="bg-white border p-1 h-auto">
-                <TabsTrigger value="ledger" className="px-4 py-2 gap-2 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
-                    <Receipt className="h-4 w-4" />
-                    Estado de Cuenta
-                </TabsTrigger>
-                <TabsTrigger value="history" className="px-4 py-2 gap-2 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
-                    <ShoppingBag className="h-4 w-4" />
-                    Historial de Ventas
-                </TabsTrigger>
-            </TabsList>
+      {/* Header */}
+      <div className="flex flex-col gap-4 border-b pb-4">
+        <div className="flex items-center gap-2">
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className="-ml-2 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/customers")}
+            >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Volver a Clientes
+            </Button>
         </div>
 
-        <TabsContent value="ledger" className="mt-4 flex-1">
-            <Card className="h-full border shadow-sm min-h-[400px]">
-                {isLoadingStatement ? (
-                    <div className="p-8 space-y-4">
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <User className="h-7 w-7" />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">{customer.name}</h1>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                        <Badge variant="outline" className="font-mono text-xs font-normal">
+                            {customer.code || "S/C"}
+                        </Badge>
+                        <CopyablePhone phone={customer.phone} />
                     </div>
-                ) : (
-                    <Table>
-                        <TableHeader className="bg-gray-50">
-                            <TableRow>
-                                <TableHead className="w-[180px]">Fecha</TableHead>
-                                <TableHead>Folio / Concepto</TableHead>
-                                <TableHead className="text-right">Cargo (+)</TableHead>
-                                <TableHead className="text-right">Abono (-)</TableHead>
-                                <TableHead className="text-right bg-gray-100/50 font-bold">Saldo</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {statement?.movements.map((mov) => {
-                                const isCharge = mov.movement_type === 'charge';
-                                return (
-                                    <TableRow key={mov.id} className="hover:bg-gray-50/50">
-                                        <TableCell className="text-muted-foreground text-xs font-mono">
-                                            {format(new Date(mov.date), "dd/MM/yyyy HH:mm", { locale: es })}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-sm">
-                                                    {isCharge ? "Compra a Crédito" : "Abono a Cuenta"}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {mov.reference} {mov.notes && `• ${mov.notes}`}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium text-gray-900">
-                                            {isCharge ? formatCurrency(mov.amount) : "-"}
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium text-emerald-600">
-                                            {!isCharge ? formatCurrency(mov.amount) : "-"}
-                                        </TableCell>
-                                        <TableCell className="text-right font-bold text-gray-800 bg-gray-50/30 tabular-nums">
-                                            {formatCurrency(mov.balance_after)}
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                            {statement?.movements.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                                        Sin movimientos registrados.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                </div>
+            </div>
+
+            <div className="text-right">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Saldo Actual
+                </p>
+                <div className={`text-3xl font-bold ${balanceColorClass}`}>
+                    {formatCurrency(currentBalance)}
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="ledger" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="w-full justify-start rounded-none bg-transparent p-0 border-b h-auto flex-none">
+            <TabsTrigger 
+                value="ledger"
+                className={cn(
+                    "relative rounded-none bg-transparent px-4 pb-3 pt-2 text-muted-foreground shadow-none transition-none",
+                    "data-[state=active]:border-b-2 data-[state=active]:border-[#480489] data-[state=active]:text-[#480489] data-[state=active]:font-bold data-[state=active]:shadow-none",
+                    "hover:text-foreground"
                 )}
-            </Card>
+            >
+                Estado de Cuenta
+            </TabsTrigger>
+            
+            <TabsTrigger 
+                value="history"
+                className={cn(
+                    "relative rounded-none bg-transparent px-4 pb-3 pt-2 text-muted-foreground shadow-none transition-none",
+                    "data-[state=active]:border-b-2 data-[state=active]:border-[#480489] data-[state=active]:text-[#480489] data-[state=active]:font-bold data-[state=active]:shadow-none",
+                    "hover:text-foreground"
+                )}
+            >
+                Historial de Ventas
+            </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ledger" className="flex-1 mt-4 overflow-hidden flex flex-col">
+            <div className="flex-1 border rounded-md overflow-auto flex flex-col bg-white">
+                <DataTable 
+                    columns={columns} 
+                    data={statement?.movements || []} 
+                    isLoading={isLoadingStatement}
+                    searchPlaceholder="Buscar folio..."
+                    manualPagination={false} 
+                    manualSorting={false}
+                    initialPageSize={16} 
+                />
+            </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-             <Card className="border shadow-sm p-8 text-center flex flex-col items-center justify-center text-muted-foreground min-h-[300px]">
+            <Card className="border shadow-sm p-8 text-center flex flex-col items-center justify-center text-muted-foreground min-h-[300px]">
                 <div className="bg-gray-100 p-4 rounded-full mb-4">
                     <Calendar className="h-8 w-8 opacity-50" />
                 </div>
@@ -218,13 +236,19 @@ export default function CustomerDetailPage() {
 
 function CustomerDetailSkeleton() {
     return (
-        <div className="p-6 space-y-6">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-32 w-full rounded-xl" />
-            <div className="space-y-2">
-                <Skeleton className="h-10 w-64" />
-                <Skeleton className="h-64 w-full" />
+        <div className="p-6 space-y-6 h-full bg-background">
+            <div className="flex justify-between items-center">
+                <div className="flex gap-4">
+                    <Skeleton className="h-16 w-16 rounded-full" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                </div>
+                <Skeleton className="h-12 w-32" />
             </div>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-full w-full rounded-md" />
         </div>
     );
 }
