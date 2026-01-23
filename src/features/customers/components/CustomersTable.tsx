@@ -8,7 +8,9 @@ import {
   PlusCircle, 
   Pencil, 
   Trash,
+  ReceiptText 
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { DataTable } from "@/components/ui/data-table/data-table"; 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +24,7 @@ import { CustomerFormDialog } from "./CustomerFormDialog";
 import { DeleteCustomersDialog } from "./DeleteCustomersDialog";
 
 export default function CustomersTable() {
+  const navigate = useNavigate(); 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -62,6 +65,10 @@ export default function CustomersTable() {
 
   const handleDelete = () => {
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleViewStatement = (customer: Customer) => {
+    navigate(`/customers/${customer.id}`);
   };
 
   const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
@@ -137,9 +144,23 @@ export default function CustomersTable() {
           const selectedRows = table.getFilteredSelectedRowModel().rows;
           const selectedCustomer = selectedRows.length === 1 ? selectedRows[0].original : null;
           const hasSelection = selectedRows.length > 0;
+          const isSingleSelection = selectedRows.length === 1;
 
           return (
             <div className="flex items-center gap-2 w-full md:w-auto">
+              
+              {can('customers:view') && (
+                 <Button
+                   variant="outline"
+                   className="whitespace-nowrap border-dashed border-gray-400 text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 mr-2"
+                   disabled={!isSingleSelection} 
+                   onClick={() => selectedCustomer && handleViewStatement(selectedCustomer)}
+                 >
+                   <ReceiptText className="mr-2 h-4 w-4" />
+                   <span className="hidden sm:inline">Estado de Cuenta</span>
+                 </Button>
+              )}
+
               {can('customers:create') && (
                 <Button 
                   className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"

@@ -52,6 +52,8 @@ export default function CustomerDetailPage() {
             search: id 
         });
         
+        console.log("Estado de cuenta del cliente:", statement);
+        console.log("Datos del cliente:", customersResponse);
         if (customersResponse.data.length > 0) {
             setCustomer(customersResponse.data[0]);
         }

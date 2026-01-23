@@ -41,7 +41,7 @@ VALUES
 INSERT OR IGNORE INTO debt_payments (id, folio, customer_id, sale_id, amount, payment_date, payment_method, user_id, notes)
 VALUES (
   'pay_lm_01',
-  1001,
+  '1001',
   'c_red_03',
   'sale_lm_01', -- Linked to previous sale
   300.00,       -- Payment of $300 to leave debt at exactly $4,900
@@ -108,7 +108,7 @@ VALUES (
 INSERT OR IGNORE INTO debt_payments (id, folio, customer_id, sale_id, amount, payment_date, user_id, notes)
 VALUES (
   'pay_am_01', 
-  1002, 
+  '1002', 
   'c_green_01', 
   'sale_am_01', 
   1200.00, 
