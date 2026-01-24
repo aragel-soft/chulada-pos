@@ -1,6 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { User, Role, CreateUserPayload, CreateUserError, UpdateUserPayload } from '@/types/users';
 
+export interface UserListOptions {
+  include_deleted?: boolean;
+}
+
 export async function createUser(payload: CreateUserPayload): Promise<User> {
   try {
     return await invoke<User>('create_user', { payload });
@@ -26,8 +30,8 @@ export async function saveAvatar(fileData: number[], username: string): Promise<
   return await invoke<string>('save_avatar', { fileData, username });
 }
 
-export async function getUsersList(): Promise<User[]> {
-  return await invoke<User[]>('get_users_list');
+export async function getUsersList(options?: UserListOptions): Promise<User[]> {
+  return await invoke<User[]>('get_users_list', { options });
 }
 
 export async function updateUser(payload: UpdateUserPayload): Promise<User> {

@@ -20,10 +20,16 @@ pub struct UserView {
     is_active: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserListOptions {
+    pub include_deleted: Option<bool>,
+}
+
 #[tauri::command]
 pub fn get_users_list(
     db_state: State<'_, Mutex<Connection>>,
     app_handle: tauri::AppHandle,
+    options: Option<UserListOptions>,
 ) -> Result<Vec<UserView>, String> {
     let conn = db_state.lock().unwrap();
 
@@ -32,7 +38,14 @@ pub fn get_users_list(
         .app_data_dir()
         .expect("No se pudo obtener el directorio de datos");
 
-    let sql = "
+    let show_deleted = options.map(|opt| opt.include_deleted.unwrap_or(false)).unwrap_or(false);
+    let where_clause = if show_deleted {
+        "" 
+    } else {
+        "WHERE u.deleted_at IS NULL" 
+    };
+
+    let sql = format!("
         SELECT 
             u.id, 
             u.username, 
@@ -44,11 +57,11 @@ pub fn get_users_list(
             u.is_active
         FROM users u
         JOIN roles r ON u.role_id = r.id
-        WHERE u.deleted_at IS NULL
+        {}
         ORDER BY u.full_name ASC;
-    ";
+    ", where_clause);
 
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
     let user_iter = stmt
         .query_map([], |row| {
