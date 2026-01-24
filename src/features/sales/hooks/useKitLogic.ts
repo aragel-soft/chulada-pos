@@ -18,14 +18,11 @@ export function useKitLogic() {
   const { addToCart } = useCartStore();
   const { getKitForProduct } = useKitStore();
 
-  // Modal State (Queue)
   const [kitModalOpen, setKitModalOpen] = useState(false);
   const [pendingKitsQueue, setPendingKitsQueue] = useState<PendingKit[]>([]);
 
   const currentPendingKit = pendingKitsQueue.length > 0 ? pendingKitsQueue[0] : null;
 
-  // Logic: Validate kits before checkout
-  // Return true if blocked (and opens modal), false if clean.
   const validateKitsForCheckout = useCallback(async (items: CartItem[]): Promise<boolean> => {
       const incompleteKits: PendingKit[] = [];
       
@@ -56,7 +53,7 @@ export function useKitLogic() {
           setPendingKitsQueue(incompleteKits);
           setKitModalOpen(true);
           toast.warning(`Hay ${incompleteKits.length} promociones por completar.`);
-          return true; // Blocked
+          return true;
       }
 
       return false;
@@ -68,11 +65,8 @@ export function useKitLogic() {
       
       const { triggerProduct, isScan } = currentPendingKit;
 
-      // Add Gifts Linked to Trigger
       for (const gift of selectedItems) {
            try {
-               // Always fetch fresh details to ensure we have the full product object
-               // Optimization: Could check if we already have it in a cache, but for safety in this flow correctness > speed
                const detail = await getProductById(gift.product_id);
                const realProduct = detail as unknown as Product;
 
@@ -105,12 +99,6 @@ export function useKitLogic() {
   }, [currentPendingKit, addToCart]);
 
   const handleKitCancel = useCallback(() => {
-      // Skip current kit? Or close all?
-      // Usually Cancel means "I don't want this specific gift right now".
-      // But if it's REQUIRED, blocking checkout...
-      // Let's just skip it and move to next, but they won't be able to checkout if verified again.
-      // Or close strictly?
-      // Let's just Close for now, simplest behavior.
       setKitModalOpen(false);
       setPendingKitsQueue([]);
   }, []);
@@ -118,8 +106,8 @@ export function useKitLogic() {
   return {
     kitModalOpen,
     setKitModalOpen,
-    pendingKit: currentPendingKit, // Expose as 'pendingKit' for compatibility
-    setPendingKit: () => {}, // No-op or refactor if needed, but UI only reads it
+    pendingKit: currentPendingKit,
+    setPendingKit: () => {}, 
     validateKitsForCheckout,
     handleKitConfirm,
     handleKitCancel 

@@ -40,12 +40,11 @@ interface CartState {
   getTicketTotal: () => number;
 }
 
-// --- Helper Logic (Pure-ish) ---
 
 const findTriggerForGift = (product: Product, items: CartItem[]): string | undefined => {
     const kitStore = useKitStore.getState();
     
-    // 1. Check if this product is a NEEDED GIFT for any active trigger
+    // Check if this product is a NEEDED GIFT
     for (const item of items) {
         if (item.priceType === 'kit_item') continue;
 
@@ -67,14 +66,12 @@ const findTriggerForGift = (product: Product, items: CartItem[]): string | undef
     return undefined;
 };
 
-// Returns MODIFIED items array (cloned)
 const processKitTriggerInternal = (triggerProduct: Product, items: CartItem[]): CartItem[] => {
     const kitStore = useKitStore.getState();
     const kit = kitStore.getKitForProduct(triggerProduct.id);
     
     if (!kit || !kit.is_required) return items;
 
-    // We need to work with Clones to avoid modifying state directly if passed reference
     let currentItems = items.map(i => ({...i}));
 
     const triggerItems = currentItems.filter(i => i.id === triggerProduct.id && i.priceType !== 'kit_item');
@@ -101,8 +98,6 @@ const processKitTriggerInternal = (triggerProduct: Product, items: CartItem[]): 
          for (const candidate of candidates) {
              if (stillNeeded <= 0) break;
              
-             // Check UUID equality to ensure we don't use same item multiple times across triggers improperly?
-             // candidateUsage tracks how much we TOOK from this candidate in this pass
              const usedSoFar = candidateUsage[candidate.uuid] || 0;
              const available = candidate.quantity - usedSoFar;
              
@@ -110,19 +105,13 @@ const processKitTriggerInternal = (triggerProduct: Product, items: CartItem[]): 
 
              const take = Math.min(available, stillNeeded);
              
-             // Perform Convert Logic directly here on `currentItems`
-             // 1. Reduce Candidate
              if (candidate.quantity === take) {
-                 // Remove effectively (but we can't splice easily while iterating candidates?)
-                 // We will mark it for update.
-                 candidate.quantity = 0; // Mark for removal
+                 candidate.quantity = 0;
              } else {
                  candidate.quantity -= take;
              }
              candidateUsage[candidate.uuid] = usedSoFar + take;
              
-             // 2. Add Gift
-             // Check if gift line exists
              const giftIndex = currentItems.findIndex(i => i.id === candidate.id && i.priceType === 'kit_item' && i.kitTriggerId === triggerItem.uuid);
              if (giftIndex >= 0) {
                  currentItems[giftIndex].quantity += take;
@@ -142,7 +131,6 @@ const processKitTriggerInternal = (triggerProduct: Product, items: CartItem[]): 
          }
     }
 
-    // Cleanup 0 qty items
     return currentItems.filter(i => i.quantity > 0);
 };
 
@@ -166,26 +154,19 @@ const reconcileKitGiftsInternal = (triggerItem: CartItem, items: CartItem[]): Ca
                
                const reduceBy = Math.min(gift.quantity, excess);
                
-               // 1. Reduce Gift Qty
                const giftInArray = currentItems.find(i => i.uuid === gift.uuid);
                if (giftInArray) {
                     if (giftInArray.quantity === reduceBy) {
-                        giftInArray.quantity = 0; // Mark remove
+                        giftInArray.quantity = 0;
                     } else {
                         giftInArray.quantity -= reduceBy;
                     }
                }
 
-               // 2. Add as Retail
-               // Check if retail line exists
-               const existingRetail = currentItems.find(i => i.id === gift.id && i.priceType === 'retail'); // Default to retail
+               const existingRetail = currentItems.find(i => i.id === gift.id && i.priceType === 'retail');
                if (existingRetail) {
                    existingRetail.quantity += reduceBy;
                } else {
-                   // Or wholesale if ticket is wholesale? 
-                   // Logic usually defaults to Retail when unlinking? 
-                   // Let's assume Retail for safety or specific logic.
-                   // Previous logic: `addToCart(gift, { priceType: 'retail' ... })`
                    currentItems.push({
                        ...gift,
                        uuid: uuidv4(),
