@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { CartItem } from "@/features/sales/stores/cartStore"; 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Tag } from "lucide-react";
+import { Minus, Plus, Trash2, Tag, Gift } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -17,29 +18,33 @@ interface CartItemRowProps {
 interface PriceTypeStyle {
     container: string;
     badge: string;
-    label?: string; // Additional text like "Mayoreo" or "Regalo"
-    isInteractive: boolean;
-    labelClass?: string; // Style for the label text
+    label?: string;
+    labelClass?: string;
+    icon: typeof Tag;
+    canTogglePrice: boolean;
 }
 
 const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
     kit_item: {
-        container: 'ml-0 bg-purple-50/50 border-purple-100',
-        badge: 'bg-purple-100 text-purple-700 font-medium',
+        container: 'ml-0 bg-pink-50/50 border-pink-100',
+        badge: 'bg-pink-100 text-pink-700 border border-pink-200 font-medium hover:bg-pink-100',
         label: 'Regalo',
         labelClass: 'font-bold tracking-wider',
-        isInteractive: false // TODO: Implement kit item interaction in the future
+        icon: Gift,
+        canTogglePrice: false
     },
     wholesale: {
         container: 'bg-amber-50/50 border-amber-200',
-        badge: 'bg-amber-100 text-amber-700 font-bold ring-1 ring-amber-200',
+        badge: 'bg-amber-100 text-amber-700 border border-amber-200 font-bold hover:bg-amber-200',
         label: 'Mayoreo',
-        isInteractive: true
+        icon: Tag,
+        canTogglePrice: true
     },
-    retail: { // Default
+    retail: {
         container: 'bg-white border-zinc-100 hover:border-zinc-300',
         badge: 'bg-zinc-100 text-muted-foreground group-hover/price:bg-zinc-200',
-        isInteractive: true
+        icon: Tag,
+        canTogglePrice: true
     }
 };
 
@@ -94,21 +99,25 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
           {item.name}
         </div>
         
-        <div 
-          onClick={style.isInteractive ? onTogglePriceType : undefined}
-          className={`flex items-center gap-2 mt-1 w-fit select-none group/price ${style.isInteractive ? "cursor-pointer" : "cursor-default opacity-80"}`}
-          title={style.isInteractive ? "Clic para cambiar tipo de precio" : "Precio fijo"}
+        <button
+          type="button"
+          onClick={style.canTogglePrice ? onTogglePriceType : undefined}
+          disabled={!style.canTogglePrice}
+          className={`flex items-center gap-2 mt-1 w-fit select-none group/price ${
+            style.canTogglePrice ? "cursor-pointer" : "cursor-default opacity-80"
+          }`}
+          title={style.canTogglePrice ? "Clic para cambiar tipo de precio" : "Precio fijo"}
         >
-          <div className={`text-xs flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${style.badge}`}>
-             <Tag size={10} />
+          <Badge className={`text-xs flex items-center gap-1 px-1.5 py-0.5 transition-colors ${style.badge}`}>
+             <style.icon size={10} />
              <span>{formatCurrency(item.finalPrice)}</span>
              {style.label && (
                  <span className={`text-[9px] ml-1 uppercase ${style.labelClass || ''}`}>
                      {style.label}
                  </span>
              )}
-          </div>
-        </div>
+          </Badge>
+        </button>
       </div>
 
       <div className="flex items-center gap-1 shrink-0 mr-3">
@@ -128,7 +137,7 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
         </Button>
         
         <div className="w-12 text-center relative">
-          {(style.isInteractive && isEditing) ? (
+          {(isEditing) ? (
             <Input
               ref={inputRef}
               value={tempQty}
@@ -141,7 +150,7 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
             <span 
               className="block text-sm font-bold tabular-nums rounded px-1 select-none cursor-text hover:bg-zinc-100"
               onDoubleClick={() => setIsEditing(true)}
-              title={style.isInteractive ? "Doble clic para editar manual" : undefined}
+              title={"Doble clic para editar manual"}
             >
               {item.quantity}
             </span>
