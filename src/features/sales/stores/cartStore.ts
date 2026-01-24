@@ -5,14 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { MAX_OPEN_TICKETS } from '@/config/constants';
 import { useKitStore } from './kitStore';
 import { toast } from 'sonner';
-import { playSound } from '@/lib/sounds';
+import * as KitService from '@/features/sales/services/kitService';
 
 export interface CartItem extends Product {
-  uuid: string; // Unique ID for this specific row in the cart
+  uuid: string;
   quantity: number;
   priceType: 'retail' | 'wholesale' | 'kit_item';
   finalPrice: number;
-  kitTriggerId?: string; // ID of the product that triggered this gift (if applicable)
+  kitTriggerId?: string;
 }
 interface Ticket {
   id: string;
@@ -39,152 +39,6 @@ interface CartState {
   getActiveTicket: () => Ticket | undefined;
   getTicketTotal: () => number;
 }
-
-
-const findTriggerForGift = (product: Product, items: CartItem[]): string | undefined => {
-    const kitStore = useKitStore.getState();
-    
-    // Check if this product is a NEEDED GIFT
-    for (const item of items) {
-        if (item.priceType === 'kit_item') continue;
-
-        const kit = kitStore.getKitForProduct(item.id);
-        if (kit && kit.is_required) {
-            const builtInItem = kit.items.find(k => k.product_id === product.id);
-            if (builtInItem) {
-                const quota = kit.max_selections * item.quantity;
-                const used = items
-                    .filter(i => i.kitTriggerId === item.uuid) 
-                    .reduce((sum, i) => sum + i.quantity, 0);
-                
-                if (used < quota) {
-                    return item.uuid; 
-                }
-            }
-        }
-    }
-    return undefined;
-};
-
-const processKitTriggerInternal = (triggerProduct: Product, items: CartItem[]): CartItem[] => {
-    const kitStore = useKitStore.getState();
-    const kit = kitStore.getKitForProduct(triggerProduct.id);
-    
-    if (!kit || !kit.is_required) return items;
-
-    let currentItems = items.map(i => ({...i}));
-
-    const triggerItems = currentItems.filter(i => i.id === triggerProduct.id && i.priceType !== 'kit_item');
-    if (triggerItems.length === 0) return currentItems;
-
-    const candidates = currentItems.filter(i => 
-         i.priceType !== 'kit_item' && 
-         kit!.items.some(k => k.product_id === i.id)
-    );
-
-    if (candidates.length === 0) return currentItems;
-
-    const candidateUsage: Record<string, number> = {}; 
-
-    for (const triggerItem of triggerItems) {
-         const neededTotal = kit.max_selections * triggerItem.quantity;
-         const linkedCount = currentItems
-             .filter(i => i.kitTriggerId === triggerItem.uuid)
-             .reduce((sum, i) => sum + i.quantity, 0);
-
-         let stillNeeded = neededTotal - linkedCount;
-         if (stillNeeded <= 0) continue;
-
-         for (const candidate of candidates) {
-             if (stillNeeded <= 0) break;
-             
-             const usedSoFar = candidateUsage[candidate.uuid] || 0;
-             const available = candidate.quantity - usedSoFar;
-             
-             if (available <= 0) continue;
-
-             const take = Math.min(available, stillNeeded);
-             
-             if (candidate.quantity === take) {
-                 candidate.quantity = 0;
-             } else {
-                 candidate.quantity -= take;
-             }
-             candidateUsage[candidate.uuid] = usedSoFar + take;
-             
-             const giftIndex = currentItems.findIndex(i => i.id === candidate.id && i.priceType === 'kit_item' && i.kitTriggerId === triggerItem.uuid);
-             if (giftIndex >= 0) {
-                 currentItems[giftIndex].quantity += take;
-             } else {
-                 currentItems.push({
-                     ...candidate,
-                     uuid: uuidv4(),
-                     priceType: 'kit_item',
-                     finalPrice: 0,
-                     quantity: take,
-                     kitTriggerId: triggerItem.uuid
-                 });
-             }
-
-             stillNeeded -= take;
-             toast.success(`Producto vinculado como regalo: ${candidate.name}`);
-         }
-    }
-
-    return currentItems.filter(i => i.quantity > 0);
-};
-
-const reconcileKitGiftsInternal = (triggerItem: CartItem, items: CartItem[]): CartItem[] => {
-       const kitStore = useKitStore.getState();
-       const kit = kitStore.getKitForProduct(triggerItem.id);
-       if (!kit || !kit.is_required) return items;
-
-       let currentItems = items.map(i => ({...i}));
-
-       const maxAllowed = kit.max_selections * triggerItem.quantity;
-       
-       const linkedGifts = currentItems.filter(i => i.kitTriggerId === triggerItem.uuid && i.priceType === 'kit_item');
-       const currentTotalGifts = linkedGifts.reduce((sum, i) => sum + i.quantity, 0);
-       
-       if (currentTotalGifts > maxAllowed) {
-           let excess = currentTotalGifts - maxAllowed;
-           
-           for (const gift of linkedGifts) {
-               if (excess <= 0) break;
-               
-               const reduceBy = Math.min(gift.quantity, excess);
-               
-               const giftInArray = currentItems.find(i => i.uuid === gift.uuid);
-               if (giftInArray) {
-                    if (giftInArray.quantity === reduceBy) {
-                        giftInArray.quantity = 0;
-                    } else {
-                        giftInArray.quantity -= reduceBy;
-                    }
-               }
-
-               const existingRetail = currentItems.find(i => i.id === gift.id && i.priceType === 'retail');
-               if (existingRetail) {
-                   existingRetail.quantity += reduceBy;
-               } else {
-                   currentItems.push({
-                       ...gift,
-                       uuid: uuidv4(),
-                       priceType: 'retail',
-                       finalPrice: gift.retail_price,
-                       kitTriggerId: undefined,
-                       quantity: reduceBy
-                   });
-               }
-               
-               toast.success(`Regresado a precio normal: ${gift.name}`);
-               playSound("success");
-
-               excess -= reduceBy;
-           }
-       }
-       return currentItems.filter(i => i.quantity > 0);
-};
 
 
 export const useCartStore = create<CartState>()(
@@ -243,16 +97,16 @@ export const useCartStore = create<CartState>()(
           if (ticketIndex === -1) return state;
 
           const currentTicket = state.tickets[ticketIndex];
-          // Use provided priceType or fallback to ticket default
           let targetPriceType = options?.priceType || currentTicket.priceType;
           const targetQuantity = options?.quantity || 1;
           let kitTriggerId = options?.kitTriggerId;
           
           let newItems = [...currentTicket.items];
 
-          // 1. Auto-Link Logic (If adding a standard item, check if it should be a gift)
+          const kitDefs = useKitStore.getState().kitDefs;
+
           if (targetPriceType !== 'kit_item') {
-               const autoLinkTriggerId = findTriggerForGift(product, newItems);
+               const autoLinkTriggerId = KitService.findTriggerForGift(product, newItems, kitDefs);
                if (autoLinkTriggerId) {
                    targetPriceType = 'kit_item';
                    kitTriggerId = autoLinkTriggerId;
@@ -273,8 +127,6 @@ export const useCartStore = create<CartState>()(
             }
           } else {
             // Check stock for new item
-            // Logic note: if `product.stock` is checked against `targetQuantity`, assuming existing cart items + targetQuantity <= stock?
-            // Simple check:
             const totalInCart = newItems.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
             if (totalInCart + targetQuantity > product.stock) {
                 toast.error(`Stock insuficiente para: ${product.name}`);
@@ -303,11 +155,8 @@ export const useCartStore = create<CartState>()(
             });
           }
 
-          // 3. Post-Process: Check if this new/updated item IS A TRIGGER
-          // We pass the PRODUCT, and ProcessKitTrigger scans items to see if that product is a trigger in the cart.
-          // Since we just updated `newItems`, let's run the processor on it.
-          // Note: `addToCart` implies we added 'product'.
-          newItems = processKitTriggerInternal(product, newItems);
+          // Check if this new/updated item IS A KIT TRIGGER
+          newItems = KitService.processKitTrigger(product, newItems, kitDefs);
 
           const newTickets = [...state.tickets];
           newTickets[ticketIndex] = { ...currentTicket, items: newItems };
@@ -365,7 +214,8 @@ export const useCartStore = create<CartState>()(
               const kitStore = useKitStore.getState();
               const kit = kitStore.getKitForProduct(removedItem.id);
               if (kit && kit.is_required) {
-                  newItems = reconcileKitGiftsInternal({ ...removedItem, quantity: 0 }, newItems);
+                  const kitDefs = useKitStore.getState().kitDefs;
+                  newItems = KitService.reconcileKitGifts({ ...removedItem, quantity: 0 }, newItems, kitDefs);
               }
           }
 
@@ -388,8 +238,23 @@ export const useCartStore = create<CartState>()(
 
           const oldQty = item.quantity;
           
-          // Stock Check
+          // Validation when increasing quantity
           if (quantity > oldQty) {
+              // Kit quota validation for kit_item
+              if (item.priceType === 'kit_item' && item.kitTriggerId) {
+                  const triggerItem = currentTicket.items.find(i => i.uuid === item.kitTriggerId);
+                  if (triggerItem) {
+                      const kitDefs = useKitStore.getState().kitDefs;
+                      const remaining = KitService.getRemainingKitQuota(triggerItem, currentTicket.items, kitDefs);
+                      
+                      if (remaining !== null && (quantity - oldQty) > remaining) {
+                          toast.error(`Límite de regalos alcanzado (${remaining} disponibles)`);
+                          return state;
+                      }
+                  }
+              }
+              
+              // Stock validation
               if (quantity > item.stock) {
                    toast.error(`Stock máximo disponible: ${item.stock}`);
                    return state;
@@ -404,37 +269,21 @@ export const useCartStore = create<CartState>()(
           });
 
           // Post-Update Logic (Kits)
+          const kitDefs = useKitStore.getState().kitDefs;
+          
           if (quantity > oldQty) {
                const updatedItem = newItems.find(i => i.uuid === uuid);
                if (updatedItem) {
-                   // 1. Is Trigger?
-                   newItems = processKitTriggerInternal(updatedItem, newItems);
+                   newItems = KitService.processKitTrigger(updatedItem, newItems, kitDefs);
                    
-                   // 2. Is Candidate? (And NOT already a gift)
                    if (updatedItem.priceType !== 'kit_item') {
-                        // Check if we can link this increased quantity to a trigger?
-                        // `findTriggerForGift` looks for ANY trigger that needs this product.
-                        // We might have just increased quantity, so we have "excess" to give.
-                        // The logic in `SalesPage.tsx` was: `convertProductToKitGift` for delta.
-                        // Here we can just try to run `processKitTriggerInternal` for ALL triggers? 
-                        // No, simpler: Check if *this* item is needed.
-                        const triggerId = findTriggerForGift(updatedItem, newItems);
+                        const triggerId = KitService.findTriggerForGift(updatedItem, newItems, kitDefs);
                         if (triggerId) {
                             const delta = quantity - oldQty;
-                            // Convert delta
-                            // We call `convertProductToKitGift` action? Or internal logic?
-                            // Internal logic is safe.
-                            // reuse `convertProductToKitGift` logic roughly.
-                            
-                            // Let's implement simple convert here on `newItems`
                             const sourceIndex = newItems.findIndex(i => i.uuid === uuid);
                             if (sourceIndex >= 0) {
-                                // Reduce Source
-                                // Note: We just set quantity to `quantity`. So we reduce it by `delta`.
                                 newItems[sourceIndex].quantity -= delta;
                                 
-                                // Add Gift
-                                // Find or Create
                                 const giftIndex = newItems.findIndex(i => i.id === updatedItem.id && i.priceType === 'kit_item' && i.kitTriggerId === triggerId);
                                 if (giftIndex >= 0) {
                                     newItems[giftIndex].quantity += delta;
@@ -455,13 +304,9 @@ export const useCartStore = create<CartState>()(
                }
 
           } else if (quantity < oldQty) {
-              // Reconcile
-              // If we reduced a TRIGGER, we must check (and potentially remove) gifts.
-              // Note: `item` is the OLD state. `newItems` has the NEW quantity (reduced).
-              // We pass the Updated Item (with reduced quantity) to Reconcile.
               const updatedItem = newItems.find(i => i.uuid === uuid);
               if (updatedItem && updatedItem.priceType !== 'kit_item') {
-                  newItems = reconcileKitGiftsInternal(updatedItem, newItems);
+                  newItems = KitService.reconcileKitGifts(updatedItem, newItems, kitDefs);
               }
           }
 
@@ -486,24 +331,22 @@ export const useCartStore = create<CartState>()(
 
            let newItems = [...currentItems];
 
-           // 2. Reduce Source Qty
            if (sourceItem.quantity === quantityToConvert) {
                newItems.splice(sourceIndex, 1);
            } else {
                newItems[sourceIndex] = { ...sourceItem, quantity: sourceItem.quantity - quantityToConvert };
            }
 
-           // 3. Add/Update Gift Item
            const giftIndex = newItems.findIndex(i => i.id === productId && i.priceType === 'kit_item' && i.kitTriggerId === kitTriggerId);
            
            if (giftIndex >= 0) {
                newItems[giftIndex].quantity += quantityToConvert;
            } else {
                const newItem: CartItem = {
-                   ...sourceItem, // Copy product props
+                   ...sourceItem,
                    uuid: uuidv4(),
                    priceType: 'kit_item',
-                   finalPrice: 0, // Gift
+                   finalPrice: 0,
                    quantity: quantityToConvert,
                    kitTriggerId
                };
@@ -522,7 +365,7 @@ export const useCartStore = create<CartState>()(
           if (ticketIndex === -1) return state;
 
           const newItems = state.tickets[ticketIndex].items.map(item => {
-            if (item.uuid === uuid) { // Fix: use uuid for row identification
+            if (item.uuid === uuid) {
               if (item.priceType === 'kit_item') return item; 
 
               const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
