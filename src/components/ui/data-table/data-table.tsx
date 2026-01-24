@@ -15,6 +15,7 @@ import {
   OnChangeFn,
   RowSelectionState,
   PaginationState,
+  Row,
 } from "@tanstack/react-table"
 import { Search, ChevronDown } from "lucide-react"
 
@@ -49,6 +50,8 @@ interface DataTableProps<TData, TValue> {
   sorting?: SortingState;
   onSortingChange?: OnChangeFn<SortingState>;
   getRowId?: (originalRow: TData, index: number, parent?: any) => string;
+  onRowClick?: (row: Row<TData>) => void;
+  showColumnFilters?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -74,6 +77,8 @@ export function DataTable<TData, TValue>({
   sorting: externalSorting,
   onSortingChange: externalOnSortingChange,
   getRowId,
+  onRowClick,
+  showColumnFilters = true,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -130,23 +135,32 @@ export function DataTable<TData, TValue>({
               className="pl-10 h-9 w-full"
             />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-9">Filtros <ChevronDown className="ml-2 h-4 w-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((column) => column.getCanHide()).map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {columnTitles[column.id] || column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {showColumnFilters && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-9">
+                  Filtros <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {columnTitles[column.id] || column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       }
       pagination={<DataTablePagination table={table} />}
@@ -166,7 +180,13 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+              <TableRow
+                key={row.id} 
+                data-state={row.getIsSelected() && "selected"}
+                onClick={() => onRowClick && onRowClick(row)}
+                className={`
+                  ${onRowClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                `}>
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

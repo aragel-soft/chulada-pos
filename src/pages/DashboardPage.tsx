@@ -43,7 +43,7 @@ export default function DashboardPage() {
           <Tabs
             value={currentTab}
             onValueChange={onTabChange}
-            className="w-[400px]"
+            className={currentTab === 'sales' ? "w-[400px]" : "w-full"}
           >
             <TabsList className="w-full justify-start rounded-none bg-transparent p-0 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1px] after:bg-gray-200 dark:after:bg-gray-700">
               {dashboardTabs.map((tab) => (

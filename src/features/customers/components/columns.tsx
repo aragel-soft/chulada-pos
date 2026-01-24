@@ -4,13 +4,8 @@ import { Badge } from "../../../components/ui/badge";
 import {  Copy, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-  }).format(amount);
-};
+import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 export const columns: ColumnDef<Customer>[] = [
   {
@@ -59,58 +54,67 @@ export const columns: ColumnDef<Customer>[] = [
     ),
   },
   {
-  accessorKey: "current_balance",
-  header: ({ column }) => <DataTableColumnHeader column={column} title="Saldo" />,
-  cell: ({ row }) => {
-    const balance = parseFloat(row.getValue("current_balance"));
-    const limit = row.original.credit_limit;
-    const percentage = limit > 0 ? (balance / limit) : 0;
+    accessorKey: "current_balance",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Saldo" />,
+    cell: ({ row }) => {
+      const balance = parseFloat(row.getValue("current_balance"));
+      const limit = row.original.credit_limit;
+      const percentage = limit > 0 ? (balance / limit) : 0;
 
-    let statusColor = "text-muted-foreground";
-    let dotClass = "bg-gray-400";
-    let shouldPulse = false;
-    let title = "Al corriente";
+      let statusColor = "text-muted-foreground";
+      let dotClass = "bg-gray-400";
+      let shouldPulse = false;
+      let title = "Al corriente";
 
-    if (balance < 0) {
-      statusColor = "text-blue-600 font-bold";
-      dotClass = "bg-blue-500";
-      title = "Saldo a favor";
-    } else if (balance > 0) {
-        if (percentage >= 0.5 || balance > limit) {
-            statusColor = "text-destructive font-extrabold";
-            dotClass = "bg-destructive";
-            shouldPulse = true; 
-            title = "Deuda Crítica";
-        } else {
-            statusColor = "text-amber-600 font-medium";
-            dotClass = "bg-amber-500";
-            title = "Deuda Regular";
-        }
-    } else {
-        statusColor = "text-emerald-600 font-medium";
-        dotClass = "bg-emerald-500";
-    }
+      if (balance < 0) {
+        statusColor = "text-blue-600 font-bold";
+        dotClass = "bg-blue-500";
+        title = "Saldo a favor";
+      } else if (balance > 0) {
+          if (percentage >= 0.5 || balance > limit) {
+              statusColor = "text-destructive font-extrabold";
+              dotClass = "bg-destructive";
+              shouldPulse = true; 
+              title = "Deuda Crítica";
+          } else {
+              statusColor = "text-amber-600 font-medium";
+              dotClass = "bg-amber-500";
+              title = "Deuda Regular";
+          }
+      } else {
+          statusColor = "text-emerald-600 font-medium";
+          dotClass = "bg-emerald-500";
+      }
 
-    return (
-      <div>
-      <div 
-        className={`flex items-center gap-2 ${statusColor}`} 
-        title={title}
-      >
-       
-       <span className="font-medium">{formatCurrency(balance)}</span>
+      return (
+        <div>
+        <div 
+          className={`flex items-center gap-2 ${statusColor}`} 
+          title={title}
+        >
+        
+        <span className="font-medium">{formatCurrency(balance)}</span>
 
-        <span className="relative flex h-2.5 w-2.5">
-            {shouldPulse && (
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span>
-            )}
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dotClass}`}></span>
-        </span>
-      </div>
-      </div>
-    );
+          <span className="relative flex h-2.5 w-2.5">
+              {shouldPulse && (
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dotClass}`}></span>
+          </span>
+        </div>
+        </div>
+      );
+    },
   },
-},
+  {
+    accessorKey: "created_at",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Fecha de Creación" />
+    ),
+    cell: ({ row }) => (
+      <div>{(format(row.getValue("created_at") as string, 'yyyy-MM-dd HH:mm'))}</div>
+    ),
+  },
   {
     accessorKey: "is_active",
     header: ({ column }) => (

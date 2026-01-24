@@ -65,6 +65,8 @@ fn main() {
             commands::inventory::kits::create_kit,
             commands::inventory::kits::get_kit_for_product,
             commands::inventory::kits::get_all_kits,
+            // Inventory - Promotions
+            commands::inventory::promotions::get_promotions,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
@@ -79,6 +81,13 @@ fn main() {
             commands::settings::business::save_logo_image,
             // Customers
             commands::customers::customers::get_customers,
+            commands::customers::customers::upsert_customer,
+            commands::customers::customers::restore_customer,
+            commands::customers::customers::delete_customers,
+            // Sales - History
+            commands::sales::history::get_sales_history,
+            commands::sales::history::get_sale_details,
+
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
