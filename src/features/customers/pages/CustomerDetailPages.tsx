@@ -179,9 +179,9 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="ledger" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="w-full justify-start rounded-none bg-transparent p-0 border-b h-auto flex-none">
-            <TabsTrigger 
+      <Tabs defaultValue="ledger" className="flex-1 flex flex-col">
+        <TabsList className="w-full justify-start rounded-none bg-transparent p-0 border-b h-auto">
+            <TabsTrigger
                 value="ledger"
                 className={cn(
                     "relative rounded-none bg-transparent px-4 pb-3 pt-2 text-muted-foreground shadow-none transition-none",
@@ -191,8 +191,8 @@ export default function CustomerDetailPage() {
             >
                 Estado de Cuenta
             </TabsTrigger>
-            
-            <TabsTrigger 
+
+            <TabsTrigger
                 value="history"
                 className={cn(
                     "relative rounded-none bg-transparent px-4 pb-3 pt-2 text-muted-foreground shadow-none transition-none",
@@ -204,22 +204,23 @@ export default function CustomerDetailPage() {
             </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ledger" className="flex-1 mt-4 overflow-hidden flex flex-col">
-            <div className="flex-1 border rounded-md overflow-auto flex flex-col bg-white">
-                <DataTable 
-                    columns={columns} 
-                    data={statement?.movements || []} 
+        <TabsContent value="ledger" className="flex-1 mt-4">
+            <div className="h-full border rounded-md overflow-auto bg-white">
+                <DataTable
+                    columns={columns}
+                    data={statement?.movements || []}
                     isLoading={isLoadingStatement}
                     searchPlaceholder="Buscar folio..."
-                    manualPagination={false} 
+                    manualPagination={false}
                     manualSorting={false}
-                    initialPageSize={16} 
+                    initialPageSize={16}
+                    showColumnFilters={false}
                 />
             </div>
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
-            <Card className="border shadow-sm p-8 text-center flex flex-col items-center justify-center text-muted-foreground min-h-[300px]">
+        <TabsContent value="history" className="flex-1 mt-4">
+            <Card className="h-full border rounded-md shadow-sm p-8 text-center flex flex-col items-center justify-center text-muted-foreground bg-white">
                 <div className="bg-gray-100 p-4 rounded-full mb-4">
                     <Calendar className="h-8 w-8 opacity-50" />
                 </div>
