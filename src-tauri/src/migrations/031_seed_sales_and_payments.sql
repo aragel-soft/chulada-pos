@@ -17,7 +17,7 @@ VALUES (
   'c_red_03', 
   (SELECT id FROM users LIMIT 1), 
   'credit', 
-  'Purchase of professional Babyliss equipment on credit', 
+  'Compra de equipo Babyliss profesional a crédito', 
   datetime('now', '-30 days')
 );
 
@@ -27,13 +27,13 @@ VALUES
 -- Babyliss Optima 3000 Flat Iron (p042) - $2,800
 (
   'item_lm_01_a', 'sale_lm_01', 'p042', 
-  'Plancha Alaciadora Babyliss Optima 3000 Acero Inoxidable Doble Función', 
+  'Plancha Babyliss Optima 3000', 
   'PLA-BAB', 1, 2800.00, 'retail', 2800.00
 ),
 -- Babyliss Portofino Dryer (p041) - $2,400
 (
   'item_lm_01_b', 'sale_lm_01', 'p041', 
-  'Secadora Babyliss Pro Portofino 6600 Nano Titanium 2000 Watts Azul', 
+  'Secadora Babyliss Pro Portofino', 
   'SEC-BAB', 1, 2400.00, 'retail', 2400.00
 );
 
@@ -48,7 +48,7 @@ VALUES (
   datetime('now', '-15 days'),
   'cash',
   (SELECT id FROM users LIMIT 1),
-  'Partial payment on account for Babyliss equipment'
+  'Abono parcial por equipo Babyliss'
 );
 
 -- Sale 2 (Cash Purchase - Fast Consumables)
@@ -72,7 +72,7 @@ VALUES
 -- 2x Gel Elegance (p035) at $65 each
 (
   'item_lm_02_a', 'sale_lm_02', 'p035', 
-  'Gel Elegance Extra Fuerte Transparente 500ml', 
+  'Gel Elegance Extra Fuerte 500ml', 
   'GEL-ELEG', 2, 65.00, 'retail', 130.00
 );
 
@@ -93,14 +93,14 @@ VALUES (
   'c_green_01', 
   (SELECT id FROM users LIMIT 1), 
   'credit', 
-  'Purchase of Wahl Clipper', 
+  'Compra de Máquina Wahl', 
   datetime('now', '-10 days')
 );
 
 INSERT OR IGNORE INTO sale_items (id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, subtotal)
 VALUES (
   'item_am_01', 'sale_am_01', 'p031', 
-  'Máquina Wahl Super Taper Clásica (Alámbrica)', 
+  'Máquina Wahl Super Taper', 
   'WAHL-SUP', 1, 1200.00, 'retail', 1200.00
 );
 
@@ -114,5 +114,5 @@ VALUES (
   1200.00, 
   datetime('now', '-2 days'), 
   (SELECT id FROM users LIMIT 1), 
-  'Total settlement Wahl'
+  'Liquidación total Wahl'
 );

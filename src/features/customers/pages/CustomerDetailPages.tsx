@@ -6,7 +6,6 @@ import {
   ArrowLeft, 
   User,
   AlertCircle, 
-  Calendar,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,7 +19,7 @@ import { getCustomerAccountStatement } from "@/lib/api/account";
 import { getCustomers } from "@/lib/api/customers";
 import { formatCurrency, cn } from "@/lib/utils";
 import { AccountMovement } from "@/types/account";
-import { Card } from "@/components/ui/card";
+import SalesHistoryModule from "@/features/sales/components/SalesHistoryModule";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -220,15 +219,7 @@ export default function CustomerDetailPage() {
         </TabsContent>
 
         <TabsContent value="history" className="flex-1 mt-4">
-            <Card className="h-full border rounded-md shadow-sm p-8 text-center flex flex-col items-center justify-center text-muted-foreground bg-white">
-                <div className="bg-gray-100 p-4 rounded-full mb-4">
-                    <Calendar className="h-8 w-8 opacity-50" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">Historial en Construcción</h3>
-                <p className="max-w-sm mt-2">
-                    Próximamente verás aquí el desglose de productos comprados.
-                </p>
-            </Card>
+            <SalesHistoryModule />
         </TabsContent>
       </Tabs>
     </div>
