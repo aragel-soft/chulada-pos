@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
-import { Customer } from "@/types/customers";
+import { Customer, CustomerInput, RestoreRequiredError } from "@/types/customers";
 
 export const getCustomers = async (params: PaginationParams): Promise<PaginatedResponse<Customer>> => {
   try {
@@ -16,3 +16,43 @@ export const getCustomers = async (params: PaginationParams): Promise<PaginatedR
     throw error;
   }
 };
+
+export async function upsertCustomer(customer: CustomerInput): Promise<Customer> {
+  try {
+    return await invoke("upsert_customer", { customer });
+  } catch (error: any) {
+    if (typeof error === "string" && error.startsWith("RESTORE_REQUIRED:")) {
+      const jsonPart = error.replace("RESTORE_REQUIRED:", "");
+      try {
+        const payload = JSON.parse(jsonPart);
+        const restoreError: RestoreRequiredError = {
+          code: "RESTORE_REQUIRED",
+          payload
+        };
+        throw restoreError;
+      } catch (e) {
+        throw error;
+      }
+    }
+    throw error;
+  }
+}
+
+export async function restoreCustomer(id: string, customer: CustomerInput): Promise<Customer> {
+  try {
+    return await invoke("restore_customer", { id, customer });
+  }
+  catch (error) {
+    console.error("Error restoring customer:", error);
+    throw error;
+  }
+}
+
+export async function deleteCustomers(ids: string[]): Promise<void> {
+  try {
+    return await invoke("delete_customers", { ids });
+  } catch (error) {
+    console.error("Error deleting customers:", error);
+    throw error;
+  }
+}

@@ -4,6 +4,7 @@ import { Badge } from "../../../components/ui/badge";
 import {  Copy, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
 export const columns: ColumnDef<Customer>[] = [
@@ -104,6 +105,15 @@ export const columns: ColumnDef<Customer>[] = [
         </div>
       );
     },
+  },
+  {
+    accessorKey: "created_at",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Fecha de Creación" />
+    ),
+    cell: ({ row }) => (
+      <div>{(format(row.getValue("created_at") as string, 'yyyy-MM-dd HH:mm'))}</div>
+    ),
   },
   {
     accessorKey: "is_active",
