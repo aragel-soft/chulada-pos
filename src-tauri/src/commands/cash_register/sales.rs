@@ -313,9 +313,10 @@ fn calculate_sale_items<'a>(
             None => return Err(format!("Producto ID {} no encontrado en base de datos. Posible desincronización.", item.product_id)),
         };
 
-        // Select Price
         let unit_price = if item.price_type == "kit_item" {
             0.0
+        } else if discount_percentage > 0.0 {
+            retail
         } else if item.price_type == "wholesale" { 
             wholesale 
         } else { 
@@ -378,7 +379,7 @@ pub fn process_sale(
     let folio = generate_smart_folio(&tx)?;
     let store_id = get_store_id(&tx)?;
 
-    let has_discount = total_item_discounts > 0.0; // ToDo: Discount is not implemented
+    let has_discount = total_item_discounts > 0.0;
 
     tx.execute(
         "INSERT INTO sales (
@@ -391,8 +392,8 @@ pub fn process_sale(
             sale_id,
             folio,
             total_gross,
-            payload.discount_percentage, // This is explicitly the global discount percentage // To Do: Isn't working 
-            total_item_discounts,// To Do: Isn't working,
+            payload.discount_percentage,
+            total_item_discounts,
             final_total,
             payload.user_id,
             payload.cash_register_shift_id,
@@ -458,8 +459,8 @@ pub fn process_sale(
                 item.quantity,
                 data.unit_price,
                 item.price_type,
-                payload.discount_percentage, // ToDo: Discount is not implemented
-                data.item_discount_amt, // ToDo: Discount is not implemented
+                payload.discount_percentage,
+                data.item_discount_amt,
                 data.item_subtotal,
                 if item.price_type == "kit_item" { 1 } else { 0 },
                 parent_db_id
