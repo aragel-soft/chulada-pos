@@ -10,7 +10,7 @@
 INSERT OR IGNORE INTO sales (id, folio, subtotal, total, status, customer_id, user_id, payment_method, notes, created_at)
 VALUES (
   'sale_lm_01', 
-  'XAL1-0001', 
+  '00000008', 
   5200.00, 
   5200.00, 
   'completed', 
@@ -56,7 +56,7 @@ VALUES (
 INSERT OR IGNORE INTO sales (id, folio, subtotal, total, status, customer_id, user_id, payment_method, cash_amount, created_at)
 VALUES (
   'sale_lm_02', 
-  'XAL1-0002', 
+  '00000009', 
   130.00, 
   130.00, 
   'completed', 
@@ -86,7 +86,7 @@ VALUES
 INSERT OR IGNORE INTO sales (id, folio, subtotal, total, status, customer_id, user_id, payment_method, notes, created_at)
 VALUES (
   'sale_am_01', 
-  'XAL1-0003', 
+  '00000010', 
   1200.00, 
   1200.00, 
   'completed', 
