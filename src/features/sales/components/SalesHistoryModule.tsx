@@ -11,12 +11,21 @@ import { useSalesHistory } from "@/hooks/use-sales-history";
 import { FiltersPanel } from "@/features/sales/components/history/FiltersPanel";
 import { historyColumns } from "@/features/sales/components/history/columns";
 import { SaleDetailPanel } from "@/features/sales/components/history/SaleDetailSheet";
-import { SaleMaster } from "@/types/sales-history";
+import { SaleMaster, SalesHistoryFilter } from "@/types/sales-history";
 
-export default function SalesHistoryModule() {
-  const { data, isLoading, filters, actions } = useSalesHistory();
+interface SalesHistoryModuleProps {
+  initialFilters?: Partial<SalesHistoryFilter>;
+  defaultCollapsed?: boolean;
+}
+
+export default function SalesHistoryModule({ 
+  initialFilters = {},
+  defaultCollapsed = false
+}: SalesHistoryModuleProps) {
+  const { data, isLoading, filters, actions } = useSalesHistory({
+    initialFilters});
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(defaultCollapsed);
   const [rowSelection, setRowSelection] = useState({});
 
   const columns = useMemo<ColumnDef<SaleMaster>[]>(
