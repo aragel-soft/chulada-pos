@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Promotion } from '@/types/promotions';
+import { Promotion, CreatePromotionDto } from '@/types/promotions';
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
 
 
@@ -14,6 +14,15 @@ export const getPromotions = async (params: PaginationParams): Promise<Paginated
     });
   } catch (error) {
     console.error('Error fetching promotions:', error);
+    throw error;
+  }
+};
+
+export const createPromotion = async (promotion: CreatePromotionDto): Promise<void> => {
+  try {
+    await invoke('create_promotion', { promotion });
+  } catch (error) {
+    console.error('Error creating promotion:', error);
     throw error;
   }
 };
