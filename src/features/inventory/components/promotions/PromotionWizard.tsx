@@ -27,6 +27,7 @@ import {
   Tag,
   Calendar,
   DollarSign,
+  AlertCircle, // Aseguramos que esté importado
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -137,7 +138,7 @@ export function PromotionWizard({
 
   const isStep1Valid =
     formData.name.trim().length >= 3 &&
-    formData.comboPrice >= 0 &&
+    formData.comboPrice > 0 &&
     formData.startDate <= formData.endDate;
 
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -257,8 +258,8 @@ export function PromotionWizard({
                           isActive
                             ? "border-[#480489] bg-[#480489] text-white shadow-md scale-110"
                             : isCompleted
-                              ? "border-[#480489] bg-[#480489] text-white"
-                              : "border-muted-foreground/30 text-muted-foreground bg-background",
+                            ? "border-[#480489] bg-[#480489] text-white"
+                            : "border-muted-foreground/30 text-muted-foreground bg-background",
                         )}
                       >
                         {isCompleted ? (
@@ -276,8 +277,8 @@ export function PromotionWizard({
                             isActive
                               ? "text-[#480489]"
                               : isCompleted
-                                ? "text-foreground"
-                                : "text-muted-foreground",
+                              ? "text-foreground"
+                              : "text-muted-foreground",
                           )}
                         >
                           {step.title}
@@ -411,80 +412,109 @@ export function PromotionWizard({
               </div>
             ),
 
-            // PASO 3: REVIEW
-            review: () => (
-              <div className="max-w-3xl mx-auto w-full py-4 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                {/* Resumen Header */}
-                <div className="bg-muted/30 p-5 rounded-lg border flex flex-col md:flex-row justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl text-[#480489]">
-                      {formData.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {formData.description || "Sin descripción"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {format(formData.startDate, "dd MMM yyyy", {
-                          locale: es,
-                        })}{" "}
-                        -{" "}
-                        {format(formData.endDate, "dd MMM yyyy", {
-                          locale: es,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end justify-center border-l pl-6 min-w-[150px]">
-                    <span className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">
-                      Precio Final
-                    </span>
-                    <div className="text-3xl font-bold text-green-600 flex items-center">
-                      <DollarSign className="h-6 w-6" />
-                      {formData.comboPrice.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
+            // PASO 3: REVIEW 
+            review: () => {
+              const regularPriceTotal = items.reduce((acc, item) => {
+                return acc + item.product.retail_price * item.quantity;
+              }, 0);
 
-                {/* Lista de Productos */}
-                <div className="border rounded-xl overflow-hidden shadow-sm">
-                  <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      Productos Incluidos
-                    </h4>
-                    <Badge variant="outline" className="bg-background">
-                      {totalItemsCount} piezas
-                    </Badge>
+              const isPriceHigherThanRegular =
+                formData.comboPrice > regularPriceTotal;
+
+              return (
+                <div className="max-w-3xl mx-auto w-full py-4 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                  {/* Resumen Header */}
+                  <div className="bg-muted/30 p-5 rounded-lg border flex flex-col md:flex-row justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-xl text-[#480489]">
+                        {formData.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {formData.description || "Sin descripción"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 text-sm">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          {format(formData.startDate, "dd MMM yyyy", {
+                            locale: es,
+                          })}{" "}
+                          -{" "}
+                          {format(formData.endDate, "dd MMM yyyy", {
+                            locale: es,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end justify-center border-l pl-6 min-w-[150px]">
+                      <span className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">
+                        Precio Final
+                      </span>
+                      <div className="text-3xl font-bold text-green-600 flex items-center">
+                        <DollarSign className="h-6 w-6" />
+                        {formData.comboPrice.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                  <ul className="divide-y max-h-[300px] overflow-y-auto bg-background">
-                    {items.map((item) => (
-                      <li
-                        key={item.product.id}
-                        className="p-3 flex justify-between items-center hover:bg-muted/20"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium text-foreground">
-                            {item.product.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.product.code}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge
-                            variant="secondary"
-                            className="h-7 px-3 text-sm font-mono bg-[#480489]/10 text-[#480489]"
-                          >
-                            x{item.quantity}
-                          </Badge>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+
+                  {/* TODO: Estandarizar las alertas en el sistema */}
+                  {isPriceHigherThanRegular && (
+                    <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-900">
+                      <AlertCircle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">¡Cuidado con el precio!</p>
+                        <p>
+                          El precio del combo (
+                          <strong>${formData.comboPrice.toFixed(2)}</strong>) es
+                          mayor que comprar los productos por separado (
+                          <strong>${regularPriceTotal.toFixed(2)}</strong>).
+                        </p>
+                        <p className="text-xs mt-1 text-orange-800/80">
+                          ¿Seguro que deseas continuar? Normalmente una
+                          promoción ofrece un descuento.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista de Productos */}
+                  <div className="border rounded-xl overflow-hidden shadow-sm">
+                    <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        Productos Incluidos
+                      </h4>
+                      <Badge variant="outline" className="bg-background">
+                        {totalItemsCount} piezas
+                      </Badge>
+                    </div>
+                    <ul className="divide-y max-h-[300px] overflow-y-auto bg-background">
+                      {items.map((item) => (
+                        <li
+                          key={item.product.id}
+                          className="p-3 flex justify-between items-center hover:bg-muted/20"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-foreground">
+                              {item.product.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.product.code}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Badge
+                              variant="secondary"
+                              className="h-7 px-3 text-sm font-mono bg-[#480489]/10 text-[#480489]"
+                            >
+                              x{item.quantity}
+                            </Badge>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            ),
+              );
+            },
           })}
         </div>
 

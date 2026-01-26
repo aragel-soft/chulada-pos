@@ -210,8 +210,8 @@ pub fn create_promotion(
 ) -> Result<(), String> {
   let mut conn = db_state.lock().unwrap();
 
-  if promotion.combo_price < 0.0 {
-    return Err("El precio del combo no puede ser negativo.".to_string());
+  if promotion.combo_price <= 0.0 { 
+    return Err("El precio del combo debe ser mayor a 0.".to_string());
   }
 
   if promotion.items.is_empty() {
