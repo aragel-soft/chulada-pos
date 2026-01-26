@@ -1,11 +1,10 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Customer } from "../../../types/customers";
 import { Badge } from "../../../components/ui/badge";
-import {  Copy, Phone } from "lucide-react";
-import { toast } from "sonner";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import { CopyablePhone } from "@/components/ui/copyable-phone";
 
 export const columns: ColumnDef<Customer>[] = [
   {
@@ -25,24 +24,9 @@ export const columns: ColumnDef<Customer>[] = [
   {
     accessorKey: "phone",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Teléfono" />,
-    cell: ({ row }) => {
-      const phone = row.getValue("phone") as string;
-      if (!phone) return <span className="font-medium">-</span>;
-
-      return (
-        <div
-          className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-          onClick={() => {
-            navigator.clipboard.writeText(phone);
-            toast.success("Teléfono copiado al portapapeles");
-          }}
-        >
-          <Phone className="h-3 w-3" />
-          <span>{phone}</span>
-          <Copy className="h-3 w-3 opacity-0 hover:opacity-100 transition-opacity" />
-        </div>
-      );
-    },
+    cell: ({ row }) => (
+      <CopyablePhone phone={row.getValue("phone")} />
+    )
   },
   {
     accessorKey: "credit_limit",

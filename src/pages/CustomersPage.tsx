@@ -1,7 +1,8 @@
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/lib/utils";
+import CustomersTable from '@/features/customers/components/CustomersTable';
 
 const customersTabs = [
   {
@@ -81,7 +82,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex-1 overflow-hidden min-h-0">
-        <Outlet />
+        <CustomersTable />
       </div>
     </div>
   );
