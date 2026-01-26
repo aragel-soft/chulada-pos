@@ -26,3 +26,13 @@ export const createPromotion = async (promotion: CreatePromotionDto): Promise<vo
     throw error;
   }
 };
+
+export const updatePromotion = async (id: string, promotion: CreatePromotionDto): Promise<void> => {
+  try {
+    console.log('Updating promotion with ID:', id, 'and data:', promotion);
+    //await invoke('update_promotion', { id, promotion });
+  } catch (error) {
+    console.error('Error updating promotion:', error);
+    throw error;
+  }
+};
