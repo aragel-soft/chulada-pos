@@ -15,6 +15,7 @@ export function useProcessSale() {
     userId: string,
     shiftId: string,
     shouldPrint: boolean,
+    discountPercentage: number = 0,
     customerId?: string
   ): Promise<SaleResponse | null> => {
     setIsProcessing(true);
@@ -28,7 +29,7 @@ export function useProcessSale() {
       }));
 
       const payload: SaleRequest = {
-        discount_percentage: 0,
+        discount_percentage: discountPercentage,
         customer_id: customerId || null,
         user_id: userId,
         cash_register_shift_id: shiftId,

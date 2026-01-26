@@ -5,6 +5,9 @@ use std::collections::{HashMap, HashSet};
 use tauri::State;
 use uuid::Uuid;
 
+// Business Constants
+const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleItemRequest {
     pub id: Option<String>,
@@ -353,6 +356,19 @@ pub fn process_sale(
 
     if payload.items.is_empty() {
         return Err("No hay items en la venta.".to_string());
+    }
+    
+    // Validate discount percentage
+    if payload.discount_percentage < 0.0 {
+        return Err("El porcentaje de descuento no puede ser negativo.".to_string());
+    }
+    
+    if payload.discount_percentage > MAX_DISCOUNT_PERCENTAGE {
+        return Err(format!(
+            "El descuento máximo permitido es {}%. Descuento solicitado: {}%",
+            MAX_DISCOUNT_PERCENTAGE,
+            payload.discount_percentage
+        ));
     }
     
     // Validate & Apply Kit Rules (Enforce Pricing)

@@ -19,6 +19,7 @@ interface Ticket {
   name: string;
   items: CartItem[];
   priceType: 'retail' | 'wholesale';
+  discountPercentage: number;
 }
 
 interface CartState {
@@ -35,6 +36,11 @@ interface CartState {
   toggleTicketPriceType: () => void;
   convertProductToKitGift: (productId: string, quantityToConvert: number, kitTriggerId: string) => void;
   clearTicket: () => void;
+  
+  // Discount methods
+  setTicketDiscount: (percentage: number) => void;
+  clearTicketDiscount: () => void;
+  getTicketSubtotal: () => number;
 
   getActiveTicket: () => Ticket | undefined;
   getTicketTotal: () => number;
@@ -44,7 +50,7 @@ interface CartState {
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      tickets: [{ id: 'default', name: 'Ticket 1', items: [], priceType: 'retail' }],
+      tickets: [{ id: 'default', name: 'Ticket 1', items: [], priceType: 'retail', discountPercentage: 0 }],
       activeTicketId: 'default',
 
       createTicket: () => {
@@ -71,7 +77,8 @@ export const useCartStore = create<CartState>()(
             id: newId,
             name: `Ticket ${nextNumber}`,
             items: [],
-            priceType: 'retail'
+            priceType: 'retail',
+            discountPercentage: 0
           };
           return {
             tickets: [...state.tickets, newTicket],
@@ -395,10 +402,63 @@ export const useCartStore = create<CartState>()(
           newTickets[ticketIndex] = {
             ...state.tickets[ticketIndex],
             items: [],
-            priceType: 'retail'
+            priceType: 'retail',
+            discountPercentage: 0
           };
           return { tickets: newTickets };
         });
+      },
+      
+      setTicketDiscount: (percentage: number) => {
+        set((state) => {
+          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+          if (ticketIndex === -1) return state;
+
+          const currentTicket = state.tickets[ticketIndex];
+          
+          // When discount is applied, force all items to retail (except kit_item)
+          const newItems = currentTicket.items.map(item => {
+            if (item.priceType === 'kit_item') return item;
+            
+            return {
+              ...item,
+              priceType: 'retail' as const,
+              finalPrice: item.retail_price
+            };
+          });
+
+          const newTickets = [...state.tickets];
+          newTickets[ticketIndex] = {
+            ...currentTicket,
+            items: newItems,
+            priceType: 'retail',
+            discountPercentage: percentage
+          };
+
+          return { tickets: newTickets };
+        });
+      },
+
+      clearTicketDiscount: () => {
+        set((state) => {
+          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+          if (ticketIndex === -1) return state;
+
+          const newTickets = [...state.tickets];
+          newTickets[ticketIndex] = {
+            ...state.tickets[ticketIndex],
+            discountPercentage: 0
+          };
+
+          return { tickets: newTickets };
+        });
+      },
+      
+      getTicketSubtotal: () => {
+        const state = get();
+        const ticket = state.tickets.find(t => t.id === state.activeTicketId);
+        if (!ticket) return 0;
+        return ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
       },
 
       getActiveTicket: () => {
@@ -410,7 +470,10 @@ export const useCartStore = create<CartState>()(
         const state = get();
         const ticket = state.tickets.find(t => t.id === state.activeTicketId);
         if (!ticket) return 0;
-        return ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        const subtotal = ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        const discount = subtotal * (ticket.discountPercentage / 100);
+        return subtotal - discount;
       }
     }),
     {

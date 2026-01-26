@@ -12,6 +12,7 @@ interface CartItemRowProps {
   onUpdateQuantity: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
   onTogglePriceType: () => void;
+  hasDiscount?: boolean;
 }
 
 // --- Style Configuration ---
@@ -48,7 +49,7 @@ const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
     }
 };
 
-export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceType }: CartItemRowProps) => {
+export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceType, hasDiscount = false }: CartItemRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempQty, setTempQty] = useState(item.quantity.toString());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,12 +102,18 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
         
         <button
           type="button"
-          onClick={style.canTogglePrice ? onTogglePriceType : undefined}
-          disabled={!style.canTogglePrice}
+          onClick={style.canTogglePrice && !hasDiscount ? onTogglePriceType : undefined}
+          disabled={!style.canTogglePrice || hasDiscount}
           className={`flex items-center gap-2 mt-1 w-fit select-none group/price ${
-            style.canTogglePrice ? "cursor-pointer" : "cursor-default opacity-80"
+            style.canTogglePrice && !hasDiscount ? "cursor-pointer" : "cursor-default opacity-80"
           }`}
-          title={style.canTogglePrice ? "Clic para cambiar tipo de precio" : "Precio fijo"}
+          title={
+            hasDiscount 
+              ? "Desactiva el descuento para cambiar precio" 
+              : style.canTogglePrice 
+                ? "Clic para cambiar tipo de precio" 
+                : "Precio fijo"
+          }
         >
           <Badge className={`text-xs flex items-center gap-1 px-1.5 py-0.5 transition-colors ${style.badge}`}>
              <style.icon size={10} />

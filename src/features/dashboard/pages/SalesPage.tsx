@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X,  Printer, Wallet, Lock, Trash } from "lucide-react";
+import { Plus, X,  Printer, Wallet, Lock, Trash, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -59,12 +59,14 @@ export default function SalesPage() {
     updateQuantity,
     getActiveTicket,
     getTicketTotal,
+    getTicketSubtotal,
     clearTicket,
     toggleItemPriceType,
   } = useCartStore();
 
   const activeTicket = getActiveTicket();
   const ticketTotal = getTicketTotal();
+  const ticketSubtotal = getTicketSubtotal();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
@@ -149,6 +151,7 @@ export default function SalesPage() {
           user.id,
           shift.id.toString(),
           shouldPrint,
+          activeTicket.discountPercentage,
           customerId
       );
 
@@ -364,6 +367,7 @@ export default function SalesPage() {
                 onUpdateQuantity={updateQuantity}
                 onRemove={(uuid) => removeFromCart(uuid)}
                 onTogglePriceType={() => toggleItemPriceType(item.uuid)}
+                hasDiscount={(activeTicket?.discountPercentage || 0) > 0}
               />
             ))
           )}
@@ -381,6 +385,25 @@ export default function SalesPage() {
               >
                 <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
               </Button>
+            </div>
+          )}
+
+          {/* Discount Info */}
+          {activeTicket && activeTicket.discountPercentage > 0 && (
+            <div className="space-y-1 pb-2 border-b">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-zinc-600">Subtotal:</span>
+                <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-amber-600 flex items-center gap-1">
+                  <Percent className="w-3 h-3" />
+                  Descuento ({activeTicket.discountPercentage}%):
+                </span>
+                <span className="font-semibold text-amber-600">
+                  -{formatCurrency(ticketSubtotal * (activeTicket.discountPercentage / 100))}
+                </span>
+              </div>
             </div>
           )}
 

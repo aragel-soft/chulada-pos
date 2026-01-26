@@ -2,12 +2,16 @@
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowDownFromLine, ArrowUpFromLine, Star } from "lucide-react";
+import { ArrowDownFromLine, ArrowUpFromLine, Star, Percent } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/features/sales/stores/cartStore";
 import { CashMovementModal } from "@/features/cash-register/components/CashMovementModal";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
+import { DiscountModal } from "@/features/sales/components/DiscountModal";
+import { useState } from "react";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -15,9 +19,12 @@ export default function DashboardPage() {
   const { can } = useAuthStore();
   const { shift } = useCashRegisterStore();
 
-  const { toggleTicketPriceType, tickets, activeTicketId } = useCartStore();
+  const { toggleTicketPriceType, tickets, activeTicketId, setTicketDiscount, clearTicketDiscount } = useCartStore();
   const activeTicket = tickets.find((t) => t.id === activeTicketId);
   const isWholesale = activeTicket?.priceType === "wholesale";
+  const hasDiscount = (activeTicket?.discountPercentage || 0) > 0;
+  
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
 
   const dashboardTabs = [
     { value: "sales", label: "Venta", permission: "sales:view" },
@@ -30,6 +37,21 @@ export default function DashboardPage() {
   ].filter((tab) => can(tab.permission));
 
   const currentTab = location.pathname.split("/")[2] || "sales";
+
+  // Hotkey
+  useHotkeys('f8', () => {
+    if (activeTicket && shift?.status === 'open' && currentTab === 'sales') {
+      setIsDiscountModalOpen(true);
+    }
+  }, [activeTicket, shift, currentTab]);
+
+  // Hotkey
+  useHotkeys('ctrl+0', () => {
+    if (hasDiscount && shift?.status === 'open' && currentTab === 'sales') {
+      clearTicketDiscount();
+      toast.info("Descuento removido");
+    }
+  }, [hasDiscount, shift, currentTab, clearTicketDiscount]);
 
   const onTabChange = (value: string) => {
     if (value === "sales") navigate("/dashboard");
@@ -81,7 +103,13 @@ export default function DashboardPage() {
             <Button
               variant={isWholesale ? "default" : "secondary"}
               size="sm"
-              onClick={toggleTicketPriceType}
+              onClick={() => {
+                if (hasDiscount) {
+                  clearTicketDiscount();
+                  toast.info("Descuento removido para activar Mayoreo");
+                }
+                toggleTicketPriceType();
+              }}
               className={cn(
                 "transition-all",
                 isWholesale
@@ -94,9 +122,39 @@ export default function DashboardPage() {
               />
               Mayoreo
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDiscountModalOpen(true)}
+              disabled={!activeTicket}
+              className={cn(
+                "transition-all duration-200",
+                hasDiscount
+                  ? "border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 hover:bg-amber-100 shadow-sm ring-1 ring-amber-200"
+                  : "border-[#480489] text-[#480489] hover:bg-purple-50"
+              )}
+            >
+              <Percent className="w-4 h-4 mr-2" />
+              Descuento
+            </Button>
           </div>
         )}
       </div>
+
+      <DiscountModal
+        isOpen={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        currentDiscount={activeTicket?.discountPercentage || 0}
+        onApplyDiscount={(percentage) => {
+          if (percentage === 0) {
+            clearTicketDiscount();
+            toast.info("Descuento removido");
+          } else {
+            setTicketDiscount(percentage);
+            toast.success(`Descuento del ${percentage}% aplicado`);
+          }
+        }}
+      />
 
       <div className="flex-1 overflow-hidden">
         <Outlet />
