@@ -14,6 +14,10 @@ import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "../components/promotions/columns";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getPromotions } from "@/lib/api/inventory/promotions";
+import {
+  PromotionWizard,
+  PromotionWithDetails,
+} from "../components/promotions/PromotionWizard";
 
 export default function PromotionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -24,6 +28,8 @@ export default function PromotionsPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [rowSelection, setRowSelection] = useState({});
   const { can } = useAuthStore();
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [editingPromotion, setEditingPromotion] = useState<PromotionWithDetails | undefined>(undefined);
 
   const queryParams: PaginationParams = useMemo(
     () => ({
@@ -42,6 +48,22 @@ export default function PromotionsPage() {
     queryFn: () => getPromotions(queryParams),
     placeholderData: keepPreviousData,
   });
+
+  const handleCreate = () => {
+    setEditingPromotion(undefined);
+    setIsWizardOpen(true);
+  };
+
+  const handleEdit = (selectedRows: Promotion[]) => {
+    if (selectedRows.length !== 1) return;
+    const promotionToEdit = selectedRows[0];
+    setEditingPromotion(promotionToEdit as unknown as PromotionWithDetails);
+    setIsWizardOpen(true);
+  };
+
+  const handleDelete = (selectedRows: Promotion[]) => {
+    console.log("Abrir DeleteDialog para:", selectedRows);
+  };
 
   const columns = useMemo<ColumnDef<Promotion>[]>(
     () => [
@@ -104,55 +126,53 @@ export default function PromotionsPage() {
         onGlobalFilterChange={(val) => setGlobalFilter(String(val))}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
-        actions={(table) => (
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            {can("promotions:create") && (
-              <Button
-                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                onClick={() => console.log("Abrir CreatePromotionDialog")}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Nueva Promoción</span>
-              </Button>
-            )}
+        actions={(table) => {
+          const selectedRows = table
+            .getFilteredSelectedRowModel()
+            .rows.map((row) => row.original);
 
-            {can("promotions:edit") && (
-              <Button
-                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() =>
-                  console.log(
-                    "Abrir EditPromotionDialog",
-                    table.getFilteredSelectedRowModel().rows,
-                  )
-                }
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {table.getFilteredSelectedRowModel().rows.length > 1
-                    ? `Modificar (${table.getFilteredSelectedRowModel().rows.length})`
-                    : "Modificar"}
-                </span>
-              </Button>
-            )}
+          return (
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              {can("promotions:create") && (
+                <Button
+                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                  onClick={handleCreate}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Agregar</span>
+                </Button>
+              )}
 
-            {can("promotions:delete") && (
-              <Button
-                variant="destructive"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() =>
-                  console.log(
-                    "Abrir DeleteDialog",
-                    table.getFilteredSelectedRowModel().rows,
-                  )
-                }
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({table.getFilteredSelectedRowModel().rows.length})
-              </Button>
-            )}
-          </div>
-        )}
+              {can("promotions:edit") && (
+                <Button
+                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+                  disabled={selectedRows.length !== 1}
+                  onClick={() => handleEdit(selectedRows)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Modificar</span>
+                </Button>
+              )}
+
+              {can("promotions:delete") && (
+                <Button
+                  variant="destructive"
+                  disabled={selectedRows.length === 0}
+                  onClick={() => handleDelete(selectedRows)}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Eliminar ({selectedRows.length})
+                </Button>
+              )}
+            </div>
+          );
+        }}
+      />
+
+      <PromotionWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        promotionToEdit={editingPromotion}
       />
     </div>
   );

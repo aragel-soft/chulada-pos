@@ -251,14 +251,14 @@ pub fn create_promotion(
 
     for item in promotion.items {
       if item.quantity <= 0 {
-          return Err(format!("La cantidad para el producto {} debe ser mayor a 0", item.product_id));
+        return Err(format!("La cantidad para el producto {} debe ser mayor a 0", item.product_id));
       }
       
       stmt.execute(rusqlite::params![
-          Uuid::new_v4().to_string(),
-          promo_id,
-          item.product_id,
-          item.quantity
+        Uuid::new_v4().to_string(),
+        promo_id,
+        item.product_id,
+        item.quantity
       ]).map_err(|e| format!("Error al insertar item del combo: {}", e))?;
     }
   }

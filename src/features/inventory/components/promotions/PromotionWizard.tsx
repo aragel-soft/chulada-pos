@@ -210,7 +210,7 @@ export function PromotionWizard({
             </div>
             <div className="flex flex-col">
               <DialogTitle className="text-xl font-bold text-foreground">
-                {isEditing ? `Editar Promoción` : 'Nueva Promoción "Combo"'}
+                {isEditing ? `Editar Promoción` : 'Crear Nueva Promoción'}
               </DialogTitle>
               {isEditing && (
                 <p className="text-xs text-muted-foreground font-mono mt-1">
@@ -317,7 +317,7 @@ export function PromotionWizard({
                     </Label>
                     <Input
                       id="name"
-                      placeholder="Ej. Paquete Fin de Semana"
+                      placeholder="Ej. Combo de Verano"
                       value={formData.name}
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
