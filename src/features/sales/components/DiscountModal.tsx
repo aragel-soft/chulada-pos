@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DISCOUNT_CONFIG } from "@/config/constants";
-import { Percent, X } from "lucide-react";
+import { Percent, X, Lightbulb, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DiscountModalProps {
@@ -43,9 +43,12 @@ export function DiscountModal({
                 Descuento actual: {currentDiscount}%
               </span>
             )}
-            <span className="block mt-2 text-xs text-muted-foreground">
-              💡 Tip: Presiona <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-xs font-mono">F8</kbd> para abrir esta ventana o{" "}
-              <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-xs font-mono">Ctrl+0</kbd> para quitar descuento.
+            <span className="flex items-start gap-1.5 mt-2 text-xs text-muted-foreground">
+              <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
+              <span>
+                <strong>Tip:</strong> Presiona <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-xs font-mono">F8</kbd> para abrir esta ventana o{" "}
+                <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-xs font-mono">Ctrl+0</kbd> para quitar descuento.
+              </span>
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -80,9 +83,12 @@ export function DiscountModal({
         )}
 
         <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-xs text-amber-800">
-            <strong>⚠️ Nota:</strong> Al aplicar un descuento global, todos los
-            productos cambiarán a precio de lista (se desactiva mayoreo).
+          <p className="flex items-start gap-1.5 text-xs text-amber-800">
+            <TriangleAlert className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            <span>
+              <strong>Nota:</strong> Al aplicar un descuento global, todos los
+              productos cambiarán a precio de lista (se desactiva mayoreo).
+            </span>
           </p>
         </div>
       </DialogContent>

@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 interface KitSelectionModalProps {
   isOpen: boolean;
   kit: KitOptionDef | null;
-  triggerQuantity: number; // How many triggers are in cart?
-  alreadySelectedCount?: number; // How many gifts are ALREADY in cart linked to this trigger?
+  triggerQuantity: number;
+  alreadySelectedCount?: number;
   onConfirm: (selectedItems: KitItemDef[]) => void;
   onCancel: () => void;
 }
@@ -17,7 +17,6 @@ interface KitSelectionModalProps {
 export function KitSelectionModal({ isOpen, kit, triggerQuantity, alreadySelectedCount = 0, onConfirm, onCancel }: KitSelectionModalProps) {
   const [selectedCounts, setSelectedCounts] = useState<Record<string, number>>({});
   
-  // Reset state when opening
   useEffect(() => {
       if (isOpen) setSelectedCounts({});
   }, [isOpen]);
@@ -25,7 +24,7 @@ export function KitSelectionModal({ isOpen, kit, triggerQuantity, alreadySelecte
   if (!kit) return null;
 
   const totalNeeded = kit.max_selections * triggerQuantity;
-  const neededNow = Math.max(0, totalNeeded - alreadySelectedCount); // This is what we need to select IN THIS MODAL
+  const neededNow = Math.max(0, totalNeeded - alreadySelectedCount);
   
   const currentSelectedCount = Object.values(selectedCounts).reduce((a, b) => a + b, 0);
   const remaining = neededNow - currentSelectedCount;
@@ -49,13 +48,12 @@ export function KitSelectionModal({ isOpen, kit, triggerQuantity, alreadySelecte
   };
   
   const handleConfirm = () => {
-    // Convert counts to list of KitItemDef
     const result: KitItemDef[] = [];
     Object.entries(selectedCounts).forEach(([itemId, qty]) => {
         if (qty > 0) {
             const itemDef = kit.items.find(i => i.id === itemId);
             if (itemDef) {
-                 result.push({ ...itemDef, quantity: qty }); // Note: This quantity is TOTAL for this item type
+                 result.push({ ...itemDef, quantity: qty });
             }
         }
     });
@@ -75,7 +73,7 @@ export function KitSelectionModal({ isOpen, kit, triggerQuantity, alreadySelecte
             <span>Selecciona tus Regalos</span>
           </DialogTitle>
           <DialogDescription>
-             Te faltan seleccionar <strong>{remaining}</strong> regalo(s) de un total de {totalNeeded} ({alreadySelectedCount} ya seleccionados).
+            Te faltan seleccionar <strong>{remaining}</strong> regalo(s) del kit: <strong>{kit.name}</strong> de un total de {totalNeeded} ({alreadySelectedCount} ya seleccionados).
           </DialogDescription>
         </DialogHeader>
 

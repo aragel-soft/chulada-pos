@@ -128,10 +128,10 @@ export default function DashboardPage() {
               onClick={() => setIsDiscountModalOpen(true)}
               disabled={!activeTicket}
               className={cn(
-                "transition-all duration-200",
+                "transition-all",
                 hasDiscount
-                  ? "border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 hover:bg-amber-100 shadow-sm ring-1 ring-amber-200"
-                  : "border-[#480489] text-[#480489] hover:bg-purple-50"
+                  ? "bg-white hover:bg-orange-600 text-orange-600 hover:text-white"
+                  : "bg-orange-600 hover:bg-orange-700 text-white hover:text-white"
               )}
             >
               <Percent className="w-4 h-4 mr-2" />

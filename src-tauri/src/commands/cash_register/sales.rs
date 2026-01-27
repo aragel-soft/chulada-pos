@@ -297,25 +297,49 @@ fn calculate_sale_items<'a>(
     let mut total_gross = 0.0;
     let mut total_item_discounts = 0.0;
     let mut final_items = Vec::new();
-
-    let mut stmt = tx.prepare("SELECT code, name, retail_price, wholesale_price FROM products WHERE id = ?")
-        .map_err(|e| e.to_string())?;
-
-    for item in items {
-            let product_row = stmt.query_row([&item.product_id], |row| {
+    
+    let product_ids: Vec<String> = items.iter()
+        .map(|i| i.product_id.clone())
+        .collect();
+    
+    let ids_placeholder: String = product_ids.iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    
+    let sql = format!(
+        "SELECT id, code, name, retail_price, wholesale_price FROM products WHERE id IN ({})",
+        ids_placeholder
+    );
+    
+    let mut stmt = tx.prepare(&sql).map_err(|e| e.to_string())?;
+    let products_iter = stmt.query_map(
+        rusqlite::params_from_iter(product_ids.iter()), 
+        |row| {
             Ok((
-                row.get::<_, String>(0)?, // code
-                row.get::<_, String>(1)?, // name
-                row.get::<_, f64>(2)?,    // retail
-                row.get::<_, f64>(3)?,    // wholesale
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // code
+                row.get::<_, String>(2)?, // name
+                row.get::<_, f64>(3)?,    // retail
+                row.get::<_, f64>(4)?,    // wholesale
             ))
-        }).optional().map_err(|e| e.to_string())?;
-
-        let (db_code, db_name, retail, wholesale) = match product_row {
-            Some(r) => r,
-            None => return Err(format!("Producto ID {} no encontrado en base de datos. Posible desincronización.", item.product_id)),
+        }
+    ).map_err(|e| e.to_string())?;
+    
+    let mut products_map: HashMap<String, (String, String, f64, f64)> = HashMap::new();
+    for result in products_iter {
+        let (id, code, name, retail, wholesale) = result.map_err(|e| e.to_string())?;
+        products_map.insert(id, (code, name, retail, wholesale));
+    } 
+    
+    for item in items {
+        let (db_code, db_name, retail, wholesale) = match products_map.get(&item.product_id) {
+            Some(product_data) => product_data.clone(),
+            None => return Err(format!(
+                "Producto ID {} no encontrado en base de datos. Posible desincronización.", 
+                item.product_id
+            )),
         };
-
         let unit_price = if item.price_type == "kit_item" {
             0.0
         } else if discount_percentage > 0.0 {
@@ -342,7 +366,6 @@ fn calculate_sale_items<'a>(
             item_subtotal: net_amount,
         });
     }
-
     Ok((total_gross, total_item_discounts, final_items))
 }
 

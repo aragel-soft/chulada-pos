@@ -395,12 +395,12 @@ export default function SalesPage() {
                 <span className="text-zinc-600">Subtotal:</span>
                 <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-amber-600 flex items-center gap-1">
+              <div className="flex justify-between items-center text-sm text-red-600 font-medium">
+                <span className="flex items-center gap-1">
                   <Percent className="w-3 h-3" />
                   Descuento ({activeTicket.discountPercentage}%):
                 </span>
-                <span className="font-semibold text-amber-600">
+                <span>
                   -{formatCurrency(ticketSubtotal * (activeTicket.discountPercentage / 100))}
                 </span>
               </div>
