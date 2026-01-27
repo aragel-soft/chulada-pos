@@ -13,3 +13,17 @@ export interface Promotion {
   items_summary: string;
   created_at: string;
 }
+
+export interface ComboItemDto {
+  product_id: string;
+  quantity: number;
+}
+
+export interface CreatePromotionDto {
+  name: string;
+  description?: string;
+  combo_price: number;
+  start_date: string; 
+  end_date: string; 
+  items: ComboItemDto[];
+}

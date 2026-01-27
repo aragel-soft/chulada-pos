@@ -9,16 +9,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, FilterX, CalendarIcon, Check, ChevronsUpDown,  } from "lucide-react";
-import { format } from "date-fns";
+import { Search, FilterX, Check, ChevronsUpDown,  } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { es } from "date-fns/locale";
 import {
   Command,
   CommandEmpty,
@@ -30,6 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import { useEffect, useState } from "react";
+import { DateSelector } from "@/components/ui/date-selector";
 
 interface FiltersPanelProps {
   filters: SalesHistoryFilter;
@@ -285,44 +283,5 @@ export function FiltersPanel({
         </Button>
       </div>
     </div>
-  );
-}
-
-function DateSelector({
-  date,
-  onSelect,
-  placeholder,
-}: {
-  date?: Date;
-  onSelect: (d: Date | undefined) => void;
-  placeholder: string;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground",
-          )}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? (
-            format(date, "PPP", { locale: es })
-          ) : (
-            <span>{placeholder}</span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={onSelect}
-          className="rounded-lg border"
-        />
-      </PopoverContent>
-    </Popover>
   );
 }
