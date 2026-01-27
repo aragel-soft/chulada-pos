@@ -19,6 +19,7 @@ import {
   getPromotionDetails,
 } from "@/lib/api/inventory/promotions";
 import { PromotionWizard } from "../components/promotions/PromotionWizard";
+import { DeletePromotionsDialog } from "../components/promotions/DeletePromotionsDialog";
 
 export default function PromotionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -30,9 +31,9 @@ export default function PromotionsPage() {
   const [rowSelection, setRowSelection] = useState({});
   const { can } = useAuthStore();
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [editingPromotion, setEditingPromotion] = useState<
-    PromotionWithDetails | undefined
-  >(undefined);
+  const [editingPromotion, setEditingPromotion] = useState<PromotionWithDetails | undefined>(undefined);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [promotionsToDelete, setPromotionsToDelete] = useState<Promotion[]>([]);
 
   const queryParams: PaginationParams = useMemo(
     () => ({
@@ -78,7 +79,8 @@ export default function PromotionsPage() {
   };
 
   const handleDelete = (selectedRows: Promotion[]) => {
-    console.log("Abrir DeleteDialog para:", selectedRows);
+      setPromotionsToDelete(selectedRows);
+      setIsDeleteDialogOpen(true);
   };
 
   const columns = useMemo<ColumnDef<Promotion>[]>(
@@ -189,6 +191,13 @@ export default function PromotionsPage() {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         promotionToEdit={editingPromotion}
+      />
+
+      <DeletePromotionsDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        promotions={promotionsToDelete}
+        onSuccess={() => setRowSelection({})}
       />
     </div>
   );
