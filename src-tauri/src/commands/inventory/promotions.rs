@@ -422,3 +422,33 @@ pub fn update_promotion(
   tx.commit().map_err(|e| format!("Error al confirmar actualización: {}", e))?;
   Ok(())
 }
+
+#[tauri::command]
+pub fn delete_promotions(
+  db_state: State<'_, Mutex<Connection>>,
+  ids: Vec<String>,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().unwrap();
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  {
+    let mut delete_children_stmt = tx.prepare(
+      "DELETE FROM promotion_combos WHERE promotion_id = ?1"
+    ).map_err(|e| e.to_string())?;
+
+    let mut soft_delete_parent_stmt = tx.prepare(
+      "UPDATE promotions SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id = ?1"
+    ).map_err(|e| e.to_string())?;
+
+    for id in ids {
+      delete_children_stmt.execute([&id])
+        .map_err(|e| format!("Error al eliminar items de la promoción {}: {}", id, e))?;
+
+      soft_delete_parent_stmt.execute([&id])
+        .map_err(|e| format!("Error al eliminar promoción {}: {}", id, e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error al confirmar eliminación: {}", e))?;
+  Ok(())
+}
