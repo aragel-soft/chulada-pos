@@ -260,7 +260,7 @@ pub fn get_promotion_details(
   ).map_err(|e| format!("Promoción no encontrada o error de BD: {}", e))?;
 
   let mut stmt = conn.prepare(
-    "SELECT pc.product_id, p.name, p.code, p.sale_price, pc.quantity 
+    "SELECT pc.product_id, p.name, p.code, p.retail_price, pc.quantity 
      FROM promotion_combos pc
      JOIN products p ON pc.product_id = p.id
      WHERE pc.promotion_id = ?1"
