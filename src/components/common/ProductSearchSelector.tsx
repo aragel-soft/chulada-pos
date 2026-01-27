@@ -58,7 +58,7 @@ export function ProductSearchSelector({
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 

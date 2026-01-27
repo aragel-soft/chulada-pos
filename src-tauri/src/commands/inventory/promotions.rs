@@ -142,7 +142,7 @@ pub fn get_promotions(
       p.end_date, 
       p.is_active,
       p.created_at,
-      GROUP_CONCAT(prod.name, ' + ') as items_summary
+      GROUP_CONCAT(pc.quantity || 'x ' || prod.name, ' + ') as items_summary
     FROM promotions p
     LEFT JOIN promotion_combos pc ON p.id = pc.promotion_id
     LEFT JOIN products prod ON pc.product_id = prod.id
