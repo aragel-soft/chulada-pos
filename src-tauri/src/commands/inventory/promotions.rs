@@ -30,6 +30,37 @@ pub struct PromotionView {
   pub created_at: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct PromotionItemDetail {
+  pub product_id: String, 
+  pub name: String, 
+  pub code: String,
+  pub sale_price: f64,
+  pub quantity: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PromotionDetails {
+  pub id: String,
+  pub name: String,
+  pub description: Option<String>,
+  pub combo_price: f64,
+  pub start_date: String,
+  pub end_date: String,
+  pub is_active: bool,
+  pub items: Vec<PromotionItemDetail>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePromotionDto {
+  pub name: String,
+  pub description: Option<String>,
+  pub combo_price: f64,
+  pub start_date: String,
+  pub end_date: String,
+  pub items: Vec<ComboItemDto>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ComboItemDto {
   pub product_id: String,
@@ -204,6 +235,59 @@ fn map_promotion_row(row: &rusqlite::Row) -> rusqlite::Result<PromotionView> {
 }
 
 #[tauri::command]
+pub fn get_promotion_details(
+  db_state: State<'_, Mutex<Connection>>,
+  id: String,
+) -> Result<PromotionDetails, String> {
+  let conn = db_state.lock().unwrap();
+
+  let promo = conn.query_row(
+    "SELECT id, name, description, combo_price, start_date, end_date, is_active 
+     FROM promotions WHERE id = ?1 AND deleted_at IS NULL",
+    [&id],
+    |row| {
+      Ok(PromotionDetails {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        combo_price: row.get(3)?,
+        start_date: row.get(4)?,
+        end_date: row.get(5)?,
+        is_active: row.get(6)?,
+        items: Vec::new(),
+      })
+    },
+  ).map_err(|e| format!("Promoción no encontrada o error de BD: {}", e))?;
+
+  let mut stmt = conn.prepare(
+    "SELECT pc.product_id, p.name, p.code, p.sale_price, pc.quantity 
+     FROM promotion_combos pc
+     JOIN products p ON pc.product_id = p.id
+     WHERE pc.promotion_id = ?1"
+  ).map_err(|e| e.to_string())?;
+
+  let items_iter = stmt.query_map([&id], |row| {
+    Ok(PromotionItemDetail {
+      product_id: row.get(0)?,
+      name: row.get(1)?,
+      code: row.get(2)?,
+      sale_price: row.get(3)?,
+      quantity: row.get(4)?,
+    })
+  }).map_err(|e| e.to_string())?;
+
+  let mut items = Vec::new();
+  for item in items_iter {
+    items.push(item.map_err(|e| e.to_string())?);
+  }
+
+  Ok(PromotionDetails {
+    items,
+    ..promo
+  })
+}
+
+#[tauri::command]
 pub fn create_promotion(
   db_state: State<'_, Mutex<Connection>>,
   promotion: CreatePromotionDto,
@@ -264,5 +348,77 @@ pub fn create_promotion(
   }
 
   tx.commit().map_err(|e| format!("Error al confirmar transacción: {}", e))?;
+  Ok(())
+}
+
+#[tauri::command]
+pub fn update_promotion(
+  db_state: State<'_, Mutex<Connection>>,
+  id: String,
+  promotion: UpdatePromotionDto,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().unwrap();
+
+  if promotion.combo_price <= 0.0 {
+    return Err("El precio del combo debe ser mayor a 0.".to_string());
+  }
+  if promotion.items.is_empty() {
+    return Err("La promoción debe incluir al menos un producto.".to_string());
+  }
+
+  let start = chrono::NaiveDate::parse_from_str(&promotion.start_date, "%Y-%m-%d")
+    .map_err(|_| "Formato de fecha de inicio inválido".to_string())?;
+  let end = chrono::NaiveDate::parse_from_str(&promotion.end_date, "%Y-%m-%d")
+    .map_err(|_| "Formato de fecha de fin inválido".to_string())?;
+
+  if start > end {
+    return Err("La fecha de inicio no puede ser mayor a la fecha de fin.".to_string());
+  }
+
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  {
+    let affected = tx.execute(
+      "UPDATE promotions 
+       SET name = ?1, description = ?2, combo_price = ?3, start_date = ?4, end_date = ?5 
+       WHERE id = ?6 AND deleted_at IS NULL",
+      rusqlite::params![
+        promotion.name,
+        promotion.description,
+        promotion.combo_price,
+        promotion.start_date,
+        promotion.end_date,
+        id
+      ],
+    ).map_err(|e| format!("Error al actualizar promoción: {}", e))?;
+
+    if affected == 0 {
+      return Err("La promoción no existe o fue eliminada.".to_string());
+    }
+
+    tx.execute(
+      "DELETE FROM promotion_combos WHERE promotion_id = ?1",
+      [&id],
+    ).map_err(|e| format!("Error al limpiar items anteriores: {}", e))?;
+
+    let mut stmt = tx.prepare(
+      "INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES (?1, ?2, ?3, ?4)"
+    ).map_err(|e| e.to_string())?;
+
+    for item in promotion.items {
+      if item.quantity <= 0 {
+        return Err(format!("La cantidad para el producto {} debe ser mayor a 0", item.product_id));
+      }
+          
+      stmt.execute(rusqlite::params![
+        Uuid::new_v4().to_string(),
+        id,
+        item.product_id,
+        item.quantity
+      ]).map_err(|e| format!("Error al insertar nuevo item: {}", e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error al confirmar actualización: {}", e))?;
   Ok(())
 }
