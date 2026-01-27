@@ -27,7 +27,7 @@ import {
   Tag,
   Calendar,
   DollarSign,
-  AlertCircle, // Aseguramos que esté importado
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -38,16 +38,7 @@ import {
   createPromotion,
   updatePromotion,
 } from "@/lib/api/inventory/promotions";
-import { Promotion } from "@/types/promotions";
-import { Product } from "@/types/inventory";
-
-export interface PromotionWithDetails extends Omit<Promotion, "items_summary"> {
-  code: string;
-  items: {
-    product: Product;
-    quantity: number;
-  }[];
-}
+import { PromotionWithDetails } from "@/types/promotions"; 
 
 const { useStepper, steps } = defineStepper(
   { id: "info", title: "Configuración", description: "Precio y vigencia" },
@@ -215,7 +206,7 @@ export function PromotionWizard({
               </DialogTitle>
               {isEditing && (
                 <p className="text-xs text-muted-foreground font-mono mt-1">
-                  ID: {promotionToEdit.code || promotionToEdit.id.slice(0, 8)}
+                  ID: {promotionToEdit.id.slice(0, 8)}
                   ...
                 </p>
               )}
@@ -456,9 +447,9 @@ export function PromotionWizard({
                     </div>
                   </div>
 
-                  {/* TODO: Estandarizar las alertas en el sistema */}
+                  {/* TODO: Estandarizar componentes de alerta/warning */}
                   {isPriceHigherThanRegular && (
-                    <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-900">
+                    <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-900 animate-pulse">
                       <AlertCircle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-bold">¡Cuidado con el precio!</p>
