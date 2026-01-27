@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::collections::{HashMap, HashSet};
 use tauri::State;
 use uuid::Uuid;
+use chrono;
 
 // Business Constants
 const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
@@ -14,7 +15,8 @@ pub struct SaleItemRequest {
     pub parent_item_id: Option<String>,
     pub product_id: String,
     pub quantity: f64,
-    pub price_type: String, // 'retail', 'wholesale', 'kit_item'
+    pub price_type: String, // 'retail', 'wholesale', 'kit_item', 'promo'
+    pub promotion_id: Option<String>, // ID de la promoción si aplica
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -250,6 +252,157 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
     Ok(items.to_vec())
 }
 
+// Estructura para datos de una promoción validada
+struct ValidatedPromotion {
+    combo_price: f64,
+    product_ids: HashSet<String>,
+}
+
+fn validate_promotions(
+    conn: &Connection,
+    items: &[SaleItemRequest],
+) -> Result<HashMap<String, ValidatedPromotion>, String> {
+    let mut promo_groups: HashMap<String, Vec<&SaleItemRequest>> = HashMap::new();
+    
+    for item in items {
+        if let Some(promo_id) = &item.promotion_id {
+            promo_groups.entry(promo_id.clone())
+                .or_insert_with(Vec::new)
+                .push(item);
+        }
+    }
+    
+    if promo_groups.is_empty() {
+        return Ok(HashMap::new());
+    }
+    
+    let promo_ids: Vec<String> = promo_groups.keys().cloned().collect();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    
+    // Fetch all promotions
+    let placeholders = promo_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql_promotions = format!(
+        "SELECT id, combo_price 
+         FROM promotions 
+         WHERE id IN ({}) AND deleted_at IS NULL AND is_active = 1 AND start_date <= ? AND end_date >= ?",
+        placeholders
+    );
+    
+    let mut params: Vec<&dyn rusqlite::ToSql> = promo_ids.iter()
+        .map(|id| id as &dyn rusqlite::ToSql)
+        .collect();
+    params.push(&today);
+    params.push(&today);
+    
+    let mut stmt = conn.prepare(&sql_promotions).map_err(|e| e.to_string())?;
+    let promo_data_iter = stmt.query_map(params.as_slice(), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+    }).map_err(|e| e.to_string())?;
+    
+    let mut promo_prices: HashMap<String, f64> = HashMap::new();
+    for result in promo_data_iter {
+        let (id, price) = result.map_err(|e| e.to_string())?;
+        promo_prices.insert(id, price);
+    }
+    
+    // Fetch all promotion combos
+    let sql_combos = format!(
+        "SELECT promotion_id, product_id, quantity 
+         FROM promotion_combos 
+         WHERE promotion_id IN ({})",
+        placeholders
+    );
+    
+    let mut stmt_combos = conn.prepare(&sql_combos).map_err(|e| e.to_string())?;
+    let combos_iter = stmt_combos.query_map(
+        rusqlite::params_from_iter(promo_ids.iter()),
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?, // promotion_id
+                row.get::<_, String>(1)?, // product_id
+                row.get::<_, i64>(2)?     // quantity
+            ))
+        }
+    ).map_err(|e| e.to_string())?;
+    
+    let mut promo_combos: HashMap<String, HashMap<String, i64>> = HashMap::new();
+    for result in combos_iter {
+        let (promo_id, product_id, qty) = result.map_err(|e| e.to_string())?;
+        promo_combos.entry(promo_id)
+            .or_insert_with(HashMap::new)
+            .insert(product_id, qty);
+    }
+    
+    // VALIDATIONS: In-memory
+    let mut validated_promos: HashMap<String, ValidatedPromotion> = HashMap::new();
+    
+    for (promo_id, promo_items) in promo_groups {
+        let combo_price = promo_prices[&promo_id];
+        let required_products = promo_combos.get(&promo_id)
+            .ok_or(format!("La promoción '{}' no tiene productos configurados", promo_id))?;
+        
+        if required_products.is_empty() {
+            return Err(format!("La promoción '{}' no tiene productos configurados", promo_id));
+        }
+        
+        // Validate exact match in number of products
+        if promo_items.len() != required_products.len() {
+            return Err(format!(
+                "Promoción '{}': se requieren {} productos, pero se enviaron {}",
+                promo_id,
+                required_products.len(),
+                promo_items.len()
+            ));
+        }
+        
+        // Build map of provided products
+        let mut provided_products: HashMap<String, f64> = HashMap::new();
+        for item in &promo_items {
+            *provided_products.entry(item.product_id.clone()).or_insert(0.0) += item.quantity;
+        }
+        
+        // Validate each required product and quantity
+        for (prod_id, required_qty) in required_products {
+            match provided_products.get(prod_id) {
+                Some(&provided_qty) => {
+                    if (provided_qty - *required_qty as f64).abs() > 0.001 {
+                        return Err(format!(
+                            "Promoción '{}': el producto '{}' requiere cantidad {}, pero se envió {}",
+                            promo_id, prod_id, required_qty, provided_qty
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "Promoción '{}': falta el producto '{}' (requerido: {})",
+                        promo_id, prod_id, required_qty
+                    ));
+                }
+            }
+        }
+        
+        // Validate no extra products
+        for prod_id in provided_products.keys() {
+            if !required_products.contains_key(prod_id) {
+                return Err(format!(
+                    "Promoción '{}': el producto '{}' no pertenece a esta promoción",
+                    promo_id, prod_id
+                ));
+            }
+        }
+        
+        validated_promos.insert(
+            promo_id.clone(),
+            ValidatedPromotion {
+                combo_price,
+                product_ids: required_products.keys().cloned().collect(),
+            },
+        );
+    }
+    
+    Ok(validated_promos)
+}
+
 fn validate_credit_sale(
     tx: &Connection,
     payment_method: &str,
@@ -292,7 +445,8 @@ fn validate_credit_sale(
 fn calculate_sale_items<'a>(
     tx: &Connection,
     items: &'a [SaleItemRequest],
-    discount_percentage: f64
+    discount_percentage: f64,
+    validated_promos: &HashMap<String, ValidatedPromotion>,
 ) -> Result<(f64, f64, Vec<FinalItemData<'a>>), String> {
     let mut total_gross = 0.0;
     let mut total_item_discounts = 0.0;
@@ -330,42 +484,94 @@ fn calculate_sale_items<'a>(
     for result in products_iter {
         let (id, code, name, retail, wholesale) = result.map_err(|e| e.to_string())?;
         products_map.insert(id, (code, name, retail, wholesale));
-    } 
-    
-    for item in items {
-        let (db_code, db_name, retail, wholesale) = match products_map.get(&item.product_id) {
-            Some(product_data) => product_data.clone(),
-            None => return Err(format!(
-                "Producto ID {} no encontrado en base de datos. Posible desincronización.", 
-                item.product_id
-            )),
-        };
-        let unit_price = if item.price_type == "kit_item" {
-            0.0
-        } else if discount_percentage > 0.0 {
-            retail
-        } else if item.price_type == "wholesale" { 
-            wholesale 
-        } else { 
-            retail 
-        };
-        
-        let gross_amount = unit_price * item.quantity;
-        let item_discount_val = gross_amount * (discount_percentage / 100.0);
-        let net_amount = gross_amount - item_discount_val;
-
-        total_gross += gross_amount;
-        total_item_discounts += item_discount_val;
-
-        final_items.push(FinalItemData {
-            original_req: item,
-            db_name,
-            db_code,
-            unit_price,
-            item_discount_amt: item_discount_val,
-            item_subtotal: net_amount,
-        });
     }
+    
+    let mut promo_groups: HashMap<Option<String>, Vec<&SaleItemRequest>> = HashMap::new();
+    for item in items {
+        promo_groups.entry(item.promotion_id.clone())
+            .or_insert_with(Vec::new)
+            .push(item);
+    }
+    
+    for (promo_id_opt, group_items) in promo_groups {
+        if let Some(promo_id) = promo_id_opt {
+            // PROMO ITEMS
+            let validated_promo = validated_promos.get(&promo_id)
+                .ok_or(format!("Error interno: promoción {} no validada", promo_id))?;
+            
+            // Calculate total retail of promo products
+            let mut total_retail = 0.0;
+            let mut item_retails: Vec<(&SaleItemRequest, f64)> = Vec::new();
+            
+            for item in &group_items {
+                let (_, _, retail, _) = products_map.get(&item.product_id)
+                    .ok_or(format!("Producto {} no encontrado", item.product_id))?;
+                let item_retail = retail * item.quantity;
+                total_retail += item_retail;
+                item_retails.push((item, item_retail));
+            }
+            
+            // Distribute combo_price proportionally
+            for (item, item_retail) in item_retails {
+                let (db_code, db_name, _, _) = products_map.get(&item.product_id)
+                    .ok_or(format!("Producto {} no encontrado", item.product_id))?;
+                
+                let proportion = if total_retail > 0.0 { item_retail / total_retail } else { 0.0 };
+                let allocated_price = validated_promo.combo_price * proportion;
+                let unit_price = allocated_price / item.quantity;
+                
+                // Global discounts are not applied to promo items
+                total_gross += allocated_price;
+                
+                final_items.push(FinalItemData {
+                    original_req: item,
+                    db_name: db_name.clone(),
+                    db_code: db_code.clone(),
+                    unit_price,
+                    item_discount_amt: 0.0,
+                    item_subtotal: allocated_price,
+                });
+            }
+        } else {
+            // NORMAL ITEMS
+            for item in group_items {
+                let (db_code, db_name, retail, wholesale) = match products_map.get(&item.product_id) {
+                    Some(product_data) => product_data.clone(),
+                    None => return Err(format!(
+                        "Producto ID {} no encontrado en base de datos. Posible desincronización.", 
+                        item.product_id
+                    )),
+                };
+                
+                let unit_price = if item.price_type == "kit_item" {
+                    0.0
+                } else if discount_percentage > 0.0 {
+                    retail
+                } else if item.price_type == "wholesale" { 
+                    wholesale 
+                } else { 
+                    retail 
+                };
+                
+                let gross_amount = unit_price * item.quantity;
+                let item_discount_val = gross_amount * (discount_percentage / 100.0);
+                let net_amount = gross_amount - item_discount_val;
+
+                total_gross += gross_amount;
+                total_item_discounts += item_discount_val;
+
+                final_items.push(FinalItemData {
+                    original_req: item,
+                    db_name,
+                    db_code,
+                    unit_price,
+                    item_discount_amt: item_discount_val,
+                    item_subtotal: net_amount,
+                });
+            }
+        }
+    }
+    
     Ok((total_gross, total_item_discounts, final_items))
 }
 
@@ -394,13 +600,28 @@ pub fn process_sale(
         ));
     }
     
-    // Validate & Apply Kit Rules (Enforce Pricing)
+    // Validate that items with promotion do not have global discount
+    if payload.discount_percentage > 0.0 {
+        for item in &payload.items {
+            if item.promotion_id.is_some() {
+                return Err(format!(
+                    "No se pueden aplicar descuentos globales sobre items con promoción. Item: {}",
+                    item.product_id
+                ));
+            }
+        }
+    }
+    
+    // Validate promotions
+    let validated_promos = validate_promotions(&conn, &payload.items)?;
+    
+    // Validate & Apply Kit Rules
     let validated_items = apply_kit_rules(&conn, &payload.items)?;
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // 2. Calculate Items & Totals (Use validated_items)
-    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &validated_items, payload.discount_percentage)?;
+    // Calculate Items & Totals
+    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &validated_items, payload.discount_percentage, &validated_promos)?;
     
     let final_total = total_gross - total_item_discounts;
 
