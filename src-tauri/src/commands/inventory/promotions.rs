@@ -58,6 +58,7 @@ pub struct UpdatePromotionDto {
   pub combo_price: f64,
   pub start_date: String,
   pub end_date: String,
+  pub is_active: bool,
   pub items: Vec<ComboItemDto>,
 }
 
@@ -380,14 +381,15 @@ pub fn update_promotion(
   {
     let affected = tx.execute(
       "UPDATE promotions 
-       SET name = ?1, description = ?2, combo_price = ?3, start_date = ?4, end_date = ?5 
-       WHERE id = ?6 AND deleted_at IS NULL",
+       SET name = ?1, description = ?2, combo_price = ?3, start_date = ?4, end_date = ?5, is_active = ?6
+       WHERE id = ?7 AND deleted_at IS NULL",
       rusqlite::params![
         promotion.name,
         promotion.description,
         promotion.combo_price,
         promotion.start_date,
         promotion.end_date,
+        promotion.is_active,
         id
       ],
     ).map_err(|e| format!("Error al actualizar promoción: {}", e))?;

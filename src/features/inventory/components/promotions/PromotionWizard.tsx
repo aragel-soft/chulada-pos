@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/text-area";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateSelector } from "@/components/ui/date-selector";
+import { Switch } from "@/components/ui/switch";
 import {
   CheckCircle2,
   ArrowLeft,
@@ -38,7 +39,7 @@ import {
   createPromotion,
   updatePromotion,
 } from "@/lib/api/inventory/promotions";
-import { PromotionWithDetails } from "@/types/promotions"; 
+import { PromotionWithDetails } from "@/types/promotions";
 
 const { useStepper, steps } = defineStepper(
   { id: "info", title: "Configuración", description: "Precio y vigencia" },
@@ -50,12 +51,14 @@ interface PromotionWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promotionToEdit?: PromotionWithDetails;
+  onSuccess?: () => void;
 }
 
 export function PromotionWizard({
   open,
   onOpenChange,
   promotionToEdit,
+  onSuccess,
 }: PromotionWizardProps) {
   const stepper = useStepper();
   const queryClient = useQueryClient();
@@ -73,6 +76,7 @@ export function PromotionWizard({
         comboPrice: promotionToEdit.combo_price,
         startDate: start,
         endDate: end,
+        isActive: promotionToEdit.is_active,
       };
     }
     return {
@@ -81,6 +85,7 @@ export function PromotionWizard({
       comboPrice: 0,
       startDate: new Date(),
       endDate: addDays(new Date(), 30),
+      isActive: true,
     };
   });
 
@@ -107,6 +112,7 @@ export function PromotionWizard({
           comboPrice: promotionToEdit.combo_price,
           startDate: start,
           endDate: end,
+          isActive: promotionToEdit.is_active,
         });
         setItems(
           promotionToEdit.items.map((i) => ({
@@ -121,6 +127,7 @@ export function PromotionWizard({
           comboPrice: 0,
           startDate: new Date(),
           endDate: addDays(new Date(), 30),
+          isActive: true,
         });
         setItems([]);
       }
@@ -156,6 +163,7 @@ export function PromotionWizard({
       combo_price: formData.comboPrice,
       start_date: format(formData.startDate, "yyyy-MM-dd"),
       end_date: format(formData.endDate, "yyyy-MM-dd"),
+      is_active: formData.isActive,
       items: items.map((i) => ({
         product_id: i.product.id,
         quantity: i.quantity,
@@ -172,6 +180,7 @@ export function PromotionWizard({
       }
 
       queryClient.invalidateQueries({ queryKey: ["promotions"] });
+      onSuccess?.();
       handleClose();
     } catch (error) {
       console.error(error);
@@ -202,14 +211,8 @@ export function PromotionWizard({
             </div>
             <div className="flex flex-col">
               <DialogTitle className="text-xl font-bold text-foreground">
-                {isEditing ? `Editar Promoción` : 'Crear Nueva Promoción'}
+                {isEditing ? `Editar Promoción` : "Crear Nueva Promoción"}
               </DialogTitle>
-              {isEditing && (
-                <p className="text-xs text-muted-foreground font-mono mt-1">
-                  ID: {promotionToEdit.id.slice(0, 8)}
-                  ...
-                </p>
-              )}
             </div>
           </DialogHeader>
 
@@ -249,8 +252,8 @@ export function PromotionWizard({
                           isActive
                             ? "border-[#480489] bg-[#480489] text-white shadow-md scale-110"
                             : isCompleted
-                            ? "border-[#480489] bg-[#480489] text-white"
-                            : "border-muted-foreground/30 text-muted-foreground bg-background",
+                              ? "border-[#480489] bg-[#480489] text-white"
+                              : "border-muted-foreground/30 text-muted-foreground bg-background",
                         )}
                       >
                         {isCompleted ? (
@@ -268,8 +271,8 @@ export function PromotionWizard({
                             isActive
                               ? "text-[#480489]"
                               : isCompleted
-                              ? "text-foreground"
-                              : "text-muted-foreground",
+                                ? "text-foreground"
+                                : "text-muted-foreground",
                           )}
                         >
                           {step.title}
@@ -372,6 +375,23 @@ export function PromotionWizard({
                       </div>
                     </div>
                   </div>
+                  {isEditing && (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <Separator className="my-1" />
+                      <Label>Estatus</Label>
+                      <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">
+                          {formData.isActive ? "Activa" : "Inactiva"}
+                        </span>
+                        <Switch
+                          checked={formData.isActive}
+                          onCheckedChange={(checked) =>
+                            setFormData({ ...formData, isActive: checked })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ),
@@ -403,7 +423,7 @@ export function PromotionWizard({
               </div>
             ),
 
-            // PASO 3: REVIEW 
+            // PASO 3: REVIEW
             review: () => {
               const regularPriceTotal = items.reduce((acc, item) => {
                 return acc + item.product.retail_price * item.quantity;

@@ -189,6 +189,7 @@ export default function PromotionsPage() {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         promotionToEdit={editingPromotion}
+        onSuccess={() => setRowSelection({})}
       />
     </div>
   );

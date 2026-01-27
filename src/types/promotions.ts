@@ -30,7 +30,9 @@ export interface CreatePromotionDto {
   items: ComboItemDto[];
 }
 
-export interface UpdatePromotionDto extends CreatePromotionDto {}
+export interface UpdatePromotionDto extends CreatePromotionDto {
+  is_active: boolean;
+}
 
 export interface PromotionItemDetailRaw {
   product_id: string;
