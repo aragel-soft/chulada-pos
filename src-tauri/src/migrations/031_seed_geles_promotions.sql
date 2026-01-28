@@ -49,8 +49,8 @@ INSERT INTO promotions (id, name, description, combo_price, start_date, end_date
 ('promo_gel_02', 'Pack 3 Geles Kuul Completo', 'Los 3 geles Kuul al mejor precio', 220.00, date('now', '-5 days'), date('now', '+90 days'), 1);
 
 INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES 
-('pc_gel_02_a', 'promo_gel_02', 'pr-gel-k-1', 1), -- Gel Fijación
-('pc_gel_02_b', 'promo_gel_02', 'pr-gel-k-2', 1), -- Gel Brillo
+('pc_gel_02_a', 'promo_gel_02', 'pr-gel-k-1', 2), -- Gel Fijación
+('pc_gel_02_b', 'promo_gel_02', 'pr-gel-k-2', 3), -- Gel Brillo
 ('pc_gel_02_c', 'promo_gel_02', 'pr-gel-k-3', 1); -- Gel Wet Look
 
 -- 🟢 PROMO 3: Pack 2 Geles Nefertiti (Activa)
@@ -96,3 +96,21 @@ INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES
 ('pc_gel_07_a', 'promo_gel_07', 'pr-gel-a-1', 1), -- Sculpting
 ('pc_gel_07_b', 'promo_gel_07', 'pr-gel-a-2', 1), -- Defining
 ('pc_gel_07_c', 'promo_gel_07', 'pr-gel-a-3', 1); -- Modeling Wax
+
+-- 🔴 PROMO 8: Pack Verano Kuul (VENCIDA - para validar que NO se cargue)
+INSERT INTO promotions (id, name, description, combo_price, start_date, end_date, is_active) VALUES 
+('promo_gel_08', 'Pack Verano Kuul 2024', 'Promoción de verano pasado - VENCIDA', 180.00, date('now', '-60 days'), date('now', '-10 days'), 1);
+
+INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES 
+('pc_gel_08_a', 'promo_gel_08', 'pr-gel-k-1', 2), -- Fijación
+('pc_gel_08_b', 'promo_gel_08', 'pr-gel-n-1', 1); -- Nefertiti Ultra
+
+-- 🟡 PROMO 9: Pack Navidad Nefertiti (FUTURA - para validar que NO se cargue)
+INSERT INTO promotions (id, name, description, combo_price, start_date, end_date, is_active) VALUES 
+('promo_gel_09', 'Pack Navidad Nefertiti 2026', 'Disponible próximamente en Navidad', 200.00, date('now', '+300 days'), date('now', '+365 days'), 1);
+
+INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES 
+('pc_gel_09_a', 'promo_gel_09', 'pr-gel-n-1', 2), -- Nefertiti Ultra
+('pc_gel_09_b', 'promo_gel_09', 'pr-gel-k-1', 2), -- Kuul Fijación
+('pc_gel_09_c', 'promo_gel_09', 'pr-gel-a-3', 2); -- Alfaparf Modeling Wax
+
