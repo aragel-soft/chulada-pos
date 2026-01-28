@@ -133,6 +133,11 @@ export const useCartStore = create<CartState>()(
                 return state;
             }
 
+            // If ticket has discount, force retail price for new items (so discount applies to base price)
+            if (currentTicket.discountPercentage > 0 && targetPriceType !== 'kit_item') {
+                targetPriceType = 'retail';
+            }
+
             // Calculate Price
             let finalPrice = 0;
             if (targetPriceType === 'kit_item') {
@@ -483,7 +488,7 @@ export const useCartStore = create<CartState>()(
           const result = PromotionService.detectAndApplyPromotions(
             currentTicket.items,
             promotionDefs,
-            currentTicket.discountPercentage > 0
+            currentTicket.discountPercentage > 0 ? 'retail' : currentTicket.priceType
           );
 
           // Update ticket with new items
