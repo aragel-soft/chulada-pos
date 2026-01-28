@@ -123,7 +123,6 @@ function groupCartItemsByPromotion(
   const resultMap = new Map<string, CartItem>();
   const assignedToPromo = new Map<string, number>();
 
-  // Track total assigned quantities
   for (const instance of promotionInstances) {
     for (const [productId, productInfo] of instance.products.entries()) {
       const current = assignedToPromo.get(productId) || 0;
@@ -131,7 +130,6 @@ function groupCartItemsByPromotion(
     }
   }
 
-  // Process each product
   for (const [productId, totalQty] of inventory.entries()) {
     const promoQty = assignedToPromo.get(productId) || 0;
     const normalQty = totalQty - promoQty;
@@ -139,7 +137,6 @@ function groupCartItemsByPromotion(
     const sampleItem = eligibleItems.find(i => i.id === productId);
     if (!sampleItem) continue;
 
-    // Group promotional quantities by unit price
     const promoByPrice = new Map<number, { qty: number; instance: PromotionInstance }>();
 
     for (const instance of promotionInstances) {
@@ -158,7 +155,6 @@ function groupCartItemsByPromotion(
       }
     }
 
-    // Add promotional items (one line per unique unit price)
     for (const [unitPrice, { qty, instance }] of promoByPrice.entries()) {
       const key = `${productId}-promo-${unitPrice.toFixed(2)}`;
       resultMap.set(key, {
@@ -173,11 +169,9 @@ function groupCartItemsByPromotion(
       });
     }
 
-    // Add normal items (if any)
     if (normalQty > 0) {
       const key = `${productId}-normal`;
       
-      // Determine final price based on defaultPriceType
       const finalPrice = defaultPriceType === 'wholesale' 
         ? (sampleItem.wholesale_price || sampleItem.retail_price) 
         : sampleItem.retail_price;
@@ -204,15 +198,12 @@ export function detectAndApplyPromotions(
   defaultPriceType: 'retail' | 'wholesale' = 'retail'
 ): PromotionDetectionResult {
 
-  
-  // 1. Identify items that are acting as Kit Triggers
   const kitTriggerIds = new Set(
     cartItems
       .filter(item => item.priceType === 'kit_item' && item.kitTriggerId)
       .map(item => item.kitTriggerId)
   );
   
-  // 2. Filter eligible items: Non-kit items AND Non-trigger items
   const eligibleItems = cartItems.filter(
     item => item.priceType !== 'kit_item' && !kitTriggerIds.has(item.uuid)
   );
@@ -231,7 +222,6 @@ export function detectAndApplyPromotions(
 
   const resultMap = groupCartItemsByPromotion(inventory, promotionInstances, eligibleItems, defaultPriceType);
 
-  // 3. Preserve ignored items (Kit Items + Kit Triggers)
   const ignoredItems = cartItems.filter(
      item => item.priceType === 'kit_item' || kitTriggerIds.has(item.uuid)
   );
