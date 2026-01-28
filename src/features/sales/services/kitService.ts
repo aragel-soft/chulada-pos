@@ -1,6 +1,6 @@
 import { Product } from '@/types/inventory';
 import { KitOptionDef } from '@/types/kits';
-import { CartItem } from '@/features/sales/stores/cartStore';
+import { CartItem } from '@/types/sales';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 

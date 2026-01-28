@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { CartItem } from '../stores/cartStore';
+import { CartItem } from '@/types/sales';
 import { SaleItemRequest, SaleRequest, SaleResponse } from '@/types/sale';
 import { processSale as processSaleApi } from '@/lib/api/cash-register/sales';
 

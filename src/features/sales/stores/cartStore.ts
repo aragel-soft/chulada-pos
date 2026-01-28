@@ -7,24 +7,9 @@ import { useKitStore } from './kitStore';
 import { usePromotionsStore } from './promotionsStore';
 import { toast } from 'sonner';
 import * as KitService from '@/features/sales/services/kitService';
+import * as PromotionService from '@/features/sales/services/promotionService';
+import { CartItem, Ticket } from '@/types/sales';
 
-export interface CartItem extends Product {
-  uuid: string;
-  quantity: number;
-  priceType: 'retail' | 'wholesale' | 'kit_item' | 'promo';
-  finalPrice: number;
-  kitTriggerId?: string;
-  promotionId?: string;
-  promotionInstanceId?: string; // For multiple instances of same promotion
-  promotionName?: string;
-}
-interface Ticket {
-  id: string;
-  name: string;
-  items: CartItem[];
-  priceType: 'retail' | 'wholesale';
-  discountPercentage: number;
-}
 
 interface CartState {
   tickets: Ticket[];
@@ -45,6 +30,7 @@ interface CartState {
   setTicketDiscount: (percentage: number) => void;
   clearTicketDiscount: () => void;
   getTicketSubtotal: () => number;
+  getTicketDiscountAmount: () => number;
 
   // Promotion methods
   detectAndApplyPromotions: () => void;
@@ -194,7 +180,7 @@ export const useCartStore = create<CartState>()(
           const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
 
           const newItems = currentTicket.items.map(item => {
-            if (item.priceType === 'kit_item') {
+            if (item.priceType === 'kit_item' || item.priceType === 'promo') {
                 return item;
             }
             const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
@@ -396,7 +382,8 @@ export const useCartStore = create<CartState>()(
 
           const newItems = state.tickets[ticketIndex].items.map(item => {
             if (item.uuid === uuid) {
-              if (item.priceType === 'kit_item') return item; 
+              // Prevent toggling kit items and promotional items
+              if (item.priceType === 'kit_item' || item.priceType === 'promo') return item; 
 
               const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
               const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
@@ -439,16 +426,9 @@ export const useCartStore = create<CartState>()(
 
           const currentTicket = state.tickets[ticketIndex];
           
-          // Validate no promotional items
-          const hasPromoItems = currentTicket.items.some(item => item.promotionId);
-          if (hasPromoItems) {
-            toast.error('No se pueden aplicar descuentos cuando hay productos en promoción');
-            return state;
-          }
-          
-          // When discount is applied, force all items to retail (except kit_item)
+          // When discount is applied, force non-promo items to retail price
           const newItems = currentTicket.items.map(item => {
-            if (item.priceType === 'kit_item') return item;
+            if (item.priceType === 'kit_item' || item.priceType === 'promo') return item;
             
             return {
               ...item,
@@ -480,7 +460,11 @@ export const useCartStore = create<CartState>()(
             discountPercentage: 0
           };
 
-          return { tickets: newTickets };
+          // Re-detect promotions after clearing discount
+          set({ tickets: newTickets });
+          get().detectAndApplyPromotions();
+          
+          return get();
         });
       },
       
@@ -491,177 +475,20 @@ export const useCartStore = create<CartState>()(
 
           const currentTicket = state.tickets[ticketIndex];
           
-          // Skip if ticket has discount
-          if (currentTicket.discountPercentage > 0) {
-            return state;
-          }
+          // Get promotion definitions
+          const promotionsStore = usePromotionsStore.getState();
+          const promotionDefs = promotionsStore.promotionDefs;
 
-          // Only consider non-kit items for promotion detection
-          const eligibleItems = currentTicket.items.filter(
-            item => item.priceType !== 'kit_item'
+          // Use promotion service to detect and apply promotions
+          const result = PromotionService.detectAndApplyPromotions(
+            currentTicket.items,
+            promotionDefs,
+            currentTicket.discountPercentage > 0
           );
 
-          if (eligibleItems.length === 0) {
-            return state;
-          }
-
-          // Build inventory map (product_id -> total quantity)
-          const inventory = new Map<string, number>();
-          eligibleItems.forEach(item => {
-            const current = inventory.get(item.id) || 0;
-            inventory.set(item.id, current + item.quantity);
-          });
-
-          // Get all promotion definitions
-          const promotionsStore = usePromotionsStore.getState();
-          let allPromotions = promotionsStore.promotionDefs;
-          
-          // Sort promotions by total quantity required (descending)
-          // This ensures larger/more specific promotions are tried first
-          allPromotions = [...allPromotions].sort((a, b) => {
-            const totalA = Array.from(a.required_products.values()).reduce((sum, qty) => sum + qty, 0);
-            const totalB = Array.from(b.required_products.values()).reduce((sum, qty) => sum + qty, 0);
-            return totalB - totalA; // Descending order
-          });
-
-          // Track promotion assignments: product_id -> { promoQty, instances: PromotionInstance[] }
-          interface PromotionInstance {
-            promotionId: string;
-            instanceId: string;
-            promotionName: string;
-            comboPrice: number;
-            products: Map<string, { quantity: number; unitPrice: number }>;
-          }
-
-          const promotionInstances: PromotionInstance[] = [];
-          const assignedToPromo = new Map<string, number>(); // product_id -> qty in promos
-
-          // Greedy: for each promotion, create as many instances as possible
-          for (const promotion of allPromotions) {
-
-            while (true) {
-              // Check if we can create another instance
-              let canCreate = true;
-              for (const [productId, requiredQty] of promotion.required_products.entries()) {
-                const available = inventory.get(productId) || 0;
-                const alreadyUsed = assignedToPromo.get(productId) || 0;
-                if (available - alreadyUsed < requiredQty) {
-                  canCreate = false;
-                  break;
-                }
-              }
-
-              if (!canCreate) break;
-
-              // Calculate proportional pricing for this instance
-              let totalRetailValue = 0;
-              const retailPrices = new Map<string, number>();
-
-              for (const [productId] of promotion.required_products.entries()) {
-                const item = eligibleItems.find(i => i.id === productId);
-                if (!item) continue;
-                const retailPrice = item.retail_price;
-                retailPrices.set(productId, retailPrice);
-                totalRetailValue += retailPrice * promotion.required_products.get(productId)!;
-              }
-
-              if (totalRetailValue === 0) break;
-
-              // Create instance
-              const instance: PromotionInstance = {
-                promotionId: promotion.id,
-                instanceId: uuidv4(),
-                promotionName: promotion.name,
-                comboPrice: promotion.combo_price,
-                products: new Map(),
-              };
-
-              // Assign products with proportional pricing
-              for (const [productId, requiredQty] of promotion.required_products.entries()) {
-                const retailPrice = retailPrices.get(productId) || 0;
-                const proportion = (retailPrice * requiredQty) / totalRetailValue;
-                const allocatedPrice = promotion.combo_price * proportion;
-                const unitPrice = allocatedPrice / requiredQty;
-
-                instance.products.set(productId, { quantity: requiredQty, unitPrice });
-
-                // Track assignment
-                const used = assignedToPromo.get(productId) || 0;
-                assignedToPromo.set(productId, used + requiredQty);
-              }
-
-              promotionInstances.push(instance);
-            }
-          }
-
-          // Build result items (grouped)
-          const resultMap = new Map<string, CartItem>();
-
-          // Process each product
-          for (const [productId, totalQty] of inventory.entries()) {
-            const promoQty = assignedToPromo.get(productId) || 0;
-            const normalQty = totalQty - promoQty;
-
-            const sampleItem = eligibleItems.find(i => i.id === productId);
-            if (!sampleItem) continue;
-
-            // Group promotional quantities by unit price
-            const promoByPrice = new Map<number, { qty: number; instance: PromotionInstance }>();
-            
-            for (const instance of promotionInstances) {
-              const productInfo = instance.products.get(productId);
-              if (!productInfo) continue;
-
-              const key = productInfo.unitPrice;
-              const existing = promoByPrice.get(key);
-              if (existing) {
-                existing.qty += productInfo.quantity;
-              } else {
-                promoByPrice.set(key, { 
-                  qty: productInfo.quantity, 
-                  instance 
-                });
-              }
-            }
-
-            // Add promotional items (one line per unique unit price)
-            for (const [unitPrice, { qty, instance }] of promoByPrice.entries()) {
-              const key = `${productId}-promo-${unitPrice.toFixed(2)}`;
-              resultMap.set(key, {
-                ...sampleItem,
-                uuid: uuidv4(),
-                quantity: qty,
-                priceType: 'promo',
-                finalPrice: unitPrice,
-                promotionId: instance.promotionId,
-                promotionInstanceId: instance.instanceId,
-                promotionName: instance.promotionName,
-              });
-            }
-
-            // Add normal items (if any)
-            if (normalQty > 0) {
-              const key = `${productId}-normal`;
-              resultMap.set(key, {
-                ...sampleItem,
-                uuid: uuidv4(),
-                quantity: normalQty,
-                priceType: sampleItem.priceType === 'wholesale' ? 'wholesale' : 'retail',
-                finalPrice: sampleItem.priceType === 'wholesale' ? 
-                  (sampleItem.wholesale_price || sampleItem.retail_price) : sampleItem.retail_price,
-                promotionId: undefined,
-                promotionInstanceId: undefined,
-                promotionName: undefined,
-              });
-            }
-          }
-
-          // Keep kit items unchanged
-          const kitItems = currentTicket.items.filter(item => item.priceType === 'kit_item');
-          const newItems = [...kitItems, ...Array.from(resultMap.values())];
-
+          // Update ticket with new items
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...currentTicket, items: newItems };
+          newTickets[ticketIndex] = { ...currentTicket, items: result.items };
           
           return { tickets: newTickets };
         });
@@ -671,7 +498,20 @@ export const useCartStore = create<CartState>()(
         const state = get();
         const ticket = state.tickets.find(t => t.id === state.activeTicketId);
         if (!ticket) return 0;
+        
         return ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+      },
+
+      getTicketDiscountAmount: () => {
+        const state = get();
+        const ticket = state.tickets.find(t => t.id === state.activeTicketId);
+        if (!ticket) return 0;
+        
+        const nonPromoTotal = ticket.items
+          .filter(item => item.priceType !== 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        return nonPromoTotal * (ticket.discountPercentage / 100);
       },
 
       getActiveTicket: () => {
@@ -684,9 +524,16 @@ export const useCartStore = create<CartState>()(
         const ticket = state.tickets.find(t => t.id === state.activeTicketId);
         if (!ticket) return 0;
         
-        const subtotal = ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
-        const discount = subtotal * (ticket.discountPercentage / 100);
-        return subtotal - discount;
+        const promoTotal = ticket.items
+          .filter(item => item.priceType === 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+          
+        const nonPromoTotal = ticket.items
+          .filter(item => item.priceType !== 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        const discount = nonPromoTotal * (ticket.discountPercentage / 100);
+        return promoTotal + nonPromoTotal - discount;
       }
     }),
     {

@@ -63,6 +63,7 @@ export default function SalesPage() {
     getActiveTicket,
     getTicketTotal,
     getTicketSubtotal,
+    getTicketDiscountAmount,
     clearTicket,
     toggleItemPriceType,
   } = useCartStore();
@@ -404,7 +405,7 @@ export default function SalesPage() {
                   Descuento ({activeTicket.discountPercentage}%):
                 </span>
                 <span>
-                  -{formatCurrency(ticketSubtotal * (activeTicket.discountPercentage / 100))}
+                  -{formatCurrency(getTicketDiscountAmount())}
                 </span>
               </div>
             </div>

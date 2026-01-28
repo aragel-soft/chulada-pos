@@ -40,7 +40,6 @@ export const usePromotionsStore = create<PromotionsStoreState>((set, get) => ({
     const state = get();
     
     for (const promo of state.promotionDefs) {
-      // Check if all required products match exactly
       if (promo.required_products.size !== productQuantities.size) {
         continue;
       }
@@ -54,7 +53,6 @@ export const usePromotionsStore = create<PromotionsStoreState>((set, get) => ({
         }
       }
 
-      // Check for extra products
       for (const productId of productQuantities.keys()) {
         if (!promo.required_products.has(productId)) {
           matches = false;

@@ -32,3 +32,11 @@ export interface PromotionDef {
   combo_price: number;
   required_products: Map<string, number>; // product_id -> quantity
 }
+
+export interface PromotionInstance {
+  promotionId: string;
+  instanceId: string;
+  promotionName: string;
+  comboPrice: number;
+  products: Map<string, { quantity: number; unitPrice: number }>;
+}
