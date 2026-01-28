@@ -208,7 +208,7 @@ export default function SalesPage() {
       <KitSelectionModal
         isOpen={kitModalOpen}
         kit={pendingKit?.kit || null}
-        triggerQuantity={pendingKit?.triggerProduct.quantity || 1}
+        triggerQuantity={pendingKit?.totalNeeded || 1}
         alreadySelectedCount={pendingKit?.alreadySelectedCount || 0}
         onConfirm={handleKitConfirm}
         onCancel={handleKitCancel}

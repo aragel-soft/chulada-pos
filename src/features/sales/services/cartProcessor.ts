@@ -32,11 +32,9 @@ export function processCart(
   }
 
   // Stage 1: Process Kits
-  // Kit processing detects trigger items and automatically links eligible items as gifts
   let processedItems = processKits(items, options.kitDefs);
 
   // Stage 2: Apply Promotions  
-  // Promotions only apply to items NOT involved in kits (neither triggers nor gifts)
   processedItems = applyPromotions(
     processedItems, 
     options.promotionDefs,
@@ -44,7 +42,6 @@ export function processCart(
   );
 
   // Stage 3: Apply Wholesale Pricing
-  // Wholesale pricing only applies to regular items (not kit gifts, not promo items)
   processedItems = applyWholesalePricing(
     processedItems, 
     options.ticketPriceType
@@ -98,12 +95,10 @@ function applyWholesalePricing(
   ticketPriceType: 'retail' | 'wholesale'
 ): CartItem[] {
   return items.map(item => {
-    // Don't touch kit items or promo items
     if (item.priceType === 'kit_item' || item.priceType === 'promo') {
       return item;
     }
 
-    // Convert to wholesale if ticket is in wholesale mode
     if (ticketPriceType === 'wholesale' && item.priceType === 'retail') {
       const wholesalePrice = item.wholesale_price !== null 
         && item.wholesale_price !== undefined 
@@ -118,7 +113,6 @@ function applyWholesalePricing(
       };
     }
 
-    // Convert back to retail if ticket is in retail mode
     if (ticketPriceType === 'retail' && item.priceType === 'wholesale') {
       return {
         ...item,
@@ -127,7 +121,6 @@ function applyWholesalePricing(
       };
     }
 
-    // No change needed
     return item;
   });
 }

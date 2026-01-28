@@ -221,40 +221,86 @@ export const useCartStore = create<CartState>()(
           if (!item) return state;
 
           const oldQty = item.quantity;
+          let newItems = [...currentTicket.items];
           
-          // Validation when increasing quantity
           if (quantity > oldQty) {
-              // Kit quota validation for kit_item
               if (item.priceType === 'kit_item' && item.kitTriggerId) {
                   const triggerItem = currentTicket.items.find(i => i.uuid === item.kitTriggerId);
                   if (triggerItem) {
                       const kitDefs = useKitStore.getState().kitDefs;
                       const remaining = KitService.getRemainingKitQuota(triggerItem, currentTicket.items, kitDefs);
                       
-                      if (remaining !== null && (quantity - oldQty) > remaining) {
-                          toast.error(`Límite de regalos alcanzado (${remaining} disponibles)`);
-                          return state;
+                      const increase = quantity - oldQty;
+                      if (remaining !== null && increase > remaining) {
+                          const allowedIncrease = remaining;
+                          const excessQty = increase - remaining;
+                          
+                          if (allowedIncrease > 0) {
+                              newItems = newItems.map(i => {
+                                  if (i.uuid === uuid) {
+                                      return { ...i, quantity: oldQty + allowedIncrease };
+                                  }
+                                  return i;
+                              });
+                          }
+                          
+                          const existingRetail = newItems.find(i => 
+                              i.id === item.id && 
+                              i.priceType === 'retail' && 
+                              !i.kitTriggerId
+                          );
+                          
+                          if (existingRetail) {
+                              newItems = newItems.map(i => {
+                                  if (i.uuid === existingRetail.uuid) {
+                                      return { ...i, quantity: i.quantity + excessQty };
+                                  }
+                                  return i;
+                              });
+                          } else {
+                              newItems.push({
+                                  ...item,
+                                  uuid: uuidv4(),
+                                  priceType: 'retail',
+                                  finalPrice: item.retail_price,
+                                  quantity: excessQty,
+                                  kitTriggerId: undefined,
+                                  promotionId: undefined,
+                                  promotionInstanceId: undefined,
+                                  promotionName: undefined
+                              });
+                          }
+                          
+                          toast.info(`${excessQty} unidad(es) agregadas a precio normal`);
+                          
+                          const processedItems = CartProcessor.processCart(newItems, {
+                              kitDefs: useKitStore.getState().kitDefs,
+                              promotionDefs: usePromotionsStore.getState().promotionDefs,
+                              ticketPriceType: currentTicket.priceType,
+                              discountPercentage: currentTicket.discountPercentage
+                          });
+                          
+                          const newTickets = [...state.tickets];
+                          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
+                          
+                          return { tickets: newTickets };
                       }
                   }
               }
               
-              // Stock validation
               if (quantity > item.stock) {
                    toast.error(`Stock máximo disponible: ${item.stock}`);
                    return state;
               }
           }
 
-          let newItems = currentTicket.items.map(i => {
+          newItems = newItems.map(i => {
             if (i.uuid === uuid) {
               return { ...i, quantity };
             }
             return i;
           });
 
-          // CartProcessor will handle all kit linking/reconciliation automatically
-
-          // Process cart through unified pipeline
           const processedItems = CartProcessor.processCart(newItems, {
             kitDefs: useKitStore.getState().kitDefs,
             promotionDefs: usePromotionsStore.getState().promotionDefs,

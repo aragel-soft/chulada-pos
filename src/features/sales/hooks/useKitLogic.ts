@@ -11,8 +11,9 @@ import * as KitService from '@/features/sales/services/kitService';
 
 interface PendingKit {
     kit: KitOptionDef;
-    triggerProduct: CartItem;
+    triggerProducts: CartItem[];  // Multiple triggers of same kit
     isScan: boolean;
+    totalNeeded: number;  // Total gifts needed for all triggers
     alreadySelectedCount?: number;
 }
 
@@ -26,7 +27,7 @@ export function useKitLogic() {
   const currentPendingKit = pendingKitsQueue.length > 0 ? pendingKitsQueue[0] : null;
 
   const validateKitsForCheckout = useCallback(async (items: CartItem[]): Promise<boolean> => {
-      const incompleteKits: PendingKit[] = [];
+      const kitGroups = new Map<string, { kit: KitOptionDef; triggers: CartItem[] }>();
       
       for (const item of items) {
           if (item.priceType === 'kit_item') continue;
@@ -34,28 +35,44 @@ export function useKitLogic() {
           const kit = getKitForProduct(item.id);
           
           if (kit && kit.is_required && kit.items.length > 0) {
-              // Use KitService to calculate remaining quota
               const remaining = KitService.getRemainingKitQuota(item, items, kitDefs);
               
               if (remaining !== null && remaining > 0) {
-                  const provided = items
-                      .filter(i => i.kitTriggerId === item.uuid)
-                      .reduce((sum, i) => sum + i.quantity, 0);
-                  
-                  incompleteKits.push({ 
-                      kit, 
-                      triggerProduct: item, 
-                      isScan: false,
-                      alreadySelectedCount: provided 
-                  });
+                  if (!kitGroups.has(kit.id)) {
+                      kitGroups.set(kit.id, { kit, triggers: [] });
+                  }
+                  kitGroups.get(kit.id)!.triggers.push(item);
               }
           }
+      }
+
+      const incompleteKits: PendingKit[] = [];
+      
+      for (const [_kitId, { kit, triggers }] of kitGroups.entries()) {
+          let totalNeeded = 0;
+          let totalProvided = 0;
+          
+          for (const trigger of triggers) {
+              totalNeeded += kit.max_selections * trigger.quantity;
+              const provided = items
+                  .filter(i => i.kitTriggerId === trigger.uuid)
+                  .reduce((sum, i) => sum + i.quantity, 0);
+              totalProvided += provided;
+          }
+          
+          incompleteKits.push({
+              kit,
+              triggerProducts: triggers,
+              isScan: false,
+              totalNeeded,
+              alreadySelectedCount: totalProvided
+          });
       }
 
       if (incompleteKits.length > 0) {
           setPendingKitsQueue(incompleteKits);
           setKitModalOpen(true);
-          toast.warning(`Hay ${incompleteKits.length} promociones por completar.`);
+          toast.warning(`Hay ${incompleteKits.length} promoción(es) por completar.`);
           return true;
       }
 
@@ -63,10 +80,20 @@ export function useKitLogic() {
   }, [getKitForProduct, kitDefs]);
 
 
+
   const handleKitConfirm = useCallback(async (selectedItems: KitItemDef[]) => {
       if (!currentPendingKit) return;
       
-      const { triggerProduct, isScan } = currentPendingKit;
+      const { triggerProducts, isScan } = currentPendingKit;
+
+      const triggersWithNeeds: Array<{ trigger: CartItem; remaining: number }> = [];
+      
+      for (const trigger of triggerProducts) {
+          const remaining = KitService.getRemainingKitQuota(trigger, useCartStore.getState().getActiveTicket()?.items || [], kitDefs);
+          if (remaining && remaining > 0) {
+              triggersWithNeeds.push({ trigger, remaining });
+          }
+      }
 
       for (const gift of selectedItems) {
            try {
@@ -74,11 +101,21 @@ export function useKitLogic() {
                const realProduct = detail as unknown as Product;
 
                if (realProduct) {
-                  addToCart(realProduct, { 
-                      priceType: 'kit_item', 
-                      quantity: gift.quantity,
-                      kitTriggerId: triggerProduct.uuid
-                  });
+                   let remainingQuantity = gift.quantity;
+                   
+                   for (const { trigger, remaining } of triggersWithNeeds) {
+                       if (remainingQuantity <= 0) break;
+                       
+                       const toAdd = Math.min(remainingQuantity, remaining);
+                       if (toAdd > 0) {
+                           addToCart(realProduct, { 
+                               priceType: 'kit_item', 
+                               quantity: toAdd,
+                               kitTriggerId: trigger.uuid
+                           });
+                           remainingQuantity -= toAdd;
+                       }
+                   }
                }
            } catch (e) {
                console.error("Could not fetch gift product", e);
@@ -99,7 +136,7 @@ export function useKitLogic() {
           return next;
       });
       
-  }, [currentPendingKit, addToCart]);
+  }, [currentPendingKit, addToCart, kitDefs]);
 
   const handleKitCancel = useCallback(() => {
       setKitModalOpen(false);

@@ -2,7 +2,6 @@ import { Product } from '@/types/inventory';
 import { KitOptionDef } from '@/types/kits';
 import { CartItem } from '@/types/sales';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'sonner';
 
 /**
  * Gets the total count of gifts already linked to a trigger item.
@@ -97,8 +96,6 @@ function reconcileKitGifts(
           quantity: reduceBy,
         });
       }
-
-      toast.success(`Regresado a precio normal: ${gift.name}`);
 
       excess -= reduceBy;
     }
@@ -200,7 +197,6 @@ function processKitTrigger(
       }
 
       stillNeeded -= take;
-      toast.success(`Producto vinculado como regalo: ${candidate.name}`);
     }
   }
 
