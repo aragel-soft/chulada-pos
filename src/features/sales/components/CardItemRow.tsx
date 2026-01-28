@@ -23,6 +23,7 @@ interface PriceTypeStyle {
     labelClass?: string;
     icon: typeof Tag;
     canTogglePrice: boolean;
+    getLabel?: (item: CartItem) => string | undefined;
 }
 
 const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
@@ -40,6 +41,15 @@ const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
         label: 'Mayoreo',
         icon: Tag,
         canTogglePrice: true
+    },
+    promo: {
+        container: 'bg-purple-50/50 border-purple-200',
+        badge: 'bg-purple-100 text-purple-700 border border-purple-200 font-bold hover:bg-purple-100',
+        label: 'Promo',
+        labelClass: 'font-bold tracking-wider',
+        icon: Tag,
+        canTogglePrice: false,
+        getLabel: (item) => item.promotionName || 'Promo'
     },
     retail: {
         container: 'bg-white border-zinc-100 hover:border-zinc-300',
@@ -91,6 +101,9 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
   // Resolve Styles
   const validPriceType = PRICE_TYPE_STYLES[item.priceType] ? item.priceType : 'retail';
   const style = PRICE_TYPE_STYLES[validPriceType];
+  
+  // Resolve label dynamically
+  const displayLabel = style.getLabel ? style.getLabel(item) : style.label;
 
   return (
     <div className={`flex items-center justify-between p-2 rounded-lg border shadow-sm transition-all group ${style.container}`}>
@@ -118,9 +131,9 @@ export const CartItemRow = ({ item, onUpdateQuantity, onRemove, onTogglePriceTyp
           <Badge className={`text-xs flex items-center gap-1 px-1.5 py-0.5 transition-colors ${style.badge}`}>
              <style.icon size={10} />
              <span>{formatCurrency(item.finalPrice)}</span>
-             {style.label && (
-                 <span className={`text-[9px] ml-1 uppercase ${style.labelClass || ''}`}>
-                     {style.label}
+             {displayLabel && (
+                 <span className={`text-[9px] ml-1 uppercase truncate max-w-[80px] ${style.labelClass || ''}`} title={displayLabel}>
+                     {displayLabel}
                  </span>
              )}
           </Badge>

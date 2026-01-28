@@ -26,6 +26,7 @@ export function useProcessSale() {
         product_id: item.id,
         quantity: item.quantity,
         price_type: item.priceType,
+        promotion_id: item.promotionId || null,
       }));
 
       const payload: SaleRequest = {

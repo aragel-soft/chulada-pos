@@ -13,3 +13,22 @@ export interface Promotion {
   items_summary: string;
   created_at: string;
 }
+
+// Combo product definition for promotions
+export interface PromotionComboProduct {
+  product_id: string;
+  quantity: number;
+}
+
+// Promotion with full combo details
+export interface PromotionWithCombos extends Promotion {
+  combo_products: PromotionComboProduct[];
+}
+
+// Helper type for promotion detection
+export interface PromotionDef {
+  id: string;
+  name: string;
+  combo_price: number;
+  required_products: Map<string, number>; // product_id -> quantity
+}

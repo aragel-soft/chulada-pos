@@ -23,6 +23,7 @@ import { useSalesStore } from "@/features/sales/stores/salesStore";
 import { KitSelectionModal } from "@/features/sales/components/KitSelectionModal";
 import { useKitLogic } from "@/features/sales/hooks/useKitLogic";
 import { useKitStore } from "@/features/sales/stores/kitStore";
+import { usePromotionsStore } from "@/features/sales/stores/promotionsStore";
 
 
 import {
@@ -41,12 +42,14 @@ export default function SalesPage() {
   const { can, user } = useAuthStore();
   const { processSale, isProcessing } = useProcessSale();
   const { fetchKits } = useKitStore();
+  const { fetchPromotions } = usePromotionsStore();
 
   useEffect(() => {
     if (shift?.status === 'open') {
       fetchKits();
+      fetchPromotions();
     }
-  }, [shift?.status, fetchKits]);
+  }, [shift?.status, fetchKits, fetchPromotions]);
 
   const {
     tickets,

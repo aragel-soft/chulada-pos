@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Promotion } from '@/types/promotions';
+import { Promotion, PromotionWithCombos } from '@/types/promotions';
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
 
 
@@ -15,5 +15,14 @@ export const getPromotions = async (params: PaginationParams): Promise<Paginated
   } catch (error) {
     console.error('Error fetching promotions:', error);
     throw error;
+  }
+};
+
+export const getAllActivePromotions = async (): Promise<PromotionWithCombos[]> => {
+  try {
+    return await invoke('get_all_active_promotions');
+  } catch (error) {
+    console.error('Error fetching active promotions:', error);
+    return [];
   }
 };
