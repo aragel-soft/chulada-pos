@@ -255,7 +255,7 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
 // Estructura para datos de una promoción validada
 struct ValidatedPromotion {
     combo_price: f64,
-    product_ids: HashSet<String>,
+    instance_count: f64,
 }
 
 fn validate_promotions(
@@ -345,43 +345,65 @@ fn validate_promotions(
             return Err(format!("La promoción '{}' no tiene productos configurados", promo_id));
         }
         
-        // Validate exact match in number of products
-        if promo_items.len() != required_products.len() {
-            return Err(format!(
-                "Promoción '{}': se requieren {} productos, pero se enviaron {}",
-                promo_id,
-                required_products.len(),
-                promo_items.len()
-            ));
-        }
-        
         // Build map of provided products
         let mut provided_products: HashMap<String, f64> = HashMap::new();
         for item in &promo_items {
             *provided_products.entry(item.product_id.clone()).or_insert(0.0) += item.quantity;
         }
+
+        // Validate exact match in number of unique products types
+        if provided_products.len() != required_products.len() {
+            return Err(format!(
+                "Promoción '{}': se requieren {} tipos de productos, pero se enviaron {}",
+                promo_id,
+                required_products.len(),
+                provided_products.len()
+            ));
+        }
         
-        // Validate each required product and quantity
+        // Calculate Multiplier
+        let first_required_prod_id = required_products.keys().next().unwrap();
+        let first_required_qty = required_products[first_required_prod_id] as f64;
+        
+        let first_provided_qty = match provided_products.get(first_required_prod_id) {
+             Some(qty) => *qty,
+             None => return Err(format!("Promoción '{}': falta el producto '{}'", promo_id, first_required_prod_id)),
+        };
+
+        let multiplier = first_provided_qty / first_required_qty;
+
+        // Multiplier
+        if multiplier < 1.0 || (multiplier - multiplier.round()).abs() > 0.001 {
+             return Err(format!(
+                "Promoción '{}': cantidades inválidas (multiplicador detectado: {:.2}). Deben ser múltiplos exactos.", 
+                promo_id, multiplier
+             ));
+        }
+
+        let instance_count = multiplier.round() as f64;
+
+        // Validate required products match the multiplier
         for (prod_id, required_qty) in required_products {
+            let expected_qty = *required_qty as f64 * instance_count;
             match provided_products.get(prod_id) {
                 Some(&provided_qty) => {
-                    if (provided_qty - *required_qty as f64).abs() > 0.001 {
+                    if (provided_qty - expected_qty).abs() > 0.001 {
                         return Err(format!(
-                            "Promoción '{}': el producto '{}' requiere cantidad {}, pero se envió {}",
-                            promo_id, prod_id, required_qty, provided_qty
+                            "Promoción '{}': el producto '{}' requiere cantidad total {} (para {} promos), pero se envió {}",
+                            promo_id, prod_id, expected_qty, instance_count, provided_qty
                         ));
                     }
                 }
                 None => {
                     return Err(format!(
-                        "Promoción '{}': falta el producto '{}' (requerido: {})",
-                        promo_id, prod_id, required_qty
+                        "Promoción '{}': falta el producto '{}' (requerido total: {})",
+                        promo_id, prod_id, expected_qty
                     ));
                 }
             }
         }
         
-        // Validate no extra products
+        // Validate no extra products provided
         for prod_id in provided_products.keys() {
             if !required_products.contains_key(prod_id) {
                 return Err(format!(
@@ -395,7 +417,7 @@ fn validate_promotions(
             promo_id.clone(),
             ValidatedPromotion {
                 combo_price,
-                product_ids: required_products.keys().cloned().collect(),
+                instance_count,
             },
         );
     }
@@ -446,8 +468,10 @@ fn calculate_sale_items<'a>(
     tx: &Connection,
     items: &'a [SaleItemRequest],
     discount_percentage: f64,
-    validated_promos: &HashMap<String, ValidatedPromotion>,
 ) -> Result<(f64, f64, Vec<FinalItemData<'a>>), String> {
+    // Validate Promotions (and get multipliers)
+    let validated_promos = validate_promotions(tx, items)?;
+    
     let mut total_gross = 0.0;
     let mut total_item_discounts = 0.0;
     let mut final_items = Vec::new();
@@ -512,12 +536,14 @@ fn calculate_sale_items<'a>(
             }
             
             // Distribute combo_price proportionally
+            let total_promo_price = validated_promo.combo_price * validated_promo.instance_count;
+            
             for (item, item_retail) in item_retails {
                 let (db_code, db_name, _, _) = products_map.get(&item.product_id)
                     .ok_or(format!("Producto {} no encontrado", item.product_id))?;
                 
                 let proportion = if total_retail > 0.0 { item_retail / total_retail } else { 0.0 };
-                let allocated_price = validated_promo.combo_price * proportion;
+                let allocated_price = total_promo_price * proportion;
                 let unit_price = allocated_price / item.quantity;
                 
                 // Global discounts are not applied to promo items
@@ -612,16 +638,13 @@ pub fn process_sale(
         }
     }
     
-    // Validate promotions
-    let validated_promos = validate_promotions(&conn, &payload.items)?;
-    
     // Validate & Apply Kit Rules
     let validated_items = apply_kit_rules(&conn, &payload.items)?;
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // Calculate Items & Totals
-    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &validated_items, payload.discount_percentage, &validated_promos)?;
+    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &validated_items, payload.discount_percentage)?;
     
     let final_total = total_gross - total_item_discounts;
 
