@@ -8,7 +8,7 @@ import { usePromotionsStore } from './promotionsStore';
 import { toast } from 'sonner';
 import * as KitService from '@/features/sales/services/kitService';
 import * as CartProcessor from '@/features/sales/services/cartProcessor';
-import { CartItem, Ticket } from '@/types/sales';
+import { Ticket } from '@/types/sales';
 
 
 interface CartState {
