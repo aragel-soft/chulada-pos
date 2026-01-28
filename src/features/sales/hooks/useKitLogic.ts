@@ -2,10 +2,12 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { KitOptionDef, KitItemDef } from '@/types/kits';
 import { Product } from '@/types/inventory';
-import { useCartStore, CartItem } from '@/features/sales/stores/cartStore';
+import { CartItem } from '@/types/sales';
+import { useCartStore } from '@/features/sales/stores/cartStore';
 import { playSound } from '@/lib/sounds';
 import { useKitStore } from '@/features/sales/stores/kitStore';
 import { getProductById } from '@/lib/api/inventory/products';
+import * as KitService from '@/features/sales/services/kitService';
 
 interface PendingKit {
     kit: KitOptionDef;
@@ -16,7 +18,7 @@ interface PendingKit {
 
 export function useKitLogic() {
   const { addToCart } = useCartStore();
-  const { getKitForProduct } = useKitStore();
+  const { getKitForProduct, kitDefs } = useKitStore();
 
   const [kitModalOpen, setKitModalOpen] = useState(false);
   const [pendingKitsQueue, setPendingKitsQueue] = useState<PendingKit[]>([]);
@@ -29,16 +31,17 @@ export function useKitLogic() {
       for (const item of items) {
           if (item.priceType === 'kit_item') continue;
           
-          let kit = getKitForProduct(item.id);
+          const kit = getKitForProduct(item.id);
           
           if (kit && kit.is_required && kit.items.length > 0) {
-              const provided = items
-                  .filter(i => i.kitTriggerId === item.uuid)
-                  .reduce((sum, i) => sum + i.quantity, 0);
+              // Use KitService to calculate remaining quota
+              const remaining = KitService.getRemainingKitQuota(item, items, kitDefs);
               
-              const needed = kit.max_selections * item.quantity;
-              
-              if (provided < needed) {
+              if (remaining !== null && remaining > 0) {
+                  const provided = items
+                      .filter(i => i.kitTriggerId === item.uuid)
+                      .reduce((sum, i) => sum + i.quantity, 0);
+                  
                   incompleteKits.push({ 
                       kit, 
                       triggerProduct: item, 
@@ -57,7 +60,7 @@ export function useKitLogic() {
       }
 
       return false;
-  }, [getKitForProduct]);
+  }, [getKitForProduct, kitDefs]);
 
 
   const handleKitConfirm = useCallback(async (selectedItems: KitItemDef[]) => {

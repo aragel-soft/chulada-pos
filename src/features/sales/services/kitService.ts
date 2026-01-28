@@ -5,48 +5,105 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
 /**
- * Finds a trigger item that needs the given product as a gift.
- */
-export function findTriggerForGift(
-  product: Product,
-  items: CartItem[],
-  kitDefs: Record<string, KitOptionDef>
-): string | undefined {
-  for (const item of items) {
-    if (item.priceType === 'kit_item') continue;
-
-    const kit = kitDefs[item.id];
-    if (kit && kit.is_required) {
-      const builtInItem = kit.items.find(k => k.product_id === product.id);
-      if (builtInItem) {
-        const quota = kit.max_selections * item.quantity;
-        const used = items
-          .filter(i => i.kitTriggerId === item.uuid)
-          .reduce((sum, i) => sum + i.quantity, 0);
-
-        if (used < quota) {
-          return item.uuid;
-        }
-      }
-    }
-  }
-  return undefined;
-}
-
-/**
- * Calculates the kit quota (total gifts needed) for a trigger item.
- */
-export function calculateKitQuota(kit: KitOptionDef, triggerQuantity: number): number {
-  return kit.max_selections * triggerQuantity;
-}
-
-/**
  * Gets the total count of gifts already linked to a trigger item.
+ * @internal - Used internally by getRemainingKitQuota
  */
-export function getLinkedGiftCount(triggerId: string, items: CartItem[]): number {
+function getLinkedGiftCount(triggerId: string, items: CartItem[]): number {
   return items
     .filter(i => i.kitTriggerId === triggerId && i.priceType === 'kit_item')
     .reduce((sum, i) => sum + i.quantity, 0);
+}
+
+/**
+ * Main entry point for kit processing in the cart pipeline.
+ * Processes all kit triggers in the cart and automatically links eligible items as gifts.
+ * Also reconciles gifts when trigger quantities decrease.
+ * This is called by CartProcessor as Stage 1 of the processing pipeline.
+ */
+export function processAllKits(
+  items: CartItem[],
+  kitDefs: Record<string, KitOptionDef>
+): CartItem[] {
+  let currentItems = [...items];
+  
+  // Process each potential trigger item
+  const potentialTriggers = items.filter(item => item.priceType !== 'kit_item');
+  
+  for (const item of potentialTriggers) {
+    const kit = kitDefs[item.id];
+    if (kit && kit.is_required) {
+      // First, process kit trigger to add gifts
+      currentItems = processKitTrigger(item, currentItems, kitDefs);
+      
+      // Then, reconcile to remove excess gifts if trigger quantity decreased
+      currentItems = reconcileKitGifts(item, currentItems, kitDefs);
+    }
+  }
+  
+  return currentItems;
+}
+
+/**
+ * Reconciles kit gifts when a trigger item's quantity changes.
+ * Converts excess gifts back to regular priced items.
+ * @internal - Used internally by processAllKits
+ */
+function reconcileKitGifts(
+  triggerItem: CartItem,
+  items: CartItem[],
+  kitDefs: Record<string, KitOptionDef>
+): CartItem[] {
+  const kit = kitDefs[triggerItem.id];
+  if (!kit || !kit.is_required) return items;
+
+  let currentItems = items.map(i => ({ ...i }));
+
+  const maxAllowed = kit.max_selections * triggerItem.quantity;
+
+  const linkedGifts = currentItems.filter(
+    i => i.kitTriggerId === triggerItem.uuid && i.priceType === 'kit_item'
+  );
+  const currentTotalGifts = linkedGifts.reduce((sum, i) => sum + i.quantity, 0);
+
+  if (currentTotalGifts > maxAllowed) {
+    let excess = currentTotalGifts - maxAllowed;
+
+    for (const gift of linkedGifts) {
+      if (excess <= 0) break;
+
+      const reduceBy = Math.min(gift.quantity, excess);
+
+      const giftInArray = currentItems.find(i => i.uuid === gift.uuid);
+      if (giftInArray) {
+        if (giftInArray.quantity === reduceBy) {
+          giftInArray.quantity = 0;
+        } else {
+          giftInArray.quantity -= reduceBy;
+        }
+      }
+
+      const existingRetail = currentItems.find(
+        i => i.id === gift.id && i.priceType === 'retail'
+      );
+      if (existingRetail) {
+        existingRetail.quantity += reduceBy;
+      } else {
+        currentItems.push({
+          ...gift,
+          uuid: uuidv4(),
+          priceType: 'retail',
+          finalPrice: gift.retail_price,
+          kitTriggerId: undefined,
+          quantity: reduceBy,
+        });
+      }
+
+      toast.success(`Regresado a precio normal: ${gift.name}`);
+
+      excess -= reduceBy;
+    }
+  }
+  return currentItems.filter(i => i.quantity > 0);
 }
 
 /**
@@ -69,8 +126,9 @@ export function getRemainingKitQuota(
 
 /**
  * Processes a trigger product and automatically links eligible products as gifts.
+ * @internal - Used internally by processAllKits
  */
-export function processKitTrigger(
+function processKitTrigger(
   triggerProduct: Product,
   items: CartItem[],
   kitDefs: Record<string, KitOptionDef>
@@ -149,64 +207,4 @@ export function processKitTrigger(
   return currentItems.filter(i => i.quantity > 0);
 }
 
-/**
- * Reconciles kit gifts when a trigger item's quantity decreases.
- * Converts excess gifts back to regular priced items.
- */
-export function reconcileKitGifts(
-  triggerItem: CartItem,
-  items: CartItem[],
-  kitDefs: Record<string, KitOptionDef>
-): CartItem[] {
-  const kit = kitDefs[triggerItem.id];
-  if (!kit || !kit.is_required) return items;
 
-  let currentItems = items.map(i => ({ ...i }));
-
-  const maxAllowed = kit.max_selections * triggerItem.quantity;
-
-  const linkedGifts = currentItems.filter(
-    i => i.kitTriggerId === triggerItem.uuid && i.priceType === 'kit_item'
-  );
-  const currentTotalGifts = linkedGifts.reduce((sum, i) => sum + i.quantity, 0);
-
-  if (currentTotalGifts > maxAllowed) {
-    let excess = currentTotalGifts - maxAllowed;
-
-    for (const gift of linkedGifts) {
-      if (excess <= 0) break;
-
-      const reduceBy = Math.min(gift.quantity, excess);
-
-      const giftInArray = currentItems.find(i => i.uuid === gift.uuid);
-      if (giftInArray) {
-        if (giftInArray.quantity === reduceBy) {
-          giftInArray.quantity = 0;
-        } else {
-          giftInArray.quantity -= reduceBy;
-        }
-      }
-
-      const existingRetail = currentItems.find(
-        i => i.id === gift.id && i.priceType === 'retail'
-      );
-      if (existingRetail) {
-        existingRetail.quantity += reduceBy;
-      } else {
-        currentItems.push({
-          ...gift,
-          uuid: uuidv4(),
-          priceType: 'retail',
-          finalPrice: gift.retail_price,
-          kitTriggerId: undefined,
-          quantity: reduceBy,
-        });
-      }
-
-      toast.success(`Regresado a precio normal: ${gift.name}`);
-
-      excess -= reduceBy;
-    }
-  }
-  return currentItems.filter(i => i.quantity > 0);
-}
