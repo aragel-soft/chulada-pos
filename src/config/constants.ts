@@ -17,3 +17,6 @@ export const CUSTOMER_CONFIG = {
 // Luego se guardaran en configuración
 export const MAX_OPEN_TICKETS = 5;
 
+export const DISCOUNT_CONFIG = {
+  PRESET_OPTIONS: [5, 10, 15, 20], 
+};

@@ -1,4 +1,6 @@
 export interface SaleItemRequest {
+  id?: string;
+  parent_item_id?: string;
   product_id: string;
   quantity: number;
   price_type: string;

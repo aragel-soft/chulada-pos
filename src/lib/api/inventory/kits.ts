@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
-import { CreateKitPayload, KitListItem } from "@/types/kits";
+import { CreateKitPayload, KitListItem, KitDefinitionWithTrigger } from "@/types/kits";
 
 export const getKits = async (params: PaginationParams): Promise<PaginatedResponse<KitListItem>> => {
   try {
@@ -32,5 +32,14 @@ export const createKit = async (payload: CreateKitPayload): Promise<void> => {
   } catch (error) {
     console.error("Error creating kit:", error);
     throw error;
+  }
+};
+
+export const getAllKits = async (): Promise<KitDefinitionWithTrigger[]> => {
+  try {
+    return await invoke("get_all_kits");
+  } catch (error) {
+    console.error("Error fetching all kits:", error);
+    return [];
   }
 };

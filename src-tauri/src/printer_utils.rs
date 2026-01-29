@@ -108,6 +108,8 @@ pub struct TicketItem {
     #[allow(dead_code)]
     pub unit_price: f64,
     pub total: f64,
+    pub promotion_id: Option<String>,
+    pub promotion_name: Option<String>,
 }
 
 
@@ -160,9 +162,13 @@ pub fn print_sale_from_db(
             }
         ).map_err(|e| format!("Venta no encontrada: {}", e))?;
 
-        // Fetch Items
-        let mut stmt = conn.prepare("SELECT product_name, quantity, unit_price, subtotal FROM sale_items WHERE sale_id = ?1")
-            .map_err(|e| e.to_string())?;
+        // Fetch Items with promotion info
+        let mut stmt = conn.prepare(
+            "SELECT si.product_name, si.quantity, si.unit_price, si.subtotal, si.promotion_id, p.name
+             FROM sale_items si
+             LEFT JOIN promotions p ON si.promotion_id = p.id
+             WHERE si.sale_id = ?1"
+        ).map_err(|e| e.to_string())?;
         
         let items_iter = stmt.query_map([&sale_id], |row| {
              Ok(TicketItem {
@@ -170,6 +176,8 @@ pub fn print_sale_from_db(
                  quantity: row.get(1)?,
                  unit_price: row.get(2)?,
                  total: row.get(3)?,
+                 promotion_id: row.get(4).ok(),
+                 promotion_name: row.get(5).ok(),
              })
         }).map_err(|e| e.to_string())?;
 
@@ -336,34 +344,92 @@ pub fn print_ticket(
 
     job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
 
-    for item in data.items {
-        let quantity_str = format!("{:<.2}", item.quantity);
-        let quantity_display = if quantity_str.len() > qty_w {
-             &quantity_str[0..qty_w]
+    // Group items by promotion_id
+    use std::collections::HashMap;
+    let mut promo_groups: HashMap<Option<String>, Vec<&TicketItem>> = HashMap::new();
+    for item in &data.items {
+        promo_groups.entry(item.promotion_id.clone())
+            .or_insert_with(Vec::new)
+            .push(item);
+    }
+
+    for (promo_id_opt, items_group) in promo_groups {
+        if let Some(_promo_id) = promo_id_opt {
+            // PROMOTION GROUP
+            let promo_name = items_group[0].promotion_name.as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or("Promocion");
+            
+            // Promo header (without emoji)
+            let promo_header = format!("PROMO: {}", remove_accents(promo_name));
+            job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+            job_content.extend_from_slice(format!("{}\n", promo_header).as_bytes());
+            job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+            
+            // Items in promo (indented)
+            let mut promo_total = 0.0;
+            for item in &items_group {
+                let clean_desc = remove_accents(&item.description);
+                let desc_display = if clean_desc.chars().count() > desc_w {
+                    clean_desc.chars().take(desc_w - 2).collect::<String>()
+                } else {
+                    clean_desc
+                };
+                
+                let quantity_str = format!("{:<.2}", item.quantity);
+                let line = format!("  {}x {}\n", quantity_str, desc_display);
+                job_content.extend_from_slice(line.as_bytes());
+                promo_total += item.total;
+            }
+            
+            // Promo total
+            let promo_total_line = format!("  Precio Promo: {:>10.2}\n", promo_total);
+            job_content.extend_from_slice(promo_total_line.as_bytes());
+            job_content.extend_from_slice(b"\n"); // Extra spacing
+            
         } else {
-             &quantity_str
-        };
+            // NORMAL ITEMS - Consolidate duplicates
+            // Group by (description, unit_price) and sum quantities
+            let mut consolidated: HashMap<(String, String), (f64, f64)> = HashMap::new();
+            
+            for item in &items_group {
+                let key = (item.description.clone(), format!("{:.2}", item.unit_price));
+                let entry = consolidated.entry(key).or_insert((0.0, 0.0));
+                entry.0 += item.quantity; // sum quantities
+                entry.1 += item.total;     // sum totals
+            }
+            
+            // Print consolidated items
+            for ((description, _unit_price_str), (total_qty, total_amount)) in consolidated {
+                let quantity_str = format!("{:<.2}", total_qty);
+                let quantity_display = if quantity_str.len() > qty_w {
+                     &quantity_str[0..qty_w]
+                } else {
+                     &quantity_str
+                };
 
-        let total_str = format!("{:.2}", item.total);
+                let total_str = format!("{:.2}", total_amount);
 
-        let clean_desc = remove_accents(&item.description);
-        let desc_display = if clean_desc.chars().count() > desc_w {
-            clean_desc.chars().take(desc_w).collect::<String>()
-        } else {
-            clean_desc
-        };
+                let clean_desc = remove_accents(&description);
+                let desc_display = if clean_desc.chars().count() > desc_w {
+                    clean_desc.chars().take(desc_w).collect::<String>()
+                } else {
+                    clean_desc
+                };
 
-        job_content.extend_from_slice(
-             format!(
-                 "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
-                 quantity_display,
-                 desc_display,
-                 total_str,
-                 w_qty = qty_w, 
-                 w_desc = desc_w, 
-                 w_tot = total_w
-             ).as_bytes()
-        );
+                job_content.extend_from_slice(
+                     format!(
+                         "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
+                         quantity_display,
+                         desc_display,
+                         total_str,
+                         w_qty = qty_w, 
+                         w_desc = desc_w, 
+                         w_tot = total_w
+                     ).as_bytes()
+                );
+            }
+        }
     }
     
     job_content.extend_from_slice(format!("{}\n", separator).as_bytes());

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { CartItem } from '../stores/cartStore';
+import { CartItem } from '@/types/sales';
 import { SaleItemRequest, SaleRequest, SaleResponse } from '@/types/sale';
 import { processSale as processSaleApi } from '@/lib/api/cash-register/sales';
 
@@ -15,18 +15,22 @@ export function useProcessSale() {
     userId: string,
     shiftId: string,
     shouldPrint: boolean,
+    discountPercentage: number = 0,
     customerId?: string
   ): Promise<SaleResponse | null> => {
     setIsProcessing(true);
     try {
       const saleItems: SaleItemRequest[] = items.map((item) => ({
+        id: item.uuid, 
+        parent_item_id: item.priceType === 'kit_item' ? item.kitTriggerId : undefined, 
         product_id: item.id,
         quantity: item.quantity,
         price_type: item.priceType,
+        promotion_id: item.promotionId || null,
       }));
 
       const payload: SaleRequest = {
-        discount_percentage: 0,
+        discount_percentage: discountPercentage,
         customer_id: customerId || null,
         user_id: userId,
         cash_register_shift_id: shiftId,

@@ -3,17 +3,13 @@ import { persist } from 'zustand/middleware';
 import { Product } from '@/types/inventory';
 import { v4 as uuidv4 } from 'uuid';
 import { MAX_OPEN_TICKETS } from '@/config/constants';
-export interface CartItem extends Product {
-  quantity: number;
-  priceType: 'retail' | 'wholesale';
-  finalPrice: number;
-}
-interface Ticket {
-  id: string;
-  name: string;
-  items: CartItem[];
-  priceType: 'retail' | 'wholesale';
-}
+import { useKitStore } from './kitStore';
+import { usePromotionsStore } from './promotionsStore';
+import { toast } from 'sonner';
+import * as KitService from '@/features/sales/services/kitService';
+import * as CartProcessor from '@/features/sales/services/cartProcessor';
+import { Ticket } from '@/types/sales';
+
 
 interface CartState {
   tickets: Ticket[];
@@ -22,21 +18,28 @@ interface CartState {
   createTicket: () => void;
   closeTicket: (id: string) => void;
   setActiveTicket: (id: string) => void;
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number, kitTriggerId?: string }) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
-  toggleItemPriceType: (productId: string) => void;
+  toggleItemPriceType: (uuid: string) => void;
   toggleTicketPriceType: () => void;
   clearTicket: () => void;
+  
+  // Discount methods
+  setTicketDiscount: (percentage: number) => void;
+  clearTicketDiscount: () => void;
+  getTicketSubtotal: () => number;
+  getTicketDiscountAmount: () => number;
 
   getActiveTicket: () => Ticket | undefined;
   getTicketTotal: () => number;
 }
 
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      tickets: [{ id: 'default', name: 'Ticket 1', items: [], priceType: 'retail' }],
+      tickets: [{ id: 'default', name: 'Ticket 1', items: [], priceType: 'retail', discountPercentage: 0 }],
       activeTicketId: 'default',
 
       createTicket: () => {
@@ -63,7 +66,8 @@ export const useCartStore = create<CartState>()(
             id: newId,
             name: `Ticket ${nextNumber}`,
             items: [],
-            priceType: 'retail'
+            priceType: 'retail',
+            discountPercentage: 0
           };
           return {
             tickets: [...state.tickets, newTicket],
@@ -83,34 +87,68 @@ export const useCartStore = create<CartState>()(
 
       setActiveTicket: (id) => set({ activeTicketId: id }),
 
-      addToCart: (product) => {
+      addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number, kitTriggerId?: string }) => {
         set((state) => {
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
 
           const currentTicket = state.tickets[ticketIndex];
-          const targetPriceType = currentTicket.priceType;
-          const existingItemIndex = currentTicket.items.findIndex(i => i.id === product.id);
+          let targetPriceType = options?.priceType || currentTicket.priceType;
+          const targetQuantity = options?.quantity || 1;
+          let kitTriggerId = options?.kitTriggerId;
+          
+          let newItems = [...currentTicket.items];
 
-          const newItems = [...currentTicket.items];
+          // Auto-link logic will be handled by CartProcessor after adding item
+
+          // 2. Add Item Logic
+          const existingItemIndex = newItems.findIndex(i => i.id === product.id && i.priceType === targetPriceType && i.kitTriggerId === kitTriggerId);
 
           if (existingItemIndex >= 0) {
             const currentQty = newItems[existingItemIndex].quantity;
-            if (currentQty < product.stock) {
-              newItems[existingItemIndex].quantity += 1;
+            if (currentQty + targetQuantity <= product.stock) {
+                 newItems[existingItemIndex].quantity += targetQuantity;
+            } else {
+                 toast.error(`Stock insuficiente para: ${product.name}`);
+                 return state; // Cancel add
             }
           } else {
-            const priceToUse = targetPriceType === 'retail' ? product.retail_price : (product.wholesale_price !== null && product.wholesale_price !== undefined && product.wholesale_price !== 0 ? product.wholesale_price : product.retail_price);
+            // Check stock for new item
+            const totalInCart = newItems.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
+            if (totalInCart + targetQuantity > product.stock) {
+                toast.error(`Stock insuficiente para: ${product.name}`);
+                return state;
+            }
+
+            // If ticket has discount, force retail price for new items (so discount applies to base price)
+            if (currentTicket.discountPercentage > 0 && targetPriceType !== 'kit_item') {
+                targetPriceType = 'retail';
+            }
+
+            // Price will be calculated by CartProcessor pipeline
+            // Use retail as base, will be adjusted by wholesale/discount stages
+            const finalPrice = product.retail_price;
+
             newItems.push({
               ...product,
-              quantity: 1,
+              uuid: uuidv4(),
+              quantity: targetQuantity,
               priceType: targetPriceType,
-              finalPrice: priceToUse
+              finalPrice: finalPrice,
+              kitTriggerId
             });
           }
 
+          // Process cart through unified pipeline
+          const processedItems = CartProcessor.processCart(newItems, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: currentTicket.priceType,
+            discountPercentage: currentTicket.discountPercentage
+          });
+
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...currentTicket, items: newItems };
+          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
 
           return { tickets: newTickets };
         });
@@ -124,19 +162,18 @@ export const useCartStore = create<CartState>()(
           const currentTicket = state.tickets[ticketIndex];
           const newType: 'retail' | 'wholesale' = currentTicket.priceType === 'retail' ? 'wholesale' : 'retail';
 
-          const newItems = currentTicket.items.map(item => {
-            const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
-            return {
-              ...item,
-              priceType: newType,
-              finalPrice: newType === 'retail' ? item.retail_price : wholesale
-            };
+          // Process cart with new price type through unified pipeline
+          const processedItems = CartProcessor.processCart(currentTicket.items, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: newType,
+            discountPercentage: currentTicket.discountPercentage
           });
 
           const newTickets = [...state.tickets];
           newTickets[ticketIndex] = {
             ...currentTicket,
-            items: newItems,
+            items: processedItems,
             priceType: newType
           };
 
@@ -144,47 +181,153 @@ export const useCartStore = create<CartState>()(
         });
       },
 
-      removeFromCart: (productId) => {
+      removeFromCart: (uuid: string) => {
         set((state) => {
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
 
-          const newItems = state.tickets[ticketIndex].items.filter(i => i.id !== productId);
+          const currentTicket = state.tickets[ticketIndex];
+          
+          const removedItem = currentTicket.items.find(i => i.uuid === uuid);
+          if (!removedItem) return state;
+
+          // Remove item - CartProcessor will handle kit reconciliation
+          const newItems = currentTicket.items.filter(i => i.uuid !== uuid);
+
+          // Process cart through unified pipeline
+          const processedItems = CartProcessor.processCart(newItems, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: currentTicket.priceType,
+            discountPercentage: currentTicket.discountPercentage
+          });
 
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...state.tickets[ticketIndex], items: newItems };
+          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
+
           return { tickets: newTickets };
         });
       },
 
-      updateQuantity: (productId, quantity) => {
+      updateQuantity: (uuid: string, quantity) => {
         set((state) => {
           if (quantity < 0) return state;
 
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
 
-          const newItems = state.tickets[ticketIndex].items.map(item => {
-            if (item.id === productId) {
-              const validQuantity = quantity > item.stock ? item.stock : quantity;
-              return { ...item, quantity: validQuantity };
+          const currentTicket = state.tickets[ticketIndex];
+          const item = currentTicket.items.find(i => i.uuid === uuid);
+          if (!item) return state;
+
+          const oldQty = item.quantity;
+          let newItems = [...currentTicket.items];
+          
+          if (quantity > oldQty) {
+              if (item.priceType === 'kit_item' && item.kitTriggerId) {
+                  const triggerItem = currentTicket.items.find(i => i.uuid === item.kitTriggerId);
+                  if (triggerItem) {
+                      const kitDefs = useKitStore.getState().kitDefs;
+                      const remaining = KitService.getRemainingKitQuota(triggerItem, currentTicket.items, kitDefs);
+                      
+                      const increase = quantity - oldQty;
+                      if (remaining !== null && increase > remaining) {
+                          const allowedIncrease = remaining;
+                          const excessQty = increase - remaining;
+                          
+                          if (allowedIncrease > 0) {
+                              newItems = newItems.map(i => {
+                                  if (i.uuid === uuid) {
+                                      return { ...i, quantity: oldQty + allowedIncrease };
+                                  }
+                                  return i;
+                              });
+                          }
+                          
+                          const existingRetail = newItems.find(i => 
+                              i.id === item.id && 
+                              i.priceType === 'retail' && 
+                              !i.kitTriggerId
+                          );
+                          
+                          if (existingRetail) {
+                              newItems = newItems.map(i => {
+                                  if (i.uuid === existingRetail.uuid) {
+                                      return { ...i, quantity: i.quantity + excessQty };
+                                  }
+                                  return i;
+                              });
+                          } else {
+                              newItems.push({
+                                  ...item,
+                                  uuid: uuidv4(),
+                                  priceType: 'retail',
+                                  finalPrice: item.retail_price,
+                                  quantity: excessQty,
+                                  kitTriggerId: undefined,
+                                  promotionId: undefined,
+                                  promotionInstanceId: undefined,
+                                  promotionName: undefined
+                              });
+                          }
+                          
+                          toast.info(`${excessQty} unidad(es) agregadas a precio normal`);
+                          
+                          const processedItems = CartProcessor.processCart(newItems, {
+                              kitDefs: useKitStore.getState().kitDefs,
+                              promotionDefs: usePromotionsStore.getState().promotionDefs,
+                              ticketPriceType: currentTicket.priceType,
+                              discountPercentage: currentTicket.discountPercentage
+                          });
+                          
+                          const newTickets = [...state.tickets];
+                          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
+                          
+                          return { tickets: newTickets };
+                      }
+                  }
+              }
+              
+              if (quantity > item.stock) {
+                   toast.error(`Stock máximo disponible: ${item.stock}`);
+                   return state;
+              }
+          }
+
+          newItems = newItems.map(i => {
+            if (i.uuid === uuid) {
+              return { ...i, quantity };
             }
-            return item;
+            return i;
+          });
+
+          const processedItems = CartProcessor.processCart(newItems, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: currentTicket.priceType,
+            discountPercentage: currentTicket.discountPercentage
           });
 
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...state.tickets[ticketIndex], items: newItems };
+          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
+
           return { tickets: newTickets };
         });
       },
 
-      toggleItemPriceType: (productId) => {
+
+
+      toggleItemPriceType: (uuid: string) => {
         set((state) => {
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
 
-          const newItems = state.tickets[ticketIndex].items.map(item => {
-            if (item.id === productId) {
+          const currentTicket = state.tickets[ticketIndex];
+          const newItems = currentTicket.items.map(item => {
+            if (item.uuid === uuid) {
+              // Prevent toggling kit items and promotional items
+              if (item.priceType === 'kit_item' || item.priceType === 'promo') return item; 
+
               const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
               const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
 
@@ -197,8 +340,16 @@ export const useCartStore = create<CartState>()(
             return item;
           });
 
+          // Process through pipeline to ensure consistency
+          const processedItems = CartProcessor.processCart(newItems, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: currentTicket.priceType,
+            discountPercentage: currentTicket.discountPercentage
+          });
+
           const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...state.tickets[ticketIndex], items: newItems };
+          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
           return { tickets: newTickets };
         });
       },
@@ -212,10 +363,86 @@ export const useCartStore = create<CartState>()(
           newTickets[ticketIndex] = {
             ...state.tickets[ticketIndex],
             items: [],
-            priceType: 'retail'
+            priceType: 'retail',
+            discountPercentage: 0
           };
           return { tickets: newTickets };
         });
+      },
+      
+      setTicketDiscount: (percentage: number) => {
+        set((state) => {
+          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+          if (ticketIndex === -1) return state;
+
+          const currentTicket = state.tickets[ticketIndex];
+          
+          // Process cart with discount through unified pipeline
+          // Discount forces retail price type
+          const processedItems = CartProcessor.processCart(currentTicket.items, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: 'retail',
+            discountPercentage: percentage
+          });
+
+          const newTickets = [...state.tickets];
+          newTickets[ticketIndex] = {
+            ...currentTicket,
+            items: processedItems,
+            priceType: 'retail',
+            discountPercentage: percentage
+          };
+
+          return { tickets: newTickets };
+        });
+      },
+
+      clearTicketDiscount: () => {
+        set((state) => {
+          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
+          if (ticketIndex === -1) return state;
+
+          const currentTicket = state.tickets[ticketIndex];
+
+          // Process cart without discount through unified pipeline
+          const processedItems = CartProcessor.processCart(currentTicket.items, {
+            kitDefs: useKitStore.getState().kitDefs,
+            promotionDefs: usePromotionsStore.getState().promotionDefs,
+            ticketPriceType: currentTicket.priceType,
+            discountPercentage: 0
+          });
+
+          const newTickets = [...state.tickets];
+          newTickets[ticketIndex] = {
+            ...currentTicket,
+            items: processedItems,
+            discountPercentage: 0
+          };
+
+          return { tickets: newTickets };
+        });
+      },
+      
+      
+      getTicketSubtotal: () => {
+        const state = get();
+        const ticket = state.tickets.find(t => t.id === state.activeTicketId);
+        if (!ticket) return 0;
+        
+        return ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+      },
+
+      getTicketDiscountAmount: () => {
+        const state = get();
+        const ticket = state.tickets.find(t => t.id === state.activeTicketId);
+        if (!ticket) return 0;
+        
+        const nonPromoTotal = ticket.items
+          .filter(item => item.priceType !== 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        return nonPromoTotal * (ticket.discountPercentage / 100);
       },
 
       getActiveTicket: () => {
@@ -227,7 +454,17 @@ export const useCartStore = create<CartState>()(
         const state = get();
         const ticket = state.tickets.find(t => t.id === state.activeTicketId);
         if (!ticket) return 0;
-        return ticket.items.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        const promoTotal = ticket.items
+          .filter(item => item.priceType === 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+          
+        const nonPromoTotal = ticket.items
+          .filter(item => item.priceType !== 'promo')
+          .reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
+        
+        const discount = nonPromoTotal * (ticket.discountPercentage / 100);
+        return promoTotal + nonPromoTotal - discount;
       }
     }),
     {

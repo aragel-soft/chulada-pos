@@ -27,7 +27,7 @@ pub async fn test_print_ticket(
         job_content.extend_from_slice(b"\x1B\x40");
         job_content.extend_from_slice(b"\x1B\x61\x01");
 
-        // --- 1. LOGO ---
+        // LOGO
         let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
         let max_width = if width_val == 58 { 384 } else { 512 };
 
@@ -67,8 +67,7 @@ pub async fn test_print_ticket(
 
                     if bin_path.exists() {
                         if let Ok(bin_data) = std::fs::read(&bin_path) {
-                            println!("Using cached logo: {:?}", bin_path);
-                            logo_cmds = Some(bin_data);
+                          logo_cmds = Some(bin_data);
                         }
                     }
                 }
@@ -87,13 +86,13 @@ pub async fn test_print_ticket(
             job_content.extend_from_slice(b"\n");
         }
 
-        // --- 2. HEADER ---
+        // HEADER
         if !settings.ticket_header.is_empty() {
             job_content.extend_from_slice(settings.ticket_header.as_bytes());
             job_content.extend_from_slice(b"\n");
         }
 
-        // --- 3. TEST BODY ---
+        // TEST BODY
         job_content.extend_from_slice(b"\n*** TICKET DE PRUEBA ***\n");
         let now = chrono::Local::now().format("%d/%m/%Y %H:%M").to_string();
         job_content.extend_from_slice(format!("Fecha: {}\n", now).as_bytes());
@@ -107,7 +106,7 @@ pub async fn test_print_ticket(
         job_content.extend_from_slice(b"TOTAL: 720.00\n");
         job_content.extend_from_slice(b"\n");
 
-        // --- 4. FOOTER ---
+        // FOOTER
         if !settings.ticket_footer.is_empty() {
             job_content.extend_from_slice(b"\n");
             job_content.extend_from_slice(settings.ticket_footer.as_bytes());
