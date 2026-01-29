@@ -9,7 +9,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Product } from "@/types/inventory";
+import { Product, SelectorItem } from "@/types/inventory"; // Importamos tipos globales
 import { getProducts } from "@/lib/api/inventory/products";
 import { checkProductsInActiveKits } from "@/lib/api/inventory/kits";
 import { Input } from "@/components/ui/input";
@@ -32,13 +32,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export interface SelectorItem {
-  product: Product;
-  quantity: number;
-}
-
 interface ProductSearchSelectorProps {
-  mode?: "triggers" | "rewards" | "generic"; 
+  mode?: "triggers" | "rewards" | "generic";
   selectedItems: SelectorItem[];
   onItemsChange: (items: SelectorItem[]) => void;
   excludeProductIds?: string[];
@@ -70,6 +65,7 @@ export function ProductSearchSelector({
         pageSize: 5,
         search: debouncedSearch,
       }),
+    enabled: debouncedSearch.length > 2,
     staleTime: 1000 * 60,
   });
 
@@ -83,7 +79,7 @@ export function ProductSearchSelector({
   });
 
   const isProductBlocked = (productId: string) => {
-    const isBusy = mode === 'triggers' && busyProductIds?.includes(productId);
+    const isBusy = mode === "triggers" && busyProductIds?.includes(productId);
     const isExcluded = excludeProductIds.includes(productId);
     return isBusy || isExcluded;
   };
@@ -96,7 +92,7 @@ export function ProductSearchSelector({
 
   const handleRemove = (productId: string) => {
     onItemsChange(
-      selectedItems.filter((item) => item.product.id !== productId)
+      selectedItems.filter((item) => item.product.id !== productId),
     );
   };
 
@@ -104,8 +100,8 @@ export function ProductSearchSelector({
     if (qty < 1) return;
     onItemsChange(
       selectedItems.map((item) =>
-        item.product.id === productId ? { ...item, quantity: qty } : item
-      )
+        item.product.id === productId ? { ...item, quantity: qty } : item,
+      ),
     );
   };
 
@@ -114,7 +110,7 @@ export function ProductSearchSelector({
     const newItems = searchResults.data
       .filter((product) => {
         const isAlreadySelected = selectedItems.some(
-          (i) => i.product.id === product.id
+          (i) => i.product.id === product.id,
         );
         const isExcluded = excludeProductIds.includes(product.id);
         const isBusy =
@@ -132,12 +128,12 @@ export function ProductSearchSelector({
     }
   };
 
-  const showQuantityInput = enableQuantity ?? (mode === "rewards");
-  const title = customTitle 
-    ? customTitle 
-    : mode === "triggers" 
-      ? "Productos Activadores" 
-      : mode === "rewards" 
+  const showQuantityInput = enableQuantity ?? mode === "rewards";
+  const title = customTitle
+    ? customTitle
+    : mode === "triggers"
+      ? "Productos Activadores"
+      : mode === "rewards"
         ? "Productos de Regalo"
         : "Productos Seleccionados";
 
@@ -152,6 +148,7 @@ export function ProductSearchSelector({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+
           {searchResults?.data && searchResults.data.length > 0 && (
             <Button
               variant="outline"
@@ -184,12 +181,12 @@ export function ProductSearchSelector({
               <TableBody>
                 {searchResults?.data.map((product) => {
                   const isSelected = selectedItems.some(
-                    (i) => i.product.id === product.id
+                    (i) => i.product.id === product.id,
                   );
                   const isBusyInBackend =
                     mode === "triggers" && busyProductIds?.includes(product.id);
                   const isExcludedByProps = excludeProductIds.includes(
-                    product.id
+                    product.id,
                   );
                   const isBlocked = isBusyInBackend || isExcludedByProps;
 
@@ -206,12 +203,14 @@ export function ProductSearchSelector({
                           <span>{product.name}</span>
                           {isBusyInBackend && (
                             <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> Ocupado en otro kit
+                              <AlertCircle className="h-3 w-3" /> Ocupado en
+                              otro kit
                             </span>
                           )}
                           {isExcludedByProps && !isBusyInBackend && (
                             <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> Ya seleccionado en la otra lista
+                              <AlertCircle className="h-3 w-3" /> Ya
+                              seleccionado en la otra lista
                             </span>
                           )}
                         </div>
@@ -220,10 +219,12 @@ export function ProductSearchSelector({
                         <Button
                           size="sm"
                           variant={isSelected ? "secondary" : "default"}
-                          disabled={ isSelected || (isBlocked || false) } 
+                          disabled={isSelected || isBlocked || false}
                           className={cn(
                             "h-7 text-xs transition-all",
-                            !isSelected ? "bg-[#480489] hover:bg-[#480489]/90" : ""
+                            !isSelected
+                              ? "bg-[#480489] hover:bg-[#480489]/90"
+                              : "",
                           )}
                           onClick={() => handleAdd(product)}
                         >
@@ -311,7 +312,7 @@ export function ProductSearchSelector({
                           onChange={(e) =>
                             handleQuantityChange(
                               item.product.id,
-                              parseInt(e.target.value) || 1
+                              parseInt(e.target.value) || 1,
                             )
                           }
                         />

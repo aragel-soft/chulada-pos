@@ -11,10 +11,14 @@ export const promotionFormSchema = z.object({
         .max(100, "El nombre es demasiado largo")
     ),
   description: z.string().optional(),
-  comboPrice: z
-    .number()
-    .positive("El precio debe ser mayor a 0")
-    .min(0.01, "El precio debe ser mayor a 0"),
+  comboPrice: z.union([z.number(), z.string()])
+    .refine((val) => val !== "", { 
+      message: "El precio es requerido" 
+    })
+    .transform((val) => Number(val))
+    .refine((val) => val > 0, { 
+      message: "El precio debe ser mayor a 0" 
+    }),
   startDate: z.date(),
   endDate: z.date(),
   isActive: z.boolean(),

@@ -33,10 +33,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  ProductSearchSelector,
-  SelectorItem,
-} from "@/components/common/ProductSearchSelector";
+import { ProductSearchSelector } from "@/components/common/ProductSearchSelector";
 import {
   createPromotion,
   updatePromotion,
@@ -46,6 +43,7 @@ import {
   promotionFormSchema,
   type PromotionFormData,
 } from "@/features/inventory/schemas/promotionSchema";
+import { SelectorItem } from "@/types/inventory";
 
 const { useStepper, steps } = defineStepper(
   { id: "info", title: "Configuración", description: "Precio y vigencia" },
@@ -79,11 +77,11 @@ export function PromotionWizard({
     reset,
     trigger,
   } = useForm<PromotionFormData>({
-    resolver: zodResolver(promotionFormSchema),
+    resolver: zodResolver(promotionFormSchema) as any,
     defaultValues: {
       name: "",
       description: "",
-      comboPrice: 0,
+      comboPrice: "" as unknown as number,
       startDate: new Date(),
       endDate: addDays(new Date(), 30),
       isActive: true,
@@ -115,7 +113,7 @@ export function PromotionWizard({
       if (promotionToEdit) {
         const start = new Date(promotionToEdit.start_date + "T00:00:00");
         const end = new Date(promotionToEdit.end_date + "T00:00:00");
-        
+
         reset({
           name: promotionToEdit.name,
           description: promotionToEdit.description || "",
@@ -135,7 +133,7 @@ export function PromotionWizard({
         reset({
           name: "",
           description: "",
-          comboPrice: 0,
+          comboPrice: "" as unknown as number,
           startDate: new Date(),
           endDate: addDays(new Date(), 30),
           isActive: true,
@@ -161,7 +159,7 @@ export function PromotionWizard({
   const handleNext = async () => {
     if (stepper.current.id === "info") {
       const isValid = await trigger();
-      
+
       if (isValid) {
         stepper.next();
       } else {
@@ -339,7 +337,7 @@ export function PromotionWizard({
                       {...register("name")}
                       className={cn(
                         "focus-visible:ring-[#480489]",
-                        errors.name && "border-destructive"
+                        errors.name && "border-destructive",
                       )}
                       autoFocus
                     />
@@ -365,16 +363,29 @@ export function PromotionWizard({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>
-                        Precio del Combo <span className="text-destructive">*</span>
+                        Precio del Combo{" "}
+                        <span className="text-destructive">*</span>
                       </Label>
                       <MoneyInput
                         value={formData.comboPrice}
-                        onChange={(e) =>
-                          setValue("comboPrice", parseFloat(e.target.value) || 0)
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "") {
+                            setValue("comboPrice", "" as unknown as number, {
+                              shouldValidate: true,
+                            });
+                            return;
+                          }
+                          const numberVal = parseFloat(val);
+                          setValue(
+                            "comboPrice",
+                            isNaN(numberVal) ? 0 : numberVal,
+                            { shouldValidate: true },
+                          );
+                        }}
                         className={cn(
                           "focus-visible:ring-[#480489] text-lg font-semibold",
-                          errors.comboPrice && "border-destructive"
+                          errors.comboPrice && "border-destructive",
                         )}
                       />
                       {errors.comboPrice && (
@@ -453,7 +464,7 @@ export function PromotionWizard({
                     }}
                   />
                 </div>
-                
+
                 {itemsError && (
                   <div className="mt-4 flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                     <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
