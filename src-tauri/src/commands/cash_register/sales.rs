@@ -720,8 +720,8 @@ pub fn process_sale(
             "INSERT INTO sale_items (
                 id, sale_id, product_id, product_name, product_code, quantity, 
                 unit_price, price_type, discount_percentage, discount_amount, 
-                subtotal, is_kit_item, parent_sale_item_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                subtotal, is_kit_item, parent_sale_item_id, promotion_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 item_id,
                 sale_id,
@@ -735,7 +735,8 @@ pub fn process_sale(
                 data.item_discount_amt,
                 data.item_subtotal,
                 if item.price_type == "kit_item" { 1 } else { 0 },
-                parent_db_id
+                parent_db_id,
+                item.promotion_id
             ],
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;
     }

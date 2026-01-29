@@ -360,8 +360,8 @@ pub fn print_ticket(
                 .map(|s| s.as_str())
                 .unwrap_or("Promocion");
             
-            // Promo header (without emoji)
-            let promo_header = format!("PROMO: {}", remove_accents(promo_name));
+            // Promo header (explicitly marked as COMBO)
+            let promo_header = format!("COMBO: {}", remove_accents(promo_name));
             job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
             job_content.extend_from_slice(format!("{}\n", promo_header).as_bytes());
             job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
@@ -443,6 +443,10 @@ pub fn print_ticket(
     job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
     job_content.extend_from_slice(format!("TOTAL: {:>10.2}\n", data.total).as_bytes());
     job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    
+    // Total Items Count
+    let total_items_count: f64 = data.items.iter().map(|i| i.quantity).sum();
+    job_content.extend_from_slice(format!("TOTAL ARTICULOS: {:>10.2}\n", total_items_count).as_bytes());
     
     job_content.extend_from_slice(format!("EFECTIVO/PAGO: {:>10.2}\n", data.paid_amount).as_bytes());
     job_content.extend_from_slice(format!("CAMBIO: {:>10.2}\n", data.change).as_bytes());
