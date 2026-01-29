@@ -61,10 +61,8 @@ fn main() {
             commands::inventory::tags::get_all_tags,
             // Inventory - Kits
             commands::inventory::kits::get_kits,
-            commands::inventory::kits::get_kit_details,
             commands::inventory::kits::check_products_in_active_kits,
             commands::inventory::kits::create_kit,
-            commands::inventory::kits::update_kit,
             // Inventory - Promotions
             commands::inventory::promotions::get_promotions,
             commands::inventory::promotions::get_promotion_details,
