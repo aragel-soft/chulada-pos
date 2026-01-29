@@ -200,7 +200,7 @@ pub fn get_customers(
   let has_search = search.is_some() && !search.as_ref().unwrap().trim().is_empty();
 
   let where_clause = if has_search {
-    "WHERE deleted_at IS NULL AND (lower(name) LIKE ?1 OR phone LIKE ?1 OR lower(code) LIKE ?1)"
+    "WHERE deleted_at IS NULL AND (lower(name) LIKE ?1 OR phone LIKE ?1 OR lower(code) LIKE ?1) OR lower(id) LIKE ?1"
   } else {
     "WHERE deleted_at IS NULL"
   };

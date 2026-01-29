@@ -12,14 +12,15 @@ const INITIAL_FILTER: SalesHistoryFilter = {
   status: [],
   payment_method: 'all',
   user_id: null,
+  customer_id: null,
   folio: '',
   product_search: '',
   sort_by: 'folio',
   sort_order: 'desc'
 };
 
-export const useSalesHistory = () => {
-  const [filters, setFilters] = useState<SalesHistoryFilter>(INITIAL_FILTER);
+export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<SalesHistoryFilter> } = {}) => {
+  const [filters, setFilters] = useState<SalesHistoryFilter>({ ...INITIAL_FILTER, ...initialFilters });
 
   const historyQuery = useQuery({
     queryKey: ['sales-history', filters],

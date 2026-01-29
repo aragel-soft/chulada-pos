@@ -6,6 +6,7 @@ export interface SalesHistoryFilter {
   status?: string[] | null;        // ['completed', 'cancelled', etc]
   payment_method?: string | null;  // 'cash', 'card', 'mixed', 'all'
   user_id?: string | null;
+  customer_id?: string | null;
   folio?: string | null;        
   product_search?: string | null;  
   sort_by?: string;
