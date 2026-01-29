@@ -270,12 +270,12 @@ export function CheckoutModal({
           </div>
 
           {/*Inputs & Details */}
-          <div className="flex-1 p-8 bg-white flex flex-col justify-center space-y-6">
+          <div className="flex-1 p-4 bg-white flex flex-col justify-center space-y-6">
             
             {method === "credit" && (
-                <div className="flex flex-col h-full justify-start space-y-6 pt-4">
+                <div className="flex flex-col h-full justify-start space-y-4 pt-0 overflow-y-auto">
                      <div className="space-y-4">
-                        <label className="text-lg font-medium block">Cliente para Crédito</label>
+                        <label className="text-lg font-bold block text-[#480489]">Cliente para Crédito</label>
                         <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen} modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
