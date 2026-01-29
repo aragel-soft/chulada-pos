@@ -15,14 +15,14 @@ export interface Promotion {
 }
 
 // Combo product definition for promotions
-export interface PromotionComboProduct {
+export interface ComboItemDto {
   product_id: string;
   quantity: number;
 }
 
 // Promotion with full combo details
 export interface PromotionWithCombos extends Promotion {
-  combo_products: PromotionComboProduct[];
+  combo_products: ComboItemDto[];
 }
 
 // Helper type for promotion detection
@@ -39,4 +39,12 @@ export interface PromotionInstance {
   promotionName: string;
   comboPrice: number;
   products: Map<string, { quantity: number; unitPrice: number }>;
+}
+export interface CreatePromotionDto {
+  name: string;
+  description?: string;
+  combo_price: number;
+  start_date: string; 
+  end_date: string; 
+  items: ComboItemDto[];
 }

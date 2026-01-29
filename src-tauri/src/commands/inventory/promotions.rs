@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use chrono::Local;
+use uuid::Uuid;
 
 //TODO: Colocar PaginatedResponse en un módulo común e importarlo donde se necesite
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +28,22 @@ pub struct PromotionView {
   pub status: String,
   pub items_summary: String,
   pub created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ComboItemDto {
+  pub product_id: String,
+  pub quantity: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreatePromotionDto {
+  pub name: String,
+  pub description: Option<String>,
+  pub combo_price: f64,
+  pub start_date: String,
+  pub end_date: String,
+  pub items: Vec<ComboItemDto>,
 }
 
 #[tauri::command]
@@ -186,6 +203,69 @@ fn map_promotion_row(row: &rusqlite::Row) -> rusqlite::Result<PromotionView> {
   })
 }
 
+#[tauri::command]
+pub fn create_promotion(
+  db_state: State<'_, Mutex<Connection>>,
+  promotion: CreatePromotionDto,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().unwrap();
+
+  if promotion.combo_price <= 0.0 { 
+    return Err("El precio del combo debe ser mayor a 0.".to_string());
+  }
+
+  if promotion.items.is_empty() {
+    return Err("La promoción debe incluir al menos un producto.".to_string());
+  }
+
+  let start = chrono::NaiveDate::parse_from_str(&promotion.start_date, "%Y-%m-%d")
+    .map_err(|_| "Formato de fecha de inicio inválido (Use YYYY-MM-DD)".to_string())?;
+  let end = chrono::NaiveDate::parse_from_str(&promotion.end_date, "%Y-%m-%d")
+    .map_err(|_| "Formato de fecha de fin inválido (Use YYYY-MM-DD)".to_string())?;
+
+  if start > end {
+    return Err("La fecha de inicio no puede ser mayor a la fecha de fin.".to_string());
+  }
+
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  {
+    let promo_id = Uuid::new_v4().to_string();
+      
+    tx.execute(
+      "INSERT INTO promotions (id, name, description, type, combo_price, start_date, end_date, is_active) 
+       VALUES (?1, ?2, ?3, 'combo', ?4, ?5, ?6, 1)",
+      rusqlite::params![
+        promo_id,
+        promotion.name,
+        promotion.description,
+        promotion.combo_price,
+        promotion.start_date,
+        promotion.end_date
+      ],
+    ).map_err(|e| format!("Error al insertar promoción: {}", e))?;
+
+    let mut stmt = tx.prepare(
+      "INSERT INTO promotion_combos (id, promotion_id, product_id, quantity) VALUES (?1, ?2, ?3, ?4)"
+    ).map_err(|e| e.to_string())?;
+
+    for item in promotion.items {
+      if item.quantity <= 0 {
+        return Err(format!("La cantidad para el producto {} debe ser mayor a 0", item.product_id));
+      }
+      
+      stmt.execute(rusqlite::params![
+        Uuid::new_v4().to_string(),
+        promo_id,
+        item.product_id,
+        item.quantity
+      ]).map_err(|e| format!("Error al insertar item del combo: {}", e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error al confirmar transacción: {}", e))?;
+  Ok(())
+}
 // Structures for get_all_active_promotions
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PromotionComboProduct {

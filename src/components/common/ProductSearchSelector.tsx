@@ -38,17 +38,21 @@ export interface SelectorItem {
 }
 
 interface ProductSearchSelectorProps {
-  mode: "triggers" | "rewards";
+  mode?: "triggers" | "rewards" | "generic"; 
   selectedItems: SelectorItem[];
   onItemsChange: (items: SelectorItem[]) => void;
   excludeProductIds?: string[];
+  customTitle?: string;
+  enableQuantity?: boolean;
 }
 
 export function ProductSearchSelector({
-  mode,
+  mode = "generic",
   selectedItems,
   onItemsChange,
   excludeProductIds = [],
+  customTitle,
+  enableQuantity,
 }: ProductSearchSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -71,18 +75,18 @@ export function ProductSearchSelector({
 
   const productIdsToCheck = searchResults?.data.map((p) => p.id) || [];
 
-  const isProductBlocked = (productId: string) => {
-    const isBusy = mode === 'triggers' && busyProductIds?.includes(productId);
-    const isExcluded = excludeProductIds.includes(productId);
-    return isBusy || isExcluded;
-  };
-
   const { data: busyProductIds } = useQuery({
     queryKey: ["kits", "check-conflicts", productIdsToCheck],
     queryFn: () => checkProductsInActiveKits(productIdsToCheck),
     enabled: mode === "triggers" && productIdsToCheck.length > 0,
     staleTime: 0,
   });
+
+  const isProductBlocked = (productId: string) => {
+    const isBusy = mode === 'triggers' && busyProductIds?.includes(productId);
+    const isExcluded = excludeProductIds.includes(productId);
+    return isBusy || isExcluded;
+  };
 
   const handleAdd = (product: Product) => {
     if (selectedItems.some((item) => item.product.id === product.id)) return;
@@ -127,6 +131,15 @@ export function ProductSearchSelector({
       onItemsChange([...selectedItems, ...newItems]);
     }
   };
+
+  const showQuantityInput = enableQuantity ?? (mode === "rewards");
+  const title = customTitle 
+    ? customTitle 
+    : mode === "triggers" 
+      ? "Productos Activadores" 
+      : mode === "rewards" 
+        ? "Productos de Regalo"
+        : "Productos Seleccionados";
 
   return (
     <div className="flex flex-col h-full min-h-[500px] gap-4">
@@ -174,7 +187,7 @@ export function ProductSearchSelector({
                     (i) => i.product.id === product.id
                   );
                   const isBusyInBackend =
-                    busyProductIds?.includes(product.id) && mode === "triggers";
+                    mode === "triggers" && busyProductIds?.includes(product.id);
                   const isExcludedByProps = excludeProductIds.includes(
                     product.id
                   );
@@ -207,7 +220,7 @@ export function ProductSearchSelector({
                         <Button
                           size="sm"
                           variant={isSelected ? "secondary" : "default"}
-                          disabled={ isSelected || (isBlocked) }
+                          disabled={ isSelected || (isBlocked || false) } 
                           className={cn(
                             "h-7 text-xs transition-all",
                             !isSelected ? "bg-[#480489] hover:bg-[#480489]/90" : ""
@@ -238,9 +251,7 @@ export function ProductSearchSelector({
       <div className="flex-1 flex flex-col min-h-[250px] border rounded-md shadow-sm">
         <div className="flex items-center justify-between p-3 border-b bg-muted/40">
           <h4 className="text-sm font-semibold flex items-center gap-2 text-[#480489]">
-            {mode === "triggers"
-              ? "Productos Activadores"
-              : "Productos de Regalo"}
+            {title}
             <Badge className="bg-[#480489] text-white hover:bg-[#480489]/80 ml-1">
               {selectedItems.length}
             </Badge>
@@ -272,7 +283,7 @@ export function ProductSearchSelector({
                 <TableRow>
                   <TableHead className="w-[100px]">Código</TableHead>
                   <TableHead>Producto</TableHead>
-                  {mode === "rewards" && (
+                  {showQuantityInput && (
                     <TableHead className="w-[100px] text-center">
                       Cantidad
                     </TableHead>
@@ -290,7 +301,7 @@ export function ProductSearchSelector({
                       {item.product.name}
                     </TableCell>
 
-                    {mode === "rewards" && (
+                    {showQuantityInput && (
                       <TableCell className="text-center">
                         <Input
                           type="number"
