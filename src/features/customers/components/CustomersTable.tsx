@@ -8,7 +8,9 @@ import {
   PlusCircle, 
   Pencil, 
   Trash,
+  ReceiptText 
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { DataTable } from "@/components/ui/data-table/data-table"; 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,14 +22,23 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
 import { CustomerFormDialog } from "./CustomerFormDialog";
 import { DeleteCustomersDialog } from "./DeleteCustomersDialog";
+import { useUrlPagination } from "@/hooks/use-url-pagination";
 
 export default function CustomersTable() {
+  const navigate = useNavigate(); 
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { 
+      page, 
+      setPage, 
+      pageSize, 
+      setPageSize, 
+      search, 
+      setSearch 
+    } = useUrlPagination({ defaultPageSize: 16 });
+  const paginationState: PaginationState = useMemo(() => ({
+    pageIndex: page - 1,
+    pageSize: pageSize,
+  }), [page, pageSize]);
   const [rowSelection, setRowSelection] = useState({});
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -36,13 +47,22 @@ export default function CustomersTable() {
 
   const { can } = useAuthStore();
 
+  const handlePaginationChange = (updaterOrValue: any) => {
+    const newPagination = typeof updaterOrValue === "function"
+      ? updaterOrValue(paginationState)
+      : updaterOrValue;
+
+    setPage(newPagination.pageIndex + 1);
+    setPageSize(newPagination.pageSize);
+  };
+
   const queryParams: PaginationParams = useMemo(() => ({
-    page: pagination.pageIndex + 1,
-    pageSize: pagination.pageSize,
-    search: globalFilter,
+    page,
+    pageSize,   
+    search,
     sortBy: sorting.length > 0 ? sorting[0].id : undefined,
     sortOrder: sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined,
-  }), [pagination, globalFilter, sorting]);
+  }), [page, pageSize, search, sorting]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["customers", queryParams],
@@ -64,13 +84,16 @@ export default function CustomersTable() {
     setIsDeleteDialogOpen(true);
   };
 
+  const handleViewStatement = (customer: Customer) => {
+    navigate(`/customers/${customer.id}`, { state: { customer } });
+  };
+
   const handleSuccess = (mode: 'create' | 'update' | 'restore') => {
     setRowSelection({});
     
     if (mode === 'create' || mode === 'restore') {
-      setGlobalFilter("");      
-      setPagination(prev => ({ ...prev, pageIndex: 0 }));
-      
+      setSearch("");      
+      setPage(1);
       setSorting([{ id: 'created_at', desc: true }]);
     }
   };
@@ -123,12 +146,12 @@ export default function CustomersTable() {
         manualFiltering={true}
         manualSorting={true}
         rowCount={data?.total || 0}
-        pagination={pagination}
-        onPaginationChange={setPagination}
+        pagination={paginationState}
+        onPaginationChange={handlePaginationChange}
         sorting={sorting}
         onSortingChange={setSorting}
-        globalFilter={globalFilter}
-        onGlobalFilterChange={(val) => setGlobalFilter(String(val))} 
+        globalFilter={search}
+        onGlobalFilterChange={(val) => setSearch(String(val))} 
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         getRowId={(row) => row.id} 
@@ -137,9 +160,23 @@ export default function CustomersTable() {
           const selectedRows = table.getFilteredSelectedRowModel().rows;
           const selectedCustomer = selectedRows.length === 1 ? selectedRows[0].original : null;
           const hasSelection = selectedRows.length > 0;
+          const isSingleSelection = selectedRows.length === 1;
 
           return (
             <div className="flex items-center gap-2 w-full md:w-auto">
+              
+              {can('customers:view') && (
+                 <Button
+                   variant="outline"
+                   className="whitespace-nowrap border-dashed border-gray-400 text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 mr-2"
+                   disabled={!isSingleSelection} 
+                   onClick={() => selectedCustomer && handleViewStatement(selectedCustomer)}
+                 >
+                   <ReceiptText className="mr-2 h-4 w-4" />
+                   <span className="hidden sm:inline">Estado de Cuenta</span>
+                 </Button>
+              )}
+
               {can('customers:create') && (
                 <Button 
                   className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"

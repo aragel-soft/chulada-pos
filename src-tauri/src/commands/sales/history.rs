@@ -12,6 +12,7 @@ pub struct SalesFilter {
   pub status: Option<Vec<String>>,   
   pub payment_method: Option<String>, 
   pub user_id: Option<String>,
+  pub customer_id: Option<String>,
   pub folio: Option<String>,         
   pub product_search: Option<String>, 
   pub sort_by: Option<String>, 
@@ -116,6 +117,13 @@ pub fn get_sales_history(
     if !uid.is_empty() {
       where_clauses.push("s.user_id = ?".to_string());
       params.push(Box::new(uid.clone()));
+    }
+  }
+
+  if let Some(customer_id) = &filter.customer_id {
+    if !customer_id.is_empty() {
+      where_clauses.push("s.customer_id = ?".to_string());
+      params.push(Box::new(customer_id.clone()));
     }
   }
 

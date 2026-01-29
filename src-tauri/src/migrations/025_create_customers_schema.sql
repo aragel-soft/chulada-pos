@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS customers (
 
 CREATE TABLE IF NOT EXISTS debt_payments (
   id TEXT PRIMARY KEY,
-  folio INTEGER NOT NULL UNIQUE, -- Folio interno consecutivo
+  folio TEXT NOT NULL UNIQUE, 
   customer_id TEXT NOT NULL,
   sale_id TEXT, -- NULL si es un abono general, ID si es pago de una venta específica
   amount DECIMAL(10,2) NOT NULL,
