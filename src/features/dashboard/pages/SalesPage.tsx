@@ -372,6 +372,7 @@ export default function SalesPage() {
                 onRemove={(uuid) => removeFromCart(uuid)}
                 onTogglePriceType={() => toggleItemPriceType(item.uuid)}
                 hasDiscount={(activeTicket?.discountPercentage || 0) > 0}
+                discountPercentage={activeTicket?.discountPercentage || 0}
               />
             ))
           )}

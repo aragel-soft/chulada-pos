@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Gets the total count of gifts already linked to a trigger item.
- * @internal - Used internally by getRemainingKitQuota
  */
 function getLinkedGiftCount(triggerId: string, items: CartItem[]): number {
   return items
@@ -15,9 +14,6 @@ function getLinkedGiftCount(triggerId: string, items: CartItem[]): number {
 
 /**
  * Main entry point for kit processing in the cart pipeline.
- * Processes all kit triggers in the cart and automatically links eligible items as gifts.
- * Also reconciles gifts when trigger quantities decrease.
- * This is called by CartProcessor as Stage 1 of the processing pipeline.
  */
 export function processAllKits(
   items: CartItem[],
@@ -25,27 +21,24 @@ export function processAllKits(
 ): CartItem[] {
   let currentItems = [...items];
   
-  // Process each potential trigger item
   const potentialTriggers = items.filter(item => item.priceType !== 'kit_item');
   
   for (const item of potentialTriggers) {
     const kit = kitDefs[item.id];
     if (kit && kit.is_required) {
-      // First, process kit trigger to add gifts
       currentItems = processKitTrigger(item, currentItems, kitDefs);
       
-      // Then, reconcile to remove excess gifts if trigger quantity decreased
       currentItems = reconcileKitGifts(item, currentItems, kitDefs);
     }
   }
+  
+  currentItems = reconcileOrphanGifts(currentItems);
   
   return currentItems;
 }
 
 /**
  * Reconciles kit gifts when a trigger item's quantity changes.
- * Converts excess gifts back to regular priced items.
- * @internal - Used internally by processAllKits
  */
 function reconcileKitGifts(
   triggerItem: CartItem,
@@ -104,6 +97,45 @@ function reconcileKitGifts(
 }
 
 /**
+ * Cleanup function to remove/convert kit items whose trigger item has been removed from cart.
+ */
+function reconcileOrphanGifts(items: CartItem[]): CartItem[] {
+  const triggerIds = new Set(items.map(i => i.uuid));
+  
+  const orphans: CartItem[] = [];
+  const result: CartItem[] = [];
+
+  for (const item of items) {
+    if (item.priceType === 'kit_item' && item.kitTriggerId && !triggerIds.has(item.kitTriggerId)) {
+      orphans.push(item);
+    } else {
+      result.push(item);
+    }
+  }
+
+  if (orphans.length === 0) return items;
+
+  for (const orphan of orphans) {
+    const existing = result.find(i => i.id === orphan.id && i.priceType === 'retail' && !i.kitTriggerId);
+    
+    if (existing) {
+      existing.quantity += orphan.quantity;
+    } else {
+      result.push({
+        ...orphan,
+        uuid: uuidv4(),
+        priceType: 'retail',
+        finalPrice: orphan.retail_price,
+        kitTriggerId: undefined,
+        quantity: orphan.quantity
+      });
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Calculates remaining kit quota for a trigger item.
  */
 export function getRemainingKitQuota(
@@ -123,7 +155,6 @@ export function getRemainingKitQuota(
 
 /**
  * Processes a trigger product and automatically links eligible products as gifts.
- * @internal - Used internally by processAllKits
  */
 function processKitTrigger(
   triggerProduct: Product,
@@ -202,5 +233,3 @@ function processKitTrigger(
 
   return currentItems.filter(i => i.quantity > 0);
 }
-
-

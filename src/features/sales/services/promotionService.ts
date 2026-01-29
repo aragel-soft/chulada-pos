@@ -216,9 +216,6 @@ export function detectAndApplyPromotions(
 
   const promotionInstances = detectPromotionInstances(inventory, promotionDefs, eligibleItems);
 
-  if (promotionInstances.length === 0) {
-    return { items: cartItems, appliedPromotionCount: 0 };
-  }
 
   const resultMap = groupCartItemsByPromotion(inventory, promotionInstances, eligibleItems, defaultPriceType);
 

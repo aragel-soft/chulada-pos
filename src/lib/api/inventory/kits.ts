@@ -39,7 +39,6 @@ export const getAllKits = async (): Promise<KitDefinitionWithTrigger[]> => {
   try {
     return await invoke("get_all_kits");
   } catch (error) {
-    console.error("Error fetching all kits:", error);
     return [];
   }
 };

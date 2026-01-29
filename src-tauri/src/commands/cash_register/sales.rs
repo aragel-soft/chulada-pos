@@ -626,17 +626,6 @@ pub fn process_sale(
         ));
     }
     
-    // Validate that items with promotion do not have global discount
-    if payload.discount_percentage > 0.0 {
-        for item in &payload.items {
-            if item.promotion_id.is_some() {
-                return Err(format!(
-                    "No se pueden aplicar descuentos globales sobre items con promoción. Item: {}",
-                    item.product_id
-                ));
-            }
-        }
-    }
     
     // Validate & Apply Kit Rules
     let validated_items = apply_kit_rules(&conn, &payload.items)?;
