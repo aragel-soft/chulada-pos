@@ -24,9 +24,9 @@ export const getKitDetails = async (kitId: string): Promise<KitDetails> => {
   }
 };
 
-export const checkProductsInActiveKits = async (productIds: string[]): Promise<string[]> => {
+export const checkProductsInActiveKits = async (productIds: string[], excludeKitId?: string): Promise<string[]> => {
   try {
-    return await invoke("check_products_in_active_kits", { productIds });
+    return await invoke("check_products_in_active_kits", { productIds, excludeKitId });
   } catch (error) {
     throw error;
   }

@@ -415,6 +415,7 @@ export function KitWizard({
                         if (items.length > 0) trigger("triggers");
                       }}
                       excludeProductIds={rewardIds}
+                      currentKitId={kitIdToEdit}
                     />
                     {errors.triggers && (
                       <p className="text-sm text-destructive mt-2">
@@ -446,6 +447,7 @@ export function KitWizard({
                         if (items.length > 0) trigger("includedItems");
                       }}
                       excludeProductIds={triggerIds}
+                      currentKitId={kitIdToEdit}
                     />
                     {errors.includedItems && (
                       <p className="text-sm text-destructive mt-2">

@@ -281,6 +281,7 @@ pub fn get_kit_details(
 pub fn check_products_in_active_kits(
   db_state: State<'_, Mutex<Connection>>,
   product_ids: Vec<String>,
+  exclude_kit_id: Option<String>,
 ) -> Result<Vec<String>, String> {
   if product_ids.is_empty() {
     return Ok(Vec::new());
@@ -288,16 +289,27 @@ pub fn check_products_in_active_kits(
 
   let conn = db_state.lock().map_err(|e| e.to_string())?;
   let placeholders: String = product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-  let sql = format!(
+
+  let mut sql = format!(
     "SELECT main_product_id FROM product_kit_main WHERE main_product_id IN ({})",
     placeholders
   );
 
+  let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(product_ids.len() + 1);
+  
+  for id in &product_ids {
+    params.push(id);
+  }
+
+  if let Some(ref kit_id) = exclude_kit_id {
+    sql.push_str(" AND kit_option_id != ?");
+    params.push(kit_id);
+  }
+
   let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-  let params = rusqlite::params_from_iter(product_ids.iter());
   
   let existing_ids: Result<Vec<String>, _> = stmt
-    .query_map(params, |row| row.get(0))
+    .query_map(rusqlite::params_from_iter(params), |row| row.get(0))
     .map_err(|e| e.to_string())?
     .collect();
 

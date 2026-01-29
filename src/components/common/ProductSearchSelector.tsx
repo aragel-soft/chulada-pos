@@ -39,6 +39,7 @@ interface ProductSearchSelectorProps {
   excludeProductIds?: string[];
   customTitle?: string;
   enableQuantity?: boolean;
+  currentKitId?: string | null; 
 }
 
 export function ProductSearchSelector({
@@ -48,6 +49,7 @@ export function ProductSearchSelector({
   excludeProductIds = [],
   customTitle,
   enableQuantity,
+  currentKitId
 }: ProductSearchSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -73,7 +75,7 @@ export function ProductSearchSelector({
 
   const { data: busyProductIds } = useQuery({
     queryKey: ["kits", "check-conflicts", productIdsToCheck],
-    queryFn: () => checkProductsInActiveKits(productIdsToCheck),
+    queryFn: () => checkProductsInActiveKits(productIdsToCheck, currentKitId || undefined),
     enabled: mode === "triggers" && productIdsToCheck.length > 0,
     staleTime: 0,
   });
