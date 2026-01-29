@@ -20,7 +20,6 @@ export const getPromotions = async (params: PaginationParams): Promise<Paginated
       sortOrder: params.sortOrder || null,
     });
   } catch (error) {
-    console.error('Error fetching promotions:', error);
     throw error;
   }
 };
@@ -29,7 +28,6 @@ export const createPromotion = async (promotion: CreatePromotionDto): Promise<vo
   try {
     await invoke('create_promotion', { promotion });
   } catch (error) {
-    console.error('Error creating promotion:', error);
     throw error;
   }
 };
@@ -60,7 +58,6 @@ export const getPromotionDetails = async (id: string): Promise<PromotionWithDeta
     };
 
   } catch (error) {
-    console.error('Error fetching promotion details:', error);
     throw error;
   }
 };
@@ -69,7 +66,6 @@ export const updatePromotion = async (id: string, promotion: UpdatePromotionDto)
   try {
     await invoke('update_promotion', { id, promotion });
   } catch (error) {
-    console.error('Error updating promotion:', error);
     throw error;
   }
 };
