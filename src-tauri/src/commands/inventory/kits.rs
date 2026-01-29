@@ -36,8 +36,34 @@ pub struct CreateKitDto {
   pub name: String,
   pub description: Option<String>,
   pub is_required: bool,
+  pub is_active: Option<bool>,
   pub trigger_product_ids: Vec<String>,
   pub included_items: Vec<KitItemDto>,
+}
+
+#[derive(Serialize)]
+pub struct KitProductDetailDto {
+  id: String,
+  code: String,
+  name: String,
+  retail_price: f64, 
+}
+
+#[derive(Serialize)]
+pub struct KitIncludedItemDto {
+  product: KitProductDetailDto,
+  quantity: i64,
+}
+
+#[derive(Serialize)]
+pub struct KitDetailsResponse {
+  id: String,
+  name: String,
+  description: Option<String>,
+  is_required: bool,
+  is_active: bool,
+  triggers: Vec<KitProductDetailDto>,
+  items: Vec<KitIncludedItemDto>,
 }
 
 #[tauri::command]
@@ -177,6 +203,81 @@ fn map_kit_row(row: &rusqlite::Row) -> rusqlite::Result<KitListItem> {
 }
 
 #[tauri::command]
+pub fn get_kit_details(
+  db_state: State<'_, Mutex<Connection>>,
+  kit_id: String,
+) -> Result<KitDetailsResponse, String> {
+  let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+  let kit_sql = "
+    SELECT id, name, description, is_required, is_active 
+    FROM product_kit_options 
+    WHERE id = ? AND deleted_at IS NULL
+  ";
+  
+  let kit_header = conn.query_row(kit_sql, [&kit_id], |row| {
+    Ok((
+      row.get::<_, String>(0)?,
+      row.get::<_, String>(1)?,
+      row.get::<_, Option<String>>(2)?,
+      row.get::<_, bool>(3)?,
+      row.get::<_, bool>(4)?,
+    ))
+  }).map_err(|_| "Kit no encontrado".to_string())?;
+
+  let triggers_sql = "
+    SELECT p.id, p.code, p.name, p.retail_price
+    FROM product_kit_main pkm
+    JOIN products p ON pkm.main_product_id = p.id
+    WHERE pkm.kit_option_id = ?
+  ";
+
+  let mut triggers_stmt = conn.prepare(triggers_sql).map_err(|e| e.to_string())?;
+  let triggers_iter = triggers_stmt.query_map([&kit_id], |row| {
+    Ok(KitProductDetailDto {
+      id: row.get(0)?,
+      code: row.get(1)?,
+      name: row.get(2)?,
+      retail_price: row.get(3)?,
+    })
+  }).map_err(|e| e.to_string())?;
+
+  let triggers: Vec<KitProductDetailDto> = triggers_iter.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+
+  let items_sql = "
+    SELECT p.id, p.code, p.name, p.retail_price, pki.quantity
+    FROM product_kit_items pki
+    JOIN products p ON pki.included_product_id = p.id
+    WHERE pki.kit_option_id = ?
+  ";
+
+  let mut items_stmt = conn.prepare(items_sql).map_err(|e| e.to_string())?;
+  let items_iter = items_stmt.query_map([&kit_id], |row| {
+    Ok(KitIncludedItemDto {
+      product: KitProductDetailDto {
+        id: row.get(0)?,
+        code: row.get(1)?,
+        name: row.get(2)?,
+        retail_price: row.get(3)?,
+      },
+      quantity: row.get(4)?,
+    })
+  }).map_err(|e| e.to_string())?;
+
+  let items: Vec<KitIncludedItemDto> = items_iter.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+
+  Ok(KitDetailsResponse {
+    id: kit_header.0,
+    name: kit_header.1,
+    description: kit_header.2,
+    is_required: kit_header.3,
+    is_active: kit_header.4,
+    triggers,
+    items,
+  })
+}
+
+#[tauri::command]
 pub fn check_products_in_active_kits(
   db_state: State<'_, Mutex<Connection>>,
   product_ids: Vec<String>,
@@ -280,5 +381,102 @@ pub fn create_kit(
 
   tx.commit().map_err(|e| format!("Error confirmando transacción del kit: {}", e))?;
 
+  Ok(())
+}
+
+#[tauri::command]
+pub fn update_kit(
+  db_state: State<'_, Mutex<Connection>>,
+  kit_id: String,
+  payload: CreateKitDto,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().map_err(|e| e.to_string())?;
+
+  if payload.trigger_product_ids.is_empty() {
+    return Err("El kit debe tener al menos un producto activador (Trigger).".to_string());
+  }
+  if payload.included_items.is_empty() {
+    return Err("El kit debe tener al menos un producto de regalo.".to_string());
+  }
+  for item in &payload.included_items {
+    if payload.trigger_product_ids.contains(&item.product_id) {
+      return Err("Un producto no puede ser 'Disparador' y 'Regalo' en el mismo kit.".to_string());
+    }
+  }
+
+  let tx = conn.transaction().map_err(|e| format!("Error iniciando transacción: {}", e))?;
+
+  {
+
+    let placeholders: String = payload.trigger_product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let check_sql = format!(
+      "SELECT p.name FROM product_kit_main pkm 
+       JOIN products p ON pkm.main_product_id = p.id 
+       WHERE pkm.main_product_id IN ({}) 
+       AND pkm.kit_option_id != ? 
+       LIMIT 1",
+      placeholders
+    );
+    
+    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    for id in &payload.trigger_product_ids {
+      params_vec.push(id);
+    }
+    params_vec.push(&kit_id);
+
+    let mut check_stmt = tx.prepare(&check_sql).map_err(|e| e.to_string())?;
+    
+    let conflict_name: Option<String> = check_stmt
+      .query_row(rusqlite::params_from_iter(params_vec), |row| row.get(0))
+      .optional() 
+      .map_err(|e| format!("Error verificando conflictos: {}", e))?;
+
+    if let Some(name) = conflict_name {
+      return Err(format!("El producto '{}' ya pertenece a OTRO kit activo.", name));
+    }
+
+    tx.execute(
+      "UPDATE product_kit_options 
+       SET name = ?1, description = ?2, is_required = ?3, is_active = ?4, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?5",
+      rusqlite::params![
+        payload.name,
+        payload.description,
+        payload.is_required,
+        payload.is_active,
+        kit_id
+      ],
+    ).map_err(|e| format!("Error actualizando cabecera: {}", e))?;
+
+    tx.execute("DELETE FROM product_kit_main WHERE kit_option_id = ?", [&kit_id])
+      .map_err(|e| format!("Error limpiando triggers: {}", e))?;
+      
+    tx.execute("DELETE FROM product_kit_items WHERE kit_option_id = ?", [&kit_id])
+      .map_err(|e| format!("Error limpiando items: {}", e))?;
+
+    let mut stmt_trigger = tx.prepare(
+      "INSERT INTO product_kit_main (kit_option_id, main_product_id) VALUES (?1, ?2)"
+    ).map_err(|e| e.to_string())?;
+
+    for trigger_id in &payload.trigger_product_ids {
+      stmt_trigger.execute(rusqlite::params![kit_id, trigger_id])
+        .map_err(|e| format!("Error insertando trigger {}: {}", trigger_id, e))?;
+    }
+
+    let mut stmt_items = tx.prepare(
+      "INSERT INTO product_kit_items (id, kit_option_id, included_product_id, quantity) VALUES (?1, ?2, ?3, ?4)"
+    ).map_err(|e| e.to_string())?;
+
+    for item in &payload.included_items {
+      stmt_items.execute(rusqlite::params![
+        Uuid::new_v4().to_string(),
+        kit_id,
+        item.product_id,
+        item.quantity
+      ]).map_err(|e| format!("Error insertando item de regalo: {}", e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error guardando edición del kit: {}", e))?;
   Ok(())
 }
