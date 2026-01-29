@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowLeft, User, AlertCircle } from "lucide-react";
-import { format, subMonths } from "date-fns";
+import { format, subYears, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +43,8 @@ export default function CustomerDetailPage() {
   const customerHistoryFilters = useMemo(
     () => ({
       customer_id: id,
-      start_date: format(subMonths(new Date(), 1), "yyyy-MM-dd"), // Hace 1 mes
-      end_date: format(new Date(), "yyyy-MM-dd"), // Hoy
+      start_date: format(subYears(new Date(), 1), "yyyy-MM-dd"),
+      end_date: format(addDays(new Date(), 1), "yyyy-MM-dd"),
     }),
     [id],
   );
