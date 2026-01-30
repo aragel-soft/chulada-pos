@@ -22,6 +22,26 @@ export interface CreateKitPayload {
   included_items: KitItem[];
 }
 
+export interface KitDefinitionWithTrigger {
+  trigger_product_id: string;
+  kit: KitOptionDef;
+}
+
+export interface KitItemDef {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+}
+
+export interface KitOptionDef {
+  id: string;
+  name: string;
+  max_selections: number;
+  is_required: boolean;
+  items: KitItemDef[];
+}
+
 export interface KitProductDetail {
   id: string;
   code: string;

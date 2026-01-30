@@ -1,6 +1,7 @@
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
 use uuid::Uuid;
@@ -394,6 +395,157 @@ pub fn create_kit(
   tx.commit().map_err(|e| format!("Error confirmando transacción del kit: {}", e))?;
 
   Ok(())
+}
+#[derive(Serialize, Clone)]
+pub struct KitItemDef {
+    pub id: String,
+    pub product_id: String,
+    pub product_name: String,
+    pub quantity: i64,
+}
+
+#[derive(Serialize, Clone)]
+pub struct KitOptionDef {
+    pub id: String,
+    pub name: String,
+    pub max_selections: i64,
+    pub is_required: bool,
+    pub items: Vec<KitItemDef>,
+}
+
+#[tauri::command]
+pub fn get_kit_for_product(
+    db_state: State<'_, Mutex<Connection>>,
+    product_id: String
+) -> Result<Option<KitOptionDef>, String> {
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    // 1. Check if product is a trigger
+    let kit_option_id: Option<String> = conn.query_row(
+        "SELECT kit_option_id FROM product_kit_main WHERE main_product_id = ?",
+        [&product_id],
+        |row| row.get(0)
+    ).optional().map_err(|e| e.to_string())?;
+
+    let kit_id = match kit_option_id {
+        Some(id) => id,
+        None => return Ok(None)
+    };
+
+    // 2. Fetch Kit Headers
+    let (name, max_selections, is_required) = conn.query_row(
+        "SELECT name, max_selections, is_required FROM product_kit_options WHERE id = ?",
+        [&kit_id],
+        |row| Ok((
+            row.get::<_, String>(0)?, 
+            row.get::<_, i64>(1)?,
+            row.get::<_, bool>(2)?
+        ))
+    ).map_err(|e| format!("Error fetching kit header: {}", e))?;
+
+    // 3. Fetch Kit Items
+    let mut stmt = conn.prepare(
+        "SELECT pki.id, pki.included_product_id, pki.quantity, p.name 
+         FROM product_kit_items pki
+         JOIN products p ON pki.included_product_id = p.id
+         WHERE pki.kit_option_id = ?"
+    ).map_err(|e| e.to_string())?;
+
+    let items = stmt.query_map([&kit_id], |row| {
+        Ok(KitItemDef {
+            id: row.get(0)?,
+            product_id: row.get(1)?,
+            quantity: row.get(2)?,
+            product_name: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?
+      .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+
+    Ok(Some(KitOptionDef {
+        id: kit_id,
+        name,
+        max_selections,
+        is_required,
+        items
+    }))
+}
+
+#[derive(Serialize)]
+pub struct KitDefinitionWithTrigger {
+    pub trigger_product_id: String,
+    pub kit: KitOptionDef,
+}
+
+#[tauri::command]
+pub fn get_all_kits(
+    db_state: State<'_, Mutex<Connection>>,
+) -> Result<Vec<KitDefinitionWithTrigger>, String> {
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    // Fetch all Active Kits + Triggers
+    let mut stmt = conn.prepare(
+        "SELECT k.id, k.name, k.max_selections, k.is_required, m.main_product_id
+         FROM product_kit_options k
+         JOIN product_kit_main m ON k.id = m.kit_option_id
+         WHERE k.is_active = 1 AND k.deleted_at IS NULL"
+    ).map_err(|e| e.to_string())?;
+
+    let kit_entries = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?, // kit_id
+            row.get::<_, String>(1)?, // name
+            row.get::<_, i64>(2)?,    // max_selections
+            row.get::<_, bool>(3)?,   // is_required
+            row.get::<_, String>(4)?, // trigger_product_id
+        ))
+    }).map_err(|e| e.to_string())?
+      .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+
+    // Fetch all Items for these kits
+    let mut stmt_items = conn.prepare(
+        "SELECT i.kit_option_id, i.id, i.included_product_id, i.quantity, p.name
+         FROM product_kit_items i
+         JOIN products p ON i.included_product_id = p.id
+         JOIN product_kit_options k ON i.kit_option_id = k.id
+         WHERE k.is_active = 1 AND k.deleted_at IS NULL"
+    ).map_err(|e| e.to_string())?;
+
+    let mut items_map: HashMap<String, Vec<KitItemDef>> = HashMap::new();
+
+    let all_items = stmt_items.query_map([], |row| {
+         Ok((
+            row.get::<_, String>(0)?, // kit_option_id
+            KitItemDef {
+                id: row.get::<_, String>(1)?,
+                product_id: row.get::<_, String>(2)?,
+                quantity: row.get::<_, i64>(3)?,
+                product_name: row.get::<_, String>(4)?,
+            }
+         ))
+    }).map_err(|e| e.to_string())?;
+
+    for item_res in all_items {
+        let (kit_id, item) = item_res.map_err(|e| e.to_string())?;
+        items_map.entry(kit_id).or_default().push(item);
+    }
+
+    // Assemble Response
+    let mut result = Vec::new();
+    for (kit_id, name, max_selections, is_required, trigger_product_id) in kit_entries {
+        let items = items_map.get(&kit_id).cloned().unwrap_or_default();
+        result.push(KitDefinitionWithTrigger {
+            trigger_product_id,
+            kit: KitOptionDef {
+                id: kit_id,
+                name,
+                max_selections,
+                is_required,
+                items,
+            }
+        });
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]

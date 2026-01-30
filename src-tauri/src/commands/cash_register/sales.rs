@@ -1,17 +1,25 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use std::collections::{HashMap, HashSet};
 use tauri::State;
 use uuid::Uuid;
+use chrono;
 
-#[derive(Debug, Serialize, Deserialize)]
+// Business Constants
+const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleItemRequest {
+    pub id: Option<String>,
+    pub parent_item_id: Option<String>,
     pub product_id: String,
     pub quantity: f64,
-    pub price_type: String, // 'retail', 'wholesale'
+    pub price_type: String, // 'retail', 'wholesale', 'kit_item', 'promo'
+    pub promotion_id: Option<String>, // ID de la promoción si aplica
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleRequest {
     pub discount_percentage: f64,
     pub customer_id: Option<String>,
@@ -43,11 +51,10 @@ struct FinalItemData<'a> {
     item_subtotal: f64,
 }
 
-fn get_daily_sequence(conn: &Connection, store_prefix: &str, date_str: &str) -> Result<i64, String> {
-    let pattern = format!("{}-{}-%", store_prefix, date_str);
+fn get_sequence(conn: &Connection) -> Result<i64, String> {
     let last_folio: Option<String> = conn.query_row(
-        "SELECT folio FROM sales WHERE folio LIKE ?1 ORDER BY folio DESC LIMIT 1",
-        params![pattern],
+        "SELECT folio FROM sales ORDER BY rowid DESC LIMIT 1",
+        [],
         |row| row.get(0),
     )
     .optional()
@@ -55,12 +62,14 @@ fn get_daily_sequence(conn: &Connection, store_prefix: &str, date_str: &str) -> 
 
     match last_folio {
         Some(folio) => {
-             // Extract last part
              let parts: Vec<&str> = folio.rsplit('-').collect();
              if let Some(last_part) = parts.first() {
                  if let Ok(seq) = last_part.parse::<i64>() {
                      return Ok(seq + 1);
                  }
+             }
+             if let Ok(seq) = folio.parse::<i64>() {
+                 return Ok(seq + 1);
              }
              Ok(1)
         },
@@ -68,73 +77,352 @@ fn get_daily_sequence(conn: &Connection, store_prefix: &str, date_str: &str) -> 
     }
 }
 
-fn generate_smart_folio(
-    conn: &Connection,
-    store_prefix: &str,
-    date_str: &str, // YYYY-MM-DD
-) -> Result<String, String> {
-    let sequence = get_daily_sequence(conn, store_prefix, date_str)?;
-    Ok(format!("{}-{}-{:04}", store_prefix, date_str, sequence))
+struct KitRule {
+    name: String,
+    max_selections: i64,
+    triggers: HashSet<String>,
+    items: HashSet<String>,
 }
 
-fn get_store_prefix(conn: &Connection) -> String {
-    conn.query_row(
-        "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
-        [],
-        |row| row.get(0),
-    )
-    .unwrap_or_else(|_| "store-main".to_string())
-}
+fn get_relevant_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<HashMap<String, KitRule>, String> {
+    use std::collections::{HashMap, HashSet};
 
-fn calculate_sale_items<'a>(
-    tx: &Connection,
-    items: &'a [SaleItemRequest],
-    discount_percentage: f64
-) -> Result<(f64, f64, Vec<FinalItemData<'a>>), String> {
-    let mut total_gross = 0.0;
-    let mut total_item_discounts = 0.0;
-    let mut final_items = Vec::new();
+    let product_ids: Vec<String> = items.iter().map(|i| i.product_id.clone()).collect();
 
-    let mut stmt = tx.prepare("SELECT code, name, retail_price, wholesale_price FROM products WHERE id = ?")
-        .map_err(|e| e.to_string())?;
+    let ids_placeholder: String = product_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
-    for item in items {
-            let product_row = stmt.query_row([&item.product_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?, // code
-                row.get::<_, String>(1)?, // name
-                row.get::<_, f64>(2)?,    // retail
-                row.get::<_, f64>(3)?,    // wholesale
-            ))
-        }).optional().map_err(|e| e.to_string())?;
+    let mut relevant_kit_ids = HashSet::new();
+    
+    // Identify Kits via Triggers (Main Products)
+    let sql_triggers = format!(
+        "SELECT DISTINCT main.kit_option_id FROM product_kit_main main INNER JOIN product_kit_options options ON main.kit_option_id = options.id WHERE main.main_product_id IN ({}) AND options.is_active = 1",
+        ids_placeholder
+    );
+    let mut stmt_trig = conn.prepare(&sql_triggers).map_err(|e| e.to_string())?;
+    let triggers_iter = stmt_trig.query_map(rusqlite::params_from_iter(product_ids.iter()), |row| {
+        Ok(row.get::<_, String>(0)?)
+    }).map_err(|e| e.to_string())?;
+    
+    for kit_id in triggers_iter {
+        relevant_kit_ids.insert(kit_id.map_err(|e| e.to_string())?);
+    }
 
-        let (db_code, db_name, retail, wholesale) = match product_row {
-            Some(r) => r,
-            None => return Err(format!("Producto ID {} no encontrado en base de datos. Posible desincronización.", item.product_id)),
-        };
+    if relevant_kit_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
 
-        // Select Price
-        let unit_price = if item.price_type == "wholesale" { wholesale } else { retail };
-        
-        // ToDo: Discount is not implemented
-        let gross_amount = unit_price * item.quantity;
-        let item_discount_val = gross_amount * (discount_percentage / 100.0);
-        let net_amount = gross_amount - item_discount_val;
+    let kit_ids_vec: Vec<String> = relevant_kit_ids.into_iter().collect();
+    let kits_placeholder: String = kit_ids_vec.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
-        total_gross += gross_amount;
-        total_item_discounts += item_discount_val;
+    let mut kit_rules: HashMap<String, KitRule> = HashMap::new();
 
-        final_items.push(FinalItemData {
-            original_req: item,
-            db_name,
-            db_code,
-            unit_price,
-            item_discount_amt: item_discount_val,
-            item_subtotal: net_amount,
+    // Fetch Kit Headers
+    let sql_headers = format!(
+        "SELECT id, max_selections, name FROM product_kit_options WHERE id IN ({}) AND is_active = 1",
+        kits_placeholder
+    );
+    let mut stmt_headers = conn.prepare(&sql_headers).map_err(|e| e.to_string())?;
+    let headers_iter = stmt_headers.query_map(rusqlite::params_from_iter(kit_ids_vec.iter()), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?))
+    }).map_err(|e| e.to_string())?;
+
+    for r in headers_iter {
+        let (id, max_selections, name) = r.map_err(|e| e.to_string())?;
+        kit_rules.insert(id, KitRule {
+            name,
+            max_selections,
+            triggers: HashSet::new(),
+            items: HashSet::new(),
         });
     }
 
-    Ok((total_gross, total_item_discounts, final_items))
+    // Fetch Kit Triggers
+    let sql_kit_triggers = format!(
+        "SELECT kit_option_id, main_product_id FROM product_kit_main WHERE kit_option_id IN ({})",
+        kits_placeholder
+    );
+    let mut stmt_kit_trig = conn.prepare(&sql_kit_triggers).map_err(|e| e.to_string())?;
+    let kit_trig_iter = stmt_kit_trig.query_map(rusqlite::params_from_iter(kit_ids_vec.iter()), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    }).map_err(|e| e.to_string())?;
+
+    for r in kit_trig_iter {
+        let (kit_id, prod_id) = r.map_err(|e| e.to_string())?;
+        if let Some(rule) = kit_rules.get_mut(&kit_id) {
+            rule.triggers.insert(prod_id);
+        }
+    }
+
+    // Fetch Kit Items
+    let sql_kit_items = format!(
+        "SELECT kit_option_id, included_product_id FROM product_kit_items WHERE kit_option_id IN ({})",
+        kits_placeholder
+    );
+    let mut stmt_kit_items = conn.prepare(&sql_kit_items).map_err(|e| e.to_string())?;
+    let kit_items_iter = stmt_kit_items.query_map(rusqlite::params_from_iter(kit_ids_vec.iter()), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    }).map_err(|e| e.to_string())?;
+
+    for r in kit_items_iter {
+        let (kit_id, prod_id) = r.map_err(|e| e.to_string())?;
+        if let Some(rule) = kit_rules.get_mut(&kit_id) {
+            rule.items.insert(prod_id);
+        }
+    }
+
+    Ok(kit_rules)
+}
+
+fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<SaleItemRequest>, String> {
+    
+    // Get Kit Rules
+    let kit_rules = get_relevant_kit_rules(conn, items)?;
+
+    if kit_rules.is_empty() {
+        for item in items {
+            if item.price_type == "kit_item" {
+                 return Err(format!("El producto '{}' está marcado como regalo pero no activa ningún kit.", item.product_id));
+            }
+        }
+        return Ok(items.to_vec());
+    }
+
+    // Calculate Kit Credits
+    let mut kit_credits: HashMap<String, f64> = HashMap::new();
+
+    for item in items {
+        for (kit_id, rule) in &kit_rules {
+            if rule.triggers.contains(&item.product_id) {
+                let current_credit = kit_credits.entry(kit_id.clone()).or_insert(0.0);
+                *current_credit += item.quantity * (rule.max_selections as f64);
+            }
+        }
+    }
+
+    // Validate Claims
+    let items_by_id: HashMap<String, SaleItemRequest> = items.iter()
+        .filter_map(|i| i.id.as_ref().map(|id| (id.clone(), i.clone())))
+        .collect();
+
+    for item in items {
+        if item.price_type == "kit_item" {
+            let mut found_credit = false;
+            // look for a kit that has credits
+            for (kit_id, rule) in &kit_rules {
+                if rule.items.contains(&item.product_id) {
+                    
+                    // Specific Parent Validation
+                    if let Some(pid) = &item.parent_item_id {
+                        if let Some(parent_item) = items_by_id.get(pid) {
+                            if !rule.triggers.contains(&parent_item.product_id) {
+                                continue; 
+                            }
+                        }
+                    }
+
+                    if let Some(credits) = kit_credits.get_mut(kit_id) {
+                        if *credits >= item.quantity - 0.0001 {
+                            *credits -= item.quantity;
+                            found_credit = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if !found_credit {
+                return Err(format!(
+                    "Regalo no válido o excedido: El producto '{}' (Cant: {}) no tiene suficientes créditos de kit disponibles.", 
+                    item.product_id, item.quantity
+                ));
+            }
+        }
+    }
+    // Validate Completeness
+    for (kit_id, remaining) in &kit_credits {
+        if *remaining > 0.0001 {
+             let kit_name = &kit_rules[kit_id].name;
+            return Err(format!(
+                "Kit incompleto: '{}'. Faltan seleccionar {} opciones de regalo.", 
+                kit_name, 
+                remaining
+            ));
+        }
+    }
+    Ok(items.to_vec())
+}
+
+// Estructura para datos de una promoción validada
+struct ValidatedPromotion {
+    combo_price: f64,
+    instance_count: f64,
+}
+
+fn validate_promotions(
+    conn: &Connection,
+    items: &[SaleItemRequest],
+) -> Result<HashMap<String, ValidatedPromotion>, String> {
+    let mut promo_groups: HashMap<String, Vec<&SaleItemRequest>> = HashMap::new();
+    
+    for item in items {
+        if let Some(promo_id) = &item.promotion_id {
+            promo_groups.entry(promo_id.clone())
+                .or_insert_with(Vec::new)
+                .push(item);
+        }
+    }
+    
+    if promo_groups.is_empty() {
+        return Ok(HashMap::new());
+    }
+    
+    let promo_ids: Vec<String> = promo_groups.keys().cloned().collect();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    
+    // Fetch all promotions
+    let placeholders = promo_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql_promotions = format!(
+        "SELECT id, combo_price 
+         FROM promotions 
+         WHERE id IN ({}) AND deleted_at IS NULL AND is_active = 1 AND start_date <= ? AND end_date >= ?",
+        placeholders
+    );
+    
+    let mut params: Vec<&dyn rusqlite::ToSql> = promo_ids.iter()
+        .map(|id| id as &dyn rusqlite::ToSql)
+        .collect();
+    params.push(&today);
+    params.push(&today);
+    
+    let mut stmt = conn.prepare(&sql_promotions).map_err(|e| e.to_string())?;
+    let promo_data_iter = stmt.query_map(params.as_slice(), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+    }).map_err(|e| e.to_string())?;
+    
+    let mut promo_prices: HashMap<String, f64> = HashMap::new();
+    for result in promo_data_iter {
+        let (id, price) = result.map_err(|e| e.to_string())?;
+        promo_prices.insert(id, price);
+    }
+    
+    // Fetch all promotion combos
+    let sql_combos = format!(
+        "SELECT promotion_id, product_id, quantity 
+         FROM promotion_combos 
+         WHERE promotion_id IN ({})",
+        placeholders
+    );
+    
+    let mut stmt_combos = conn.prepare(&sql_combos).map_err(|e| e.to_string())?;
+    let combos_iter = stmt_combos.query_map(
+        rusqlite::params_from_iter(promo_ids.iter()),
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?, // promotion_id
+                row.get::<_, String>(1)?, // product_id
+                row.get::<_, i64>(2)?     // quantity
+            ))
+        }
+    ).map_err(|e| e.to_string())?;
+    
+    let mut promo_combos: HashMap<String, HashMap<String, i64>> = HashMap::new();
+    for result in combos_iter {
+        let (promo_id, product_id, qty) = result.map_err(|e| e.to_string())?;
+        promo_combos.entry(promo_id)
+            .or_insert_with(HashMap::new)
+            .insert(product_id, qty);
+    }
+    
+    // VALIDATIONS: In-memory
+    let mut validated_promos: HashMap<String, ValidatedPromotion> = HashMap::new();
+    
+    for (promo_id, promo_items) in promo_groups {
+        let combo_price = promo_prices[&promo_id];
+        let required_products = promo_combos.get(&promo_id)
+            .ok_or(format!("La promoción '{}' no tiene productos configurados", promo_id))?;
+        
+        if required_products.is_empty() {
+            return Err(format!("La promoción '{}' no tiene productos configurados", promo_id));
+        }
+        
+        // Build map of provided products
+        let mut provided_products: HashMap<String, f64> = HashMap::new();
+        for item in &promo_items {
+            *provided_products.entry(item.product_id.clone()).or_insert(0.0) += item.quantity;
+        }
+
+        // Validate exact match in number of unique products types
+        if provided_products.len() != required_products.len() {
+            return Err(format!(
+                "Promoción '{}': se requieren {} tipos de productos, pero se enviaron {}",
+                promo_id,
+                required_products.len(),
+                provided_products.len()
+            ));
+        }
+        
+        // Calculate Multiplier
+        let first_required_prod_id = required_products.keys().next().unwrap();
+        let first_required_qty = required_products[first_required_prod_id] as f64;
+        
+        let first_provided_qty = match provided_products.get(first_required_prod_id) {
+             Some(qty) => *qty,
+             None => return Err(format!("Promoción '{}': falta el producto '{}'", promo_id, first_required_prod_id)),
+        };
+
+        let multiplier = first_provided_qty / first_required_qty;
+
+        // Multiplier
+        if multiplier < 1.0 || (multiplier - multiplier.round()).abs() > 0.001 {
+             return Err(format!(
+                "Promoción '{}': cantidades inválidas (multiplicador detectado: {:.2}). Deben ser múltiplos exactos.", 
+                promo_id, multiplier
+             ));
+        }
+
+        let instance_count = multiplier.round() as f64;
+
+        // Validate required products match the multiplier
+        for (prod_id, required_qty) in required_products {
+            let expected_qty = *required_qty as f64 * instance_count;
+            match provided_products.get(prod_id) {
+                Some(&provided_qty) => {
+                    if (provided_qty - expected_qty).abs() > 0.001 {
+                        return Err(format!(
+                            "Promoción '{}': el producto '{}' requiere cantidad total {} (para {} promos), pero se envió {}",
+                            promo_id, prod_id, expected_qty, instance_count, provided_qty
+                        ));
+                    }
+                }
+                None => {
+                    return Err(format!(
+                        "Promoción '{}': falta el producto '{}' (requerido total: {})",
+                        promo_id, prod_id, expected_qty
+                    ));
+                }
+            }
+        }
+        
+        // Validate no extra products provided
+        for prod_id in provided_products.keys() {
+            if !required_products.contains_key(prod_id) {
+                return Err(format!(
+                    "Promoción '{}': el producto '{}' no pertenece a esta promoción",
+                    promo_id, prod_id
+                ));
+            }
+        }
+        
+        validated_promos.insert(
+            promo_id.clone(),
+            ValidatedPromotion {
+                combo_price,
+                instance_count,
+            },
+        );
+    }
+    
+    Ok(validated_promos)
 }
 
 fn validate_credit_sale(
@@ -176,6 +464,143 @@ fn validate_credit_sale(
     }
 }
 
+fn calculate_sale_items<'a>(
+    tx: &Connection,
+    items: &'a [SaleItemRequest],
+    discount_percentage: f64,
+) -> Result<(f64, f64, Vec<FinalItemData<'a>>), String> {
+    // Validate Promotions (and get multipliers)
+    let validated_promos = validate_promotions(tx, items)?;
+    
+    let mut total_gross = 0.0;
+    let mut total_item_discounts = 0.0;
+    let mut final_items = Vec::new();
+    
+    let product_ids: Vec<String> = items.iter()
+        .map(|i| i.product_id.clone())
+        .collect();
+    
+    let ids_placeholder: String = product_ids.iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    
+    let sql = format!(
+        "SELECT id, code, name, retail_price, wholesale_price FROM products WHERE id IN ({})",
+        ids_placeholder
+    );
+    
+    let mut stmt = tx.prepare(&sql).map_err(|e| e.to_string())?;
+    let products_iter = stmt.query_map(
+        rusqlite::params_from_iter(product_ids.iter()), 
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?, // id
+                row.get::<_, String>(1)?, // code
+                row.get::<_, String>(2)?, // name
+                row.get::<_, f64>(3)?,    // retail
+                row.get::<_, f64>(4)?,    // wholesale
+            ))
+        }
+    ).map_err(|e| e.to_string())?;
+    
+    let mut products_map: HashMap<String, (String, String, f64, f64)> = HashMap::new();
+    for result in products_iter {
+        let (id, code, name, retail, wholesale) = result.map_err(|e| e.to_string())?;
+        products_map.insert(id, (code, name, retail, wholesale));
+    }
+    
+    let mut promo_groups: HashMap<Option<String>, Vec<&SaleItemRequest>> = HashMap::new();
+    for item in items {
+        promo_groups.entry(item.promotion_id.clone())
+            .or_insert_with(Vec::new)
+            .push(item);
+    }
+    
+    for (promo_id_opt, group_items) in promo_groups {
+        if let Some(promo_id) = promo_id_opt {
+            // PROMO ITEMS
+            let validated_promo = validated_promos.get(&promo_id)
+                .ok_or(format!("Error interno: promoción {} no validada", promo_id))?;
+            
+            // Calculate total retail of promo products
+            let mut total_retail = 0.0;
+            let mut item_retails: Vec<(&SaleItemRequest, f64)> = Vec::new();
+            
+            for item in &group_items {
+                let (_, _, retail, _) = products_map.get(&item.product_id)
+                    .ok_or(format!("Producto {} no encontrado", item.product_id))?;
+                let item_retail = retail * item.quantity;
+                total_retail += item_retail;
+                item_retails.push((item, item_retail));
+            }
+            
+            // Distribute combo_price proportionally
+            let total_promo_price = validated_promo.combo_price * validated_promo.instance_count;
+            
+            for (item, item_retail) in item_retails {
+                let (db_code, db_name, _, _) = products_map.get(&item.product_id)
+                    .ok_or(format!("Producto {} no encontrado", item.product_id))?;
+                
+                let proportion = if total_retail > 0.0 { item_retail / total_retail } else { 0.0 };
+                let allocated_price = total_promo_price * proportion;
+                let unit_price = allocated_price / item.quantity;
+                
+                // Global discounts are not applied to promo items
+                total_gross += allocated_price;
+                
+                final_items.push(FinalItemData {
+                    original_req: item,
+                    db_name: db_name.clone(),
+                    db_code: db_code.clone(),
+                    unit_price,
+                    item_discount_amt: 0.0,
+                    item_subtotal: allocated_price,
+                });
+            }
+        } else {
+            // NORMAL ITEMS
+            for item in group_items {
+                let (db_code, db_name, retail, wholesale) = match products_map.get(&item.product_id) {
+                    Some(product_data) => product_data.clone(),
+                    None => return Err(format!(
+                        "Producto ID {} no encontrado en base de datos. Posible desincronización.", 
+                        item.product_id
+                    )),
+                };
+                
+                let unit_price = if item.price_type == "kit_item" {
+                    0.0
+                } else if discount_percentage > 0.0 {
+                    retail
+                } else if item.price_type == "wholesale" { 
+                    wholesale 
+                } else { 
+                    retail 
+                };
+                
+                let gross_amount = unit_price * item.quantity;
+                let item_discount_val = gross_amount * (discount_percentage / 100.0);
+                let net_amount = gross_amount - item_discount_val;
+
+                total_gross += gross_amount;
+                total_item_discounts += item_discount_val;
+
+                final_items.push(FinalItemData {
+                    original_req: item,
+                    db_name,
+                    db_code,
+                    unit_price,
+                    item_discount_amt: item_discount_val,
+                    item_subtotal: net_amount,
+                });
+            }
+        }
+    }
+    
+    Ok((total_gross, total_item_discounts, final_items))
+}
+
 #[tauri::command]
 pub fn process_sale(
     app_handle: tauri::AppHandle,
@@ -188,10 +613,27 @@ pub fn process_sale(
         return Err("No hay items en la venta.".to_string());
     }
     
+    // Validate discount percentage
+    if payload.discount_percentage < 0.0 {
+        return Err("El porcentaje de descuento no puede ser negativo.".to_string());
+    }
+    
+    if payload.discount_percentage > MAX_DISCOUNT_PERCENTAGE {
+        return Err(format!(
+            "El descuento máximo permitido es {}%. Descuento solicitado: {}%",
+            MAX_DISCOUNT_PERCENTAGE,
+            payload.discount_percentage
+        ));
+    }
+    
+    
+    // Validate & Apply Kit Rules
+    let validated_items = apply_kit_rules(&conn, &payload.items)?;
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // 1. Calculate Items & Totals
-    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &payload.items, payload.discount_percentage)?;
+    // Calculate Items & Totals
+    let (total_gross, total_item_discounts, final_items) = calculate_sale_items(&tx, &validated_items, payload.discount_percentage)?;
     
     let final_total = total_gross - total_item_discounts;
 
@@ -206,18 +648,10 @@ pub fn process_sale(
 
     // Prepare Data for Insertion
     let sale_id = Uuid::new_v4().to_string();
-    let now = chrono::Local::now();
-    let date_str = now.format("%Y-%m-%d").to_string();
-    let store_prefix = get_store_prefix(&tx);
-    let folio = generate_smart_folio(&tx, &store_prefix, &date_str)?;
+    let folio = generate_smart_folio(&tx)?;
+    let store_id = get_store_id(&tx)?;
 
-    let inventory_store_id: String = tx.query_row(
-        "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
-        [],
-        |row| row.get(0)
-    ).unwrap_or_else(|_| "store-main".to_string());
-    println!("Inventory Store ID: {}", inventory_store_id);
-    let has_discount = total_item_discounts > 0.0; // ToDo: Discount is not implemented
+    let has_discount = total_item_discounts > 0.0;
 
     tx.execute(
         "INSERT INTO sales (
@@ -230,8 +664,8 @@ pub fn process_sale(
             sale_id,
             folio,
             total_gross,
-            payload.discount_percentage, // This is explicitly the global discount percentage // To Do: Isn't working 
-            total_item_discounts,// To Do: Isn't working,
+            payload.discount_percentage,
+            total_item_discounts,
             final_total,
             payload.user_id,
             payload.cash_register_shift_id,
@@ -245,40 +679,64 @@ pub fn process_sale(
     ).map_err(|e| format!("Error insertando venta: {}", e))?;
 
     // Update Inventory & Insert Items
-    for data in &final_items {
-        let item = data.original_req;
+    // Generate IDs
+    let mut frontend_to_db_id: HashMap<String, String> = HashMap::new();
+    let mut item_db_ids: Vec<String> = Vec::with_capacity(final_items.len());
+
+    for item_data in &final_items {
+        let new_id = Uuid::new_v4().to_string();
+        item_db_ids.push(new_id.clone());
         
+        if let Some(fid) = &item_data.original_req.id {
+            frontend_to_db_id.insert(fid.clone(), new_id);
+        }
+    }
+
+    for (i, data) in final_items.iter().enumerate() {
+        let item = data.original_req;
+        let item_id = &item_db_ids[i];
+        
+        // Resolve Parent ID
+        let parent_db_id = if let Some(pid) = &item.parent_item_id {
+            match frontend_to_db_id.get(pid) {
+                Some(db_id) => Some(db_id.clone()),
+                None => return Err(format!("Integridad de datos: El item '{}' referencia a un padre (ID: {}) que no está en la venta.", data.db_name, pid)),
+            }
+        } else {
+            None
+        };
+
         // Decrease stock
         let rows_mod = tx.execute(
             "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
-            params![item.quantity, item.product_id, inventory_store_id],
+            params![item.quantity, item.product_id, store_id],
         ).map_err(|e| format!("Error actualizando inventario para {}: {}", data.db_name, e))?;
 
         if rows_mod == 0 {
              return Err(format!("Producto no encontrado en inventario (o sin stock inicializado): {}", data.db_name));
         }
 
-        let item_id = Uuid::new_v4().to_string();
         tx.execute(
             "INSERT INTO sale_items (
                 id, sale_id, product_id, product_name, product_code, quantity, 
                 unit_price, price_type, discount_percentage, discount_amount, 
-                subtotal, is_kit_item, parent_sale_item_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                subtotal, is_kit_item, parent_sale_item_id, promotion_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 item_id,
                 sale_id,
                 item.product_id,
-                data.db_name,
+                data.db_name,//
                 data.db_code,
                 item.quantity,
                 data.unit_price,
                 item.price_type,
-                payload.discount_percentage, // ToDo: Discount is not implemented
-                data.item_discount_amt, // ToDo: Discount is not implemented
+                payload.discount_percentage,
+                data.item_discount_amt,
                 data.item_subtotal,
-                false, // To Do: add kit items support
-                Option::<String>::None // To Do: add kit items support
+                if item.price_type == "kit_item" { 1 } else { 0 },
+                parent_db_id,
+                item.promotion_id
             ],
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;
     }
@@ -295,9 +753,7 @@ pub fn process_sale(
     if payload.should_print {
         let sale_id_clone = sale_id.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = crate::printer_utils::print_sale_from_db(app_handle_clone, sale_id_clone) {
-                // We log the error but we don't return it because the sale is already committed.
-                println!("Error imprimiendo ticket de venta: {}", e);
+            if let Err(_e) = crate::printer_utils::print_sale_from_db(app_handle_clone, sale_id_clone) {
             }
         });
     }
@@ -308,4 +764,20 @@ pub fn process_sale(
         total: final_total,
         change,
     })
+}
+
+fn get_store_id(tx: &Connection) -> Result<String, String> {
+    let store_id: String = tx.query_row(
+        "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or_else(|_| "store-main".to_string());
+    Ok(store_id)
+}
+
+fn generate_smart_folio(
+    conn: &Connection,
+) -> Result<String, String> {
+    let sequence = get_sequence(conn)?; 
+    Ok(format!("{:08}", sequence))
 }

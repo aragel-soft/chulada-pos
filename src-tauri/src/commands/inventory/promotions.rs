@@ -351,6 +351,121 @@ pub fn create_promotion(
   tx.commit().map_err(|e| format!("Error al confirmar transacción: {}", e))?;
   Ok(())
 }
+// Structures for get_all_active_promotions
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromotionComboProduct {
+  pub product_id: String,
+  pub quantity: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromotionWithCombos {
+  pub id: String,
+  pub name: String,
+  pub description: Option<String>,
+  pub type_field: String,
+  pub combo_price: f64,
+  pub start_date: String,
+  pub end_date: String,
+  pub is_active: bool,
+  pub status: String,
+  pub items_summary: String,
+  pub created_at: String,
+  pub combo_products: Vec<PromotionComboProduct>,
+}
+
+#[tauri::command]
+pub fn get_all_active_promotions(
+  db_state: State<'_, Mutex<Connection>>,
+) -> Result<Vec<PromotionWithCombos>, String> {
+  let conn = db_state.lock().unwrap();
+  
+  let today = Local::now().format("%Y-%m-%d").to_string();
+  
+  // Fetch active promotions
+  let sql = "
+    SELECT 
+      p.id, 
+      p.name, 
+      p.description, 
+      p.type, 
+      p.combo_price, 
+      p.start_date, 
+      p.end_date, 
+      p.is_active,
+      p.created_at,
+      GROUP_CONCAT(prod.name, ' + ') as items_summary
+    FROM promotions p
+    LEFT JOIN promotion_combos pc ON p.id = pc.promotion_id
+    LEFT JOIN products prod ON pc.product_id = prod.id
+    WHERE p.deleted_at IS NULL 
+      AND p.is_active = 1 
+      AND p.start_date <= ?1 
+      AND p.end_date >= ?1
+    GROUP BY p.id
+  ";
+  
+  let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+  
+  let promotions_iter = stmt.query_map([&today], |row| {
+    Ok((
+      row.get::<_, String>(0)?, // id
+      row.get::<_, String>(1)?, // name
+      row.get::<_, Option<String>>(2)?, // description
+      row.get::<_, String>(3)?, // type_field
+      row.get::<_, f64>(4)?, // combo_price
+      row.get::<_, String>(5)?, // start_date
+      row.get::<_, String>(6)?, // end_date
+      row.get::<_, bool>(7)?, // is_active
+      row.get::<_, String>(8)?, // created_at
+      row.get::<_, Option<String>>(9)?, // items_summary
+    ))
+  })
+  .map_err(|e| e.to_string())?;
+  
+  let mut promotions = Vec::new();
+  
+  for promo_result in promotions_iter {
+    let (id, name, description, type_field, combo_price, start_date, end_date, is_active, created_at, items_summary) = 
+      promo_result.map_err(|e| e.to_string())?;
+    
+    let combo_sql = "
+      SELECT product_id, quantity 
+      FROM promotion_combos 
+      WHERE promotion_id = ?1
+    ";
+    
+    let mut combo_stmt = conn.prepare(combo_sql).map_err(|e| e.to_string())?;
+    let combo_products_iter = combo_stmt.query_map([&id], |row| {
+      Ok(PromotionComboProduct {
+        product_id: row.get(0)?,
+        quantity: row.get(1)?,
+      })
+    })
+    .map_err(|e| e.to_string())?;
+    
+    let combo_products: Vec<PromotionComboProduct> = combo_products_iter
+      .collect::<Result<Vec<_>, _>>()
+      .map_err(|e| e.to_string())?;
+    
+    promotions.push(PromotionWithCombos {
+      id,
+      name,
+      description,
+      type_field,
+      combo_price,
+      start_date,
+      end_date,
+      is_active,
+      status: "active".to_string(),
+      items_summary: items_summary.unwrap_or_default(),
+      created_at,
+      combo_products,
+    });
+  }
+  
+  Ok(promotions)
+}
 
 #[tauri::command]
 pub fn update_promotion(
