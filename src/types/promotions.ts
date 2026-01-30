@@ -1,3 +1,5 @@
+import { Product } from "./inventory";
+
 export type PromotionStatus = 'active' | 'scheduled' | 'expired' | 'inactive';
 
 export interface Promotion {
@@ -47,4 +49,41 @@ export interface CreatePromotionDto {
   start_date: string; 
   end_date: string; 
   items: ComboItemDto[];
+}
+
+export interface UpdatePromotionDto extends CreatePromotionDto {
+  is_active: boolean;
+}
+
+export interface PromotionItemDetailRaw {
+  product_id: string;
+  name: string;
+  code: string;
+  sale_price: number;
+  quantity: number;
+}
+
+export interface PromotionDetailsResponse {
+  id: string;
+  name: string;
+  description?: string;
+  combo_price: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  items: PromotionItemDetailRaw[];
+}
+
+export interface PromotionWithDetails {
+  id: string;
+  name: string;
+  description?: string;
+  combo_price: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  items: {
+    product: Product; 
+    quantity: number;
+  }[];
 }

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
-import { CreateKitPayload, KitListItem, KitDefinitionWithTrigger } from "@/types/kits";
+import { CreateKitPayload, KitDetails, KitListItem, KitDefinitionWithTrigger } from "@/types/kits";
 
 export const getKits = async (params: PaginationParams): Promise<PaginatedResponse<KitListItem>> => {
   try {
@@ -12,25 +12,6 @@ export const getKits = async (params: PaginationParams): Promise<PaginatedRespon
       sortOrder: params.sortOrder || null,
     });
   } catch (error) {
-    console.error("Error fetching kits:", error);
-    throw error;
-  }
-};
-
-export const checkProductsInActiveKits = async (productIds: string[]): Promise<string[]> => {
-  try {
-    return await invoke("check_products_in_active_kits", { productIds });
-  } catch (error) {
-    console.error("Error checking active kits conflicts:", error);
-    throw error;
-  }
-};
-
-export const createKit = async (payload: CreateKitPayload): Promise<void> => {
-  try {
-    return await invoke("create_kit", { payload });
-  } catch (error) {
-    console.error("Error creating kit:", error);
     throw error;
   }
 };
@@ -40,5 +21,45 @@ export const getAllKits = async (): Promise<KitDefinitionWithTrigger[]> => {
     return await invoke("get_all_kits");
   } catch (error) {
     return [];
+  }
+};
+
+export const getKitDetails = async (kitId: string): Promise<KitDetails> => {
+  try {
+    return await invoke("get_kit_details", { kitId });
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const checkProductsInActiveKits = async (productIds: string[], excludeKitId?: string): Promise<string[]> => {
+  try {
+    return await invoke("check_products_in_active_kits", { productIds, excludeKitId });
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const createKit = async (payload: CreateKitPayload): Promise<void> => {
+  try {
+    return await invoke("create_kit", { payload });
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateKit = async (kitId: string, payload: CreateKitPayload): Promise<void> => {
+  try {
+    return await invoke("update_kit", { kitId, payload });
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const deleteKits = async (kitIds: string[]): Promise<void> => {
+  try {
+    return await invoke("delete_kits", { kitIds });
+  } catch (error) {
+    throw error;
   }
 };

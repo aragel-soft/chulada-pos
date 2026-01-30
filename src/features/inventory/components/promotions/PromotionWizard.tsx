@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/text-area";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DateSelector } from "@/components/ui/date-selector";
+import { Switch } from "@/components/ui/switch";
 import {
   CheckCircle2,
   ArrowLeft,
@@ -27,27 +30,20 @@ import {
   Tag,
   Calendar,
   DollarSign,
-  AlertCircle, // Aseguramos que esté importado
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  ProductSearchSelector,
-  SelectorItem,
-} from "@/components/common/ProductSearchSelector";
+import { ProductSearchSelector } from "@/components/common/ProductSearchSelector";
 import {
   createPromotion,
   updatePromotion,
 } from "@/lib/api/inventory/promotions";
-import { Promotion } from "@/types/promotions";
-import { Product } from "@/types/inventory";
-
-export interface PromotionWithDetails extends Omit<Promotion, "items_summary"> {
-  code: string;
-  items: {
-    product: Product;
-    quantity: number;
-  }[];
-}
+import { PromotionWithDetails } from "@/types/promotions";
+import {
+  promotionFormSchema,
+  type PromotionFormData,
+} from "@/features/inventory/schemas/promotionSchema";
+import { SelectorItem } from "@/types/inventory";
 
 const { useStepper, steps } = defineStepper(
   { id: "info", title: "Configuración", description: "Precio y vigencia" },
@@ -59,49 +55,56 @@ interface PromotionWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promotionToEdit?: PromotionWithDetails;
+  onSuccess?: () => void;
 }
 
 export function PromotionWizard({
   open,
   onOpenChange,
   promotionToEdit,
+  onSuccess,
 }: PromotionWizardProps) {
   const stepper = useStepper();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!promotionToEdit;
 
-  const [formData, setFormData] = useState(() => {
-    if (promotionToEdit) {
-      const start = new Date(promotionToEdit.start_date + "T00:00:00");
-      const end = new Date(promotionToEdit.end_date + "T00:00:00");
-
-      return {
-        name: promotionToEdit.name,
-        description: promotionToEdit.description || "",
-        comboPrice: promotionToEdit.combo_price,
-        startDate: start,
-        endDate: end,
-      };
-    }
-    return {
+  const {
+    register,
+    formState: { errors },
+    setValue,
+    watch,
+    reset,
+    trigger,
+  } = useForm<PromotionFormData>({
+    resolver: zodResolver(promotionFormSchema) as any,
+    defaultValues: {
       name: "",
       description: "",
-      comboPrice: 0,
+      comboPrice: "" as unknown as number,
       startDate: new Date(),
       endDate: addDays(new Date(), 30),
-    };
+      isActive: true,
+    },
   });
 
-  const [items, setItems] = useState<SelectorItem[]>(() => {
-    if (promotionToEdit?.items) {
-      return promotionToEdit.items.map((i) => ({
-        product: i.product,
-        quantity: i.quantity,
-      }));
+  const formData = watch();
+
+  const [items, setItems] = useState<SelectorItem[]>([]);
+  const [itemsError, setItemsError] = useState<string | null>(null);
+
+  const validateItems = (): boolean => {
+    if (items.length === 0) {
+      setItemsError("Debes agregar al menos 1 producto");
+      return false;
     }
-    return [];
-  });
+    if (items.length === 1 && items[0].quantity <= 1) {
+      setItemsError("Debes tener al menos 2 unidades o 2 productos diferentes");
+      return false;
+    }
+    setItemsError(null);
+    return true;
+  };
 
   useEffect(() => {
     if (open) {
@@ -110,13 +113,16 @@ export function PromotionWizard({
       if (promotionToEdit) {
         const start = new Date(promotionToEdit.start_date + "T00:00:00");
         const end = new Date(promotionToEdit.end_date + "T00:00:00");
-        setFormData({
+
+        reset({
           name: promotionToEdit.name,
           description: promotionToEdit.description || "",
           comboPrice: promotionToEdit.combo_price,
           startDate: start,
           endDate: end,
+          isActive: promotionToEdit.is_active,
         });
+
         setItems(
           promotionToEdit.items.map((i) => ({
             product: i.product,
@@ -124,35 +130,48 @@ export function PromotionWizard({
           })),
         );
       } else {
-        setFormData({
+        reset({
           name: "",
           description: "",
-          comboPrice: 0,
+          comboPrice: "" as unknown as number,
           startDate: new Date(),
           endDate: addDays(new Date(), 30),
+          isActive: true,
         });
         setItems([]);
       }
+      setItemsError(null);
     }
-  }, [open, promotionToEdit]);
-
-  const isStep1Valid =
-    formData.name.trim().length >= 3 &&
-    formData.comboPrice > 0 &&
-    formData.startDate <= formData.endDate;
-
-  const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-  const isStep2Valid =
-    items.length >= 2 || (items.length === 1 && items[0].quantity > 1);
+  }, [open, promotionToEdit, reset]);
 
   useEffect(() => {
     if (formData.startDate > formData.endDate) {
-      setFormData((prev) => ({ ...prev, endDate: prev.startDate }));
+      setValue("endDate", formData.startDate);
     }
-  }, [formData.startDate]);
+  }, [formData.startDate, formData.endDate, setValue]);
+
+  const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleClose = () => {
     onOpenChange(false);
+  };
+
+  const handleNext = async () => {
+    if (stepper.current.id === "info") {
+      const isValid = await trigger();
+
+      if (isValid) {
+        stepper.next();
+      } else {
+        toast.error("Por favor corrige los errores antes de continuar");
+      }
+    } else if (stepper.current.id === "items") {
+      if (validateItems()) {
+        stepper.next();
+      } else {
+        toast.error("Por favor agrega productos al combo");
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -165,6 +184,7 @@ export function PromotionWizard({
       combo_price: formData.comboPrice,
       start_date: format(formData.startDate, "yyyy-MM-dd"),
       end_date: format(formData.endDate, "yyyy-MM-dd"),
+      is_active: formData.isActive,
       items: items.map((i) => ({
         product_id: i.product.id,
         quantity: i.quantity,
@@ -181,6 +201,7 @@ export function PromotionWizard({
       }
 
       queryClient.invalidateQueries({ queryKey: ["promotions"] });
+      onSuccess?.();
       handleClose();
     } catch (error) {
       console.error(error);
@@ -211,14 +232,8 @@ export function PromotionWizard({
             </div>
             <div className="flex flex-col">
               <DialogTitle className="text-xl font-bold text-foreground">
-                {isEditing ? `Editar Promoción` : 'Crear Nueva Promoción'}
+                {isEditing ? `Editar Promoción` : "Crear Nueva Promoción"}
               </DialogTitle>
-              {isEditing && (
-                <p className="text-xs text-muted-foreground font-mono mt-1">
-                  ID: {promotionToEdit.code || promotionToEdit.id.slice(0, 8)}
-                  ...
-                </p>
-              )}
             </div>
           </DialogHeader>
 
@@ -258,8 +273,8 @@ export function PromotionWizard({
                           isActive
                             ? "border-[#480489] bg-[#480489] text-white shadow-md scale-110"
                             : isCompleted
-                            ? "border-[#480489] bg-[#480489] text-white"
-                            : "border-muted-foreground/30 text-muted-foreground bg-background",
+                              ? "border-[#480489] bg-[#480489] text-white"
+                              : "border-muted-foreground/30 text-muted-foreground bg-background",
                         )}
                       >
                         {isCompleted ? (
@@ -277,8 +292,8 @@ export function PromotionWizard({
                             isActive
                               ? "text-[#480489]"
                               : isCompleted
-                              ? "text-foreground"
-                              : "text-muted-foreground",
+                                ? "text-foreground"
+                                : "text-muted-foreground",
                           )}
                         >
                           {step.title}
@@ -319,13 +334,18 @@ export function PromotionWizard({
                     <Input
                       id="name"
                       placeholder="Ej. Combo de Verano"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      className="focus-visible:ring-[#480489]"
+                      {...register("name")}
+                      className={cn(
+                        "focus-visible:ring-[#480489]",
+                        errors.name && "border-destructive",
+                      )}
                       autoFocus
                     />
+                    {errors.name && (
+                      <p className="text-sm text-destructive">
+                        {errors.name.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-2">
@@ -333,13 +353,7 @@ export function PromotionWizard({
                     <Textarea
                       id="desc"
                       placeholder="Detalles internos..."
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
+                      {...register("description")}
                       className="focus-visible:ring-[#480489] min-h-[80px] resize-none"
                     />
                   </div>
@@ -348,39 +362,77 @@ export function PromotionWizard({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Precio del Combo</Label>
+                      <Label>
+                        Precio del Combo{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
                       <MoneyInput
                         value={formData.comboPrice}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            comboPrice: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="focus-visible:ring-[#480489] text-lg font-semibold"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "") {
+                            setValue("comboPrice", "" as unknown as number, {
+                              shouldValidate: true,
+                            });
+                            return;
+                          }
+                          const numberVal = parseFloat(val);
+                          setValue(
+                            "comboPrice",
+                            isNaN(numberVal) ? 0 : numberVal,
+                            { shouldValidate: true },
+                          );
+                        }}
+                        className={cn(
+                          "focus-visible:ring-[#480489] text-lg font-semibold",
+                          errors.comboPrice && "border-destructive",
+                        )}
                       />
+                      {errors.comboPrice && (
+                        <p className="text-sm text-destructive">
+                          {errors.comboPrice.message}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Vigencia</Label>
                       <div className="flex flex-col gap-2">
                         <DateSelector
                           date={formData.startDate}
-                          onSelect={(d) =>
-                            d && setFormData({ ...formData, startDate: d })
-                          }
+                          onSelect={(d) => d && setValue("startDate", d)}
                           placeholder="Inicio"
                         />
                         <DateSelector
                           date={formData.endDate}
-                          onSelect={(d) =>
-                            d && setFormData({ ...formData, endDate: d })
-                          }
+                          onSelect={(d) => d && setValue("endDate", d)}
                           placeholder="Fin"
                           minDate={formData.startDate}
                         />
                       </div>
+                      {errors.endDate && (
+                        <p className="text-sm text-destructive">
+                          {errors.endDate.message}
+                        </p>
+                      )}
                     </div>
                   </div>
+                  {isEditing && (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <Separator className="my-1" />
+                      <Label>Estatus</Label>
+                      <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">
+                          {formData.isActive ? "Activa" : "Inactiva"}
+                        </span>
+                        <Switch
+                          checked={formData.isActive}
+                          onCheckedChange={(checked) =>
+                            setValue("isActive", checked)
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ),
@@ -406,13 +458,23 @@ export function PromotionWizard({
                     enableQuantity={true}
                     customTitle="Productos del Combo"
                     selectedItems={items}
-                    onItemsChange={setItems}
+                    onItemsChange={(newItems) => {
+                      setItems(newItems);
+                      setItemsError(null);
+                    }}
                   />
                 </div>
+
+                {itemsError && (
+                  <div className="mt-4 flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive">{itemsError}</p>
+                  </div>
+                )}
               </div>
             ),
 
-            // PASO 3: REVIEW 
+            // PASO 3: REVIEW
             review: () => {
               const regularPriceTotal = items.reduce((acc, item) => {
                 return acc + item.product.retail_price * item.quantity;
@@ -456,9 +518,9 @@ export function PromotionWizard({
                     </div>
                   </div>
 
-                  {/* TODO: Estandarizar las alertas en el sistema */}
+                  {/* TODO: Estandarizar componentes de alerta/warning */}
                   {isPriceHigherThanRegular && (
-                    <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-900">
+                    <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-900 animate-pulse">
                       <AlertCircle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-bold">¡Cuidado con el precio!</p>
@@ -552,11 +614,7 @@ export function PromotionWizard({
             </Button>
           ) : (
             <Button
-              onClick={stepper.next}
-              disabled={
-                (stepper.current.id === "info" && !isStep1Valid) ||
-                (stepper.current.id === "items" && !isStep2Valid)
-              }
+              onClick={handleNext}
               className="bg-[#480489] hover:bg-[#3a036e] text-white gap-2"
             >
               Siguiente <ArrowRight className="h-4 w-4" />
