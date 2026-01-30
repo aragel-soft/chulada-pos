@@ -80,3 +80,9 @@ export interface BulkUpdateProductsPayload {
   wholesale_price?: number;
   tags_to_add?: string[];
 }
+
+export interface SelectorItem {
+  product: Product;
+  quantity: number;
+}
+
