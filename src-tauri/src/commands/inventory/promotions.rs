@@ -78,6 +78,29 @@ pub struct CreatePromotionDto {
   pub items: Vec<ComboItemDto>,
 }
 
+// Structures for get_all_active_promotions
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromotionComboProduct {
+  pub product_id: String,
+  pub quantity: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromotionWithCombos {
+  pub id: String,
+  pub name: String,
+  pub description: Option<String>,
+  pub type_field: String,
+  pub combo_price: f64,
+  pub start_date: String,
+  pub end_date: String,
+  pub is_active: bool,
+  pub status: String,
+  pub items_summary: String,
+  pub created_at: String,
+  pub combo_products: Vec<PromotionComboProduct>,
+}
+
 #[tauri::command]
 pub fn get_promotions(
   db_state: State<'_, Mutex<Connection>>,
@@ -350,28 +373,6 @@ pub fn create_promotion(
 
   tx.commit().map_err(|e| format!("Error al confirmar transacción: {}", e))?;
   Ok(())
-}
-// Structures for get_all_active_promotions
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PromotionComboProduct {
-  pub product_id: String,
-  pub quantity: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PromotionWithCombos {
-  pub id: String,
-  pub name: String,
-  pub description: Option<String>,
-  pub type_field: String,
-  pub combo_price: f64,
-  pub start_date: String,
-  pub end_date: String,
-  pub is_active: bool,
-  pub status: String,
-  pub items_summary: String,
-  pub created_at: String,
-  pub combo_products: Vec<PromotionComboProduct>,
 }
 
 #[tauri::command]

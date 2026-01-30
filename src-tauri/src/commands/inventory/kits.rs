@@ -67,6 +67,29 @@ pub struct KitDetailsResponse {
   items: Vec<KitIncludedItemDto>,
 }
 
+#[derive(Serialize, Clone)]
+pub struct KitItemDef {
+    pub id: String,
+    pub product_id: String,
+    pub product_name: String,
+    pub quantity: i64,
+}
+
+#[derive(Serialize, Clone)]
+pub struct KitOptionDef {
+    pub id: String,
+    pub name: String,
+    pub max_selections: i64,
+    pub is_required: bool,
+    pub items: Vec<KitItemDef>,
+}
+
+#[derive(Serialize)]
+pub struct KitDefinitionWithTrigger {
+    pub trigger_product_id: String,
+    pub kit: KitOptionDef,
+}
+
 #[tauri::command]
 pub fn get_kits(
   db_state: State<'_, Mutex<Connection>>,
@@ -396,22 +419,6 @@ pub fn create_kit(
 
   Ok(())
 }
-#[derive(Serialize, Clone)]
-pub struct KitItemDef {
-    pub id: String,
-    pub product_id: String,
-    pub product_name: String,
-    pub quantity: i64,
-}
-
-#[derive(Serialize, Clone)]
-pub struct KitOptionDef {
-    pub id: String,
-    pub name: String,
-    pub max_selections: i64,
-    pub is_required: bool,
-    pub items: Vec<KitItemDef>,
-}
 
 #[tauri::command]
 pub fn get_kit_for_product(
@@ -468,12 +475,6 @@ pub fn get_kit_for_product(
         is_required,
         items
     }))
-}
-
-#[derive(Serialize)]
-pub struct KitDefinitionWithTrigger {
-    pub trigger_product_id: String,
-    pub kit: KitOptionDef,
 }
 
 #[tauri::command]
