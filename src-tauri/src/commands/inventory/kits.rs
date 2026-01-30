@@ -645,3 +645,39 @@ pub fn update_kit(
   tx.commit().map_err(|e| format!("Error guardando edición del kit: {}", e))?;
   Ok(())
 }
+
+#[tauri::command]
+pub fn delete_kits(
+  db_state: State<'_, Mutex<Connection>>,
+  kit_ids: Vec<String>,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().map_err(|e| e.to_string())?;
+
+  let tx = conn.transaction().map_err(|e| format!("Error iniciando transacción: {}", e))?;
+
+  {
+    let mut delete_main_stmt = tx.prepare("DELETE FROM product_kit_main WHERE kit_option_id = ?")
+      .map_err(|e| e.to_string())?;
+    
+    let mut delete_items_stmt = tx.prepare("DELETE FROM product_kit_items WHERE kit_option_id = ?")
+      .map_err(|e| e.to_string())?;
+    
+    let mut soft_delete_header_stmt = tx.prepare(
+      "UPDATE product_kit_options SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id = ?"
+    ).map_err(|e| e.to_string())?;
+
+    for id in &kit_ids {
+      delete_main_stmt.execute([id])
+        .map_err(|e| format!("Error liberando triggers del kit {}: {}", id, e))?;
+
+      delete_items_stmt.execute([id])
+        .map_err(|e| format!("Error limpiando items del kit {}: {}", id, e))?;
+
+      soft_delete_header_stmt.execute([id])
+        .map_err(|e| format!("Error archivando kit {}: {}", id, e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error confirmando eliminación: {}", e))?;
+  Ok(())
+}
