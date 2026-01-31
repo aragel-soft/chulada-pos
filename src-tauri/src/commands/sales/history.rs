@@ -70,8 +70,8 @@ pub struct SaleItemView {
   pub quantity: f64,
   pub unit_price: f64,
   pub subtotal: f64,
-  pub price_type: String, // 'retail', 'wholesale', 'promo'
-  pub is_kit_item: bool,
+  pub price_type: String, // 'retail', 'wholesale', 'promo', 'kit_item'
+  pub kit_option_id: Option<String>,
   pub is_gift: bool, // quantity > 0 && price == 0
   pub product_image: Option<String>,
   pub promotion_name: Option<String>,
@@ -290,13 +290,13 @@ pub fn get_sale_details(
   let items_sql = "
     SELECT 
       si.id, si.product_name, si.quantity, si.unit_price, si.subtotal,
-      si.price_type, si.is_kit_item,
+      si.price_type, si.kit_option_id,
       p.image_url, pr.name as promotion_name
     FROM sale_items si
     LEFT JOIN products p ON si.product_id = p.id
     LEFT JOIN promotions pr ON si.promotion_id = pr.id
     WHERE si.sale_id = ?
-    ORDER BY si.is_kit_item ASC, si.product_name ASC
+    ORDER BY si.kit_option_id ASC, si.product_name ASC
   ";
 
   let mut stmt_items = conn.prepare(items_sql).map_err(|e| e.to_string())?;
@@ -320,7 +320,7 @@ pub fn get_sale_details(
           unit_price,
           subtotal: row.get(4)?,
           price_type: row.get(5)?,
-          is_kit_item: row.get(6).unwrap_or(false),
+          kit_option_id: row.get(6)?,
           is_gift: unit_price == 0.0,
           product_image: resolved_img,
           promotion_name: row.get(8)?,

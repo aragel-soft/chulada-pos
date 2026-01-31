@@ -12,11 +12,11 @@ const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleItemRequest {
     pub id: Option<String>,
-    pub parent_item_id: Option<String>,
     pub product_id: String,
     pub quantity: f64,
     pub price_type: String, // 'retail', 'wholesale', 'kit_item', 'promo'
-    pub promotion_id: Option<String>, // ID de la promoción si aplica
+    pub promotion_id: Option<String>,
+    pub kit_option_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -180,8 +180,8 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
 
     if kit_rules.is_empty() {
         for item in items {
-            if item.price_type == "kit_item" {
-                 return Err(format!("El producto '{}' está marcado como regalo pero no activa ningún kit.", item.product_id));
+            if item.kit_option_id.is_some() {
+                 return Err(format!("El producto '{}' está marcado como kit pero no se encontraron reglas válidas.", item.product_id));
             }
         }
         return Ok(items.to_vec());
@@ -199,46 +199,47 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
         }
     }
 
-    // Validate Claims
-    let items_by_id: HashMap<String, SaleItemRequest> = items.iter()
-        .filter_map(|i| i.id.as_ref().map(|id| (id.clone(), i.clone())))
-        .collect();
-
+    // Validate Claims (Consuming Credits)
     for item in items {
-        if item.price_type == "kit_item" {
-            let mut found_credit = false;
-            // look for a kit that has credits
-            for (kit_id, rule) in &kit_rules {
-                if rule.items.contains(&item.product_id) {
-                    
-                    // Specific Parent Validation
-                    if let Some(pid) = &item.parent_item_id {
-                        if let Some(parent_item) = items_by_id.get(pid) {
-                            if !rule.triggers.contains(&parent_item.product_id) {
-                                continue; 
-                            }
-                        }
-                    }
-
-                    if let Some(credits) = kit_credits.get_mut(kit_id) {
-                        if *credits >= item.quantity - 0.0001 {
-                            *credits -= item.quantity;
-                            found_credit = true;
-                            break;
-                        }
-                    }
+        if let Some(target_kit_id) = &item.kit_option_id {
+            // Verify this item actually belongs to the kit definition
+            if let Some(rule) = kit_rules.get(target_kit_id) {
+                if rule.triggers.contains(&item.product_id) {
+                     continue; 
                 }
-            }
 
-            if !found_credit {
-                return Err(format!(
-                    "Regalo no válido o excedido: El producto '{}' (Cant: {}) no tiene suficientes créditos de kit disponibles.", 
-                    item.product_id, item.quantity
-                ));
+                if !rule.items.contains(&item.product_id) {
+                     return Err(format!(
+                        "Integridad de Kit: El producto '{}' no pertenece oficialmente al kit '{}'.", 
+                        item.product_id, rule.name
+                    ));
+                }
+
+                // Consume Credit
+                if let Some(credits) = kit_credits.get_mut(target_kit_id) {
+                    if *credits >= item.quantity - 0.0001 {
+                        *credits -= item.quantity;
+                    } else {
+                        return Err(format!(
+                            "Créditos insuficientes para el kit '{}'. Producto: '{}' (Cant: {}). Créditos disponibles: {}", 
+                            rule.name, item.product_id, item.quantity, credits
+                        ));
+                    }
+                } else {
+                     return Err(format!(
+                        "Se intenta agregar item al kit '{}' pero no hay detonantes (productos principales) en el carrito.", 
+                        rule.name
+                    ));
+                }
+
+            } else {
+                return Err(format!("Kit ID inválido o inactivo: {}", target_kit_id));
             }
         }
     }
-    // Validate Completeness
+    
+    // Validate Completeness (Optional: You might want to allow partial kits, but user usually wants full)
+    // For now we warn or strict check? Code was strict: "Kit incompleto".
     for (kit_id, remaining) in &kit_credits {
         if *remaining > 0.0001 {
              let kit_name = &kit_rules[kit_id].name;
@@ -249,7 +250,21 @@ fn apply_kit_rules(conn: &Connection, items: &[SaleItemRequest]) -> Result<Vec<S
             ));
         }
     }
-    Ok(items.to_vec())
+    // Auto-Link Triggers
+    let active_kit_ids: HashSet<String> = items.iter().filter_map(|i| i.kit_option_id.clone()).collect();
+    let mut final_items = items.to_vec();
+    for item in final_items.iter_mut() {
+        if item.kit_option_id.is_some() { continue; }
+        for kit_id in &active_kit_ids {
+            if let Some(rule) = kit_rules.get(kit_id) {
+                if rule.triggers.contains(&item.product_id) {
+                    item.kit_option_id = Some(kit_id.clone());
+                    break;
+                }
+            }
+        }
+    }
+    Ok(final_items)
 }
 
 // Estructura para datos de una promoción validada
@@ -695,17 +710,7 @@ pub fn process_sale(
     for (i, data) in final_items.iter().enumerate() {
         let item = data.original_req;
         let item_id = &item_db_ids[i];
-        
-        // Resolve Parent ID
-        let parent_db_id = if let Some(pid) = &item.parent_item_id {
-            match frontend_to_db_id.get(pid) {
-                Some(db_id) => Some(db_id.clone()),
-                None => return Err(format!("Integridad de datos: El item '{}' referencia a un padre (ID: {}) que no está en la venta.", data.db_name, pid)),
-            }
-        } else {
-            None
-        };
-
+    
         // Decrease stock
         let rows_mod = tx.execute(
             "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
@@ -720,8 +725,8 @@ pub fn process_sale(
             "INSERT INTO sale_items (
                 id, sale_id, product_id, product_name, product_code, quantity, 
                 unit_price, price_type, discount_percentage, discount_amount, 
-                subtotal, is_kit_item, parent_sale_item_id, promotion_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                subtotal, kit_option_id, promotion_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 item_id,
                 sale_id,
@@ -734,8 +739,7 @@ pub fn process_sale(
                 payload.discount_percentage,
                 data.item_discount_amt,
                 data.item_subtotal,
-                if item.price_type == "kit_item" { 1 } else { 0 },
-                parent_db_id,
+                item.kit_option_id,
                 item.promotion_id
             ],
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;
