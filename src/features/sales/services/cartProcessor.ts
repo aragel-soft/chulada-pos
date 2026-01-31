@@ -45,18 +45,58 @@ export function processCart(
   processedItems = applyWholesalePricing(
     processedItems, 
     options.ticketPriceType
-  );
 
-  // Stage 4: Discount
-  // Discount is applied at the total calculation level, not at item level
-  // See getTicketTotal() in cartStore.ts
-
-  return processedItems;
+  // Stage 4: Finalize (Merge & Sort)
+  // Note: Discount is applied at total calculation level in cartStore.ts
+  return finalizeCart(processedItems, options.kitDefs);
 }
 
 /**
- * Stage 1: Process all kit triggers and link eligible items as gifts
+ * Finalizes cart by merging duplicates and sorting for display.
  */
+function finalizeCart(items: CartItem[], kitDefs: Record<string, KitOptionDef>): CartItem[] {
+  const map = new Map<string, CartItem>();
+
+  for (const item of items) {
+    if (item.quantity <= 0) continue;
+
+    const key = `${item.id}|${item.priceType}|${item.kitOptionId || ''}|${item.promotionId || ''}`;
+
+    if (map.has(key)) {
+       const existing = map.get(key)!;
+       existing.quantity += item.quantity;
+    } else {
+       map.set(key, { ...item });
+    }
+  }
+
+  const mergedItems = Array.from(map.values());
+
+  const getKitId = (item: CartItem): string | null => {
+    if (item.kitOptionId) return item.kitOptionId;
+    if (item.priceType !== 'kit_item' && kitDefs[item.id]) return kitDefs[item.id].id;
+    return null;
+  };
+
+  return mergedItems.sort((a, b) => {
+    const kitA = getKitId(a);
+    const kitB = getKitId(b);
+
+    if (kitA && kitB) {
+      if (kitA !== kitB) return kitA.localeCompare(kitB);
+      const isGiftA = a.priceType === 'kit_item';
+      const isGiftB = b.priceType === 'kit_item';
+      if (isGiftA !== isGiftB) return isGiftA ? 1 : -1; 
+      return 0; 
+    }
+
+    if (kitA) return -1; 
+    if (kitB) return 1;
+
+    return 0; 
+  });
+}
+
 function processKits(
   items: CartItem[],
   kitDefs: Record<string, KitOptionDef>
@@ -64,10 +104,6 @@ function processKits(
   return KitService.processAllKits(items, kitDefs);
 }
 
-/**
- * Stage 2: Detect and apply promotional pricing
- * Only processes items that are NOT part of kits
- */
 function applyPromotions(
   items: CartItem[],
   promotionDefs: PromotionDef[],
@@ -86,10 +122,6 @@ function applyPromotions(
   return result.items;
 }
 
-/**
- * Stage 3: Apply wholesale pricing to eligible items
- * Converts between retail and wholesale based on ticket price type
- */
 function applyWholesalePricing(
   items: CartItem[],
   ticketPriceType: 'retail' | 'wholesale'

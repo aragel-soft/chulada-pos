@@ -6,7 +6,6 @@ import { MAX_OPEN_TICKETS } from '@/config/constants';
 import { useKitStore } from './kitStore';
 import { usePromotionsStore } from './promotionsStore';
 import { toast } from 'sonner';
-import * as KitService from '@/features/sales/services/kitService';
 import * as CartProcessor from '@/features/sales/services/cartProcessor';
 import { Ticket } from '@/types/sales';
 
@@ -18,7 +17,7 @@ interface CartState {
   createTicket: () => void;
   closeTicket: (id: string) => void;
   setActiveTicket: (id: string) => void;
-  addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number, kitTriggerId?: string }) => void;
+  addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleItemPriceType: (uuid: string) => void;
@@ -87,7 +86,7 @@ export const useCartStore = create<CartState>()(
 
       setActiveTicket: (id) => set({ activeTicketId: id }),
 
-      addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number, kitTriggerId?: string }) => {
+      addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => {
         set((state) => {
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
@@ -95,14 +94,10 @@ export const useCartStore = create<CartState>()(
           const currentTicket = state.tickets[ticketIndex];
           let targetPriceType = options?.priceType || currentTicket.priceType;
           const targetQuantity = options?.quantity || 1;
-          let kitTriggerId = options?.kitTriggerId;
           
           let newItems = [...currentTicket.items];
 
-          // Auto-link logic will be handled by CartProcessor after adding item
-
-          // 2. Add Item Logic
-          const existingItemIndex = newItems.findIndex(i => i.id === product.id && i.priceType === targetPriceType && i.kitTriggerId === kitTriggerId);
+          const existingItemIndex = newItems.findIndex(i => i.id === product.id && i.priceType === targetPriceType);
 
           if (existingItemIndex >= 0) {
             const currentQty = newItems[existingItemIndex].quantity;
@@ -120,13 +115,10 @@ export const useCartStore = create<CartState>()(
                 return state;
             }
 
-            // If ticket has discount, force retail price for new items (so discount applies to base price)
             if (currentTicket.discountPercentage > 0 && targetPriceType !== 'kit_item') {
                 targetPriceType = 'retail';
             }
 
-            // Price will be calculated by CartProcessor pipeline
-            // Use retail as base, will be adjusted by wholesale/discount stages
             const finalPrice = product.retail_price;
 
             newItems.push({
@@ -135,7 +127,6 @@ export const useCartStore = create<CartState>()(
               quantity: targetQuantity,
               priceType: targetPriceType,
               finalPrice: finalPrice,
-              kitTriggerId
             });
           }
 
@@ -187,11 +178,9 @@ export const useCartStore = create<CartState>()(
           if (ticketIndex === -1) return state;
 
           const currentTicket = state.tickets[ticketIndex];
-          
           const removedItem = currentTicket.items.find(i => i.uuid === uuid);
           if (!removedItem) return state;
 
-          // Remove item - CartProcessor will handle kit reconciliation
           const newItems = currentTicket.items.filter(i => i.uuid !== uuid);
 
           // Process cart through unified pipeline
@@ -223,69 +212,77 @@ export const useCartStore = create<CartState>()(
           const oldQty = item.quantity;
           let newItems = [...currentTicket.items];
           
-          if (quantity > oldQty) {
-              if (item.priceType === 'kit_item' && item.kitTriggerId) {
-                  const triggerItem = currentTicket.items.find(i => i.uuid === item.kitTriggerId);
-                  if (triggerItem) {
-                      const kitDefs = useKitStore.getState().kitDefs;
-                      const remaining = KitService.getRemainingKitQuota(triggerItem, currentTicket.items, kitDefs);
-                      
-                      const increase = quantity - oldQty;
-                      if (remaining !== null && increase > remaining) {
-                          const allowedIncrease = remaining;
-                          const excessQty = increase - remaining;
-                          
-                          if (allowedIncrease > 0) {
-                              newItems = newItems.map(i => {
-                                  if (i.uuid === uuid) {
-                                      return { ...i, quantity: oldQty + allowedIncrease };
-                                  }
-                                  return i;
-                              });
-                          }
-                          
-                          const existingRetail = newItems.find(i => 
-                              i.id === item.id && 
-                              i.priceType === 'retail' && 
-                              !i.kitTriggerId
-                          );
-                          
-                          if (existingRetail) {
-                              newItems = newItems.map(i => {
-                                  if (i.uuid === existingRetail.uuid) {
-                                      return { ...i, quantity: i.quantity + excessQty };
-                                  }
-                                  return i;
-                              });
-                          } else {
-                              newItems.push({
-                                  ...item,
-                                  uuid: uuidv4(),
-                                  priceType: 'retail',
-                                  finalPrice: item.retail_price,
-                                  quantity: excessQty,
-                                  kitTriggerId: undefined,
-                                  promotionId: undefined,
-                                  promotionInstanceId: undefined,
-                                  promotionName: undefined
-                              });
-                          }
-                          
-                          toast.info(`${excessQty} unidad(es) agregadas a precio normal`);
-                          
-                          const processedItems = CartProcessor.processCart(newItems, {
-                              kitDefs: useKitStore.getState().kitDefs,
-                              promotionDefs: usePromotionsStore.getState().promotionDefs,
-                              ticketPriceType: currentTicket.priceType,
-                              discountPercentage: currentTicket.discountPercentage
-                          });
-                          
-                          const newTickets = [...state.tickets];
-                          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
-                          
-                          return { tickets: newTickets };
-                      }
-                  }
+            if (quantity > oldQty) {
+              if (item.priceType === 'kit_item' && item.kitOptionId) {
+                   const kitDefs = useKitStore.getState().kitDefs;
+                   const kit = Object.values(kitDefs).find(k => k.id === item.kitOptionId);
+                   if (kit) {
+                        const totalCredits = currentTicket.items
+                            .filter(i => i.priceType !== 'kit_item' && kitDefs[i.id]?.id === kit.id)
+                            .reduce((sum, i) => sum + (i.quantity * kit.max_selections), 0);
+
+                        const totalConsumed = currentTicket.items
+                            .filter(i => i.kitOptionId === kit.id && i.priceType === 'kit_item')
+                            .reduce((sum, i) => sum + i.quantity, 0);
+                        
+                        const remaining = totalCredits - totalConsumed;
+
+                        const increase = quantity - oldQty;
+                        if (increase > remaining) {
+                            const allowedIncrease = remaining;
+                            const excessQty = increase - remaining;
+
+                            if (allowedIncrease > 0) {
+                                newItems = newItems.map(i => {
+                                    if (i.uuid === uuid) {
+                                        return { ...i, quantity: oldQty + allowedIncrease };
+                                    }
+                                    return i;
+                                });
+                            }
+
+                            const existingRetail = newItems.find(i => 
+                                i.id === item.id && 
+                                i.priceType === 'retail' && 
+                                !i.kitOptionId
+                            );
+
+                            if (existingRetail) {
+                                newItems = newItems.map(i => {
+                                    if (i.uuid === existingRetail.uuid) {
+                                        return { ...i, quantity: i.quantity + excessQty };
+                                    }
+                                    return i;
+                                });
+                            } else {
+                                newItems.push({
+                                    ...item,
+                                    uuid: uuidv4(),
+                                    priceType: 'retail',
+                                    finalPrice: item.retail_price,
+                                    quantity: excessQty,
+                                    kitOptionId: undefined,
+                                    promotionId: undefined,
+                                    promotionInstanceId: undefined,
+                                    promotionName: undefined
+                                });
+                            }
+                            
+                            toast.info(`${excessQty} unidad(es) agregadas a precio normal`);
+                            
+                            const processedItems = CartProcessor.processCart(newItems, {
+                                kitDefs: useKitStore.getState().kitDefs,
+                                promotionDefs: usePromotionsStore.getState().promotionDefs,
+                                ticketPriceType: currentTicket.priceType,
+                                discountPercentage: currentTicket.discountPercentage
+                            });
+                            
+                            const newTickets = [...state.tickets];
+                            newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
+                            
+                            return { tickets: newTickets };
+                        }
+                   }
               }
               
               if (quantity > item.stock) {
@@ -325,7 +322,6 @@ export const useCartStore = create<CartState>()(
           const currentTicket = state.tickets[ticketIndex];
           const newItems = currentTicket.items.map(item => {
             if (item.uuid === uuid) {
-              // Prevent toggling kit items and promotional items
               if (item.priceType === 'kit_item' || item.priceType === 'promo') return item; 
 
               const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
@@ -340,7 +336,6 @@ export const useCartStore = create<CartState>()(
             return item;
           });
 
-          // Process through pipeline to ensure consistency
           const processedItems = CartProcessor.processCart(newItems, {
             kitDefs: useKitStore.getState().kitDefs,
             promotionDefs: usePromotionsStore.getState().promotionDefs,
@@ -377,8 +372,6 @@ export const useCartStore = create<CartState>()(
 
           const currentTicket = state.tickets[ticketIndex];
           
-          // Process cart with discount through unified pipeline
-          // Discount forces retail price type
           const processedItems = CartProcessor.processCart(currentTicket.items, {
             kitDefs: useKitStore.getState().kitDefs,
             promotionDefs: usePromotionsStore.getState().promotionDefs,
@@ -405,7 +398,6 @@ export const useCartStore = create<CartState>()(
 
           const currentTicket = state.tickets[ticketIndex];
 
-          // Process cart without discount through unified pipeline
           const processedItems = CartProcessor.processCart(currentTicket.items, {
             kitDefs: useKitStore.getState().kitDefs,
             promotionDefs: usePromotionsStore.getState().promotionDefs,
