@@ -2,15 +2,6 @@
 -- MIGRATION 032: REFACTOR SALES KITS STRUCTURE
 -- ============================================
 
--- SQLite does not support multiple DROP COLUMN in one statement nor changing constraints easily without recreating the table.
--- However, since SQLite 3.35+ supports DROP COLUMN, we can try that if the version allows, but safer is typical alter table or recreate.
--- Given Rust `rusqlite` usually bundles recent SQLite, we might assume `ALTER TABLE DROP COLUMN` works.
--- If not, we would need the full recreate dance, but let's try the direct ALTERs for simplicity if supported, or just ADD/DROP.
-
--- NOTE: To be safe and compliant with standard SQLite migration practices (and since we can't easily ensure 3.35+ or if constraints break):
--- The `sale_items` table has Foreign Keys. Dropping `parent_sale_item_id` is tricky if it is part of an FK.
--- Actually, `parent_sale_item_id` IS a foreign key. SQLite doesn't let you DROP a column that is part of a Foreign Key or Index without recreating the table usually, unless constraints are disabled.
-
 -- Let's do the standard Recreate Table approach for safety and data integrity.
 
 PRAGMA foreign_keys = OFF;
