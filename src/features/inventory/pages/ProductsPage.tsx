@@ -16,16 +16,16 @@ import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { formatCurrency } from "@/lib/utils";
-import { CreateProductDialog } from "../components/CreateProductDialog";
-import { EditProductDialog } from "../components/EditProductDialog";
-import { BulkEditProductDialog } from "../components/BulkEditProductDialog";
-import { DeleteProductsDialog } from "../components/DeleteProductsDialog";
+import { CreateProductDialog } from "../components/products/CreateProductDialog";
+import { EditProductDialog } from "../components/products/EditProductDialog";
+import { BulkEditProductDialog } from "../components/products/BulkEditProductDialog";
+import { DeleteProductsDialog } from "../components/products/DeleteProductsDialog";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { ProductImagePreview } from "../components/ProductImageHover";
+import { ProductImagePreview } from "../components/products/ProductImageHover";
 import { format } from "date-fns";
 
 export default function ProductsPage() {
