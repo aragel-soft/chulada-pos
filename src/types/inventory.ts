@@ -81,6 +81,11 @@ export interface BulkUpdateProductsPayload {
   tags_to_add?: string[];
 }
 
+export interface SelectorItem {
+  product: Product;
+  quantity: number;
+}
+
 export interface ProductFilters {
   category_ids?: string[];
   tag_ids?: string[];
