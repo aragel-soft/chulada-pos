@@ -8,7 +8,6 @@ import { playSound } from '@/lib/sounds';
 import { useKitStore } from '@/features/sales/stores/kitStore';
 import { getProductById } from '@/lib/api/inventory/products';
 
-
 interface PendingKit {
     kit: KitOptionDef;
     triggerProducts: CartItem[];  // Multiple triggers of same kit
