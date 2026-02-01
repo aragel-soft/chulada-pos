@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use rusqlite::types::ToSql;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
@@ -129,14 +130,45 @@ pub struct BulkUpdateProductsPayload {
   pub tags_to_add: Option<Vec<String>>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductFilters {
+  pub category_ids: Option<Vec<String>>,
+  pub tag_ids: Option<Vec<String>>,
+  pub stock_status: Option<Vec<String>>, // 'out', 'low', 'ok'
+  pub include_deleted: Option<bool>,
+}
+
+
+struct DynamicQuery {
+  sql_parts: Vec<String>,
+  params: Vec<Box<dyn ToSql>>,
+}
+
+impl DynamicQuery {
+  fn new() -> Self {
+    Self {
+      sql_parts: Vec::new(),
+      params: Vec::new(),
+    }
+  }
+
+  fn add_condition(&mut self, sql: &str) {
+    self.sql_parts.push(sql.to_string());
+  }
+
+  fn add_param<T: ToSql + 'static>(&mut self, param: T) {
+    self.params.push(Box::new(param));
+  }
+}
+
 fn get_current_store_id(conn: &Connection) -> Result<String, String> {
-    let mut stmt = conn
-        .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
-        .map_err(|e| e.to_string())?;
-    let store_id: String = stmt
-        .query_row([], |row| row.get(0))
-        .unwrap_or_else(|_| "store-main".to_string());
-    Ok(store_id)
+  let mut stmt = conn
+    .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+    .map_err(|e| e.to_string())?;
+  let store_id: String = stmt
+    .query_row([], |row| row.get(0))
+    .unwrap_or_else(|_| "store-main".to_string());
+  Ok(store_id)
 }
 
 #[tauri::command]
@@ -148,6 +180,7 @@ pub fn get_products(
   search: Option<String>,
   sort_by: Option<String>,
   sort_order: Option<String>,
+  filters: Option<ProductFilters>,
 ) -> Result<PaginatedResponse<ProductView>, String> {
   let conn = db_state.lock().unwrap();
 
@@ -156,24 +189,89 @@ pub fn get_products(
     .app_data_dir()
     .expect("No se pudo obtener el directorio de datos");
 
-  let search_term = search.as_ref().map(|s| format!("%{}%", s));
-  let has_search = search.is_some() && !search.as_ref().unwrap().is_empty();
+  let store_id = get_current_store_id(&conn)?;
+  let mut dq = DynamicQuery::new();
+  
+  let include_deleted = filters.as_ref().and_then(|f| f.include_deleted).unwrap_or(false);
+  if !include_deleted {
+    dq.add_condition("p.deleted_at IS NULL");
+  }
 
-  let count_sql = if has_search {
-    "SELECT COUNT(*) FROM products p 
-    LEFT JOIN categories c ON p.category_id = c.id
-     WHERE p.deleted_at IS NULL 
-     AND (p.name LIKE ?1 OR p.description LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1)"
+  if let Some(s) = &search {
+    if !s.is_empty() {
+      dq.add_condition("(p.name LIKE ? OR p.description LIKE ? OR p.code LIKE ? OR p.barcode LIKE ? OR c.name LIKE ?)");
+      let pattern = format!("%{}%", s);
+      for _ in 0..5 {
+        dq.add_param(pattern.clone());
+      }
+    }
+  }
+
+  if let Some(f) = filters {
+    if let Some(cats) = f.category_ids {
+      if !cats.is_empty() {
+        let placeholders: Vec<String> = cats.iter().map(|_| "?".to_string()).collect();
+        dq.add_condition(&format!("p.category_id IN ({})", placeholders.join(",")));
+        for cat in cats {
+          dq.add_param(cat);
+        }
+      }
+    }
+
+    if let Some(tags) = f.tag_ids {
+      if !tags.is_empty() {
+        let placeholders: Vec<String> = tags.iter().map(|_| "?".to_string()).collect();
+        dq.add_condition(&format!(
+          "p.id IN (SELECT product_id FROM product_tags WHERE tag_id IN ({}))", 
+          placeholders.join(",")
+        ));
+        for tag in tags {
+          dq.add_param(tag);
+        }
+      }
+    }
+
+    if let Some(statuses) = f.stock_status {
+      if !statuses.is_empty() {
+        let mut status_conditions = Vec::new();
+        for status in statuses {
+          match status.as_str() {
+            "out" => status_conditions.push("COALESCE(si.stock, 0) <= 0"),
+            "low" => status_conditions.push("(COALESCE(si.stock, 0) > 0 AND COALESCE(si.stock, 0) <= COALESCE(si.minimum_stock, 5))"),
+            "ok" => status_conditions.push("COALESCE(si.stock, 0) > COALESCE(si.minimum_stock, 5)"),
+            _ => {}
+          }
+        }
+        if !status_conditions.is_empty() {
+          dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+        }
+      }
+    }
+  }
+
+  let where_clause = if dq.sql_parts.is_empty() {
+    "1=1".to_string()
   } else {
-    "SELECT COUNT(*) FROM products p WHERE p.deleted_at IS NULL"
+    dq.sql_parts.join(" AND ")
   };
 
-  let total: i64 = if has_search {
-    conn.query_row(count_sql, [search_term.as_ref().unwrap()], |row| row.get(0))
-  } else {
-    conn.query_row(count_sql, [], |row| row.get(0))
+  let count_sql = format!(
+    "SELECT COUNT(DISTINCT p.id) 
+     FROM products p 
+     LEFT JOIN categories c ON p.category_id = c.id
+     LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?
+     WHERE {}",
+    where_clause
+  );
+
+  let mut count_params: Vec<&dyn ToSql> = Vec::new();
+  count_params.push(&store_id);
+  for p in &dq.params {
+    count_params.push(p.as_ref());
   }
-  .map_err(|e| format!("Error contando productos: {}", e))?;
+
+  let total: i64 = conn.query_row(&count_sql, rusqlite::params_from_iter(count_params.iter()), |row| row.get(0))
+    .map_err(|e| format!("Error contando productos: {}", e))?;
 
   let order_column = match sort_by.as_deref() {
     Some("code") => "p.code",
@@ -190,10 +288,8 @@ pub fn get_products(
     _ => default_direction,
   };
 
-  let store_id = get_current_store_id(&conn)?;
-
-  let base_sql = format!(
-"
+  let data_sql = format!(
+    "
     SELECT 
       p.id, 
       p.code, 
@@ -212,40 +308,34 @@ pub fn get_products(
       p.created_at
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = '{}' 
-    WHERE p.deleted_at IS NULL
-  ",
-        store_id
-    );
-
-  let final_sql = if has_search {
-    format!("{} AND (p.name LIKE ?1 OR p.description LIKE ?1 OR p.code LIKE ?1 OR p.barcode LIKE ?1 OR c.name LIKE ?1) ORDER BY {} {} LIMIT ?2 OFFSET ?3", base_sql, order_column, order_direction)
-  } else {
-    format!("{} ORDER BY {} {} LIMIT ?1 OFFSET ?2", base_sql, order_column, order_direction)
-  };
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?
+    WHERE {}
+    ORDER BY {} {} 
+    LIMIT ? OFFSET ?
+    ",
+    where_clause, order_column, order_direction
+  );
 
   let limit = page_size;
   let offset = (page - 1) * page_size;
 
-  let mut stmt = conn.prepare(&final_sql).map_err(|e| e.to_string())?;
+  let mut data_params: Vec<&dyn ToSql> = Vec::new();
+  data_params.push(&store_id);
+  for p in &dq.params {
+      data_params.push(p.as_ref());
+  }
+  data_params.push(&limit);
+  data_params.push(&offset);
 
-  let products = if has_search {
-    stmt.query_map(
-      rusqlite::params![search_term.unwrap(), limit, offset],
+  let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
+  
+  let products = stmt.query_map(
+      rusqlite::params_from_iter(data_params.iter()),
       |row| map_product_row(row, &app_dir),
-    )
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?
-  } else {
-    stmt.query_map(
-      rusqlite::params![limit, offset], 
-      |row| map_product_row(row, &app_dir)
-    )
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?
-  };
+  )
+  .map_err(|e| e.to_string())?
+  .collect::<Result<Vec<_>, _>>()
+  .map_err(|e| e.to_string())?;
 
   let total_pages = (total as f64 / page_size as f64).ceil() as i64;
 
