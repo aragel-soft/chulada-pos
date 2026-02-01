@@ -78,3 +78,12 @@ export const updatePromotion = async (id: string, promotion: UpdatePromotionDto)
     throw error;
   }
 };
+
+export const deletePromotions = async (ids: string[]): Promise<void> => {
+  try {
+    await invoke('delete_promotions', { ids });
+  } catch (error) {
+    console.error('Error deleting promotions:', error);
+    throw error;
+  }
+};
