@@ -1,4 +1,3 @@
-// Importaciones
 import { ReactNode, useState } from "react"
 import {
   ColumnDef,
@@ -52,6 +51,7 @@ interface DataTableProps<TData, TValue> {
   getRowId?: (originalRow: TData, index: number, parent?: any) => string;
   onRowClick?: (row: Row<TData>) => void;
   showColumnFilters?: boolean;
+  toolbar?: ReactNode | ((table: Table<TData>) => ReactNode);
 }
 
 export function DataTable<TData, TValue>({
@@ -79,6 +79,7 @@ export function DataTable<TData, TValue>({
   getRowId,
   onRowClick,
   showColumnFilters = true,
+  toolbar,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -121,48 +122,56 @@ export function DataTable<TData, TValue>({
     getRowId,
   })
 
+  const renderToolbar = () => {
+    if (toolbar) {
+      return typeof toolbar === 'function' ? toolbar(table) : toolbar;
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row gap-4 w-full">
+        <div className="relative flex-1 min-w-[300px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <DebouncedInput
+            placeholder={searchPlaceholder}
+            value={globalFilter ?? ""}
+            onChange={(value) => onGlobalFilterChange(String(value))}
+            className="pl-10 h-9 w-full"
+          />
+        </div>
+        {showColumnFilters && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-9">
+                Filtros <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {columnTitles[column.id] || column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    );
+  };
+
   return (
     <DataTableLayout
       actions={typeof actions === 'function' ? actions(table) : actions}
-      filters={
-        <div className="flex flex-col sm:flex-row  gap-4 w-full">
-          <div className="relative flex-1 min-w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <DebouncedInput
-              placeholder={searchPlaceholder}
-              value={globalFilter ?? ""}
-              onChange={(value) => onGlobalFilterChange(String(value))}
-              className="pl-10 h-9 w-full"
-            />
-          </div>
-          {showColumnFilters && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9">
-                  Filtros <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {columnTitles[column.id] || column.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      }
+      filters={renderToolbar()}
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">
