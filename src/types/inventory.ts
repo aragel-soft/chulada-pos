@@ -80,3 +80,10 @@ export interface BulkUpdateProductsPayload {
   wholesale_price?: number;
   tags_to_add?: string[];
 }
+
+export interface ProductFilters {
+  category_ids?: string[];
+  tag_ids?: string[];
+  stock_status?: string[]; // 'out', 'low', 'ok'
+  include_deleted?: boolean;
+}
