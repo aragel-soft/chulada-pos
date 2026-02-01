@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react"
+import { ReactNode, useState } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -15,28 +15,32 @@ import {
   RowSelectionState,
   PaginationState,
   Row,
-} from "@tanstack/react-table"
-import { Search, ChevronDown } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { DebouncedInput } from "@/components/ui/debounced-input"
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DataTableLayout } from "@/components/layouts/DataTableLayout"
-import { DataTablePagination } from "./data-table-pagination"
+} from "@tanstack/react-table";
+import { Search } from "lucide-react"; 
+import { DebouncedInput } from "@/components/ui/debounced-input";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DataTableLayout } from "@/components/layouts/DataTableLayout";
+import { DataTablePagination } from "./data-table-pagination";
+import { DataTableViewOptions } from "./data-table-view-options";
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  isLoading?: boolean
-  actions?: ReactNode | ((table: Table<TData>) => ReactNode)
-  searchPlaceholder?: string
-  initialSorting?: SortingState
-  initialColumnVisibility?: VisibilityState
-  initialPageSize?: number
-  columnTitles?: Record<string, string>
-  rowSelection?: RowSelectionState
-  onRowSelectionChange?: OnChangeFn<RowSelectionState>
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  isLoading?: boolean;
+  actions?: ReactNode | ((table: Table<TData>) => ReactNode);
+  searchPlaceholder?: string;
+  initialSorting?: SortingState;
+  initialColumnVisibility?: VisibilityState;
+  initialPageSize?: number;
+  columnTitles?: Record<string, string>;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
   rowCount?: number;
   manualPagination?: boolean;
@@ -81,25 +85,34 @@ export function DataTable<TData, TValue>({
   showColumnFilters = true,
   toolbar,
 }: DataTableProps<TData, TValue>) {
-  const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility)
-  const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
-  const [internalPagination, setInternalPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: initialPageSize,
-  })
-  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
+  const [internalSorting, setInternalSorting] =
+    useState<SortingState>(initialSorting);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+    initialColumnVisibility,
+  );
+  const [internalGlobalFilter, setInternalGlobalFilter] = useState("");
+  const [internalPagination, setInternalPagination] = useState<PaginationState>(
+    {
+      pageIndex: 0,
+      pageSize: initialPageSize,
+    },
+  );
+  const [internalRowSelection, setInternalRowSelection] =
+    useState<RowSelectionState>({});
 
-  const sorting = externalSorting ?? internalSorting
-  const globalFilter = externalGlobalFilter ?? internalGlobalFilter
-  const pagination = externalPagination ?? internalPagination
-  const rowSelection = externalRowSelection ?? internalRowSelection
+  const sorting = externalSorting ?? internalSorting;
+  const globalFilter = externalGlobalFilter ?? internalGlobalFilter;
+  const pagination = externalPagination ?? internalPagination;
+  const rowSelection = externalRowSelection ?? internalRowSelection;
 
-  const onSortingChange = externalOnSortingChange ?? setInternalSorting
-  const onGlobalFilterChange = externalOnGlobalFilterChange ?? setInternalGlobalFilter
-  const onPaginationChange = externalOnPaginationChange ?? setInternalPagination
-  const onRowSelectionChange = externalOnRowSelectionChange ?? setInternalRowSelection
+  const onSortingChange = externalOnSortingChange ?? setInternalSorting;
+  const onGlobalFilterChange =
+    externalOnGlobalFilterChange ?? setInternalGlobalFilter;
+  const onPaginationChange =
+    externalOnPaginationChange ?? setInternalPagination;
+  const onRowSelectionChange =
+    externalOnRowSelectionChange ?? setInternalRowSelection;
 
   const table = useReactTable({
     data,
@@ -108,7 +121,14 @@ export function DataTable<TData, TValue>({
     manualPagination,
     manualFiltering,
     manualSorting,
-    state: { sorting, columnFilters, globalFilter, columnVisibility, rowSelection, pagination },
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      columnVisibility,
+      rowSelection,
+      pagination,
+    },
     onSortingChange,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange,
@@ -116,15 +136,17 @@ export function DataTable<TData, TValue>({
     onRowSelectionChange,
     onPaginationChange,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
+    getPaginationRowModel: manualPagination
+      ? undefined
+      : getPaginationRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
     getRowId,
-  })
+  });
 
   const renderToolbar = () => {
     if (toolbar) {
-      return typeof toolbar === 'function' ? toolbar(table) : toolbar;
+      return typeof toolbar === "function" ? toolbar(table) : toolbar;
     }
 
     return (
@@ -139,30 +161,7 @@ export function DataTable<TData, TValue>({
           />
         </div>
         {showColumnFilters && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-9">
-                Filtros <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {columnTitles[column.id] || column.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DataTableViewOptions table={table} columnTitles={columnTitles} />
         )}
       </div>
     );
@@ -170,17 +169,28 @@ export function DataTable<TData, TValue>({
 
   return (
     <DataTableLayout
-      actions={typeof actions === 'function' ? actions(table) : actions}
+      actions={typeof actions === "function" ? actions(table) : actions}
       filters={renderToolbar()}
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">
         <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
+            <TableRow
+              key={headerGroup.id}
+              className="hover:bg-transparent border-b"
+            >
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="px-4 py-2 whitespace-nowrap h-10 bg-background">
-                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                <TableHead
+                  key={header.id}
+                  className="px-4 py-2 whitespace-nowrap h-10 bg-background"
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                 </TableHead>
               ))}
             </TableRow>
@@ -190,12 +200,13 @@ export function DataTable<TData, TValue>({
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
-                key={row.id} 
+                key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 onClick={() => onRowClick && onRowClick(row)}
                 className={`
                   ${onRowClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                `}>
+                `}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -213,5 +224,5 @@ export function DataTable<TData, TValue>({
         </TableBody>
       </table>
     </DataTableLayout>
-  )
+  );
 }
