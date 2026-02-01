@@ -45,9 +45,8 @@ export function processCart(
   processedItems = applyWholesalePricing(
     processedItems, 
     options.ticketPriceType
-  )
-  // Stage 4: Finalize (Merge & Sort)
-  // Note: Discount is applied at total calculation level in cartStore.ts
+  );
+
   return finalizeCart(processedItems, options.kitDefs);
 }
 

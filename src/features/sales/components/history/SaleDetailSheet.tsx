@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SaleHistoryItem } from "@/types/sales-history";
 import { useSaleDetail } from "@/hooks/use-sales-history";
@@ -6,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, Package, Gift, Tag, User, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AppAvatar } from "@/components/ui/app-avatar";
@@ -17,6 +18,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
+import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 
 interface SaleDetailPanelProps {
   saleId: string | null;
@@ -64,6 +66,12 @@ const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
 
 export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
   const { data: sale, isLoading } = useSaleDetail(saleId);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+
+  const daysSinceSale = sale
+    ? differenceInDays(new Date(), new Date(sale.sale_date))
+    : 999;
+  const canReturn = daysSinceSale <= 30;
 
   return (
     <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
@@ -113,33 +121,57 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
         </div>
 
         {sale && (
-          <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={sale.user_avatar} />
-              <AvatarFallback>
-                <User />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm font-medium">Vendedor</p>
-              <p className="text-xs text-muted-foreground">{sale.user_name}</p>
+          <>
+            <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={sale.user_avatar} />
+                <AvatarFallback>
+                  <User />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm font-medium">Vendedor</p>
+                <p className="text-xs text-muted-foreground">{sale.user_name}</p>
+              </div>
+              <div className="ml-auto flex gap-2">
+                {sale.payment_method === "credit" && (
+                  <Badge className="bg-purple-600">A CRÉDITO</Badge>
+                )}
+                {sale.has_discount && (
+                  <Badge
+                    variant="secondary"
+                    className="text-orange-600 border-orange-200 bg-orange-50"
+                  >
+                    DESCUENTO
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="ml-auto flex gap-2">
-              {sale.payment_method === "credit" && (
-                <Badge className="bg-purple-600">A CRÉDITO</Badge>
-              )}
-              {sale.has_discount && (
-                <Badge
-                  variant="secondary"
-                  className="text-orange-600 border-orange-200 bg-orange-50"
-                >
-                  DESCUENTO
-                </Badge>
-              )}
-            </div>
-          </div>
+
+            <Button
+              variant="outline"
+              className="w-full mt-3"
+              onClick={() => setReturnModalOpen(true)}
+              disabled={!canReturn}
+              title={
+                !canReturn
+                  ? `Esta venta excede el periodo de devoluciones (${daysSinceSale} días)`
+                  : undefined
+              }
+            >
+              Procesar Devolución
+            </Button>
+          </>
         )}
       </div>
+
+      {sale && (
+        <ReturnModal
+          sale={sale}
+          isOpen={returnModalOpen}
+          onClose={() => setReturnModalOpen(false)}
+        />
+      )}
 
       {/* BODY */}
       <ScrollArea className="flex-1 p-6">

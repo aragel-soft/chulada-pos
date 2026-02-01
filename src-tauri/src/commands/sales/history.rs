@@ -74,6 +74,7 @@ pub struct SaleItemView {
   pub kit_option_id: Option<String>,
   pub is_gift: bool, // quantity > 0 && price == 0
   pub product_image: Option<String>,
+  pub promotion_id: Option<String>,
   pub promotion_name: Option<String>,
 }
 
@@ -290,7 +291,7 @@ pub fn get_sale_details(
   let items_sql = "
     SELECT 
       si.id, si.product_name, si.quantity, si.unit_price, si.subtotal,
-      si.price_type, si.kit_option_id,
+      si.price_type, si.kit_option_id, si.promotion_id,
       p.image_url, pr.name as promotion_name
     FROM sale_items si
     LEFT JOIN products p ON si.product_id = p.id
@@ -302,7 +303,7 @@ pub fn get_sale_details(
   let mut stmt_items = conn.prepare(items_sql).map_err(|e| e.to_string())?;
   let items_iter = stmt_items
     .query_map([&sale_id], |row| {
-      let raw_img: Option<String> = row.get(7)?;
+      let raw_img: Option<String> = row.get(8)?;
       let resolved_img = raw_img.map(|path| {
         if path.starts_with("http") {
             path
@@ -323,7 +324,8 @@ pub fn get_sale_details(
           kit_option_id: row.get(6)?,
           is_gift: unit_price == 0.0,
           product_image: resolved_img,
-          promotion_name: row.get(8)?,
+          promotion_id: row.get(7)?,
+          promotion_name: row.get(9)?,
       })
     })
     .map_err(|e| e.to_string())?;
