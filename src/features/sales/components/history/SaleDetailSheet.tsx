@@ -247,8 +247,9 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
 
     if (item.price_type === "wholesale") badges.push("wholesale");
     if (item.price_type === "promo") badges.push("promo");
-    if (item.is_kit_item && item.is_gift) badges.push("gift");
-    if (item.is_kit_item && !item.is_gift) badges.push("kit");
+    
+    if (item.price_type === 'kit_item' && item.is_gift) badges.push("gift");
+    if (item.price_type === 'kit_item' && !item.is_gift) badges.push("kit");
 
     return badges;
   };

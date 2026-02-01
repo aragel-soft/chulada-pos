@@ -5,7 +5,7 @@ export interface CartItem extends Product {
   quantity: number;
   priceType: 'retail' | 'wholesale' | 'kit_item' | 'promo';
   finalPrice: number;
-  kitTriggerId?: string;
+  kitOptionId?: string;
   promotionId?: string;
   promotionInstanceId?: string;
   promotionName?: string;

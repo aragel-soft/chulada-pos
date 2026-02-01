@@ -55,7 +55,6 @@ export interface SaleHistoryItem {
   unit_price: number;
   subtotal: number;
   price_type: 'retail' | 'wholesale' | 'promo';
-  is_kit_item: boolean;
   is_gift: boolean; // quantity > 0 && price == 0
   product_image?: string;
   promotion_name?: string;
