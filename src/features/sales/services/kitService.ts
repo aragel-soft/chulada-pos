@@ -1,138 +1,35 @@
-import { Product } from '@/types/inventory';
 import { KitOptionDef } from '@/types/kits';
 import { CartItem } from '@/types/sales';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Gets the total count of gifts already linked to a trigger item.
- */
-function getLinkedGiftCount(triggerId: string, items: CartItem[]): number {
-  return items
-    .filter(i => i.kitTriggerId === triggerId && i.priceType === 'kit_item')
-    .reduce((sum, i) => sum + i.quantity, 0);
-}
-
-/**
- * Main entry point for kit processing in the cart pipeline.
+ * Processes all kits using pool-based credit logic:
+ * - Triggers provide credits (Qty × MaxSelections)
+ * - Gifts consume credits
+ * - Candidates convert to gifts when credits available
+ * - Excess gifts revert to retail when credits insufficient
  */
 export function processAllKits(
   items: CartItem[],
   kitDefs: Record<string, KitOptionDef>
 ): CartItem[] {
-  let currentItems = [...items];
+  let currentItems = items.map(i => ({ ...i }));
   
-  const potentialTriggers = items.filter(item => item.priceType !== 'kit_item');
+  const activeKitIds = new Set<string>();
+  currentItems.forEach(i => {
+      if (i.priceType !== 'kit_item' && kitDefs[i.id]) {
+          activeKitIds.add(kitDefs[i.id].id);
+      }
+      if (i.kitOptionId) {
+          activeKitIds.add(i.kitOptionId);
+      }
+  });
   
-  for (const item of potentialTriggers) {
-    const kit = kitDefs[item.id];
-    if (kit && kit.is_required) {
-      currentItems = processKitTrigger(item, currentItems, kitDefs);
-      
-      currentItems = reconcileKitGifts(item, currentItems, kitDefs);
-    }
+  for (const kitId of activeKitIds) {
+      currentItems = processKitPool(kitId, currentItems, kitDefs);
   }
-  
-  currentItems = reconcileOrphanGifts(currentItems);
   
   return currentItems;
-}
-
-/**
- * Reconciles kit gifts when a trigger item's quantity changes.
- */
-function reconcileKitGifts(
-  triggerItem: CartItem,
-  items: CartItem[],
-  kitDefs: Record<string, KitOptionDef>
-): CartItem[] {
-  const kit = kitDefs[triggerItem.id];
-  if (!kit || !kit.is_required) return items;
-
-  let currentItems = items.map(i => ({ ...i }));
-
-  const maxAllowed = kit.max_selections * triggerItem.quantity;
-
-  const linkedGifts = currentItems.filter(
-    i => i.kitTriggerId === triggerItem.uuid && i.priceType === 'kit_item'
-  );
-  const currentTotalGifts = linkedGifts.reduce((sum, i) => sum + i.quantity, 0);
-
-  if (currentTotalGifts > maxAllowed) {
-    let excess = currentTotalGifts - maxAllowed;
-
-    for (const gift of linkedGifts) {
-      if (excess <= 0) break;
-
-      const reduceBy = Math.min(gift.quantity, excess);
-
-      const giftInArray = currentItems.find(i => i.uuid === gift.uuid);
-      if (giftInArray) {
-        if (giftInArray.quantity === reduceBy) {
-          giftInArray.quantity = 0;
-        } else {
-          giftInArray.quantity -= reduceBy;
-        }
-      }
-
-      const existingRetail = currentItems.find(
-        i => i.id === gift.id && i.priceType === 'retail'
-      );
-      if (existingRetail) {
-        existingRetail.quantity += reduceBy;
-      } else {
-        currentItems.push({
-          ...gift,
-          uuid: uuidv4(),
-          priceType: 'retail',
-          finalPrice: gift.retail_price,
-          kitTriggerId: undefined,
-          quantity: reduceBy,
-        });
-      }
-
-      excess -= reduceBy;
-    }
-  }
-  return currentItems.filter(i => i.quantity > 0);
-}
-
-/**
- * Cleanup function to remove/convert kit items whose trigger item has been removed from cart.
- */
-function reconcileOrphanGifts(items: CartItem[]): CartItem[] {
-  const triggerIds = new Set(items.map(i => i.uuid));
-  
-  const orphans: CartItem[] = [];
-  const result: CartItem[] = [];
-
-  for (const item of items) {
-    if (item.priceType === 'kit_item' && item.kitTriggerId && !triggerIds.has(item.kitTriggerId)) {
-      orphans.push(item);
-    } else {
-      result.push(item);
-    }
-  }
-
-  if (orphans.length === 0) return items;
-
-  for (const orphan of orphans) {
-    const existing = result.find(i => i.id === orphan.id && i.priceType === 'retail' && !i.kitTriggerId);
-    
-    if (existing) {
-      existing.quantity += orphan.quantity;
-    } else {
-      result.push({
-        ...orphan,
-        uuid: uuidv4(),
-        priceType: 'retail',
-        finalPrice: orphan.retail_price,
-        kitTriggerId: undefined,
-        quantity: orphan.quantity
-      });
-    }
-  }
-  
-  return result;
 }
 
 /**
@@ -146,90 +43,139 @@ export function getRemainingKitQuota(
   const kit = kitDefs[triggerItem.id];
   if (!kit) return null;
   
-  const maxQuota = kit.max_selections * triggerItem.quantity;
-  const used = getLinkedGiftCount(triggerItem.uuid, items);
-  
-  return maxQuota - used;
+  const totalCredits = items
+    .filter(i => i.priceType !== 'kit_item' && kitDefs[i.id]?.id === kit.id)
+    .reduce((sum, i) => sum + (i.quantity * kit.max_selections), 0);
+    
+  const totalConsumed = items
+    .filter(i => i.kitOptionId === kit.id && i.priceType === 'kit_item')
+    .reduce((sum, i) => sum + i.quantity, 0);
+
+  return totalCredits - totalConsumed;
 }
 
-
 /**
- * Processes a trigger product and automatically links eligible products as gifts.
+ * Internal logic to process a specific Kit Pool.
  */
-function processKitTrigger(
-  triggerProduct: Product,
-  items: CartItem[],
-  kitDefs: Record<string, KitOptionDef>
+function processKitPool(
+   kitId: string,
+   items: CartItem[],
+   kitDefs: Record<string, KitOptionDef>
 ): CartItem[] {
-  const kit = kitDefs[triggerProduct.id];
+    const kit = Object.values(kitDefs).find(k => k.id === kitId);
+    if (!kit) return items;
 
-  if (!kit || !kit.is_required) return items;
+    // 1. Calculate Credits
+    const triggers = items.filter(i => i.priceType !== 'kit_item' && kitDefs[i.id]?.id === kitId);
+    const totalCredits = triggers.reduce((sum, i) => sum + (i.quantity * kit.max_selections), 0);
+       
+    // 2. Identification of existing gifts
+    const gifts = items.filter(i => i.kitOptionId === kitId && i.priceType === 'kit_item');
+    const currentConsumed = gifts.reduce((sum, i) => sum + i.quantity, 0);
+    
+    // 3. Candidates (Items that can be gifts but are currently Retail)
+    // Must match one of the kit.items
+    const candidates = items.filter(i => 
+        i.priceType !== 'kit_item' && 
+        kit.items.some(kItem => kItem.product_id === i.id)
+    );
 
-  let currentItems = items.map(i => ({ ...i }));
-
-  const triggerItems = currentItems.filter(
-    i => i.id === triggerProduct.id && i.priceType !== 'kit_item'
-  );
-  if (triggerItems.length === 0) return currentItems;
-
-  const candidates = currentItems.filter(
-    i =>
-      i.priceType !== 'kit_item' &&
-      kit!.items.some(k => k.product_id === i.id)
-  );
-
-  if (candidates.length === 0) return currentItems;
-
-  const candidateUsage: Record<string, number> = {};
-
-  for (const triggerItem of triggerItems) {
-    const neededTotal = kit.max_selections * triggerItem.quantity;
-    const linkedCount = currentItems
-      .filter(i => i.kitTriggerId === triggerItem.uuid)
-      .reduce((sum, i) => sum + i.quantity, 0);
-
-    let stillNeeded = neededTotal - linkedCount;
-    if (stillNeeded <= 0) continue;
-
-    for (const candidate of candidates) {
-      if (stillNeeded <= 0) break;
-
-      const usedSoFar = candidateUsage[candidate.uuid] || 0;
-      const available = candidate.quantity - usedSoFar;
-
-      if (available <= 0) continue;
-
-      const take = Math.min(available, stillNeeded);
-
-      if (candidate.quantity === take) {
-        candidate.quantity = 0;
-      } else {
-        candidate.quantity -= take;
-      }
-      candidateUsage[candidate.uuid] = usedSoFar + take;
-
-      const giftIndex = currentItems.findIndex(
-        i =>
-          i.id === candidate.id &&
-          i.priceType === 'kit_item' &&
-          i.kitTriggerId === triggerItem.uuid
-      );
-      if (giftIndex >= 0) {
-        currentItems[giftIndex].quantity += take;
-      } else {
-        currentItems.push({
-          ...candidate,
-          uuid: uuidv4(),
-          priceType: 'kit_item',
-          finalPrice: 0,
-          quantity: take,
-          kitTriggerId: triggerItem.uuid,
-        });
-      }
-
-      stillNeeded -= take;
+    // 4. Reconciliation
+    
+    // Case A: Surplus of Credits (Try to convert Candidates -> Gifts)
+    if (totalCredits > currentConsumed) {
+        let creditsRemaining = totalCredits - currentConsumed;
+        
+        for (const candidate of candidates) {
+            if (creditsRemaining <= 0) break;
+            
+            // We can convert up to 'candidate.quantity' or 'creditsRemaining'
+            const convertQty = Math.min(candidate.quantity, creditsRemaining);
+            
+            // If converting ALL
+            if (convertQty === candidate.quantity) {
+                candidate.priceType = 'kit_item';
+                candidate.finalPrice = 0;
+                candidate.kitOptionId = kitId;
+            } else {
+                // Split item
+                // Reduce candidate
+                candidate.quantity -= convertQty;
+                
+                // Create new Gift Item
+                // Check if we can merge with existing gift of same type?
+                const existingGift = items.find(i => 
+                    i.id === candidate.id && 
+                    i.priceType === 'kit_item' && 
+                    i.kitOptionId === kitId
+                );
+                
+                if (existingGift) {
+                    existingGift.quantity += convertQty;
+                } else {
+                    items.push({
+                        ...candidate,
+                        uuid: uuidv4(),
+                        quantity: convertQty,
+                        priceType: 'kit_item',
+                        finalPrice: 0,
+                        kitOptionId: kitId
+                    });
+                }
+            }
+            
+            creditsRemaining -= convertQty;
+        }
     }
-  }
-
-  return currentItems.filter(i => i.quantity > 0);
+    
+    else if (currentConsumed > totalCredits) {
+        let deficit = currentConsumed - totalCredits;
+        
+        for (const gift of gifts) {
+            if (deficit <= 0) break;
+            
+            const revertQty = Math.min(gift.quantity, deficit);
+            
+            if (revertQty === gift.quantity) {
+                 const existingRetail = items.find(i => 
+                    i.id === gift.id && 
+                    i.priceType !== 'kit_item' && 
+                    i.priceType !== 'promo'
+                );
+                
+                if (existingRetail) {
+                    existingRetail.quantity += revertQty;
+                    gift.quantity = 0;
+                } else {
+                    gift.priceType = 'retail';
+                    gift.finalPrice = gift.retail_price;
+                    gift.kitOptionId = undefined;
+                }
+            } else {
+                gift.quantity -= revertQty;
+                
+                const existingRetail = items.find(i => 
+                    i.id === gift.id && 
+                    i.priceType !== 'kit_item'
+                );
+                
+                if (existingRetail) {
+                    existingRetail.quantity += revertQty;
+                } else {
+                     items.push({
+                        ...gift,
+                        uuid: uuidv4(),
+                        quantity: revertQty,
+                        priceType: 'retail',
+                        finalPrice: gift.retail_price,
+                        kitOptionId: undefined
+                    });
+                }
+            }
+            
+            deficit -= revertQty;
+        }
+    }
+    
+    return items.filter(i => i.quantity > 0);
 }
