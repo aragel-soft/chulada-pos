@@ -5,19 +5,21 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { PlusCircle, Pencil, Trash } from "lucide-react";
+import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/stores/authStore";
-import { Promotion } from "@/types/promotions";
+import { Promotion, PromotionWithDetails } from "@/types/promotions";
 import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "../components/promotions/columns";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { getPromotions } from "@/lib/api/inventory/promotions";
 import {
-  PromotionWizard,
-  PromotionWithDetails,
-} from "../components/promotions/PromotionWizard";
+  getPromotions,
+  getPromotionDetails,
+} from "@/lib/api/inventory/promotions";
+import { PromotionWizard } from "../components/promotions/PromotionWizard";
+import { DeletePromotionsDialog } from "../components/promotions/DeletePromotionsDialog";
 
 export default function PromotionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -30,6 +32,8 @@ export default function PromotionsPage() {
   const { can } = useAuthStore();
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<PromotionWithDetails | undefined>(undefined);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [promotionsToDelete, setPromotionsToDelete] = useState<Promotion[]>([]);
 
   const queryParams: PaginationParams = useMemo(
     () => ({
@@ -54,15 +58,29 @@ export default function PromotionsPage() {
     setIsWizardOpen(true);
   };
 
-  const handleEdit = (selectedRows: Promotion[]) => {
+  const handleEdit = async (selectedRows: Promotion[]) => {
     if (selectedRows.length !== 1) return;
-    const promotionToEdit = selectedRows[0];
-    setEditingPromotion(promotionToEdit as unknown as PromotionWithDetails);
-    setIsWizardOpen(true);
+
+    const rowId = selectedRows[0].id;
+    const toastId = toast.loading("Cargando detalles de la promoción...");
+
+    try {
+      const details = await getPromotionDetails(rowId);
+      setEditingPromotion(details);
+      setIsWizardOpen(true);
+      toast.dismiss(toastId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cargar la promoción", {
+        id: toastId,
+        description: "No se pudieron obtener los detalles del servidor.",
+      });
+    }
   };
 
   const handleDelete = (selectedRows: Promotion[]) => {
-    console.log("Abrir DeleteDialog para:", selectedRows);
+      setPromotionsToDelete(selectedRows);
+      setIsDeleteDialogOpen(true);
   };
 
   const columns = useMemo<ColumnDef<Promotion>[]>(
@@ -173,6 +191,14 @@ export default function PromotionsPage() {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         promotionToEdit={editingPromotion}
+        onSuccess={() => setRowSelection({})}
+      />
+
+      <DeletePromotionsDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        promotions={promotionsToDelete}
+        onSuccess={() => setRowSelection({})}
       />
     </div>
   );
