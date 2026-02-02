@@ -16,7 +16,7 @@ import {
   PaginationState,
   Row,
 } from "@tanstack/react-table";
-import { Search } from "lucide-react"; 
+import { Search } from "lucide-react";
 import { DebouncedInput } from "@/components/ui/debounced-input";
 import {
   TableBody,
@@ -56,6 +56,8 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: Row<TData>) => void;
   showColumnFilters?: boolean;
   toolbar?: ReactNode | ((table: Table<TData>) => ReactNode);
+  columnFilters?: ColumnFiltersState;
+  onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
 }
 
 export function DataTable<TData, TValue>({
@@ -84,10 +86,13 @@ export function DataTable<TData, TValue>({
   onRowClick,
   showColumnFilters = true,
   toolbar,
+  columnFilters: externalColumnFilters,
+  onColumnFiltersChange: externalOnColumnFiltersChange,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] =
     useState<SortingState>(initialSorting);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [internalColumnFilters, setInternalColumnFilters] =
+    useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     initialColumnVisibility,
   );
@@ -113,6 +118,8 @@ export function DataTable<TData, TValue>({
     externalOnPaginationChange ?? setInternalPagination;
   const onRowSelectionChange =
     externalOnRowSelectionChange ?? setInternalRowSelection;
+  const columnFilters = externalColumnFilters ?? internalColumnFilters
+  const onColumnFiltersChange = externalOnColumnFiltersChange ?? setInternalColumnFilters
 
   const table = useReactTable({
     data,
@@ -130,7 +137,7 @@ export function DataTable<TData, TValue>({
       pagination,
     },
     onSortingChange,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange,
     onGlobalFilterChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange,

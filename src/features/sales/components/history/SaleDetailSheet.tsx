@@ -16,7 +16,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
+import { ProductImagePreview } from "@/features/inventory/components/products/ProductImageHover";
 
 interface SaleDetailPanelProps {
   saleId: string | null;
