@@ -3,8 +3,7 @@ import {
   X, 
   AlertTriangle, 
   CheckCircle2, 
-  XCircle, 
-  Trash2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DebouncedInput } from "@/components/ui/debounced-input";
@@ -26,7 +25,7 @@ const stockStatuses = [
     label: "Con Existencia",
     icon: CheckCircle2,
   },
-]
+];
 
 const activeStatuses = [
   {
@@ -35,11 +34,11 @@ const activeStatuses = [
     icon: CheckCircle2,
   },
   {
-    value: "deleted",
-    label: "Eliminados",
-    icon: Trash2,
+    value: "inactive",
+    label: "Inactivos",
+    icon: XCircle,
   },
-]
+];
 
 export interface FilterOption {
   label: string
@@ -77,8 +76,6 @@ export function ProductsDataTableToolbar<TData>({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-col lg:flex-row gap-2 w-full lg:w-auto items-start lg:items-center">
-          
-          {/* Buscador General */}
           <DebouncedInput
             placeholder="Buscar por nombre, código o categoría..."
             value={(table.getState().globalFilter as string) ?? ""}
@@ -87,7 +84,6 @@ export function ProductsDataTableToolbar<TData>({
           />
 
           <div className="flex flex-wrap gap-2">
-            {/* Filtro: Categorías */}
             {categoryOptions.length > 0 && (
               <DataTableFacetedFilter
                 title="Categoría"
@@ -97,7 +93,6 @@ export function ProductsDataTableToolbar<TData>({
               />
             )}
 
-            {/* Filtro: Etiquetas */}
             {tagOptions.length > 0 && (
               <DataTableFacetedFilter
                 title="Etiquetas"
@@ -107,7 +102,6 @@ export function ProductsDataTableToolbar<TData>({
               />
             )}
 
-            {/* Filtro: Nivel de Stock */}
             <DataTableFacetedFilter
               title="Inventario"
               options={stockStatuses}
@@ -115,7 +109,6 @@ export function ProductsDataTableToolbar<TData>({
               onSelect={(values) => handleFilterChange("stock_status", values)}
             />
 
-            {/* Filtro: Estado */}
             <DataTableFacetedFilter
               title="Estado"
               options={activeStatuses}
@@ -124,7 +117,6 @@ export function ProductsDataTableToolbar<TData>({
             />
           </div>
 
-          {/* Botón Reset Global */}
           {isFiltered && (
             <Button
               variant="ghost"

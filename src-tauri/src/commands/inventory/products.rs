@@ -135,7 +135,7 @@ pub struct ProductFilters {
   pub category_ids: Option<Vec<String>>,
   pub tag_ids: Option<Vec<String>>,
   pub stock_status: Option<Vec<String>>, // 'out', 'low', 'ok'
-  pub include_deleted: Option<bool>,
+  pub active_status: Option<Vec<String>>, // 'active', 'inactive'
 }
 
 
@@ -191,11 +191,7 @@ pub fn get_products(
 
   let store_id = get_current_store_id(&conn)?;
   let mut dq = DynamicQuery::new();
-  
-  let include_deleted = filters.as_ref().and_then(|f| f.include_deleted).unwrap_or(false);
-  if !include_deleted {
-    dq.add_condition("p.deleted_at IS NULL");
-  }
+  dq.add_condition("p.deleted_at IS NULL");
 
   if let Some(s) = &search {
     if !s.is_empty() {
@@ -222,9 +218,15 @@ pub fn get_products(
       if !tags.is_empty() {
         let placeholders: Vec<String> = tags.iter().map(|_| "?".to_string()).collect();
         dq.add_condition(&format!(
-          "p.id IN (SELECT product_id FROM product_tags WHERE tag_id IN ({}))", 
+          "p.id IN (
+            SELECT pt.product_id 
+            FROM product_tags pt 
+            INNER JOIN tags t ON pt.tag_id = t.id 
+            WHERE t.name IN ({})
+          )", 
           placeholders.join(",")
         ));
+        
         for tag in tags {
           dq.add_param(tag);
         }
@@ -239,6 +241,22 @@ pub fn get_products(
             "out" => status_conditions.push("COALESCE(si.stock, 0) <= 0"),
             "low" => status_conditions.push("(COALESCE(si.stock, 0) > 0 AND COALESCE(si.stock, 0) <= COALESCE(si.minimum_stock, 5))"),
             "ok" => status_conditions.push("COALESCE(si.stock, 0) > COALESCE(si.minimum_stock, 5)"),
+            _ => {}
+          }
+        }
+        if !status_conditions.is_empty() {
+          dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+        }
+      }
+    }
+
+    if let Some(statuses) = f.active_status {
+      if !statuses.is_empty() {
+        let mut status_conditions = Vec::new();
+        for status in statuses {
+          match status.as_str() {
+            "active" => status_conditions.push("p.is_active = 1"),
+            "inactive" => status_conditions.push("p.is_active = 0"),
             _ => {}
           }
         }

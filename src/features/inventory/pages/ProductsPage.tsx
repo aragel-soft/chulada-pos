@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   RowSelectionState,
   PaginationState,
@@ -42,28 +42,29 @@ export default function ProductsPage() {
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([]);
 
-  useEffect(() => {
-    const loadOptions = async () => {
-      try {
-        const [cats, tags] = await Promise.all([
-          getAllCategories(),
-          getAllTags(),
-        ]);
-        setCategoryOptions(
-          cats.map((c: any) => ({ label: c.name, value: c.id })),
-        );
-        setTagOptions(
-          tags.map((t: any) => ({
-            label: typeof t === "string" ? t : t.name,
-            value: typeof t === "string" ? t : t.id,
-          })),
-        );
-      } catch (error) {
-        console.error("Error cargando metadatos de filtros", error);
-      }
-    };
-    loadOptions();
+  const fetchOptions = useCallback(async () => {
+    try {
+      const [cats, tags] = await Promise.all([
+        getAllCategories(),
+        getAllTags(),
+      ]);
+      setCategoryOptions(
+        cats.map((c: any) => ({ label: c.name, value: c.id })),
+      );
+      setTagOptions(
+        tags.map((t: any) => ({
+          label: typeof t === "string" ? t : t.name,
+          value: typeof t === "string" ? t : t.id,
+        })),
+      );
+    } catch (error) {
+      console.error("Error cargando metadatos de filtros", error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchOptions();
+  }, [fetchOptions]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -93,7 +94,7 @@ export default function ProductsPage() {
           category_ids: categoryFilter?.length ? categoryFilter : undefined,
           tag_ids: tagFilter?.length ? tagFilter : undefined,
           stock_status: stockFilter?.length ? stockFilter : undefined,
-          include_deleted: statusFilter?.includes("deleted"),
+          active_status: statusFilter?.length ? statusFilter : undefined
         },
       );
 
@@ -256,6 +257,7 @@ export default function ProductsPage() {
         }}
         onSuccess={() => {
           fetchProducts();
+          fetchOptions();
           setRowSelection({});
           setIsEditDialogOpen(false);
         }}
@@ -267,6 +269,7 @@ export default function ProductsPage() {
         onSuccess={() => {
           setSelectedProductsForBulk([]);
           fetchProducts();
+          fetchOptions();
           setRowSelection({});
         }}
       />
