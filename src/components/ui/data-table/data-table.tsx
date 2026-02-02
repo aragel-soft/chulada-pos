@@ -167,16 +167,22 @@ export function DataTable<TData, TValue>({
             className="pl-10 h-9 w-full"
           />
         </div>
-        {showColumnFilters && (
-          <DataTableViewOptions table={table} columnTitles={columnTitles} />
-        )}
       </div>
     );
   };
 
+  const combinedActions = (
+    <div className="flex items-center gap-2">
+      {showColumnFilters && (
+        <DataTableViewOptions table={table} columnTitles={columnTitles} />
+      )}
+      {typeof actions === "function" ? actions(table) : actions}
+    </div>
+  );
+
   return (
     <DataTableLayout
-      actions={typeof actions === "function" ? actions(table) : actions}
+      actions={combinedActions}
       filters={renderToolbar()}
       pagination={<DataTablePagination table={table} />}
     >

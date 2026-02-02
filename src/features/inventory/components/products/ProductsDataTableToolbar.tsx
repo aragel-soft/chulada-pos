@@ -1,16 +1,14 @@
-import { Table } from "@tanstack/react-table"
+import { Table } from "@tanstack/react-table";
 import { 
   X, 
   AlertTriangle, 
   CheckCircle2, 
   XCircle, 
   Trash2,
-} from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { DebouncedInput } from "@/components/ui/debounced-input"
-import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter"
-import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DebouncedInput } from "@/components/ui/debounced-input";
+import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
 
 const stockStatuses = [
   {
@@ -76,7 +74,7 @@ export function ProductsDataTableToolbar<TData>({
   }
 
   return (
-    <div className="flex flex-col gap-4 mb-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-col lg:flex-row gap-2 w-full lg:w-auto items-start lg:items-center">
           
@@ -85,7 +83,7 @@ export function ProductsDataTableToolbar<TData>({
             placeholder="Buscar por nombre, código o categoría..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
-            className="h-8 w-full lg:w-[250px]"
+            className="h-9 w-full lg:w-[300px]"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -133,13 +131,11 @@ export function ProductsDataTableToolbar<TData>({
               onClick={() => table.resetColumnFilters()}
               className="h-8 px-2 lg:px-3"
             >
-              Resetear
+              Limpiar
               <X className="ml-2 h-4 w-4" />
             </Button>
           )}
         </div>
-
-        <DataTableViewOptions table={table} />
       </div>
     </div>
   )
