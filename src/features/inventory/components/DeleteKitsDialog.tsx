@@ -54,7 +54,6 @@ export function DeleteKitsDialog({
       onSuccess?.();
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
       toast.error("Error al eliminar", {
         description: "No se pudieron eliminar los kits seleccionados.",
       });
