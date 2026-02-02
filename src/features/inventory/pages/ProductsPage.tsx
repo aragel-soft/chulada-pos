@@ -116,6 +116,19 @@ export default function ProductsPage() {
     columnFilters,
   ]);
 
+  const handleGlobalFilterChange = (value: string) => {
+    setGlobalFilter(value);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }
+
+  const handleColumnFiltersChange = (updaterOrValue: any) => {
+    setColumnFilters((prev) => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
+      return next;
+    });
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
   const columns = useMemo(() => getColumns(can), [can]);
 
   return (
@@ -152,11 +165,11 @@ export default function ProductsPage() {
         sorting={sorting}
         onSortingChange={setSorting}
         globalFilter={globalFilter}
-        onGlobalFilterChange={setGlobalFilter}
+        onGlobalFilterChange={(val) => handleGlobalFilterChange(String(val))}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         columnFilters={columnFilters}
-        onColumnFiltersChange={setColumnFilters}
+        onColumnFiltersChange={handleColumnFiltersChange}
         toolbar={(table) => (
           <ProductsDataTableToolbar
             table={table}
