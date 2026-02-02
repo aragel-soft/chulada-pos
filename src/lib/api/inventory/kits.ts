@@ -16,6 +16,14 @@ export const getKits = async (params: PaginationParams): Promise<PaginatedRespon
   }
 };
 
+export const getAllKits = async (): Promise<KitDefinitionWithTrigger[]> => {
+  try {
+    return await invoke("get_all_kits");
+  } catch (error) {
+    return [];
+  }
+};
+
 export const getKitDetails = async (kitId: string): Promise<KitDetails> => {
   try {
     return await invoke("get_kit_details", { kitId });
@@ -48,10 +56,10 @@ export const updateKit = async (kitId: string, payload: CreateKitPayload): Promi
   }
 };
 
-export const getAllKits = async (): Promise<KitDefinitionWithTrigger[]> => {
+export const deleteKits = async (kitIds: string[]): Promise<void> => {
   try {
-    return await invoke("get_all_kits");
+    return await invoke("delete_kits", { kitIds });
   } catch (error) {
-    return [];
+    throw error;
   }
 };
