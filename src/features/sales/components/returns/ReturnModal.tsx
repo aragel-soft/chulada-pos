@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { SaleDetail } from "@/types/sales-history";
 import { ReturnStepOne } from "@/features/sales/components/returns/ReturnStepOne";
+import { ReturnStepTwo } from "@/features/sales/components/returns/ReturnStepTwo";
 import { ChevronLeft } from "lucide-react";
 
 interface ReturnModalProps {
@@ -37,9 +38,27 @@ export interface ReturnItem {
 export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleNext = () => {
     setCurrentStep(2);
+  };
+
+  const handleConfirmReturn = async (reason: string, notes: string): Promise<string> => {
+    setIsProcessing(true);
+    try {
+      // TODO: Call backend to process return
+      console.log("Processing return:", { reason, notes, items: returnItems });
+      
+      // Simulate backend delay and response
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Mock voucher code
+      const mockVoucher = `VALE-${Date.now().toString().slice(-6)}`;
+      return mockVoucher;
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleBack = () => {
@@ -87,9 +106,14 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
             />
           )}
           {currentStep === 2 && (
-            <div className="p-6">
-              <p>Paso 2 - Por implementar</p>
-            </div>
+            <ReturnStepTwo
+              sale={sale}
+              returnItems={returnItems}
+              onBack={handleBack}
+              onConfirm={handleConfirmReturn}
+              onCancel={onClose}
+              isProcessing={isProcessing}
+            />
           )}
         </div>
       </DialogContent>
