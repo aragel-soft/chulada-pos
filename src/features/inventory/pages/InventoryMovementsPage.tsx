@@ -3,6 +3,7 @@ import {
   PaginationState,
   SortingState,
   ColumnFiltersState,
+  OnChangeFn,
 } from "@tanstack/react-table";
 import { PlusCircle } from "lucide-react";
 import { format } from "date-fns";
@@ -68,19 +69,26 @@ export default function InventoryMovementsPage() {
     globalFilter,
     sorting,
     columnFilters,
-    dateRange, 
+    dateRange,
   ]);
 
-  const handleGlobalFilterChange = (value: string) => {
-    setGlobalFilter(value);
+  const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
+    setGlobalFilter((prev) => 
+      typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue
+    );
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
-  const handleColumnFiltersChange = (updaterOrValue: any) => {
+  const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updaterOrValue) => {
     setColumnFilters((prev) => {
       const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
       return next;
     });
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
@@ -110,14 +118,14 @@ export default function InventoryMovementsPage() {
         sorting={sorting}
         onSortingChange={setSorting}
         globalFilter={globalFilter}
-        onGlobalFilterChange={(val) => handleGlobalFilterChange(String(val))}
+        onGlobalFilterChange={handleGlobalFilterChange}
         columnFilters={columnFilters}
         onColumnFiltersChange={handleColumnFiltersChange}
         toolbar={(table) => (
           <InventoryMovementsTableToolbar
             table={table}
             dateRange={dateRange}
-            setDateRange={setDateRange}
+            setDateRange={handleDateRangeChange}
           />
         )}
         actions={() => (
@@ -125,6 +133,7 @@ export default function InventoryMovementsPage() {
             {can("inventory_movements:create") && (
               <Button
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                onClick={() => console.log("Open Create Inventory Movement Dialog")} 
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Agregar Movimiento</span>
