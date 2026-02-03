@@ -4,8 +4,7 @@ import { AppAvatar } from "@/components/ui/app-avatar";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { InventoryMovement } from "@/types/inventory-movements";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   {
@@ -14,17 +13,8 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
       <DataTableColumnHeader column={column} title="Fecha" />
     ),
     cell: ({ row }) => (
-      <div className="flex flex-col">
-        <span className="font-medium">
-          {format(new Date(row.original.formatted_date), "dd MMM yyyy", {
-            locale: es,
-          })}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {format(new Date(row.original.formatted_date), "HH:mm a", {
-            locale: es,
-          })}
-        </span>
+      <div>
+        {format(new Date(row.original.formatted_date), "yyyy-MM-dd HH:mm")}
       </div>
     ),
     enableSorting: true,
@@ -35,18 +25,13 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
       <DataTableColumnHeader column={column} title="Producto" />
     ),
     cell: ({ row }) => (
-      <div className="flex flex-col max-w-[250px]">
+      <div className="flex flex-col max-w-[3000px]">
         <span
           className="font-medium truncate"
           title={row.original.product_name}
         >
           {row.original.product_name}
         </span>
-        {row.original.reference && (
-          <span className="text-[10px] text-muted-foreground truncate">
-            Ref: {row.original.reference}
-          </span>
-        )}
       </div>
     ),
   },
@@ -59,19 +44,13 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
 
       return (
         <Badge
-          variant="outline"
-          className={`gap-1 pr-2 pl-1 ${
+          className={`capitalize min-w-[80px] justify-center ${
             isInput
-              ? "border-green-500 text-green-700 bg-green-50"
-              : "border-red-500 text-red-700 bg-red-50"
+              ? "bg-green-600 text-white hover:bg-green-600/80"
+              : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
           }`}
         >
-          {isInput ? (
-            <TrendingUp className="h-3 w-3" />
-          ) : (
-            <TrendingDown className="h-3 w-3" />
-          )}
-          {isInput ? "ENTRADA" : "SALIDA"}
+          {isInput ? "Entrada" : "Salida"}
         </Badge>
       );
     },
@@ -100,11 +79,10 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   {
     accessorKey: "quantity",
     header: ({ column }) => (
-      <div className="text-right">
+      <div className="flex justify-center">
         <DataTableColumnHeader
           column={column}
           title="Cantidad"
-          className="justify-end"
         />
       </div>
     ),
@@ -114,7 +92,7 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
 
       return (
         <div
-          className={`font-bold text-right ${isInput ? "text-green-600" : "text-red-600"}`}
+          className={`flex justify-center font-bold ${isInput ? "text-green-600" : "text-red-600"}`}
         >
           {isInput ? "+" : "-"}
           {qty}
@@ -124,7 +102,7 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   },
   {
     id: "snapshot",
-    header: "Stock (Antes → Ahora)",
+    header: "Existencias",
     cell: ({ row }) => (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-8 text-right">{row.original.previous_stock}</span>

@@ -22,7 +22,7 @@ export default function InventoryMovementsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 20,
+    pageSize: 16,
   });
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -92,6 +92,15 @@ export default function InventoryMovementsPage() {
         columns={columns}
         data={data}
         isLoading={isLoading}
+        columnTitles={{
+          created_at: "Fecha",
+          product: "Producto",
+          type: "Tipo",
+          reason: "Razón",
+          quantity: "Cantidad",
+          snapshot: "Existencias",
+          user: "Usuario",
+        }}
         manualPagination={true}
         manualSorting={true}
         manualFiltering={true}

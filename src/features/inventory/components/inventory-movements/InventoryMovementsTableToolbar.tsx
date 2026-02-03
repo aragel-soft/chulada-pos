@@ -71,7 +71,7 @@ export function InventoryMovementsTableToolbar<TData>({
             placeholder="Buscar por producto..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
-            className="h-9 w-full lg:w-[250px]"
+            className="h-9 w-full lg:w-[300px]"
           />
 
           <div className="flex gap-2 w-full lg:w-auto">
@@ -79,14 +79,16 @@ export function InventoryMovementsTableToolbar<TData>({
               date={dateRange?.from}
               onSelect={(d) => handleDateChange('from', d)}
               placeholder="Fecha Inicio"
-              className="w-full lg:w-[140px] h-9"
+              className="w-full lg:w-[130px] h-9 border-dashed px-" 
+              formatStr="dd MMM y" 
             />
             <DateSelector
               date={dateRange?.to}
               onSelect={(d) => handleDateChange('to', d)}
               placeholder="Fecha Fin"
-              className="w-full lg:w-[140px] h-9"
+              className="w-full lg:w-[130px] h-9 border-dashed px-3"
               minDate={dateRange?.from}
+              formatStr="dd MMM y"
             />
           </div>
 
