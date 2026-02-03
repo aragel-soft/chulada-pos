@@ -5,8 +5,7 @@ import {
   PaginationState,
   SortingState,
 } from "@tanstack/react-table";
-  import { Gift, PlusCircle, Pencil, Trash } from "lucide-react";
-import { toast } from "sonner";
+import { Gift, PlusCircle, Pencil, Trash } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +17,7 @@ import { KitListItem } from "@/types/kits";
 import { PaginationParams } from "@/types/pagination";
 import { format } from "date-fns";
 import { KitWizard } from "../components/KitWizard";
+import { DeleteKitsDialog } from "../components/DeleteKitsDialog";
 
 export default function KitsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -29,6 +29,8 @@ export default function KitsPage() {
   const [rowSelection, setRowSelection] = useState({});
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingKitId, setEditingKitId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [kitsToDelete, setKitsToDelete] = useState<KitListItem[]>([]);
   const { can } = useAuthStore();
 
   const queryParams: PaginationParams = useMemo(
@@ -58,6 +60,12 @@ export default function KitsPage() {
     const kitId = selectedRows[0].original.id;
     setEditingKitId(kitId);
     setIsWizardOpen(true);
+  };
+
+  const handleDelete = (selectedRows: any[]) => {
+    const kits = selectedRows.map((row) => row.original);
+    setKitsToDelete(kits);
+    setIsDeleteDialogOpen(true);
   };
 
   const columns: ColumnDef<KitListItem>[] = useMemo(
@@ -230,11 +238,7 @@ export default function KitsPage() {
                 <Button
                   variant="destructive"
                   disabled={!hasSelection}
-                  onClick={() => {
-                    toast.info(
-                      "Funcionalidad de eliminar pendiente de implementar",
-                    );
-                  }}
+                  onClick={() => handleDelete(selectedRows)}
                 >
                   <Trash className="mr-2 h-4 w-4" />
                   Eliminar ({selectedRows.length})
@@ -249,6 +253,15 @@ export default function KitsPage() {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         kitIdToEdit={editingKitId}
+        onSuccess={() => {
+          setRowSelection({});
+        }}
+      />
+
+      <DeleteKitsDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        kits={kitsToDelete}
         onSuccess={() => {
           setRowSelection({});
         }}

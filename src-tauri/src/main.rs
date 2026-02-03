@@ -67,6 +67,7 @@ fn main() {
             commands::inventory::kits::get_kit_for_product,
             commands::inventory::kits::get_all_kits,
             commands::inventory::kits::update_kit,
+            commands::inventory::kits::delete_kits,
             // Inventory - Promotions
             commands::inventory::promotions::get_promotions,
             commands::inventory::promotions::get_promotion_details,
