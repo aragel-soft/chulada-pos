@@ -95,10 +95,7 @@ fn main() {
             commands::customers::account::get_customer_account_statement,
             // Sales - History
             commands::sales::history::get_sales_history,
-            commands::sales::history::get_sale_details,
-            // Sales - Returns (solo consulta)
-            commands::sales::returns::get_sale_with_return_info,
-            commands::sales::returns::get_returns_by_sale,
+            commands::sales::history::get_sale_details
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
