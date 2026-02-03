@@ -106,6 +106,8 @@ pub fn get_inventory_movements(
     Some("quantity") => "m.quantity",
     Some("user") => "u.full_name",
     Some("date") => "m.created_at",
+    Some("reason") => "m.reason",
+    Some("snapshot") => "m.new_stock",
     _ => "m.created_at",
   };
 

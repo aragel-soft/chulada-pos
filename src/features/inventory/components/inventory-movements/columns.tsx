@@ -25,7 +25,7 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
       <DataTableColumnHeader column={column} title="Producto" />
     ),
     cell: ({ row }) => (
-      <div className="flex flex-col max-w-[3000px]">
+      <div className="flex flex-col max-w-[300px]">
         <span
           className="font-medium truncate"
           title={row.original.product_name}
@@ -37,7 +37,9 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   },
   {
     accessorKey: "type",
-    header: "Tipo",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Tipo" />
+    ),
     cell: ({ row }) => {
       const type = row.original.type;
       const isInput = type === "IN";
@@ -60,7 +62,9 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   },
   {
     accessorKey: "reason",
-    header: "Razón",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Razón" />
+    ),
     cell: ({ row }) => {
       const reasonMap: Record<string, string> = {
         SALE: "Venta",
@@ -101,8 +105,10 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
     },
   },
   {
-    id: "snapshot",
-    header: "Existencias",
+    accessorKey: "snapshot",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Existencias" />
+    ),
     cell: ({ row }) => (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="w-8 text-right">{row.original.previous_stock}</span>
@@ -117,7 +123,9 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
   },
   {
     accessorKey: "user",
-    header: "Usuario",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Usuario" />
+    ),
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <AppAvatar
