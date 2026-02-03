@@ -1,10 +1,15 @@
 use rusqlite::{Connection};
 use std::fs;
-
+use rusqlite::types::ToSql;
 use std::path::Path;
 use tauri::Manager;
 use std::collections::HashSet;
 use std::error::Error;
+
+pub struct DynamicQuery {
+    pub sql_parts: Vec<String>,
+    pub params: Vec<Box<dyn ToSql + Send + Sync>>,
+}
 
 pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dyn Error>> {
     let app_dir = app_handle
@@ -106,4 +111,21 @@ fn run_migrations(conn: &mut Connection) -> std::result::Result<(), Box<dyn Erro
     
     println!("DATABASE_READY");
     Ok(())
+}
+
+impl DynamicQuery {
+    pub fn new() -> Self {
+        Self {
+            sql_parts: Vec::new(),
+            params: Vec::new(),
+        }
+    }
+
+    pub fn add_condition(&mut self, sql: &str) {
+        self.sql_parts.push(sql.to_string());
+    }
+
+    pub fn add_param<T: ToSql + Send + Sync + 'static>(&mut self, param: T) {
+        self.params.push(Box::new(param));
+    }
 }
