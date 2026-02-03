@@ -53,7 +53,7 @@ FROM _vars;
 
 INSERT INTO sale_items (id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, subtotal, is_kit_item, parent_sale_item_id) VALUES
 ('si-003-a', 'sale-003', 'p042', 'Plancha Babyliss Optima', 'PLA-BAB', 1, 2800.00, 'retail', 2800.00, 0, NULL),
-('si-003-b', 'sale-003', 'p007', 'Ampolleta Alfaparf (REGALO)', 'ALF-OIL', 1, 0.00, 'retail', 0.00, 1, 'si-003-a');
+('si-003-b', 'sale-003', 'p007', 'Ampolleta Alfaparf (REGALO)', 'ALF-OIL', 1, 0.00, 'kit-item', 0.00, 1, 'si-003-a');
 
 -- ==================================================================================
 -- ESCENARIO 4: VENTA CANCELADA (HACE 1 SEMANA)
