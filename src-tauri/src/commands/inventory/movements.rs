@@ -42,6 +42,8 @@ pub fn get_inventory_movements(
   db_state: State<'_, Mutex<Connection>>,
   page: i64,
   page_size: i64,
+  sort_by: Option<String>,
+  sort_order: Option<String>,
   filters: Option<MovementsFilter>,
 ) -> Result<PaginatedResponse<InventoryMovementView>, String> {
   let conn = db_state.lock().unwrap();
@@ -98,6 +100,20 @@ pub fn get_inventory_movements(
     .query_row(&count_sql, rusqlite::params_from_iter(count_params.iter()), |row| row.get(0))
     .map_err(|e| format!("Error contando movimientos: {}", e))?;
 
+  let sort_column = match sort_by.as_deref() {
+    Some("product") => "p.name",
+    Some("type") => "m.type",
+    Some("quantity") => "m.quantity",
+    Some("user") => "u.full_name",
+    Some("date") => "m.created_at",
+    _ => "m.created_at",
+  };
+
+  let sort_direction = match sort_order.as_deref() {
+    Some("asc") => "ASC",
+    _ => "DESC", 
+  };
+
   let data_sql = format!(
     "SELECT 
       m.id,
@@ -115,9 +131,9 @@ pub fn get_inventory_movements(
      JOIN products p ON m.product_id = p.id
      LEFT JOIN users u ON m.user_id = u.id
      WHERE {}
-     ORDER BY m.created_at DESC
+     ORDER BY {} {}
      LIMIT ? OFFSET ?",
-    where_clause
+    where_clause, sort_column, sort_direction
   );
 
   let limit = page_size;
