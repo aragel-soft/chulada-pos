@@ -36,7 +36,7 @@ WITH RECURSIVE
         ELSE ABS(RANDOM() % 10) + 1 
       END AS quantity_out,
       -- ID del Admin Fijo para los movimientos iniciales
-      '550e8400-e29b-41d4-a716-446655440001' AS admin_id
+      '450e8400-e29b-41d4-a716-446655440001' AS admin_id
     FROM products p
     JOIN store_inventory si ON p.id = si.product_id
   ),
