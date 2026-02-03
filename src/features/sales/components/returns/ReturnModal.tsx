@@ -5,12 +5,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { SaleDetail } from "@/types/sales-history";
 import { ReturnStepOne } from "@/features/sales/components/returns/ReturnStepOne";
 import { ReturnStepTwo } from "@/features/sales/components/returns/ReturnStepTwo";
 import { CheckCircle2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
 
 interface ReturnModalProps {
   sale: SaleDetail;
@@ -45,7 +45,6 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  // Key to force remounting of steps when modal opens/closes to ensure fresh state
   const [sessionKey, setSessionKey] = useState(0);
 
   useEffect(() => {

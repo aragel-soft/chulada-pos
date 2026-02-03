@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/text-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ReturnItem } from "./ReturnModal";
 import { formatCurrency } from "@/lib/utils";
-import { AlertCircle, FileText } from "lucide-react";
+import { AlertCircle, Package, ArrowLeft, Check } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AppAvatar } from "@/components/ui/app-avatar";
+import { Badge } from "@/components/ui/badge";
 import { SaleDetail } from "@/types/sales-history";
 
 interface ReturnStepTwoProps {
@@ -129,41 +131,59 @@ export function ReturnStepTwo({
           </div>
           <ScrollArea className="flex-1">
             <div className="divide-y">
-              {selectedItems.map((item) => (
-                <div key={item.saleItemId} className="p-4 flex items-center gap-4">
-                  <div className="h-12 w-12 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                    {item.productImage ? (
-                      <img
-                        src={item.productImage}
-                        alt={item.productName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.productName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.isGift ? (
-                        <span className="text-orange-600 font-medium">
-                          Regalo (Kit/Promo)
+              {/* Group items by promotion for visual clarity in summary too */}
+              {Array.from(new Set(selectedItems.map(i => i.promotionId || i.kitOptionId || ""))).map(groupId => {
+                const groupItems = selectedItems.filter(i => (i.promotionId || i.kitOptionId || "") === groupId);
+                const isCombo = !!groupId;
+                const promotionName = groupItems[0]?.promotionName || (groupItems[0]?.kitOptionId ? "Kit" : "");
+
+                return (
+                  <div key={groupId || 'individual'} className={`bg-white ${isCombo ? 'border rounded-lg overflow-hidden my-3 mx-2 shadow-sm' : 'my-1'}`}>
+                    {isCombo && (
+                      <div className="px-4 py-2 bg-purple-50 border-b flex items-center gap-2">
+                        <Package className="h-3.5 w-3.5 text-purple-600" />
+                        <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest">
+                          {promotionName}
                         </span>
-                      ) : (
-                        <span>{formatCurrency(item.unitPrice)} c/u</span>
-                      )}
-                    </p>
+                      </div>
+                    )}
+                    <div className="divide-y divide-gray-100">
+                      {groupItems.map((item) => (
+                        <div key={item.saleItemId} className={`p-4 flex items-center gap-4 ${!isCombo ? 'border-b last:border-0' : ''}`}>
+                          <div className="h-10 w-10 shrink-0">
+                            <AppAvatar
+                              name={item.productName}
+                              path={item.productImage}
+                              className="h-10 w-10 border border-zinc-100"
+                              variant="muted"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate text-slate-800">{item.productName}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {item.isGift ? (
+                                <Badge variant="secondary" className="bg-pink-50 text-pink-700 border-pink-100 h-4 px-1 text-[9px] font-bold">
+                                  REGALO
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground font-medium">{formatCurrency(item.unitPrice)} c/u</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-sm text-slate-900">x{item.returnQuantity}</p>
+                            <p className="text-xs font-bold text-slate-500">
+                              {item.isGift
+                                ? formatCurrency(0)
+                                : formatCurrency(item.returnQuantity * item.unitPrice)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">x{item.returnQuantity}</p>
-                    <p className="font-bold">
-                      {item.isGift
-                        ? formatCurrency(0)
-                        : formatCurrency(item.returnQuantity * item.unitPrice)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
           <div className="p-4 bg-muted/10 border-t">
@@ -240,17 +260,31 @@ export function ReturnStepTwo({
         </div>
       </div>
 
-      <div className="border-t bg-muted/5 p-6 flex justify-end gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isProcessing}>
+      <div className="border-t bg-white p-6 flex justify-between items-center">
+        <Button 
+          variant="outline" 
+          onClick={onBack} 
+          disabled={isProcessing}
+          className="h-11 px-6 border-slate-200 hover:bg-slate-50 font-semibold text-slate-600 gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
           Atrás
         </Button>
+
         <Button 
           variant="destructive"
           onClick={handleConfirm} 
           disabled={isProcessing}
-          className="w-48 bg-red-600 hover:bg-red-700"
+          className="h-11 px-8 bg-[#3b0764] hover:bg-[#2d054a] border-none text-white font-bold gap-2 shadow-lg shadow-purple-500/20 transition-all active:scale-95"
         >
-          {isProcessing ? "Procesando..." : "Confirmar Devolución"}
+          {isProcessing ? (
+            "Procesando..."
+          ) : (
+            <>
+              Confirmar Devolución
+              <Check className="h-4 w-4" />
+            </>
+          )}
         </Button>
       </div>
     </div>

@@ -60,4 +60,7 @@ export interface SaleHistoryItem {
   product_image?: string;
   promotion_id?: string;
   promotion_name?: string;
+  // Return tracking
+  quantity_returned: number;
+  quantity_available: number;
 }

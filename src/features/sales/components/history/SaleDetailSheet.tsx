@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Package, Gift, Tag, User, X } from "lucide-react";
+import { Loader2, Package, Gift, Tag, User, X, RotateCcw } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -78,6 +78,10 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
     ? differenceInDays(new Date(), new Date(sale.sale_date))
     : 999;
   const canReturn = daysSinceSale <= 30;
+  
+  // Check if there are any items available to return
+  const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
+  const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
 
   return (
     <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
@@ -102,6 +106,18 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
             <div className="flex gap-2">
               {sale?.status === "cancelled" && (
                 <Badge variant="destructive">CANCELADA</Badge>
+              )}
+              {sale?.status === "partial_return" && (
+                <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white border-none flex items-center gap-1">
+                  <RotateCcw className="w-3 h-3 text-white" />
+                  DEVOLUCIÓN PARCIAL
+                </Badge>
+              )}
+              {sale?.status === "fully_returned" && (
+                <Badge className="bg-slate-600 hover:bg-slate-700 text-white border-none flex items-center gap-1">
+                  <RotateCcw className="w-3 h-3 text-white" />
+                  DEVOLUCIÓN TOTAL
+                </Badge>
               )}
               {sale?.is_credit && (
                 <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white border-none">
@@ -162,15 +178,22 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                       variant="outline"
                       className="w-full pointer-events-auto" 
                       onClick={() => setReturnModalOpen(true)}
-                      disabled={!canReturn}
+                      disabled={!canProcessReturn}
                     >
                       Procesar Devolución
                     </Button>
                   </div>
                 </TooltipTrigger>
-                {!canReturn && (
+                {!canProcessReturn && (
                   <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
-                    <p>Esta venta excede el periodo permitido de devoluciones (30 días)</p>
+                    <p>
+                      {sale.status === "cancelled" 
+                        ? "No se pueden procesar devoluciones de ventas canceladas"
+                        : !canReturn
+                          ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
+                          : "Todos los items ya han sido devueltos"
+                      }
+                    </p>
                   </TooltipContent>
                 )}
               </Tooltip>
@@ -200,14 +223,14 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               <thead>
                 <tr className="text-muted-foreground border-b">
                   <th className="text-left pb-2 font-medium pl-1">Producto</th>
-                  <th className="text-right pb-2 font-medium">Cant.</th>
+                   <th className="text-center pb-2 font-medium">Cant.</th>
                   <th className="text-right pb-2 font-medium">Precio</th>
                   <th className="text-right pb-2 font-medium pr-1">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {sale.items.map((item) => (
-                  <ItemRow key={item.id} item={item} />
+                  <ItemRowWithReturns key={item.id} item={item} />
                 ))}
               </tbody>
             </table>
@@ -287,7 +310,7 @@ export function SaleDetailSheet({ isOpen, ...props }: SaleDetailSheetProps) {
   );
 }
 
-function ItemRow({ item }: { item: SaleHistoryItem }) {
+function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
   const getBadgeTypes = (item: any): BadgeType[] => {
     const badges: BadgeType[] = [];
 
@@ -300,8 +323,11 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
     return badges;
   };
 
+  const isPartiallyReturned = item.quantity_returned > 0 && item.quantity_available > 0;
+  const isFullyReturned = item.quantity_available === 0;
+
   return (
-    <tr className="group">
+    <tr className={`group ${isFullyReturned ? 'opacity-50 bg-slate-50' : ''}`}>
       <td className="py-3 pr-2 pl-1">
         <div className="flex items-center gap-3">
           {/* IMAGE */}
@@ -341,14 +367,14 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
 
             {/* BADGES */}
             <div className="flex gap-1 flex-wrap">
-              {getBadgeTypes(item).map((type) => {
+              {getBadgeTypes(item).map((type, index) => {
                 const config = BADGE_CONFIGS[type]; 
                 const Icon = config.icon;
                 const label = config.getLabel ? config.getLabel(item) : config.label;
                 
                 return (
                   <Badge
-                    key={type}
+                    key={`badge-${type}-${index}`}
                     variant={config.variant || "outline"}
                     className={config.className}
                   >
@@ -361,10 +387,20 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
           </div>
         </div>
       </td>
-      <td className="py-3 text-right align-top text-gray-600">
-        x{item.quantity}
+      <td className={`py-3 text-center align-top ${isFullyReturned ? 'text-slate-400 line-through' : 'text-gray-600'}`}>
+        {/* Show return breakdown in quantity column */}
+        {isPartiallyReturned || isFullyReturned ? (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className={isFullyReturned ? 'line-through text-slate-400' : ''}>x{item.quantity}</span>
+            <span className={`text-[10px] ${isFullyReturned ? 'text-slate-500' : 'text-orange-600 font-semibold'}`}>
+              {isFullyReturned ? `(${item.quantity_returned} devueltos)` : `-${item.quantity_returned} dev.`}
+            </span>
+          </div>
+        ) : (
+          <span>x{item.quantity}</span>
+        )}
       </td>
-      <td className="py-3 text-right align-top text-gray-600">
+      <td className={`py-3 text-right align-top ${isFullyReturned ? 'text-slate-400' : 'text-gray-600'}`}>
         {item.is_gift ? (
           <span className="line-through text-xs text-muted-foreground">
             {formatCurrency(item.unit_price)}

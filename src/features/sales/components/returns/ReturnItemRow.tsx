@@ -66,7 +66,7 @@ export function ReturnItemRow({
 
     const isKitItem = item.priceType === "kit_item" || item.kitOptionId;
     if (isKitItem && item.isGift) badges.push("gift");
-    if (isKitItem && item.isGift) badges.push("gift");
+    if (isKitItem && !item.isGift) badges.push("kit");
 
     return badges;
   };

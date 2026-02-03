@@ -7,7 +7,7 @@ import { ReturnItemRow } from "./ReturnItemRow";
 import { PromotionItemRow } from "./PromotionItemRow";
 import { formatCurrency } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
-import { AlertCircle } from "lucide-react";
+import { ArrowRight, X, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ReturnStepOneProps {
@@ -29,6 +29,9 @@ export function ReturnStepOne({
   const canReturn = daysSinceSale <= 30;
 
   useEffect(() => {
+    // Only initialize if we don't have items already (prevents reset when going "back")
+    if (returnItems.length > 0) return;
+
     const items: ReturnItem[] = sale.items.map((item) => {
       // Apply global discount if exists (EXCLUDING PROMOTIONS)
       const isPromo = item.price_type === "promo" || !!item.promotion_id;
@@ -41,11 +44,11 @@ export function ReturnStepOne({
 
       return {
         saleItemId: item.id,
-        productId: item.product_name,
+        productId: item.product_name, // Reverted: using product_name as ID fallback since product_id is not in SaleHistoryItem
         productName: item.product_name,
         originalQuantity: item.quantity,
-        alreadyReturnedQuantity: 0, // TODO: Get from backend when available
-        availableQuantity: item.quantity, // Should be quantity - returned
+        alreadyReturnedQuantity: item.quantity_returned,
+        availableQuantity: item.quantity_available,
         unitPrice: adjustedUnitPrice,
         returnQuantity: 0,
         isSelected: false,
@@ -58,7 +61,7 @@ export function ReturnStepOne({
       };
     });
     setReturnItems(items);
-  }, [sale.items, setReturnItems]);
+  }, [sale.items, sale.discount_global_percent, setReturnItems, returnItems.length]);
 
   // Handler for selecting/deselecting entire promotion by quantity
   const handlePromotionQuantityChange = (promotionId: string, newSetCount: number, gcd: number) => {
@@ -71,26 +74,6 @@ export function ReturnStepOne({
             ...item,
             isSelected: newReturnQty > 0,
             returnQuantity: newReturnQty,
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  // Handler for selecting/deselecting entire promotion (Toggle All/None)
-  const handleTogglePromotion = (promotionId: string) => {
-    const promoItems = itemsByPromotion.get(promotionId) || [];
-    const allSelected = promoItems.every((i) => i.isSelected);
-    const newSelection = !allSelected;
-
-    setReturnItems(
-      returnItems.map((item) => {
-        if (item.promotionId === promotionId) {
-          return {
-            ...item,
-            isSelected: newSelection,
-            returnQuantity: newSelection ? item.originalQuantity : 0,
           };
         }
         return item;
@@ -253,7 +236,6 @@ export function ReturnStepOne({
                   key={promotionId}
                   items={items}
                   promotionName={promotionName}
-                  onToggleSelect={() => handleTogglePromotion(promotionId)}
                   onQuantityChange={(newCount, gcd) => handlePromotionQuantityChange(promotionId, newCount, gcd)}
                   canReturn={canReturn}
                 />
@@ -272,28 +254,39 @@ export function ReturnStepOne({
         </div>
       </ScrollArea>
 
-      <div className="border-t bg-muted/5 p-6 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="border-t bg-white p-6 pt-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-0.5">
               Productos seleccionados
             </p>
-            <p className="text-2xl font-bold">{selectedItems.length}</p>
+            <p className="text-2xl font-black text-slate-900">{selectedItems.length}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Total a devolver</p>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-0.5">Total a devolver</p>
+            <p className="text-3xl font-black text-indigo-600">
               {formatCurrency(totalAmount)}
             </p>
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={onCancel} className="flex-1">
+        <div className="flex items-center justify-between">
+          <Button 
+            variant="outline" 
+            onClick={onCancel} 
+            className="h-11 px-6 border-slate-200 hover:bg-slate-50 font-semibold text-slate-600 gap-2"
+          >
+            <X className="h-4 w-4" />
             Cancelar
           </Button>
-          <Button onClick={onNext} disabled={!canProceed} className="flex-1">
-            Continuar al Resumen
+          
+          <Button 
+            onClick={onNext} 
+            disabled={!canProceed} 
+            className="h-11 px-8 bg-[#3b0764] hover:bg-[#2d054a] text-white font-bold gap-2 shadow-lg shadow-purple-500/20 shadow-indigo-500/20 transition-all hover:translate-x-1"
+          >
+            Siguiente
+            <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
       </div>

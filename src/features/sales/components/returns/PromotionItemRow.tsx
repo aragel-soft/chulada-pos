@@ -1,4 +1,3 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { Package, Minus, Plus, Info } from "lucide-react";
@@ -8,7 +7,6 @@ import { Button } from "@/components/ui/button";
 interface PromotionItemRowProps {
   items: ReturnItem[];
   promotionName: string;
-  onToggleSelect: () => void;
   onQuantityChange: (newCount: number, gcd: number) => void;
   canReturn: boolean;
 }
@@ -26,7 +24,6 @@ const calculateGroupGCD = (quantities: number[]): number => {
 export function PromotionItemRow({
   items,
   promotionName,
-  onToggleSelect,
   onQuantityChange,
   canReturn,
 }: PromotionItemRowProps) {
@@ -63,37 +60,28 @@ export function PromotionItemRow({
       } ${!canReturn ? "opacity-50" : ""}`}
     >
       <div className="flex items-start gap-3">
-        {/* If multiple sets are available, show Stepper. Otherwise show Checkbox (toggle 0 or 1) */}
-        {maxSets > 1 ? (
-          <div className="flex flex-col items-center gap-1 mt-1">
+        {/* Always show Stepper for promotions */}
+        <div className="flex flex-col items-center gap-1 mt-1">
+           <Button
+              variant="outline"
+              size="icon"
+              className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
+              onClick={() => handleSetChange(1)}
+              disabled={!canReturn || currentSets >= maxSets}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            <span className="text-sm font-bold w-6 text-center">{currentSets}</span>
              <Button
-                variant="outline"
-                size="icon"
-                className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
-                onClick={() => handleSetChange(1)}
-                disabled={!canReturn || currentSets >= maxSets}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-              <span className="text-sm font-bold w-6 text-center">{currentSets}</span>
-               <Button
-                variant="outline"
-                size="icon"
-                className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
-                onClick={() => handleSetChange(-1)}
-                disabled={!canReturn || currentSets <= 0}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-          </div>
-        ) : (
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={onToggleSelect}
-            disabled={!canReturn}
-            className="mt-1"
-          />
-        )}
+              variant="outline"
+              size="icon"
+              className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
+              onClick={() => handleSetChange(-1)}
+              disabled={!canReturn || currentSets <= 0}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+        </div>
 
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
@@ -104,11 +92,9 @@ export function PromotionItemRow({
             <Badge variant="secondary" className="bg-purple-100 text-purple-700">
               Promoción
             </Badge>
-            {maxSets > 1 && (
-               <Badge variant="outline" className="text-xs text-muted-foreground ml-auto">
-                 Max: {maxSets} paquetes
-               </Badge>
-            )}
+            <Badge variant="outline" className="text-xs text-muted-foreground ml-auto">
+              Disponible: {maxSets} paquete{maxSets !== 1 ? 's' : ''}
+            </Badge>
           </div>
 
           <div className="space-y-2 ml-6">

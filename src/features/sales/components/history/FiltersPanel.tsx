@@ -163,6 +163,8 @@ export function FiltersPanel({
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="completed">Completadas</SelectItem>
             <SelectItem value="cancelled">Canceladas</SelectItem>
+            <SelectItem value="partial_return">Dev. Parcial</SelectItem>
+            <SelectItem value="fully_returned">Dev. Total</SelectItem>
           </SelectContent>
         </Select>
       </div>

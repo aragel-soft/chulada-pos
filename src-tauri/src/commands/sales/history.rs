@@ -76,6 +76,9 @@ pub struct SaleItemView {
   pub product_image: Option<String>,
   pub promotion_id: Option<String>,
   pub promotion_name: Option<String>,
+  // Return tracking
+  pub quantity_returned: f64,
+  pub quantity_available: f64,
 }
 
 #[tauri::command]
@@ -292,7 +295,14 @@ pub fn get_sale_details(
     SELECT 
       si.id, si.product_name, si.quantity, si.unit_price, si.subtotal,
       si.price_type, si.kit_option_id, si.promotion_id,
-      p.image_url, pr.name as promotion_name
+      p.image_url, pr.name as promotion_name,
+      COALESCE(
+        (SELECT SUM(ri.quantity) 
+         FROM return_items ri
+         JOIN returns r ON ri.return_id = r.id
+         WHERE ri.sale_item_id = si.id),
+        0
+      ) as quantity_returned
     FROM sale_items si
     LEFT JOIN products p ON si.product_id = p.id
     LEFT JOIN promotions pr ON si.promotion_id = pr.id
@@ -313,11 +323,14 @@ pub fn get_sale_details(
       });
 
       let unit_price: f64 = row.get(3)?;
+      let quantity: f64 = row.get(2)?;
+      let quantity_returned: f64 = row.get(10)?;
+      let quantity_available = quantity - quantity_returned;
 
       Ok(SaleItemView {
           id: row.get(0)?,
           product_name: row.get(1)?,
-          quantity: row.get(2)?,
+          quantity,
           unit_price,
           subtotal: row.get(4)?,
           price_type: row.get(5)?,
@@ -326,6 +339,8 @@ pub fn get_sale_details(
           product_image: resolved_img,
           promotion_id: row.get(7)?,
           promotion_name: row.get(9)?,
+          quantity_returned,
+          quantity_available,
       })
     })
     .map_err(|e| e.to_string())?;
