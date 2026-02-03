@@ -17,6 +17,12 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 
@@ -148,19 +154,27 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full mt-3"
-              onClick={() => setReturnModalOpen(true)}
-              disabled={!canReturn}
-              title={
-                !canReturn
-                  ? `Esta venta excede el periodo de devoluciones (${daysSinceSale} días)`
-                  : undefined
-              }
-            >
-              Procesar Devolución
-            </Button>
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="w-full mt-3 cursor-not-allowed"> 
+                    <Button
+                      variant="outline"
+                      className="w-full pointer-events-auto" 
+                      onClick={() => setReturnModalOpen(true)}
+                      disabled={!canReturn}
+                    >
+                      Procesar Devolución
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                {!canReturn && (
+                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                    <p>Esta venta excede el periodo permitido de devoluciones (30 días)</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </>
         )}
       </div>

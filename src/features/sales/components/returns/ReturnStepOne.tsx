@@ -29,35 +29,48 @@ export function ReturnStepOne({
   const canReturn = daysSinceSale <= 30;
 
   useEffect(() => {
-    const items: ReturnItem[] = sale.items.map((item) => ({
-      saleItemId: item.id,
-      productId: item.product_name,
-      productName: item.product_name,
-      originalQuantity: item.quantity,
-      alreadyReturnedQuantity: 0,
-      availableQuantity: item.quantity,
-      unitPrice: item.unit_price,
-      returnQuantity: 0,
-      isSelected: false,
-      priceType: item.price_type,
-      isGift: item.is_gift,
-      productImage: item.product_image,
-      promotionId: item.promotion_id,
-      promotionName: item.promotion_name,
-      kitOptionId: item.kit_option_id,
-    }));
+    const items: ReturnItem[] = sale.items.map((item) => {
+      // Apply global discount if exists (EXCLUDING PROMOTIONS)
+      const isPromo = item.price_type === "promo" || !!item.promotion_id;
+      
+      const globalDiscountMultiplier = (sale.discount_global_percent > 0 && !isPromo)
+        ? (1 - sale.discount_global_percent / 100) 
+        : 1;
+      
+      const adjustedUnitPrice = item.unit_price * globalDiscountMultiplier;
+
+      return {
+        saleItemId: item.id,
+        productId: item.product_name,
+        productName: item.product_name,
+        originalQuantity: item.quantity,
+        alreadyReturnedQuantity: 0, // TODO: Get from backend when available
+        availableQuantity: item.quantity, // Should be quantity - returned
+        unitPrice: adjustedUnitPrice,
+        returnQuantity: 0,
+        isSelected: false,
+        priceType: item.price_type,
+        isGift: item.is_gift,
+        productImage: item.product_image,
+        promotionId: item.promotion_id,
+        promotionName: item.promotion_name,
+        kitOptionId: item.kit_option_id,
+      };
+    });
     setReturnItems(items);
   }, [sale.items, setReturnItems]);
 
-  const handleToggleSelect = (itemId: string) => {
+  // Handler for selecting/deselecting entire promotion by quantity
+  const handlePromotionQuantityChange = (promotionId: string, newSetCount: number, gcd: number) => {
     setReturnItems(
       returnItems.map((item) => {
-        if (item.saleItemId === itemId) {
-          const newSelected = !item.isSelected;
+        if (item.promotionId === promotionId) {
+          const unitQty = item.originalQuantity / gcd;
+          const newReturnQty = unitQty * newSetCount;
           return {
             ...item,
-            isSelected: newSelected,
-            returnQuantity: newSelected ? 1 : 0,
+            isSelected: newReturnQty > 0,
+            returnQuantity: newReturnQty,
           };
         }
         return item;
@@ -65,7 +78,7 @@ export function ReturnStepOne({
     );
   };
 
-  // Handler for selecting/deselecting entire promotion
+  // Handler for selecting/deselecting entire promotion (Toggle All/None)
   const handleTogglePromotion = (promotionId: string) => {
     const promoItems = itemsByPromotion.get(promotionId) || [];
     const allSelected = promoItems.every((i) => i.isSelected);
@@ -89,11 +102,16 @@ export function ReturnStepOne({
     setReturnItems(
       returnItems.map((item) => {
         if (item.saleItemId === itemId) {
+          // Standard logic: Min 0 (not 1), Max Available
           const newQty = Math.max(
-            1,
+            0,
             Math.min(item.availableQuantity, item.returnQuantity + delta)
           );
-          return { ...item, returnQuantity: newQty };
+          return { 
+            ...item, 
+            returnQuantity: newQty,
+            isSelected: newQty > 0 
+          };
         }
         return item;
       })
@@ -141,7 +159,7 @@ export function ReturnStepOne({
       }
     });
     
-    kitOptionGroups.forEach((items, kitOptionId) => {
+    kitOptionGroups.forEach((items, _) => {
       const selectedItems = items.filter((i) => i.isSelected);
       
       if (selectedItems.length > 0) {
@@ -197,9 +215,9 @@ export function ReturnStepOne({
     validationMessages.length === 0;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {!canReturn && (
-        <Alert variant="destructive" className="mx-6 mt-4">
+        <Alert variant="destructive" className="mx-6 mt-4 mb-2">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Periodo de devolución excedido</AlertTitle>
           <AlertDescription>
@@ -210,17 +228,19 @@ export function ReturnStepOne({
       )}
 
       {validationMessages.length > 0 && (
-        <Alert variant="destructive" className="mx-6 mt-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Validación de devolución</AlertTitle>
-          <AlertDescription>
-            <ul className="list-disc list-inside space-y-1 mt-2">
-              {validationMessages.map((msg, idx) => (
-                <li key={idx}>{msg}</li>
-              ))}
-            </ul>
-          </AlertDescription>
-        </Alert>
+        <div className="absolute top-4 left-6 right-6 z-20 animate-in fade-in slide-in-from-top-2">
+             <Alert variant="destructive" className="shadow-lg bg-red-50/95 border-red-200">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Validación de devolución</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc list-inside space-y-1 mt-2 text-xs">
+                  {validationMessages.map((msg, idx) => (
+                    <li key={idx}>{msg}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+        </div>
       )}
 
       <ScrollArea className="flex-1 px-6 py-4">
@@ -234,6 +254,7 @@ export function ReturnStepOne({
                   items={items}
                   promotionName={promotionName}
                   onToggleSelect={() => handleTogglePromotion(promotionId)}
+                  onQuantityChange={(newCount, gcd) => handlePromotionQuantityChange(promotionId, newCount, gcd)}
                   canReturn={canReturn}
                 />
               );
@@ -242,7 +263,6 @@ export function ReturnStepOne({
                 <ReturnItemRow
                   key={item.saleItemId}
                   item={item}
-                  onToggleSelect={handleToggleSelect}
                   onQuantityChange={handleQuantityChange}
                   canReturn={canReturn}
                 />

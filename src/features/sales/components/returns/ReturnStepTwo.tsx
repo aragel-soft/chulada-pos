@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/text-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ReturnItem } from "./ReturnModal";
 import { formatCurrency } from "@/lib/utils";
-import { AlertCircle, CheckCircle2, FileText, Printer } from "lucide-react";
+import { AlertCircle, FileText } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SaleDetail } from "@/types/sales-history";
 
@@ -25,6 +25,9 @@ interface ReturnStepTwoProps {
   isProcessing: boolean;
 }
 
+import { returnValidationSchema } from "./returnSchema";
+
+
 export function ReturnStepTwo({
   sale,
   returnItems,
@@ -36,7 +39,11 @@ export function ReturnStepTwo({
   const [reason, setReason] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Separate errors into field-specific (for inline display) and general (for alerts)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
+  const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  // Removed old errors state to avoid confusion
 
   const selectedItems = returnItems.filter(
     (item) => item.isSelected && item.returnQuantity > 0
@@ -48,49 +55,61 @@ export function ReturnStepTwo({
   );
 
   const handleConfirm = async () => {
-    if (!reason) {
-      setError("Por favor selecciona un motivo de devolución.");
+    setFieldErrors(null);
+    setGeneralErrors([]);
+    
+    // Zod Validation
+    const result = returnValidationSchema.safeParse({
+      reason,
+      notes,
+      items: returnItems
+    });
+
+    if (!result.success) {
+      const flattened = result.error.flatten();
+      setFieldErrors(flattened.fieldErrors);
+      
+      // Combine form-level errors and specific item errors into general errors for the alert
+      const combinedGeneralErrors = [
+        ...flattened.formErrors,
+        ...(flattened.fieldErrors['items'] || [])
+      ];
+      
+      setGeneralErrors(combinedGeneralErrors);
       return;
     }
-    setError(null);
+
     try {
       const code = await onConfirm(reason, notes);
       setVoucherCode(code);
     } catch (err) {
-      setError(String(err));
+      setGeneralErrors([String(err)]);
     }
   };
 
-  if (voucherCode) {
+  if (voucherCode === "UNDER_CONSTRUCTION") {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in fade-in duration-300">
-        <div className="bg-green-100 p-4 rounded-full mb-6">
-          <CheckCircle2 className="h-12 w-12 text-green-600" />
+        <div className="bg-yellow-100 p-4 rounded-full mb-6">
+          <AlertCircle className="h-12 w-12 text-yellow-600" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">¡Devolución Procesada!</h2>
+        <h2 className="text-2xl font-bold mb-2">Devolución Confirmada</h2>
         <p className="text-muted-foreground mb-8 text-lg">
-          Se ha generado exitosamente el Vale de Tienda.
+          La devolución ha sido registrada en el sistema.
         </p>
 
-        <div className="bg-muted p-8 rounded-lg border-2 border-dashed border-primary/20 w-full max-w-md mb-8">
-          <p className="text-sm text-muted-foreground mb-2">Código del Vale</p>
-          <div className="text-4xl font-mono font-bold tracking-wider text-primary select-all">
-            {voucherCode}
-          </div>
-          <div className="mt-4 pt-4 border-t w-full flex justify-between items-center text-sm">
-            <span>Saldo:</span>
-            <span className="font-bold text-lg">{formatCurrency(totalAmount)}</span>
-          </div>
-        </div>
+        <Alert className="bg-blue-50 border-blue-200 max-w-md mb-8 text-left">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-800">En Construcción</AlertTitle>
+          <AlertDescription className="text-blue-700 mt-1">
+            La funcionalidad de generación e impresión de vales está en desarrollo.
+            Próximamente podrás imprimir el comprobante directamente desde aquí.
+          </AlertDescription>
+        </Alert>
 
         <div className="flex gap-4">
-          <Button variant="outline" className="gap-2" onClick={onCancel}>
-            <FileText className="h-4 w-4" />
-            Cerrar
-          </Button>
-          <Button className="gap-2" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" />
-            Imprimir Vale
+          <Button className="w-48" onClick={onCancel}>
+            Entendido
           </Button>
         </div>
       </div>
@@ -99,13 +118,7 @@ export function ReturnStepTwo({
 
   return (
     <div className="flex flex-col h-full">
-      {error && (
-        <Alert variant="destructive" className="mx-6 mt-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+
 
       <div className="flex-1 flex gap-6 p-6 overflow-hidden">
         {/* Left Column: Summary */}
@@ -168,9 +181,11 @@ export function ReturnStepTwo({
             
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reason">Motivo de la devolución</Label>
+                <Label htmlFor="reason">
+                  Motivo de la devolución <span className="text-red-500">*</span>
+                </Label>
                 <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger id="reason">
+                  <SelectTrigger id="reason" className={fieldErrors?.reason ? "border-red-500" : ""}>
                     <SelectValue placeholder="Selecciona un motivo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -181,6 +196,11 @@ export function ReturnStepTwo({
                     <SelectItem value="other">Otro</SelectItem>
                   </SelectContent>
                 </Select>
+                {fieldErrors?.reason && (
+                  <p className="text-sm font-medium text-destructive">
+                    {fieldErrors.reason[0]}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -193,6 +213,20 @@ export function ReturnStepTwo({
                   className="resize-none h-32"
                 />
               </div>
+
+              {generalErrors.length > 0 && (
+                <Alert variant="destructive" className="mt-2 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error de Validación</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc list-inside mt-1">
+                      {generalErrors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
@@ -213,7 +247,7 @@ export function ReturnStepTwo({
         <Button 
           variant="destructive"
           onClick={handleConfirm} 
-          disabled={!reason || isProcessing}
+          disabled={isProcessing}
           className="w-48 bg-red-600 hover:bg-red-700"
         >
           {isProcessing ? "Procesando..." : "Confirmar Devolución"}

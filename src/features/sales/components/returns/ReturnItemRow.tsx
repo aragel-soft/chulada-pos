@@ -1,8 +1,5 @@
-import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { AppAvatar } from "@/components/ui/app-avatar";
 import { ReturnItem } from "./ReturnModal";
@@ -50,71 +47,16 @@ const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
 
 interface ReturnItemRowProps {
   item: ReturnItem;
-  onToggleSelect: (itemId: string) => void;
   onQuantityChange: (itemId: string, delta: number) => void;
   canReturn: boolean;
 }
 
-function useQuantityEditor(
-  item: ReturnItem,
-  onQuantityChange: (itemId: string, delta: number) => void
-) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempQty, setTempQty] = useState(item.returnQuantity.toString());
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  useEffect(() => {
-    setTempQty(item.returnQuantity.toString());
-  }, [item.returnQuantity]);
-
-  const handleManualSubmit = () => {
-    setIsEditing(false);
-    const val = parseInt(tempQty);
-    if (!isNaN(val) && val > 0) {
-      const clampedVal = Math.min(val, item.availableQuantity);
-      const delta = clampedVal - item.returnQuantity;
-      if (delta !== 0) {
-        onQuantityChange(item.saleItemId, delta);
-      }
-      setTempQty(clampedVal.toString());
-    } else {
-      setTempQty(item.returnQuantity.toString());
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleManualSubmit();
-    if (e.key === "Escape") {
-      setIsEditing(false);
-      setTempQty(item.returnQuantity.toString());
-    }
-  };
-
-  return {
-    isEditing,
-    tempQty,
-    inputRef,
-    setIsEditing,
-    setTempQty,
-    handleManualSubmit,
-    handleKeyDown,
-  };
-}
-
 export function ReturnItemRow({
   item,
-  onToggleSelect,
   onQuantityChange,
   canReturn,
 }: ReturnItemRowProps) {
   const isFullyReturned = item.availableQuantity === 0;
-  const qtyEditor = useQuantityEditor(item, onQuantityChange);
 
   const getBadgeTypes = (): BadgeType[] => {
     const badges: BadgeType[] = [];
@@ -124,7 +66,7 @@ export function ReturnItemRow({
 
     const isKitItem = item.priceType === "kit_item" || item.kitOptionId;
     if (isKitItem && item.isGift) badges.push("gift");
-    if (isKitItem && !item.isGift) badges.push("kit");
+    if (isKitItem && item.isGift) badges.push("gift");
 
     return badges;
   };
@@ -134,18 +76,36 @@ export function ReturnItemRow({
       className={`border rounded-lg p-4 transition-all ${
         isFullyReturned
           ? "bg-gray-50 opacity-60"
-          : item.isSelected
+          : item.returnQuantity > 0 // Selected state based on quantity
           ? "bg-blue-50 border-blue-200 shadow-sm"
           : "bg-white hover:border-gray-300"
       }`}
     >
       <div className="flex items-start gap-3">
-        <Checkbox
-          checked={item.isSelected}
-          disabled={isFullyReturned || !canReturn}
-          onCheckedChange={() => onToggleSelect(item.saleItemId)}
-          className="mt-1"
-        />
+        {/* STEPPER - Replaces checkbox */}
+        <div className="flex flex-col items-center gap-1 mt-1">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
+            onClick={() => onQuantityChange(item.saleItemId, 1)}
+            disabled={!canReturn || item.returnQuantity >= item.availableQuantity}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+          <span className={`text-sm font-bold w-6 text-center ${item.returnQuantity > 0 ? "text-primary": "text-muted-foreground"}`}>
+            {item.returnQuantity}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-6 w-6 rounded-full border-zinc-300 hover:bg-zinc-100 disabled:opacity-30"
+            onClick={() => onQuantityChange(item.saleItemId, -1)}
+            disabled={!canReturn || item.returnQuantity <= 0}
+          >
+            <Minus className="h-3 w-3" />
+          </Button>
+        </div>
 
         <div className="flex items-center justify-center shrink-0">
           <AppAvatar
@@ -216,54 +176,11 @@ export function ReturnItemRow({
             </Badge>
           )}
 
-          {item.isSelected && (
+          {/* Logic to show return details if quantity > 0 */}
+          {item.returnQuantity > 0 && (
             <div className="flex items-center gap-3 mt-3 pt-3 border-t">
               <span className="text-sm font-medium">Cantidad a devolver:</span>
-
-              {/* STEPPER - CardItemRow style */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-100 hover:text-red-500"
-                  onClick={() => onQuantityChange(item.saleItemId, -1)}
-                  disabled={item.returnQuantity <= 1}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-
-                <div className="w-14 text-center relative">
-                  {qtyEditor.isEditing ? (
-                    <Input
-                      ref={qtyEditor.inputRef}
-                      value={qtyEditor.tempQty}
-                      onChange={(e) => qtyEditor.setTempQty(e.target.value)}
-                      onBlur={qtyEditor.handleManualSubmit}
-                      onKeyDown={qtyEditor.handleKeyDown}
-                      className="h-8 text-center px-0 text-base font-bold bg-white focus-visible:ring-1 focus-visible:ring-purple-500"
-                    />
-                  ) : (
-                    <span
-                      className="block text-base font-bold tabular-nums rounded px-1 select-none cursor-text hover:bg-zinc-100"
-                      onDoubleClick={() => qtyEditor.setIsEditing(true)}
-                      title="Doble clic para editar manual"
-                    >
-                      {item.returnQuantity}
-                    </span>
-                  )}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-100 hover:text-green-600"
-                  onClick={() => onQuantityChange(item.saleItemId, 1)}
-                  disabled={item.returnQuantity >= item.availableQuantity}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
+              <span className="font-bold text-lg">{item.returnQuantity}</span>
               <span className="text-sm text-muted-foreground ml-auto">
                 Subtotal:{" "}
                 <span className="font-semibold text-foreground">
