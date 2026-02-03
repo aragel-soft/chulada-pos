@@ -23,6 +23,11 @@ const inventoryTabs = [
     value: 'promotions',
     label: 'Promociones',
     permission: 'promotions:view',
+  }, 
+  {
+    value: 'inventory-movements',
+    label: 'Movimientos',
+    permission: 'inventory_movements:view',
   }
 ];
 
