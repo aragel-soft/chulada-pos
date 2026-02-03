@@ -17,6 +17,7 @@ interface DateSelectorProps {
   className?: string;
   disabled?: boolean;
   minDate?: Date;
+  formatStr?: string;
 }
 
 export function DateSelector({
@@ -26,6 +27,7 @@ export function DateSelector({
   className,
   disabled = false,
   minDate,
+  formatStr = "PPP",
 }: DateSelectorProps) {
   return (
     <Popover>
@@ -41,7 +43,7 @@ export function DateSelector({
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? (
-            format(date, "PPP", { locale: es })
+            format(date, formatStr, { locale: es })
           ) : (
             <span>{placeholder}</span>
           )}

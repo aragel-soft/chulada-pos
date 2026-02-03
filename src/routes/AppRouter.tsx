@@ -26,6 +26,7 @@ import HardwarePage from '@/features/settings/pages/HardwarePage';
 import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage';
 import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
 import CustomerDetailPage from '@/features/customers/pages/CustomerDetailPages';
+import InventoryMovementsPage from '@/features/inventory/pages/InventoryMovementsPage';
 
 // --- Componente de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -129,6 +130,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute module="promotions:view">
                 <PromotionsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "inventory-movements",
+            element: (
+              <ProtectedRoute module="inventory_movements:view">
+                <InventoryMovementsPage />
               </ProtectedRoute>
             ),
           }
