@@ -18,3 +18,12 @@ export interface MovementsFilter {
   start_date?: string; // YYYY-MM-DD
   end_date?: string;   // YYYY-MM-DD
 }
+
+export interface CreateInventoryMovementPayload {
+  product_id: string;
+  user_id: string;
+  movement_type: 'IN' | 'OUT';
+  quantity: number;
+  reason: string;
+  notes?: string;
+}
