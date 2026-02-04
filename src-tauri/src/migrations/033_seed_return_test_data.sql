@@ -124,11 +124,11 @@ SELECT
   'sale-test-return-004', 
   '00000015', 
   datetime('now', 'localtime', '-15 day'), 
-  440.00, -- Subtotal 
-  440.00, -- Total
+  590.00, -- Subtotal 
+  590.00, -- Total
   'completed', 
   'cash', 
-  440.00, 
+  590.00, 
   0, 
   '450e8400-e29b-41d4-a716-446655440001'
 ;
@@ -136,4 +136,5 @@ SELECT
 INSERT INTO sale_items (id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, subtotal, promotion_id) VALUES
 ('si-test-15', 'sale-test-return-004', 'pr-gel-k-1', 'Gel Kuul Fijación Extra Fuerte 500ml', 'GEL-KUL-FIJ', 4, 36.67, 'promo', 146.68, 'promo_gel_02'),
 ('si-test-16', 'sale-test-return-004', 'pr-gel-k-2', 'Gel Kuul Brillo Extremo 500ml', 'GEL-KUL-BRI', 6, 36.67, 'promo', 220.02, 'promo_gel_02'),
-('si-test-17', 'sale-test-return-004', 'pr-gel-k-3', 'Gel Kuul Wet Look 500ml', 'GEL-KUL-WET', 2, 36.67, 'promo', 73.34, 'promo_gel_02');
+('si-test-17', 'sale-test-return-004', 'pr-gel-k-3', 'Gel Kuul Wet Look 500ml', 'GEL-KUL-WET', 2, 36.67, 'promo', 73.34, 'promo_gel_02'),
+('si-test-18', 'sale-test-return-004', 'pr-gel-k-1', 'Gel Kuul Fijación Extra Fuerte 500ml', 'GEL-KUL-FIJ', 2, 75.00, 'retail', 150.00, null);

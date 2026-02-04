@@ -20,7 +20,7 @@ VALUES (
     datetime('now', 'localtime', '-2 days'),
     15.00, -- 1 unidad x $15.00
     'Cliente ya no lo necesita',
-    'cash',
+    'coupon',
     '450e8400-e29b-41d4-a716-446655440001'
 );
 
@@ -56,7 +56,7 @@ VALUES (
     datetime('now', 'localtime', '-5 hours'),
     476.00, -- Total de la venta
     'Producto defectuoso - lote completo',
-    'cash',
+    'coupon',
     '450e8400-e29b-41d4-a716-446655440001'
 );
 
@@ -86,9 +86,9 @@ VALUES (
     3,
     'sale-test-return-004',
     datetime('now', 'localtime', '-10 days'),
-    110.01, -- 1 de cada gel (3 geles x ~36.67)
+    220.01, -- 1 de cada gel (3 geles x ~36.67)
     'Cliente cambió de opinión',
-    'cash',
+    'coupon',
     '450e8400-e29b-41d4-a716-446655440001'
 );
 
@@ -105,15 +105,15 @@ VALUES (
     4,
     'sale-test-return-004',
     datetime('now', 'localtime', '-3 days'),
-    36.67, -- 1 Gel Fijación
+    75.00, -- 1 Gel Fijación
     'Exceso de inventario',
-    'cash',
+    'coupon',
     '450e8400-e29b-41d4-a716-446655440001'
 );
 
 INSERT INTO return_items (id, return_id, sale_item_id, product_id, quantity, unit_price, subtotal)
 VALUES 
-    ('ri-009', 'return-004', 'si-test-15', 'pr-gel-k-1', 1.000, 36.67, 36.67);  -- 1 más de Fijación
+    ('ri-009', 'return-004', 'si-test-18', 'pr-gel-k-1', 1.000, 75.00, 75.00);  -- 1 más de Fijación
 
 -- Update sale status to partial_return (multiple partial returns)
 UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-004';
@@ -135,4 +135,5 @@ UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-004';
 --   - Gel Fijación (si-test-15): vendido 4, devuelto 2, DISPONIBLE 2
 --   - Gel Brillo (si-test-16): vendido 6, devuelto 3, DISPONIBLE 3
 --   - Gel Wet Look (si-test-17): vendido 2, devuelto 1, DISPONIBLE 1
+--   - Gel Fijación (si-test-18): vendido 1, devuelto 1, DISPONIBLE 1
 -- ==================================================================================
