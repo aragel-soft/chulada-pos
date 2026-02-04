@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Package, Gift, Tag, User, X, RotateCcw } from "lucide-react";
+import { Loader2, User, X } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,50 +25,12 @@ import {
 } from "@/components/ui/tooltip";
 import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
+import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
 }
-
-type BadgeType = "wholesale" | "promo" | "gift" | "kit";
-
-interface BadgeConfig {
-  variant?: "outline" | "secondary";
-  className: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  label?: string;
-  getLabel?: (item: any) => string;
-}
-
-const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
-  wholesale: {
-    className:
-      "h-5 px-1 text-[10px] bg-amber-100 text-amber-700 border-amber-200 font-bold",
-    label: "MAYOREO",
-  },
-  promo: {
-    className:
-      "h-5 px-1 text-[10px] bg-purple-50 text-purple-700 border-purple-200",
-    icon: Tag,
-    getLabel: (item) =>
-      item.promotion_name
-        ? `PROMO: ${item.promotion_name.toUpperCase()}`
-        : "PROMO",
-  },
-  gift: {
-    className:
-      "h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100",
-    icon: Gift,
-    label: "REGALO",
-  },
-  kit: {
-    variant: "secondary",
-    className: "h-5 px-1 text-[10px]",
-    icon: Package,
-    label: "KIT",
-  },
-};
 
 export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
   const { data: sale, isLoading } = useSaleDetail(saleId);
@@ -105,30 +67,32 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
             <div className="flex gap-2">
               {sale?.status === "cancelled" && (
-                <Badge variant="destructive">CANCELADA</Badge>
+                <Badge variant={BADGE_CONFIGS.cancelled.variant} className={BADGE_CONFIGS.cancelled.className}>
+                  {BADGE_CONFIGS.cancelled.label}
+                </Badge>
               )}
               {sale?.status === "partial_return" && (
-                <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white border-none flex items-center gap-1">
-                  <RotateCcw className="w-3 h-3 text-white" />
-                  DEVOLUCIÓN PARCIAL
+                <Badge className={BADGE_CONFIGS.partial_return.className}>
+                  {BADGE_CONFIGS.partial_return.icon && <BADGE_CONFIGS.partial_return.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.partial_return.label}
                 </Badge>
               )}
               {sale?.status === "fully_returned" && (
-                <Badge className="bg-slate-600 hover:bg-slate-700 text-white border-none flex items-center gap-1">
-                  <RotateCcw className="w-3 h-3 text-white" />
-                  DEVOLUCIÓN TOTAL
+                <Badge className={BADGE_CONFIGS.fully_returned.className}>
+                  {BADGE_CONFIGS.fully_returned.icon && <BADGE_CONFIGS.fully_returned.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.fully_returned.label}
                 </Badge>
               )}
               {sale?.is_credit && (
-                <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white border-none">
-                  A CRÉDITO
+                <Badge className={BADGE_CONFIGS.credit.className}>
+                  {BADGE_CONFIGS.credit.label}
                 </Badge>
               )}
               {(sale?.has_discount ||
                 (sale?.discount_global_percent ?? 0) > 0) && (
-                <Badge className="bg-orange-600 hover:bg-orange-700 text-white border-none flex items-center gap-1">
-                  <Tag className="w-3 h-3 text-white" />
-                  CON DESCUENTO
+                <Badge className={BADGE_CONFIGS.discount_global.className}>
+                  {BADGE_CONFIGS.discount_global.icon && <BADGE_CONFIGS.discount_global.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.discount_global.label}
                 </Badge>
               )}
             </div>
@@ -311,7 +275,7 @@ export function SaleDetailSheet({ isOpen, ...props }: SaleDetailSheetProps) {
 }
 
 function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
-  const getBadgeTypes = (item: any): BadgeType[] => {
+  const getBadgeTypes = (item: SaleHistoryItem): BadgeType[] => {
     const badges: BadgeType[] = [];
 
     if (item.price_type === "wholesale") badges.push("wholesale");
@@ -322,6 +286,7 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
 
     return badges;
   };
+
 
   const isPartiallyReturned = item.quantity_returned > 0 && item.quantity_available > 0;
   const isFullyReturned = item.quantity_available === 0;

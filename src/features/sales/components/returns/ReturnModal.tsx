@@ -18,30 +18,18 @@ interface ReturnModalProps {
   onClose: () => void;
 }
 
-export interface ReturnItem {
-  saleItemId: string;
-  productId: string;
-  productName: string;
-  originalQuantity: number;
-  alreadyReturnedQuantity: number;
-  availableQuantity: number;
-  unitPrice: number;
-  returnQuantity: number;
-  isSelected: boolean;
-  priceType: string;
-  isGift: boolean;
-  productImage?: string;
-  promotionId?: string;
-  promotionName?: string;
-  kitOptionId?: string;
-}
+import { ReturnItem } from "@/types/returns";
 
-const STEPS = [
-  { id: 1, title: "Selección" },
-  { id: 2, title: "Confirmación" },
-];
+import { UI_COLORS } from "@/features/sales/constants/sales-design";
 
 export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
+
+  // --- WIZARD DESIGN ---
+  const WIZARD_STEPS = [
+    { id: 1, title: "Selección" },
+    { id: 2, title: "Confirmación" },
+  ];
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,7 +46,6 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
     setCurrentStep(2);
   };
   
-  // Handle return confirmation (Mock for now)
   const handleConfirmReturn = async (reason: string, notes: string): Promise<string> => {
     setIsProcessing(true);
     try {
@@ -68,8 +55,6 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
       // Simulate backend delay and response
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Mock voucher code
-      // const mockVoucher = `VALE-${Date.now().toString().slice(-6)}`;
       return "UNDER_CONSTRUCTION";
     } finally {
       setIsProcessing(false);
@@ -91,8 +76,8 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
         {/* --- HEADER --- */}
         <div className="p-6 pb-4 border-b bg-background">
           <DialogHeader className="mb-6 flex flex-row items-center gap-3 space-y-0">
-            <div className="bg-[#480489]/10 p-2 rounded-full">
-              <RotateCcw className="h-6 w-6 text-[#480489]" />
+            <div className="p-2 rounded-full bg-purple-50"> 
+              <RotateCcw className="h-6 w-6 text-purple-800" />
             </div>
             <div className="flex flex-col">
               <DialogTitle className="text-xl font-bold text-foreground">
@@ -107,7 +92,7 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
           {/* Stepper Visual */}
           <nav aria-label="Progreso del Wizard" className="w-full">
             <ol className="flex items-center w-full">
-              {STEPS.map((step, index) => {
+              {WIZARD_STEPS.map((step, index) => {
                 const isActive = step.id === currentStep;
                 const isCompleted = step.id < currentStep;
                 const isFuture = step.id > currentStep;
@@ -117,7 +102,7 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
                     key={step.id}
                     className={cn(
                       "flex items-center relative",
-                      index !== STEPS.length - 1 ? "flex-1" : ""
+                      index !== WIZARD_STEPS.length - 1 ? "flex-1" : ""
                     )}
                   >
                     <div
@@ -130,11 +115,15 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
                         className={cn(
                           "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300",
                           isActive
-                            ? "border-[#480489] bg-[#480489] text-white shadow-md scale-110"
+                            ? "text-white shadow-md scale-110"
                             : isCompleted
-                            ? "border-[#480489] bg-[#480489] text-white"
+                            ? "text-white"
                             : "border-muted-foreground/30 text-muted-foreground bg-background"
                         )}
+                        style={{
+                           borderColor: isActive || isCompleted ? UI_COLORS.brandPurple : undefined,
+                           backgroundColor: isActive || isCompleted ? UI_COLORS.brandPurple : undefined
+                        }}
                       >
                         {isCompleted ? (
                           <CheckCircle2 className="w-5 h-5" />
@@ -148,24 +137,26 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
                         <span
                           className={cn(
                             "text-sm font-medium transition-colors",
-                            isActive
-                              ? "text-[#480489]"
-                              : isCompleted
+                            isCompleted || isActive
                               ? "text-foreground"
                               : "text-muted-foreground"
                           )}
+                           style={{
+                              color: isActive ? UI_COLORS.brandPurple : undefined
+                           }}
                         >
                           {step.title}
                         </span>
                       </div>
                     </div>
 
-                    {index !== STEPS.length - 1 && (
+                    {index !== WIZARD_STEPS.length - 1 && (
                       <div
                         className={cn(
                           "h-[2px] w-full mx-4 transition-colors duration-500",
-                          isCompleted ? "bg-[#480489]" : "bg-muted"
+                          isCompleted ? "" : "bg-muted"
                         )}
+                         style={{ backgroundColor: isCompleted ? UI_COLORS.brandPurple : undefined }}
                       />
                     )}
                   </li>

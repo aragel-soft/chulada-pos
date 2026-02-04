@@ -2,9 +2,10 @@ import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SaleDetail } from "@/types/sales-history";
-import { ReturnItem } from "./ReturnModal";
+import { ReturnItem } from "@/types/returns";
 import { ReturnItemRow } from "./ReturnItemRow";
 import { PromotionItemRow } from "./PromotionItemRow";
+import { useReturnValidation } from "@/features/sales/hooks/useReturnValidation";
 import { formatCurrency } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 import { ArrowRight, X, AlertCircle } from "lucide-react";
@@ -13,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 interface ReturnStepOneProps {
   sale: SaleDetail;
   returnItems: ReturnItem[];
-  setReturnItems: (items: ReturnItem[]) => void;
+  setReturnItems: React.Dispatch<React.SetStateAction<ReturnItem[]>>;
   onNext: () => void;
   onCancel: () => void;
 }
@@ -44,7 +45,7 @@ export function ReturnStepOne({
 
       return {
         saleItemId: item.id,
-        productId: item.product_name, // Reverted: using product_name as ID fallback since product_id is not in SaleHistoryItem
+        productId: item.product_name, // Fallback to name as ID is not available in current projection
         productName: item.product_name,
         originalQuantity: item.quantity,
         alreadyReturnedQuantity: item.quantity_returned,
@@ -61,129 +62,63 @@ export function ReturnStepOne({
       };
     });
     setReturnItems(items);
-  }, [sale.items, sale.discount_global_percent, setReturnItems, returnItems.length]);
+  }, [sale.items, sale.discount_global_percent, setReturnItems]); // Removed returnItems.length from deps to avoid stale closure issues if length changes externally, though unlikely here. Logic inside handles the check.
 
   // Handler for selecting/deselecting entire promotion by quantity
-  const handlePromotionQuantityChange = (promotionId: string, newSetCount: number, gcd: number) => {
-    setReturnItems(
-      returnItems.map((item) => {
-        if (item.promotionId === promotionId) {
-          const unitQty = item.originalQuantity / gcd;
-          const newReturnQty = unitQty * newSetCount;
-          return {
-            ...item,
-            isSelected: newReturnQty > 0,
-            returnQuantity: newReturnQty,
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  const handleQuantityChange = (itemId: string, delta: number) => {
-    setReturnItems(
-      returnItems.map((item) => {
-        if (item.saleItemId === itemId) {
-          // Standard logic: Min 0 (not 1), Max Available
-          const newQty = Math.max(
-            0,
-            Math.min(item.availableQuantity, item.returnQuantity + delta)
-          );
-          return { 
-            ...item, 
-            returnQuantity: newQty,
-            isSelected: newQty > 0 
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  // Group items by promotion
-  const itemsByPromotion = useMemo(() => {
-    const groups = new Map<string | null, ReturnItem[]>();
-    
-    returnItems.forEach((item) => {
-      const key = item.promotionId || null;
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(item);
-    });
-    
-    return groups;
-  }, [returnItems]);
-
-  const validationMessages = useMemo(() => {
-    const messages: string[] = [];
-
-    itemsByPromotion.forEach((items, promoId) => {
-      if (promoId) {
-        const selectedCount = items.filter((i) => i.isSelected).length;
-        if (selectedCount > 0 && selectedCount < items.length) {
-          const promoName = items[0].promotionName || "Promoción";
-          messages.push(
-            `"${promoName}" debe devolverse completa. Selecciona todos los productos de la promoción.`
-          );
-        }
-      }
-    });
-
-    const kitOptionGroups = new Map<string, ReturnItem[]>();
-    
-    returnItems.forEach((item) => {
-      if (item.kitOptionId) {
-        if (!kitOptionGroups.has(item.kitOptionId)) {
-          kitOptionGroups.set(item.kitOptionId, []);
-        }
-        kitOptionGroups.get(item.kitOptionId)!.push(item);
-      }
-    });
-    
-    kitOptionGroups.forEach((items, _) => {
-      const selectedItems = items.filter((i) => i.isSelected);
-      
-      if (selectedItems.length > 0) {
-        const mainItems = selectedItems.filter((i) => !i.isGift);
-        const giftItems = selectedItems.filter((i) => i.isGift);
-        
-        const totalMainQty = mainItems.reduce((sum, i) => sum + i.returnQuantity, 0);
-        const totalGiftQty = giftItems.reduce((sum, i) => sum + i.returnQuantity, 0);
-        
-        const allMainItems = items.filter((i) => !i.isGift);
-        const allGiftItems = items.filter((i) => i.isGift);
-        const originalMainQty = allMainItems.reduce((sum, i) => sum + i.originalQuantity, 0);
-        const originalGiftQty = allGiftItems.reduce((sum, i) => sum + i.originalQuantity, 0);
-        
-        if (originalMainQty > 0) {
-          const giftsPerMain = originalGiftQty / originalMainQty;
-          const expectedGiftQty = totalMainQty * giftsPerMain;
-          
-          if (totalMainQty > 0 && totalGiftQty === 0) {
-            const mainNames = mainItems.map(i => i.productName).join(", ");
-            messages.push(
-              `Para devolver productos principales (${mainNames}), debes devolver ${expectedGiftQty} item(s) de regalo del kit.`
-            );
-          } else if (totalGiftQty > 0 && totalMainQty === 0) {
-            messages.push(
-              "No puedes devolver solo items de regalo sin devolver el producto principal del kit."
-            );
-          } else if (totalMainQty > 0 && totalGiftQty > 0) {
-            if (Math.abs(totalGiftQty - expectedGiftQty) > 0.001) {
-              const mainNames = mainItems.map(i => `${i.productName} (${i.returnQuantity})`).join(", ");
-              messages.push(
-                `Para devolver ${mainNames}, debes devolver exactamente ${expectedGiftQty} item(s) de regalo (actualmente: ${totalGiftQty}).`
-              );
+  // Handler for selecting/deselecting entire promotion by quantity
+  const handlePromotionQuantityChange = useMemo(
+    () => (promotionId: string, newSetCount: number, gcd: number) => {
+      setReturnItems((prevItems) => 
+        prevItems.map((item) => {
+          if (item.promotionId === promotionId) {
+            const unitQty = item.originalQuantity / gcd;
+            const newReturnQty = unitQty * newSetCount;
+            // Only update if changed
+            if (item.returnQuantity === newReturnQty && item.isSelected === (newReturnQty > 0)) {
+               return item;
             }
+            return {
+              ...item,
+              isSelected: newReturnQty > 0,
+              returnQuantity: newReturnQty,
+            };
           }
-        }
-      }
-    });
+          return item;
+        })
+      );
+    },
+    [setReturnItems]
+  );
 
-    return messages;
-  }, [returnItems, itemsByPromotion]);
+  const handleQuantityChange = useMemo(
+    () => (itemId: string, delta: number) => {
+      setReturnItems((prevItems) =>
+        prevItems.map((item) => {
+          if (item.saleItemId === itemId) {
+            // Standard logic: Min 0 (not 1), Max Available
+            const newQty = Math.max(
+              0,
+              Math.min(item.availableQuantity, item.returnQuantity + delta)
+            );
+             // Only update if changed
+            if (item.returnQuantity === newQty) {
+                return item;
+            }
+            return {
+              ...item,
+              returnQuantity: newQty,
+              isSelected: newQty > 0,
+            };
+          }
+          return item;
+        })
+      );
+    },
+    [setReturnItems]
+  );
+
+  // Use custom validation hook
+  const { itemsByPromotion, validationMessages } = useReturnValidation(returnItems);
 
   const selectedItems = returnItems.filter((item) => item.isSelected);
   const totalAmount = selectedItems.reduce(

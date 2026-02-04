@@ -10,7 +10,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/text-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ReturnItem } from "./ReturnModal";
+import { ReturnItem } from "@/types/returns";
 import { formatCurrency } from "@/lib/utils";
 import { AlertCircle, Package, ArrowLeft, Check } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,12 +22,14 @@ interface ReturnStepTwoProps {
   sale: SaleDetail;
   returnItems: ReturnItem[];
   onBack: () => void;
-  onConfirm: (reason: string, notes: string) => Promise<string>; // Returns voucher code
+  onConfirm: (reason: string, notes: string) => Promise<string>;
   onCancel: () => void;
   isProcessing: boolean;
 }
 
 import { returnValidationSchema } from "./returnSchema";
+import { BADGE_CONFIGS, BUTTON_STYLES } from "@/features/sales/constants/sales-design";
+import { cn } from "@/lib/utils";
 
 
 export function ReturnStepTwo({
@@ -131,7 +133,6 @@ export function ReturnStepTwo({
           </div>
           <ScrollArea className="flex-1">
             <div className="divide-y">
-              {/* Group items by promotion for visual clarity in summary too */}
               {Array.from(new Set(selectedItems.map(i => i.promotionId || i.kitOptionId || ""))).map(groupId => {
                 const groupItems = selectedItems.filter(i => (i.promotionId || i.kitOptionId || "") === groupId);
                 const isCombo = !!groupId;
@@ -140,9 +141,9 @@ export function ReturnStepTwo({
                 return (
                   <div key={groupId || 'individual'} className={`bg-white ${isCombo ? 'border rounded-lg overflow-hidden my-3 mx-2 shadow-sm' : 'my-1'}`}>
                     {isCombo && (
-                      <div className="px-4 py-2 bg-purple-50 border-b flex items-center gap-2">
-                        <Package className="h-3.5 w-3.5 text-purple-600" />
-                        <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest">
+                      <div className="px-4 py-2 border-b flex items-center gap-2 bg-purple-50">
+                        <Package className="h-3.5 w-3.5 text-purple-700" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">
                           {promotionName}
                         </span>
                       </div>
@@ -161,11 +162,14 @@ export function ReturnStepTwo({
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm truncate text-slate-800">{item.productName}</p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              {item.isGift ? (
-                                <Badge variant="secondary" className="bg-pink-50 text-pink-700 border-pink-100 h-4 px-1 text-[9px] font-bold">
-                                  REGALO
-                                </Badge>
-                              ) : (
+                                {item.isGift ? (
+                                  <Badge 
+                                    className={BADGE_CONFIGS.gift.className}
+                                    variant={BADGE_CONFIGS.gift.variant}
+                                  >
+                                    {BADGE_CONFIGS.gift.label}
+                                  </Badge>
+                                ) : (
                                 <span className="text-xs text-muted-foreground font-medium">{formatCurrency(item.unitPrice)} c/u</span>
                               )}
                             </div>
@@ -275,7 +279,7 @@ export function ReturnStepTwo({
           variant="destructive"
           onClick={handleConfirm} 
           disabled={isProcessing}
-          className="h-11 px-8 bg-[#3b0764] hover:bg-[#2d054a] border-none text-white font-bold gap-2 shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+          className={cn(BUTTON_STYLES.destructive, "bg-purple-900 hover:bg-purple-950")}
         >
           {isProcessing ? (
             "Procesando..."

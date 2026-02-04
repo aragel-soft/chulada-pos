@@ -1,49 +1,13 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AppAvatar } from "@/components/ui/app-avatar";
-import { ReturnItem } from "./ReturnModal";
+import { ReturnItem } from "@/types/returns";
 import { formatCurrency } from "@/lib/utils";
-import { Minus, Plus, Package, Gift, Tag } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
+import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 
-type BadgeType = "wholesale" | "promo" | "gift" | "kit";
-
-interface BadgeConfig {
-  variant?: "outline" | "secondary";
-  className: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  label?: string;
-  getLabel?: (item: ReturnItem) => string;
-}
-
-const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
-  wholesale: {
-    className:
-      "h-5 px-1 text-[10px] bg-amber-100 text-amber-700 border-amber-200 font-bold",
-    label: "MAYOREO",
-  },
-  promo: {
-    className:
-      "h-5 px-1 text-[10px] bg-purple-50 text-purple-700 border-purple-200",
-    icon: Tag,
-    getLabel: (item) =>
-      item.promotionName
-        ? `PROMO: ${item.promotionName.toUpperCase()}`
-        : "PROMO",
-  },
-  gift: {
-    className:
-      "h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100",
-    icon: Gift,
-    label: "REGALO",
-  },
-  kit: {
-    variant: "secondary",
-    className: "h-5 px-1 text-[10px]",
-    icon: Package,
-    label: "KIT",
-  },
-};
 
 interface ReturnItemRowProps {
   item: ReturnItem;
@@ -51,7 +15,7 @@ interface ReturnItemRowProps {
   canReturn: boolean;
 }
 
-export function ReturnItemRow({
+export const ReturnItemRow = React.memo(function ReturnItemRow({
   item,
   onQuantityChange,
   canReturn,
@@ -66,7 +30,6 @@ export function ReturnItemRow({
 
     const isKitItem = item.priceType === "kit_item" || item.kitOptionId;
     if (isKitItem && item.isGift) badges.push("gift");
-    if (isKitItem && !item.isGift) badges.push("kit");
 
     return badges;
   };
@@ -193,4 +156,4 @@ export function ReturnItemRow({
       </div>
     </div>
   );
-}
+});

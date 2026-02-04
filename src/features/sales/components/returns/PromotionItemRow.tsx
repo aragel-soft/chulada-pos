@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { Package, Minus, Plus, Info } from "lucide-react";
-import { ReturnItem } from "./ReturnModal";
+import { ReturnItem } from "@/types/returns";
 import { Button } from "@/components/ui/button";
 
 interface PromotionItemRowProps {
@@ -11,7 +12,6 @@ interface PromotionItemRowProps {
   canReturn: boolean;
 }
 
-// Simple GCD helper
 const gcd = (a: number, b: number): number => {
   return b === 0 ? a : gcd(b, a % b);
 };
@@ -21,7 +21,7 @@ const calculateGroupGCD = (quantities: number[]): number => {
   return quantities.reduce((acc, val) => gcd(acc, val));
 };
 
-export function PromotionItemRow({
+export const PromotionItemRow = memo(function PromotionItemRow({
   items,
   promotionName,
   onQuantityChange,
@@ -29,16 +29,11 @@ export function PromotionItemRow({
 }: PromotionItemRowProps) {
   const isSelected = items.every((i) => i.isSelected);
   
-  // Calculate GCD of original quantities to determine "Sets"
   const groupGCD = calculateGroupGCD(items.map(i => i.originalQuantity));
-  // Total possible sets available to return (Limited by availableQuantity logic)
-  // We take the minimum 'sets' available across all items
   const maxSets = Math.min(
     ...items.map(i => Math.floor(i.availableQuantity / (i.originalQuantity / groupGCD)))
   );
 
-  // Current sets selected
-  // We look at the first item to determine how many 'sets' are currently selected for return
   const firstItem = items[0];
   const unitQty = firstItem.originalQuantity / groupGCD;
   const currentSets = unitQty > 0 ? Math.floor(firstItem.returnQuantity / unitQty) : 0;
@@ -60,7 +55,6 @@ export function PromotionItemRow({
       } ${!canReturn ? "opacity-50" : ""}`}
     >
       <div className="flex items-start gap-3">
-        {/* Always show Stepper for promotions */}
         <div className="flex flex-col items-center gap-1 mt-1">
            <Button
               variant="outline"
@@ -157,4 +151,14 @@ export function PromotionItemRow({
       </div>
     </div>
   );
-}
+}, (prev, next) => {
+  if (prev.promotionName !== next.promotionName) return false;
+  if (prev.canReturn !== next.canReturn) return false;
+  if (prev.items.length !== next.items.length) return false;
+  
+  for (let i = 0; i < prev.items.length; i++) {
+    if (prev.items[i] !== next.items[i]) return false;
+  }
+  
+  return true;
+});
