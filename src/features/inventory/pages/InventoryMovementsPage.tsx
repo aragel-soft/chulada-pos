@@ -27,8 +27,10 @@ export default function InventoryMovementsPage() {
     pageSize: 16,
   });
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);  
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "created_at", desc: true }
+  ]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -36,7 +38,7 @@ export default function InventoryMovementsPage() {
     setIsLoading(true);
     try {
       const typeFilter = columnFilters.find((f) => f.id === "type")?.value as string[];
-      const sortField = sorting.length > 0 ? sorting[0].id : undefined;
+      const sortField = sorting.length > 0 ? sorting[0].id : "created_at";
       const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
 
       const response = await getInventoryMovements(
@@ -73,6 +75,21 @@ export default function InventoryMovementsPage() {
     columnFilters,
     dateRange,
   ]);
+
+  const handleMovementSuccess = () => {
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    const newSorting = [{ id: "created_at", desc: true }];
+    setSorting(newSorting);
+
+    if (
+      pagination.pageIndex === 0 && 
+      sorting.length > 0 && 
+      sorting[0].id === "created_at" && 
+      sorting[0].desc === true
+    ) {
+      fetchMovements();
+    }
+  };
 
   const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
     setGlobalFilter((prev) => 
@@ -135,7 +152,7 @@ export default function InventoryMovementsPage() {
             {can("inventory_movements:create") && (
               <Button
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                onClick={() => setIsCreateModalOpen(true)} 
+                onClick={() => setIsCreateModalOpen(true)}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Agregar Movimiento</span>
@@ -148,7 +165,7 @@ export default function InventoryMovementsPage() {
       <CreateInventoryMovementDialog 
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
-        onSuccess={fetchMovements}
+        onSuccess={handleMovementSuccess}
       />
     </>
   );

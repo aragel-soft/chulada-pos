@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   Loader2, 
   Check, 
@@ -51,7 +51,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
 import { getProducts } from "@/lib/api/inventory/products";
 import { createInventoryMovement } from "@/lib/api/inventory/inventory-movements";
 import { useAuthStore } from "@/stores/authStore";
@@ -74,6 +73,7 @@ export function CreateInventoryMovementDialog({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 500);
+  const queryClient = useQueryClient();
 
   const form = useForm<CreateInventoryMovementFormValues>({
     resolver: zodResolver(createInventoryMovementSchema) as any,
@@ -111,6 +111,8 @@ export function CreateInventoryMovementDialog({
         reason: values.reason,
         notes: values.notes,
       });
+
+      await queryClient.invalidateQueries({ queryKey: ["products"] });
 
       toast.success("Movimiento registrado correctamente");
       form.reset();
