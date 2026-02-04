@@ -155,24 +155,24 @@ export function CreateInventoryMovementDialog({
                     <RadioGroup
                       onValueChange={field.onChange}
                       defaultValue={field.value}
-                      className="grid grid-cols-2 gap-4"
+                      className="grid grid-cols-2 gap-3"
                     >
                       <FormItem>
                         <FormControl>
                           <RadioGroupItem value="IN" className="peer sr-only" />
                         </FormControl>
-                        <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-500 peer-data-[state=checked]:bg-green-50 peer-data-[state=checked]:text-green-700 cursor-pointer transition-all">
-                          <ArrowUpCircle className="mb-2 h-6 w-6" />
-                          <span className="font-semibold">Entrada</span>
+                        <FormLabel className="flex flex-row items-center justify-center gap-2 rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-green-500 peer-data-[state=checked]:bg-green-50 peer-data-[state=checked]:text-green-700 cursor-pointer transition-all">
+                          <ArrowUpCircle className="h-4 w-4" />
+                          <span className="font-semibold text-sm">Entrada</span>
                         </FormLabel>
                       </FormItem>
                       <FormItem>
                         <FormControl>
                           <RadioGroupItem value="OUT" className="peer sr-only" />
                         </FormControl>
-                        <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-500 peer-data-[state=checked]:bg-red-50 peer-data-[state=checked]:text-red-700 cursor-pointer transition-all">
-                          <ArrowDownCircle className="mb-2 h-6 w-6" />
-                          <span className="font-semibold">Salida</span>
+                        <FormLabel className="flex flex-row items-center justify-center gap-2 rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-red-500 peer-data-[state=checked]:bg-red-50 peer-data-[state=checked]:text-red-700 cursor-pointer transition-all">
+                          <ArrowDownCircle className="h-4 w-4" />
+                          <span className="font-semibold text-sm">Salida</span>
                         </FormLabel>
                       </FormItem>
                     </RadioGroup>
@@ -332,7 +332,7 @@ export function CreateInventoryMovementDialog({
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className={movementType === "IN" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}
+                className="bg-[#480489] hover:bg-[#480489]/90"
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Guardar Movimiento
