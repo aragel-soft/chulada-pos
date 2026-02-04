@@ -15,6 +15,7 @@ import { InventoryMovement } from "@/types/inventory-movements";
 import { getInventoryMovements } from "@/lib/api/inventory/inventory-movements";
 import { getColumns } from "../components/inventory-movements/columns";
 import { InventoryMovementsTableToolbar } from "../components/inventory-movements/InventoryMovementsTableToolbar";
+import { CreateInventoryMovementDialog } from "../components/inventory-movements/CreateInventoryMovementDialog";
 
 export default function InventoryMovementsPage() {
   const { can } = useAuthStore();
@@ -29,6 +30,7 @@ export default function InventoryMovementsPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const fetchMovements = async () => {
     setIsLoading(true);
@@ -133,7 +135,7 @@ export default function InventoryMovementsPage() {
             {can("inventory_movements:create") && (
               <Button
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                onClick={() => console.log("Open Create Inventory Movement Dialog")} 
+                onClick={() => setIsCreateModalOpen(true)} 
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Agregar Movimiento</span>
@@ -141,6 +143,12 @@ export default function InventoryMovementsPage() {
             )}
           </div>
         )}
+      />
+
+      <CreateInventoryMovementDialog 
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        onSuccess={fetchMovements}
       />
     </>
   );
