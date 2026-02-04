@@ -26,6 +26,7 @@ import {
 import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
+import { useAuthStore } from "@/stores/authStore";
 
 interface SaleDetailPanelProps {
   saleId: string | null;
@@ -33,6 +34,8 @@ interface SaleDetailPanelProps {
 }
 
 export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
+  const { can } = useAuthStore();
+
   const { data: sale, isLoading } = useSaleDetail(saleId);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
 
@@ -41,7 +44,6 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
     : 999;
   const canReturn = daysSinceSale <= 30;
   
-  // Check if there are any items available to return
   const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
   const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
 
@@ -138,14 +140,14 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <div className="w-full mt-3 cursor-not-allowed"> 
-                    <Button
+                     {can("history:devolution") && <Button
                       variant="outline"
                       className="w-full pointer-events-auto" 
                       onClick={() => setReturnModalOpen(true)}
                       disabled={!canProcessReturn}
                     >
                       Procesar Devolución
-                    </Button>
+                    </Button>}
                   </div>
                 </TooltipTrigger>
                 {!canProcessReturn && (
