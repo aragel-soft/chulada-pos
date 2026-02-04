@@ -1,9 +1,12 @@
 use rusqlite::Connection;
 use rusqlite::types::ToSql;
-use serde::Serialize;
+use rusqlite::OptionalExtension;
+use serde::{Serialize, Deserialize};
 use std::sync::Mutex;
 use tauri::State;
+use uuid::Uuid;
 use crate::database::DynamicQuery;
+use crate::database::get_current_store_id;
 
 #[derive(Serialize)]
 pub struct InventoryMovementView {
@@ -35,6 +38,16 @@ pub struct MovementsFilter {
   pub movement_type: Option<String>, // 'IN', 'OUT' o null
   pub start_date: Option<String>,    // YYYY-MM-DD
   pub end_date: Option<String>,      // YYYY-MM-DD
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateInventoryMovementPayload {
+  pub product_id: String,
+  pub user_id: String, 
+  pub movement_type: String, // 'IN' or 'OUT'
+  pub quantity: i64,
+  pub reason: String,
+  pub notes: Option<String>,
 }
 
 #[tauri::command]
@@ -179,4 +192,84 @@ pub fn get_inventory_movements(
     page_size,
     total_pages,
   })
+}
+
+#[tauri::command]
+pub fn create_inventory_movement(
+  db_state: State<'_, Mutex<Connection>>,
+  payload: CreateInventoryMovementPayload,
+) -> Result<(), String> {
+  let mut conn = db_state.lock().unwrap();
+
+  if payload.quantity <= 0 {
+    return Err("La cantidad debe ser mayor a 0".to_string());
+  }
+  if payload.movement_type != "IN" && payload.movement_type != "OUT" {
+    return Err("Tipo de movimiento inválido".to_string());
+  }
+  if payload.reason.trim().is_empty() {
+    return Err("Debes especificar un motivo".to_string());
+  }
+
+  let store_id = get_current_store_id(&conn)?;
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  let (current_stock, min_stock): (i64, i64) = tx
+    .query_row(
+      "SELECT stock, minimum_stock FROM store_inventory WHERE product_id = ? AND store_id = ?",
+      [&payload.product_id, &store_id],
+      |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .optional() 
+    .map_err(|e| e.to_string())?
+    .unwrap_or((0, 0)); 
+
+  let new_stock = match payload.movement_type.as_str() {
+    "IN" => current_stock + payload.quantity,
+    "OUT" => current_stock - payload.quantity,
+    _ => current_stock, 
+  };
+
+  if payload.movement_type == "OUT" && new_stock < 0 {
+    return Err(format!(
+      "Stock insuficiente. Stock actual: {}, Intentas sacar: {}",
+      current_stock, payload.quantity
+    ));
+  }
+
+  let movement_id = Uuid::new_v4().to_string();
+  tx.execute(
+    "INSERT INTO inventory_movements (
+      id, product_id, store_id, user_id, type, reason, 
+      quantity, previous_stock, new_stock, notes
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+    rusqlite::params![
+      movement_id,
+      payload.product_id,
+      store_id,
+      payload.user_id,
+      payload.movement_type,
+      payload.reason,
+      payload.quantity,
+      current_stock,
+      new_stock,
+      payload.notes
+    ],
+  ).map_err(|e| format!("Error registrando movimiento: {}", e))?;
+
+  let affected = tx.execute(
+    "UPDATE store_inventory SET stock = ? WHERE product_id = ? AND store_id = ?",
+    rusqlite::params![new_stock, payload.product_id, store_id],
+  ).map_err(|e| format!("Error actualizando inventario: {}", e))?;
+
+  if affected == 0 {
+    tx.execute(
+      "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock) 
+       VALUES (?, ?, ?, ?, ?)",
+      rusqlite::params![Uuid::new_v4().to_string(), store_id, payload.product_id, new_stock, min_stock],
+    ).map_err(|e| format!("Error creando registro de inventario: {}", e))?;
+  }
+
+  tx.commit().map_err(|e| format!("Error en commit: {}", e))?;
+  Ok(())
 }
