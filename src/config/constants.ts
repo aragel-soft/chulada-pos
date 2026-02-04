@@ -20,3 +20,8 @@ export const MAX_OPEN_TICKETS = 5;
 export const DISCOUNT_CONFIG = {
   PRESET_OPTIONS: [5, 10, 15, 20], 
 };
+
+export const INVENTORY_MOVEMENT_REASONS = {
+  IN: ["Ajuste de Inventario", "Devolución Cliente", "Compra Extra"],
+  OUT: ["Merma / Daño", "Uso Interno", "Robo / Pérdida", "Ajuste de Inventario"],
+};

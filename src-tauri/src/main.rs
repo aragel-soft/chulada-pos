@@ -75,6 +75,9 @@ fn main() {
             commands::inventory::promotions::create_promotion,
             commands::inventory::promotions::update_promotion,
             commands::inventory::promotions::delete_promotions,
+            // Inventory - Movements
+            commands::inventory::movements::get_inventory_movements,
+            commands::inventory::movements::create_inventory_movement,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
