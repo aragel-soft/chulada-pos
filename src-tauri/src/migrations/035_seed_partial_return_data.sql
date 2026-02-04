@@ -115,6 +115,23 @@ INSERT INTO return_items (id, return_id, sale_item_id, product_id, quantity, uni
 VALUES 
     ('ri-009', 'return-004', 'si-test-18', 'pr-gel-k-1', 1.000, 75.00, 75.00);  -- 1 más de Fijación
 
+-- Tercera devolución parcial (solo Gel Fijación)
+INSERT INTO returns (id, folio, sale_id, return_date, total, reason, refund_method, user_id)
+VALUES (
+    'return-005',
+    5,
+    'sale-test-return-004',
+    datetime('now', 'localtime', '-3 days'),
+    75.00, -- 1 Gel Fijación
+    'Exceso de inventario',
+    'coupon',
+    '450e8400-e29b-41d4-a716-446655440001'
+);
+
+INSERT INTO return_items (id, return_id, sale_item_id, product_id, quantity, unit_price, subtotal)
+VALUES 
+    ('ri-010', 'return-005', 'si-test-18', 'pr-gel-k-1', 1.000, 75.00, 75.00);  -- 1 más de Fijación
+
 -- Update sale status to partial_return (multiple partial returns)
 UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-004';
 
