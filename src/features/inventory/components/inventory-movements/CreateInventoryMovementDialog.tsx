@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Loader2, 
   Check, 
   ChevronsUpDown, 
   ArrowUpCircle, 
-  ArrowDownCircle
+  ArrowDownCircle,
+  ArrowRightLeft 
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -55,14 +55,7 @@ import {
 import { getProducts } from "@/lib/api/inventory/products";
 import { createInventoryMovement } from "@/lib/api/inventory/inventory-movements";
 import { useAuthStore } from "@/stores/authStore";
-
-const formSchema = z.object({
-  type: z.enum(["IN", "OUT"]),
-  productId: z.string().min(1, "Selecciona un producto"),
-  reason: z.string().min(1, "Selecciona un motivo"),
-  quantity: z.coerce.number().int().positive("La cantidad debe ser mayor a 0"),
-  notes: z.string().optional(),
-});
+import { createInventoryMovementSchema, CreateInventoryMovementFormValues } from "@/features/inventory/schemas/inventoryMovementSchema";
 
 interface CreateInventoryMovementDialogProps {
   open: boolean;
@@ -77,14 +70,12 @@ export function CreateInventoryMovementDialog({
 }: CreateInventoryMovementDialogProps) {
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // --- Combobox State ---
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 500);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema) as any,
+  const form = useForm<CreateInventoryMovementFormValues>({
+    resolver: zodResolver(createInventoryMovementSchema) as any,
     defaultValues: {
       type: "IN",
       quantity: 1,
@@ -96,15 +87,14 @@ export function CreateInventoryMovementDialog({
 
   const movementType = form.watch("type");
 
-  // Fetch products for combobox
   const { data: productsData, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["products", "search", debouncedSearch],
     queryFn: () => getProducts({ page: 1, pageSize: 10, search: debouncedSearch }),
-    enabled: comboboxOpen, // Only fetch when dropdown is open
+    enabled: comboboxOpen,
     staleTime: 1000 * 60,
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: CreateInventoryMovementFormValues) => {
     if (!user?.id) {
       toast.error("Error de sesión");
       return;
@@ -121,13 +111,16 @@ export function CreateInventoryMovementDialog({
         notes: values.notes,
       });
 
-      toast.success("Movimiento registrado");
+      toast.success("Movimiento registrado correctamente");
       form.reset();
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
-      toast.error("Error al registrar movimiento");
+      const message = typeof error === 'string' 
+        ? error 
+        : (error instanceof Error ? error.message : "Error al registrar movimiento");
+        
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -142,13 +135,16 @@ export function CreateInventoryMovementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Nuevo Movimiento</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5" />
+            Nuevo Movimiento
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             
-            {/* 1. Type Selection (Radio Group Cards) */}
+            {/* Type Selection */}
             <FormField
               control={form.control}
               name="type"
@@ -185,7 +181,7 @@ export function CreateInventoryMovementDialog({
               )}
             />
 
-            {/* 2. Product Combobox */}
+            {/* Product Combobox */}
             <FormField
               control={form.control}
               name="productId"
@@ -245,7 +241,7 @@ export function CreateInventoryMovementDialog({
                               />
                               <div className="flex flex-col">
                                 <span className="font-medium">{product.name}</span>
-                                <span className="text-xs text-muted-foreground">Code: {product.code} | Stock: {product.stock}</span>
+                                <span className="text-xs text-muted-foreground">Código: {product.code} | Existencia: {product.stock}</span>
                               </div>
                             </CommandItem>
                           ))}
@@ -259,7 +255,7 @@ export function CreateInventoryMovementDialog({
             />
 
             <div className="grid grid-cols-2 gap-4">
-              {/* 3. Quantity */}
+              {/* Quantity */}
               <FormField
                 control={form.control}
                 name="quantity"
@@ -274,7 +270,7 @@ export function CreateInventoryMovementDialog({
                 )}
               />
 
-              {/* 4. Reason */}
+              {/* Reason */}
               <FormField
                 control={form.control}
                 name="reason"
@@ -301,7 +297,7 @@ export function CreateInventoryMovementDialog({
               />
             </div>
 
-            {/* 5. Notes */}
+            {/* Notes */}
             <FormField
               control={form.control}
               name="notes"
