@@ -56,6 +56,7 @@ import { getProducts } from "@/lib/api/inventory/products";
 import { createInventoryMovement } from "@/lib/api/inventory/inventory-movements";
 import { useAuthStore } from "@/stores/authStore";
 import { createInventoryMovementSchema, CreateInventoryMovementFormValues } from "@/features/inventory/schemas/inventoryMovementSchema";
+import { INVENTORY_MOVEMENT_REASONS } from "@/config/constants";
 
 interface CreateInventoryMovementDialogProps {
   open: boolean;
@@ -116,6 +117,7 @@ export function CreateInventoryMovementDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
+      console.error(error);
       const message = typeof error === 'string' 
         ? error 
         : (error instanceof Error ? error.message : "Error al registrar movimiento");
@@ -125,11 +127,7 @@ export function CreateInventoryMovementDialog({
       setIsSubmitting(false);
     }
   };
-
-  const reasons =
-    movementType === "IN"
-      ? ["Ajuste de Inventario", "Devolución Cliente", "Compra Extra"]
-      : ["Merma / Daño", "Uso Interno", "Robo / Pérdida", "Ajuste de Inventario"];
+  const reasons = INVENTORY_MOVEMENT_REASONS[movementType] || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,7 +148,7 @@ export function CreateInventoryMovementDialog({
               name="type"
               render={({ field }) => (
                 <FormItem className="space-y-1">
-                  <FormLabel>Tipo de Movimiento</FormLabel>
+                  <FormLabel className="!text-foreground">Tipo de Movimiento <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
@@ -187,7 +185,7 @@ export function CreateInventoryMovementDialog({
               name="productId"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Producto</FormLabel>
+                  <FormLabel className="!text-foreground">Producto <span className="text-destructive">*</span></FormLabel>
                   <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -206,7 +204,7 @@ export function CreateInventoryMovementDialog({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <Command shouldFilter={false}> 
                         <CommandInput 
                           placeholder="Buscar por nombre o código..." 
@@ -261,9 +259,18 @@ export function CreateInventoryMovementDialog({
                 name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cantidad</FormLabel>
+                    <FormLabel className="!text-foreground">Cantidad <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} {...field} />
+                      <Input 
+                        type="number" 
+                        min={1} 
+                        {...field}
+                        onKeyDown={(e) => {
+                          if (["-", "e", "E", "+"].includes(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -276,7 +283,7 @@ export function CreateInventoryMovementDialog({
                 name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Motivo</FormLabel>
+                    <FormLabel className="!text-foreground">Motivo <span className="text-destructive">*</span></FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
