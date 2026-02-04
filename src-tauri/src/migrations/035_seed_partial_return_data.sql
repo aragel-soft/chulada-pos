@@ -135,5 +135,5 @@ UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-004';
 --   - Gel Fijación (si-test-15): vendido 4, devuelto 2, DISPONIBLE 2
 --   - Gel Brillo (si-test-16): vendido 6, devuelto 3, DISPONIBLE 3
 --   - Gel Wet Look (si-test-17): vendido 2, devuelto 1, DISPONIBLE 1
---   - Gel Fijación (si-test-18): vendido 1, devuelto 1, DISPONIBLE 1
+--   - Gel Fijación (si-test-18): vendido 2, devuelto 1, DISPONIBLE 1
 -- ==================================================================================
