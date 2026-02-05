@@ -86,11 +86,3 @@ SET
 WHERE id = 'voucher-003';
 
 
--- ==================================================================================
--- ACTUALIZAR STATUS DE VENTAS
--- ==================================================================================
--- Actualizar el status de las ventas según el tipo de devolución
-UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-001';
-UPDATE sales SET status = 'fully_returned' WHERE id = 'sale-test-return-002';
-UPDATE sales SET status = 'partial_return' WHERE id = 'sale-test-return-004';
-
