@@ -13,10 +13,10 @@ SELECT
     sales.id,
     COALESCE(sales.cancelled_at, sales.created_at),
     sales.total,
-    COALESCE(sales.cancellation_reason, 'Venta cancelada'),
+    'change',
     'store_voucher',
     COALESCE(sales.cancelled_by, sales.user_id),
-    'Migración automática de cancelación'
+    COALESCE(sales.cancellation_reason, 'Venta cancelada (migración automática)')
 FROM sales
 WHERE sales.status = 'cancelled' 
   AND sales.cancellation_reason IS NOT NULL

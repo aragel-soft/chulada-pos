@@ -17,13 +17,13 @@ SELECT
   'sale-test-return-001', 
   '00000012', 
   datetime('now', 'localtime'), 
-  385.00, -- Subtotal 
+  440.00, -- Subtotal 
   10.00,  -- 10% Discount
-  8.50,  -- Discount Amount
-  376.50, -- Total
+  14.00,  -- Discount Amount
+  426.00, -- Total
   'completed', 
   'cash', 
-  376.50, 
+  426.00, 
   1, 
   '450e8400-e29b-41d4-a716-446655440001'
 ;
@@ -31,7 +31,7 @@ SELECT
 
 -- ITEM 1: KIT MAIN (Tinte Anven)
 INSERT INTO sale_items (id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, subtotal, kit_option_id) VALUES
-('si-test-01', 'sale-test-return-001', 'pr-kit-a-t1', 'Tinte Anven Castaño Claro Caoba', 'KIT-ANV-55', 2, 55.00, 'retail', 55.00, 'kit-anven');
+('si-test-01', 'sale-test-return-001', 'pr-kit-a-t1', 'Tinte Anven Castaño Claro Caoba', 'KIT-ANV-55', 2, 55.00, 'retail', 110.00, 'kit-anven');
 
 
 -- ITEM 2 & 3: KIT ITEMS (Peróxidos) - Linked to Main
@@ -154,13 +154,13 @@ SELECT
   'sale-test-return-005', 
   '00000016', 
   datetime('now', 'localtime'), 
-  385.00, -- Subtotal 
+  440.00, -- Subtotal 
   10.00,  -- 10% Discount
-  8.50,  -- Discount Amount
-  376.50, -- Total
+  14.00,  -- Discount Amount
+  426.00, -- Total
   'completed', 
   'cash', 
-  376.50, 
+  426.00, 
   1, 
   '450e8400-e29b-41d4-a716-446655440001'
 ;
@@ -168,7 +168,7 @@ SELECT
 
 -- ITEM 1: KIT MAIN (Tinte Anven)
 INSERT INTO sale_items (id, sale_id, product_id, product_name, product_code, quantity, unit_price, price_type, subtotal, kit_option_id) VALUES
-('si-test-19', 'sale-test-return-005', 'pr-kit-a-t1', 'Tinte Anven Castaño Claro Caoba', 'KIT-ANV-55', 2, 55.00, 'retail', 55.00, 'kit-anven');
+('si-test-19', 'sale-test-return-005', 'pr-kit-a-t1', 'Tinte Anven Castaño Claro Caoba', 'KIT-ANV-55', 2, 55.00, 'retail', 110.00, 'kit-anven');
 
 
 -- ITEM 2 & 3: KIT ITEMS (Peróxidos) - Linked to Main
