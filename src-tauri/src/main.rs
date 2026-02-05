@@ -78,6 +78,7 @@ fn main() {
             // Inventory - Movements
             commands::inventory::movements::get_inventory_movements,
             commands::inventory::movements::create_inventory_movement,
+            commands::inventory::movements::process_bulk_reception,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
