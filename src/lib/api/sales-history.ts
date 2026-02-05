@@ -1,10 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { PaginatedSalesHistory, SaleDetail, SalesHistoryFilter } from '@/types/sales-history';
 
-// ============================================
-// SALES HISTORY API
-// ============================================
-
 export const getSalesHistory = async (filter: SalesHistoryFilter): Promise<PaginatedSalesHistory> => {
   try { 
     return await invoke('get_sales_history', { filter });
