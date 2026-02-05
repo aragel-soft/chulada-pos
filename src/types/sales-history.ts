@@ -1,16 +1,16 @@
 export interface SalesHistoryFilter {
   page: number;
   page_size: number;
-  start_date?: string | null;      // YYYY-MM-DD
-  end_date?: string | null;        // YYYY-MM-DD
-  status?: string[] | null;        // ['completed', 'cancelled', etc]
-  payment_method?: string | null;  // 'cash', 'card', 'mixed', 'all'
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string[] | null;
+  payment_method?: string | null;
   user_id?: string | null;
   customer_id?: string | null;
-  folio?: string | null;        
-  product_search?: string | null;  
+  folio?: string | null;
+  product_search?: string | null;
   sort_by?: string;
-  sort_order?: 'asc' | 'desc'; 
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface SaleMaster {
@@ -54,8 +54,12 @@ export interface SaleHistoryItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
-  price_type: 'retail' | 'wholesale' | 'promo';
-  is_gift: boolean; // quantity > 0 && price == 0
+  price_type: 'retail' | 'wholesale' | 'promo' | 'kit_item';
+  kit_option_id?: string;
+  is_gift: boolean;
   product_image?: string;
+  promotion_id?: string;
   promotion_name?: string;
+  quantity_returned: number;
+  quantity_available: number;
 }

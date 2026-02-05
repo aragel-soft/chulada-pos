@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SaleHistoryItem } from "@/types/sales-history";
 import { useSaleDetail } from "@/hooks/use-sales-history";
@@ -5,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Package, Gift, Tag, User, X } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2, User, X } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AppAvatar } from "@/components/ui/app-avatar";
@@ -16,54 +17,35 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProductImagePreview } from "@/features/inventory/components/products/ProductImageHover";
+import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
+import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
+import { useAuthStore } from "@/stores/authStore";
 
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
 }
 
-type BadgeType = "wholesale" | "promo" | "gift" | "kit";
-
-interface BadgeConfig {
-  variant?: "outline" | "secondary";
-  className: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  label?: string;
-  getLabel?: (item: any) => string;
-}
-
-const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
-  wholesale: {
-    className:
-      "h-5 px-1 text-[10px] bg-amber-100 text-amber-700 border-amber-200 font-bold",
-    label: "MAYOREO",
-  },
-  promo: {
-    className:
-      "h-5 px-1 text-[10px] bg-purple-50 text-purple-700 border-purple-200",
-    icon: Tag,
-    getLabel: (item) =>
-      item.promotion_name
-        ? `PROMO: ${item.promotion_name.toUpperCase()}`
-        : "PROMO",
-  },
-  gift: {
-    className:
-      "h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100",
-    icon: Gift,
-    label: "REGALO",
-  },
-  kit: {
-    variant: "secondary",
-    className: "h-5 px-1 text-[10px]",
-    icon: Package,
-    label: "KIT",
-  },
-};
-
 export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
+  const { can } = useAuthStore();
+
   const { data: sale, isLoading } = useSaleDetail(saleId);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+
+  const daysSinceSale = sale
+    ? differenceInDays(new Date(), new Date(sale.sale_date))
+    : 999;
+  const canReturn = daysSinceSale <= 30;
+  
+  const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
+  const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
 
   return (
     <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
@@ -87,18 +69,32 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
             <div className="flex gap-2">
               {sale?.status === "cancelled" && (
-                <Badge variant="destructive">CANCELADA</Badge>
+                <Badge variant={BADGE_CONFIGS.cancelled.variant} className={BADGE_CONFIGS.cancelled.className}>
+                  {BADGE_CONFIGS.cancelled.label}
+                </Badge>
+              )}
+              {sale?.status === "partial_return" && (
+                <Badge className={BADGE_CONFIGS.partial_return.className}>
+                  {BADGE_CONFIGS.partial_return.icon && <BADGE_CONFIGS.partial_return.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.partial_return.label}
+                </Badge>
+              )}
+              {sale?.status === "fully_returned" && (
+                <Badge className={BADGE_CONFIGS.fully_returned.className}>
+                  {BADGE_CONFIGS.fully_returned.icon && <BADGE_CONFIGS.fully_returned.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.fully_returned.label}
+                </Badge>
               )}
               {sale?.is_credit && (
-                <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white border-none">
-                  A CRÉDITO
+                <Badge className={BADGE_CONFIGS.credit.className}>
+                  {BADGE_CONFIGS.credit.label}
                 </Badge>
               )}
               {(sale?.has_discount ||
                 (sale?.discount_global_percent ?? 0) > 0) && (
-                <Badge className="bg-orange-600 hover:bg-orange-700 text-white border-none flex items-center gap-1">
-                  <Tag className="w-3 h-3 text-white" />
-                  CON DESCUENTO
+                <Badge className={BADGE_CONFIGS.discount_global.className}>
+                  {BADGE_CONFIGS.discount_global.icon && <BADGE_CONFIGS.discount_global.icon className="w-3 h-3 text-white" />}
+                  {BADGE_CONFIGS.discount_global.label}
                 </Badge>
               )}
             </div>
@@ -113,33 +109,72 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
         </div>
 
         {sale && (
-          <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={sale.user_avatar} />
-              <AvatarFallback>
-                <User />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm font-medium">Vendedor</p>
-              <p className="text-xs text-muted-foreground">{sale.user_name}</p>
+          <>
+            <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={sale.user_avatar} />
+                <AvatarFallback>
+                  <User />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm font-medium">Vendedor</p>
+                <p className="text-xs text-muted-foreground">{sale.user_name}</p>
+              </div>
+              <div className="ml-auto flex gap-2">
+                {sale.payment_method === "credit" && (
+                  <Badge className="bg-purple-600">A CRÉDITO</Badge>
+                )}
+                {sale.has_discount && (
+                  <Badge
+                    variant="secondary"
+                    className="text-orange-600 border-orange-200 bg-orange-50"
+                  >
+                    DESCUENTO
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="ml-auto flex gap-2">
-              {sale.payment_method === "credit" && (
-                <Badge className="bg-purple-600">A CRÉDITO</Badge>
-              )}
-              {sale.has_discount && (
-                <Badge
-                  variant="secondary"
-                  className="text-orange-600 border-orange-200 bg-orange-50"
-                >
-                  DESCUENTO
-                </Badge>
-              )}
-            </div>
-          </div>
+
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="w-full mt-3 cursor-not-allowed"> 
+                     {can("history:devolution") && <Button
+                      variant="outline"
+                      className="w-full pointer-events-auto" 
+                      onClick={() => setReturnModalOpen(true)}
+                      disabled={!canProcessReturn}
+                    >
+                      Procesar Devolución
+                    </Button>}
+                  </div>
+                </TooltipTrigger>
+                {!canProcessReturn && (
+                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                    <p>
+                      {sale.status === "cancelled" 
+                        ? "No se pueden procesar devoluciones de ventas canceladas"
+                        : !canReturn
+                          ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
+                          : "Todos los items ya han sido devueltos"
+                      }
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          </>
         )}
       </div>
+
+      {sale && (
+        <ReturnModal
+          sale={sale}
+          isOpen={returnModalOpen}
+          onClose={() => setReturnModalOpen(false)}
+        />
+      )}
 
       {/* BODY */}
       <ScrollArea className="flex-1 p-6">
@@ -154,14 +189,14 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               <thead>
                 <tr className="text-muted-foreground border-b">
                   <th className="text-left pb-2 font-medium pl-1">Producto</th>
-                  <th className="text-right pb-2 font-medium">Cant.</th>
+                   <th className="text-center pb-2 font-medium">Cant.</th>
                   <th className="text-right pb-2 font-medium">Precio</th>
                   <th className="text-right pb-2 font-medium pr-1">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {sale.items.map((item) => (
-                  <ItemRow key={item.id} item={item} />
+                  <ItemRowWithReturns key={item.id} item={item} />
                 ))}
               </tbody>
             </table>
@@ -241,8 +276,8 @@ export function SaleDetailSheet({ isOpen, ...props }: SaleDetailSheetProps) {
   );
 }
 
-function ItemRow({ item }: { item: SaleHistoryItem }) {
-  const getBadgeTypes = (item: any): BadgeType[] => {
+function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
+  const getBadgeTypes = (item: SaleHistoryItem): BadgeType[] => {
     const badges: BadgeType[] = [];
 
     if (item.price_type === "wholesale") badges.push("wholesale");
@@ -254,8 +289,12 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
     return badges;
   };
 
+
+  const isPartiallyReturned = item.quantity_returned > 0 && item.quantity_available > 0;
+  const isFullyReturned = item.quantity_available === 0;
+
   return (
-    <tr className="group">
+    <tr className={`group ${isFullyReturned ? 'opacity-50 bg-slate-50' : ''}`}>
       <td className="py-3 pr-2 pl-1">
         <div className="flex items-center gap-3">
           {/* IMAGE */}
@@ -295,14 +334,14 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
 
             {/* BADGES */}
             <div className="flex gap-1 flex-wrap">
-              {getBadgeTypes(item).map((type) => {
+              {getBadgeTypes(item).map((type, index) => {
                 const config = BADGE_CONFIGS[type]; 
                 const Icon = config.icon;
                 const label = config.getLabel ? config.getLabel(item) : config.label;
                 
                 return (
                   <Badge
-                    key={type}
+                    key={`badge-${type}-${index}`}
                     variant={config.variant || "outline"}
                     className={config.className}
                   >
@@ -315,10 +354,20 @@ function ItemRow({ item }: { item: SaleHistoryItem }) {
           </div>
         </div>
       </td>
-      <td className="py-3 text-right align-top text-gray-600">
-        x{item.quantity}
+      <td className={`py-3 text-center align-top ${isFullyReturned ? 'text-slate-400 line-through' : 'text-gray-600'}`}>
+        {/* Show return breakdown in quantity column */}
+        {isPartiallyReturned || isFullyReturned ? (
+          <div className="flex flex-col items-center gap-0.5">
+            <span className={isFullyReturned ? 'line-through text-slate-400' : ''}>x{item.quantity}</span>
+            <span className={`text-[10px] ${isFullyReturned ? 'text-slate-500' : 'text-orange-600 font-semibold'}`}>
+              {isFullyReturned ? `(${item.quantity_returned} devueltos)` : `-${item.quantity_returned} dev.`}
+            </span>
+          </div>
+        ) : (
+          <span>x{item.quantity}</span>
+        )}
       </td>
-      <td className="py-3 text-right align-top text-gray-600">
+      <td className={`py-3 text-right align-top ${isFullyReturned ? 'text-slate-400' : 'text-gray-600'}`}>
         {item.is_gift ? (
           <span className="line-through text-xs text-muted-foreground">
             {formatCurrency(item.unit_price)}

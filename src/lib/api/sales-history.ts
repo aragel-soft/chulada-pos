@@ -6,7 +6,6 @@ export const getSalesHistory = async (filter: SalesHistoryFilter): Promise<Pagin
     return await invoke('get_sales_history', { filter });
   }
   catch (error) {
-    console.error('Error fetching sales history:', error);
     throw error;
   }
 }; 
@@ -16,7 +15,6 @@ export const getSaleDetails = async (saleId: string): Promise<SaleDetail> => {
     return await invoke('get_sale_details', { saleId });
   }
   catch (error) {
-    console.error('Error fetching sale details:', error);
     throw error;
   }
 };
