@@ -20,14 +20,12 @@ CREATE TABLE IF NOT EXISTS store_vouchers (
 -- 2. Añadir columnas a la tabla returns
 ALTER TABLE returns ADD COLUMN notes TEXT;
 
--- 3. Actualizar tabla sales para status de devoluciones
-ALTER TABLE sales ADD COLUMN return_status TEXT DEFAULT 'none' CHECK(return_status IN ('none', 'partial_return', 'fully_returned'));
-
--- 4. Indices para rendimiento
+-- 3. Indices para rendimiento
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_sale_id ON store_vouchers(sale_id);
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_code ON store_vouchers(code);
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_active ON store_vouchers(is_active);
-CREATE INDEX IF NOT EXISTS idx_sales_return_status ON sales(return_status);
 
--- 5. Actualizar datos existentes
-UPDATE sales SET return_status = 'none' WHERE return_status IS NULL;
+-- 4. Quitar la columna de notas de cancelación en sales
+ALTER TABLE sales DROP COLUMN cancellation_reason;
+ALTER TABLE sales DROP COLUMN cancelled_by;
+ALTER TABLE sales DROP COLUMN cancelled_at;
