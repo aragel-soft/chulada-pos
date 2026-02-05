@@ -305,20 +305,26 @@ pub fn process_bulk_reception(
       return Err(format!("El costo para el producto {} no puede ser negativo", item.product_id));
     }
 
-    let (current_stock, min_stock): (i64, i64) = tx
+    let (current_stock, min_stock, current_purchase_price): (i64, i64, f64) = tx
       .query_row(
-        "SELECT stock, minimum_stock FROM store_inventory WHERE product_id = ? AND store_id = ?",
-        [&item.product_id, &store_id],
-        |row| Ok((row.get(0)?, row.get(1)?))
+        "SELECT 
+           COALESCE(si.stock, 0), 
+           COALESCE(si.minimum_stock, 5),
+           p.purchase_price
+         FROM products p
+         LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?1
+         WHERE p.id = ?2",
+        rusqlite::params![store_id, item.product_id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
       )
-      .optional()
-      .map_err(|e| format!("Error consultando stock: {}", e))?
-      .unwrap_or((0, 5)); 
+      .map_err(|e| format!("Error consultando producto {}: {}", item.product_id, e))?;
 
-    tx.execute(
-      "UPDATE products SET purchase_price = ?1 WHERE id = ?2",
-      rusqlite::params![item.new_cost, item.product_id],
-    ).map_err(|e| format!("Error actualizando costo producto {}: {}", item.product_id, e))?;
+    if (item.new_cost - current_purchase_price).abs() > 0.001 {
+      tx.execute(
+        "UPDATE products SET purchase_price = ?1 WHERE id = ?2",
+        rusqlite::params![item.new_cost, item.product_id],
+      ).map_err(|e| format!("Error actualizando costo producto {}: {}", item.product_id, e))?;
+    }
 
     let new_stock = current_stock + item.quantity;
     let movement_id = Uuid::new_v4().to_string();
