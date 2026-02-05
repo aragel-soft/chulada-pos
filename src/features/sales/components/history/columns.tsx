@@ -28,12 +28,14 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
         completed: 'bg-green-600 text-white hover:bg-green-600/80',
         cancelled: 'bg-destructive text-destructive-foreground hover:bg-destructive/80',
         partial_return: 'bg-orange-500 text-white hover:bg-orange-600/80',
+        fully_returned: 'bg-slate-600 text-white hover:bg-slate-700/80',
       };
       
       const labels: Record<string, string> = {
         completed: 'Completada',
         cancelled: 'Cancelada',
-        partial_return: 'Dev. Parcial'
+        partial_return: 'Dev. Parcial',
+        fully_returned: 'Dev. Total'
       };
 
       const badgeClass = variants[status] || 'bg-slate-500 text-white';
