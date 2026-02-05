@@ -1,5 +1,4 @@
-// Importaciones
-import { ReactNode, useState } from "react"
+import { ReactNode, useState } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -16,28 +15,32 @@ import {
   RowSelectionState,
   PaginationState,
   Row,
-} from "@tanstack/react-table"
-import { Search, ChevronDown } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { DebouncedInput } from "@/components/ui/debounced-input"
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DataTableLayout } from "@/components/layouts/DataTableLayout"
-import { DataTablePagination } from "./data-table-pagination"
+} from "@tanstack/react-table";
+import { Search } from "lucide-react";
+import { DebouncedInput } from "@/components/ui/debounced-input";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DataTableLayout } from "@/components/layouts/DataTableLayout";
+import { DataTablePagination } from "./data-table-pagination";
+import { DataTableViewOptions } from "./data-table-view-options";
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  isLoading?: boolean
-  actions?: ReactNode | ((table: Table<TData>) => ReactNode)
-  searchPlaceholder?: string
-  initialSorting?: SortingState
-  initialColumnVisibility?: VisibilityState
-  initialPageSize?: number
-  columnTitles?: Record<string, string>
-  rowSelection?: RowSelectionState
-  onRowSelectionChange?: OnChangeFn<RowSelectionState>
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  isLoading?: boolean;
+  actions?: ReactNode | ((table: Table<TData>) => ReactNode);
+  searchPlaceholder?: string;
+  initialSorting?: SortingState;
+  initialColumnVisibility?: VisibilityState;
+  initialPageSize?: number;
+  columnTitles?: Record<string, string>;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
   rowCount?: number;
   manualPagination?: boolean;
@@ -52,6 +55,9 @@ interface DataTableProps<TData, TValue> {
   getRowId?: (originalRow: TData, index: number, parent?: any) => string;
   onRowClick?: (row: Row<TData>) => void;
   showColumnFilters?: boolean;
+  toolbar?: ReactNode | ((table: Table<TData>) => ReactNode);
+  columnFilters?: ColumnFiltersState;
+  onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
 }
 
 export function DataTable<TData, TValue>({
@@ -79,26 +85,41 @@ export function DataTable<TData, TValue>({
   getRowId,
   onRowClick,
   showColumnFilters = true,
+  toolbar,
+  columnFilters: externalColumnFilters,
+  onColumnFiltersChange: externalOnColumnFiltersChange,
 }: DataTableProps<TData, TValue>) {
-  const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting)
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility)
-  const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
-  const [internalPagination, setInternalPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: initialPageSize,
-  })
-  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
+  const [internalSorting, setInternalSorting] =
+    useState<SortingState>(initialSorting);
+  const [internalColumnFilters, setInternalColumnFilters] =
+    useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+    initialColumnVisibility,
+  );
+  const [internalGlobalFilter, setInternalGlobalFilter] = useState("");
+  const [internalPagination, setInternalPagination] = useState<PaginationState>(
+    {
+      pageIndex: 0,
+      pageSize: initialPageSize,
+    },
+  );
+  const [internalRowSelection, setInternalRowSelection] =
+    useState<RowSelectionState>({});
 
-  const sorting = externalSorting ?? internalSorting
-  const globalFilter = externalGlobalFilter ?? internalGlobalFilter
-  const pagination = externalPagination ?? internalPagination
-  const rowSelection = externalRowSelection ?? internalRowSelection
+  const sorting = externalSorting ?? internalSorting;
+  const globalFilter = externalGlobalFilter ?? internalGlobalFilter;
+  const pagination = externalPagination ?? internalPagination;
+  const rowSelection = externalRowSelection ?? internalRowSelection;
 
-  const onSortingChange = externalOnSortingChange ?? setInternalSorting
-  const onGlobalFilterChange = externalOnGlobalFilterChange ?? setInternalGlobalFilter
-  const onPaginationChange = externalOnPaginationChange ?? setInternalPagination
-  const onRowSelectionChange = externalOnRowSelectionChange ?? setInternalRowSelection
+  const onSortingChange = externalOnSortingChange ?? setInternalSorting;
+  const onGlobalFilterChange =
+    externalOnGlobalFilterChange ?? setInternalGlobalFilter;
+  const onPaginationChange =
+    externalOnPaginationChange ?? setInternalPagination;
+  const onRowSelectionChange =
+    externalOnRowSelectionChange ?? setInternalRowSelection;
+  const columnFilters = externalColumnFilters ?? internalColumnFilters
+  const onColumnFiltersChange = externalOnColumnFiltersChange ?? setInternalColumnFilters
 
   const table = useReactTable({
     data,
@@ -107,71 +128,82 @@ export function DataTable<TData, TValue>({
     manualPagination,
     manualFiltering,
     manualSorting,
-    state: { sorting, columnFilters, globalFilter, columnVisibility, rowSelection, pagination },
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      columnVisibility,
+      rowSelection,
+      pagination,
+    },
     onSortingChange,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange,
     onGlobalFilterChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange,
     onPaginationChange,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
+    getPaginationRowModel: manualPagination
+      ? undefined
+      : getPaginationRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
     getRowId,
-  })
+  });
+
+  const renderToolbar = () => {
+    if (toolbar) {
+      return typeof toolbar === "function" ? toolbar(table) : toolbar;
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row gap-4 w-full">
+        <div className="relative flex-1 min-w-[300px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <DebouncedInput
+            placeholder={searchPlaceholder}
+            value={globalFilter ?? ""}
+            onChange={(value) => onGlobalFilterChange(String(value))}
+            className="pl-10 h-9 w-full"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const combinedActions = (
+    <div className="flex items-center gap-2">
+      {showColumnFilters && (
+        <DataTableViewOptions table={table} columnTitles={columnTitles} />
+      )}
+      {typeof actions === "function" ? actions(table) : actions}
+    </div>
+  );
 
   return (
     <DataTableLayout
-      actions={typeof actions === 'function' ? actions(table) : actions}
-      filters={
-        <div className="flex flex-col sm:flex-row  gap-4 w-full">
-          <div className="relative flex-1 min-w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <DebouncedInput
-              placeholder={searchPlaceholder}
-              value={globalFilter ?? ""}
-              onChange={(value) => onGlobalFilterChange(String(value))}
-              className="pl-10 h-9 w-full"
-            />
-          </div>
-          {showColumnFilters && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9">
-                  Filtros <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {columnTitles[column.id] || column.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      }
+      actions={combinedActions}
+      filters={renderToolbar()}
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">
         <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
+            <TableRow
+              key={headerGroup.id}
+              className="hover:bg-transparent border-b"
+            >
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="px-4 py-2 whitespace-nowrap h-10 bg-background">
-                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                <TableHead
+                  key={header.id}
+                  className="px-4 py-2 whitespace-nowrap h-10 bg-background"
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                 </TableHead>
               ))}
             </TableRow>
@@ -181,12 +213,13 @@ export function DataTable<TData, TValue>({
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
-                key={row.id} 
+                key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 onClick={() => onRowClick && onRowClick(row)}
                 className={`
                   ${onRowClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                `}>
+                `}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -204,5 +237,5 @@ export function DataTable<TData, TValue>({
         </TableBody>
       </table>
     </DataTableLayout>
-  )
+  );
 }

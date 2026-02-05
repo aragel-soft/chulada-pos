@@ -1,9 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams } from "@/types/pagination";
-import { Product, PaginatedResponse, CreateProductPayload, ProductDetail, UpdateProductPayload } from "@/types/inventory";
+import { 
+  Product, 
+  PaginatedResponse, 
+  CreateProductPayload, 
+  ProductDetail, 
+  UpdateProductPayload,
+  ProductFilters
+} from "@/types/inventory";
 import { BulkUpdateProductsPayload } from "@/types/inventory";
 
-export const getProducts = async (params: PaginationParams): Promise<PaginatedResponse<Product>> => {
+export const getProducts = async (
+  params: PaginationParams,
+  filters?: ProductFilters
+): Promise<PaginatedResponse<Product>> => {
   try {
     return await invoke("get_products", {
       page: params.page,
@@ -11,6 +21,7 @@ export const getProducts = async (params: PaginationParams): Promise<PaginatedRe
       search: params.search || null,
       sortBy: params.sortBy || null,
       sortOrder: params.sortOrder || null,
+      filters: filters || null
     });
   } catch (error) {
     throw error;

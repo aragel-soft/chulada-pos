@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ProductImagePreview } from "@/features/inventory/components/ProductImageHover";
+import { ProductImagePreview } from "@/features/inventory/components/products/ProductImageHover";
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
