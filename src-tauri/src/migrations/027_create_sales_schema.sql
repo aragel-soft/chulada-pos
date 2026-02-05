@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS sales (
     discount_percentage DECIMAL(5,2) DEFAULT 0,
     discount_amount DECIMAL(10,2) DEFAULT 0,
     total DECIMAL(10,2) NOT NULL,
-    status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'cancelled'
+    status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'cancelled', 'partial_return', 'fully_returned'
     customer_id TEXT,
     user_id TEXT NOT NULL,
     cash_register_shift_id TEXT,

@@ -201,17 +201,11 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </tbody>
             </table>
 
-            {/* NOTAS Y RAZONES */}
+            {/* NOTAS */}
             <div className="space-y-2">
               {sale.notes && (
                 <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
                   <span className="font-semibold">Nota:</span> {sale.notes}
-                </div>
-              )}
-              {sale.cancellation_reason && (
-                <div className="bg-red-50 p-3 rounded-md border border-red-200 text-sm text-red-800">
-                  <span className="font-semibold">Motivo Cancelación:</span>{" "}
-                  {sale.cancellation_reason}
                 </div>
               )}
             </div>

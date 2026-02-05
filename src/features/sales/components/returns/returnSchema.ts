@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ReturnItem } from "./ReturnModal";
+import { ReturnItem } from "@/types/returns";
 
 // Validation Logic Helper
 const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
@@ -23,9 +23,6 @@ const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
   });
 
   itemsByPromo.forEach((promoItems) => {
-    // Simplest check: If any item from this promo is returned, are they returned in correct ratios?
-    // For now, let's stick to the existing logic requested: "Devolverse completas".
-    // If I return 1 "Combo", I must have non-zero return quantity for all components of that combo.
     
      const hasAnySelected = promoItems.some(i => i.isSelected && i.returnQuantity > 0);
      const hasAllSelectedWithQty = promoItems.every(i => i.isSelected && i.returnQuantity > 0);
@@ -38,7 +35,6 @@ const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
      }
   });
 
-  // 2. Validate Kits
   const itemsByKit = new Map<string, ReturnItem[]>();
   items.forEach((item) => {
     if (item.kitOptionId) {
@@ -81,8 +77,28 @@ const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
   });
 };
 
+
+const returnItemSchema = z.object({
+  saleItemId: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+  originalQuantity: z.number(), 
+  returnQuantity: z.number().min(0),
+  isSelected: z.boolean(),
+  unitPrice: z.number(),
+  priceType: z.string(),
+  alreadyReturnedQuantity: z.number(),
+  availableQuantity: z.number(),
+
+  promotionId: z.string().nullish(),
+  promotionName: z.string().nullish(),
+  kitOptionId: z.string().nullish(),
+  isGift: z.boolean(),
+  productImage: z.string().nullish(),
+}).passthrough();
+
 export const returnValidationSchema = z.object({
   reason: z.string().min(1, "Selecciona un motivo."),
   notes: z.string().optional(),
-  items: z.array(z.any()).superRefine(validateReturnItems),
+  items: z.array(returnItemSchema).superRefine(validateReturnItems),
 });
