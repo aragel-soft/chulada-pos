@@ -24,8 +24,3 @@ ALTER TABLE returns ADD COLUMN notes TEXT;
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_sale_id ON store_vouchers(sale_id);
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_code ON store_vouchers(code);
 CREATE INDEX IF NOT EXISTS idx_store_vouchers_active ON store_vouchers(is_active);
-
--- 4. Quitar la columna de notas de cancelación en sales
-ALTER TABLE sales DROP COLUMN cancellation_reason;
-ALTER TABLE sales DROP COLUMN cancelled_by;
-ALTER TABLE sales DROP COLUMN cancelled_at;
