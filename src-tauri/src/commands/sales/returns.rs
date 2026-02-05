@@ -46,15 +46,13 @@ fn get_store_id(tx: &Connection) -> Result<String, String> {
     Ok(store_id)
 }
 
-/// Validates that returned kits follow the kit rules (triggers + max_selections)
-/// Receives available_quantities which already accounts for previous returns
+/// Validates that returned kits follow the kit rules
 fn validate_kit_instances(
     tx: &Connection,
     sale_id: &str,
     return_items: &[ReturnItemRequest],
     available_quantities: &HashMap<String, f64>,
 ) -> Result<(), String> {
-    // 1. Get all sale_items being returned with their kit_option_id and product_id
     let sale_item_ids: Vec<&String> = return_items.iter().map(|i| &i.sale_item_id).collect();
     if sale_item_ids.is_empty() {
         return Ok(());
@@ -84,7 +82,6 @@ fn validate_kit_instances(
         item_data.insert(id, (kit_option_id, product_id));
     }
     
-    // 2. Group return items by kit_option_id
     let mut kit_groups: HashMap<String, HashMap<String, f64>> = HashMap::new();
     
     for item in return_items {
@@ -102,11 +99,9 @@ fn validate_kit_instances(
         return Ok(());
     }
     
-    // 3. Load kit rules
     let kit_ids: Vec<String> = kit_groups.keys().cloned().collect();
     let kit_rules = crate::commands::kit_utils::load_kit_rules(tx, &kit_ids)?;
     
-    // 4. Build available quantities by kit (using pre-validated available amounts)
     let kit_placeholders = kit_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let query_available = format!(
         "SELECT id, kit_option_id, product_id FROM sale_items WHERE sale_id = ? AND kit_option_id IN ({})",
@@ -129,12 +124,10 @@ fn validate_kit_instances(
         *available_by_kit.entry(kit_id).or_insert_with(HashMap::new).entry(product_id).or_insert(0.0) += available_qty;
     }
     
-    // 5. Validate each kit structure and proportions
     for (kit_id, return_products) in kit_groups {
         let kit_rule = kit_rules.get(&kit_id)
             .ok_or(format!("Kit '{}' no encontrado o inactivo", kit_id))?;
         
-        // Validate internal composition (triggers vs items)
         let mut trigger_credits: f64 = 0.0;
         let mut item_consumption: f64 = 0.0;
         
@@ -155,34 +148,40 @@ fn validate_kit_instances(
             ));
         }
         
-        // Validate against available quantities (must return full instances)
         let available_kit_products = available_by_kit.get(&kit_id)
             .ok_or(format!("Kit '{}' no tiene productos disponibles para devolver", kit_rule.name))?;
         
-        let first_trigger = kit_rule.triggers.iter().next()
-            .ok_or(format!("Kit '{}' no tiene productos principales", kit_rule.name))?;
-        
-        let available_trigger_qty = available_kit_products.get(first_trigger)
-            .ok_or(format!("Producto principal '{}' no disponible para devolución", first_trigger))?;
-        
-        let return_trigger_qty = return_products.get(first_trigger).copied().unwrap_or(0.0);
-        
-        if *available_trigger_qty < 0.001 {
-            return Err(format!("No hay cantidades disponibles para devolver del kit '{}'", kit_rule.name));
-        }
-        
-        let multiplier = return_trigger_qty / available_trigger_qty;
+        let mut total_trigger_av = 0.0;
+        let mut total_trigger_ret = 0.0;
+        let mut total_gift_av = 0.0;
+        let mut total_gift_ret = 0.0;
         
         for (product_id, available_qty) in available_kit_products {
-            let expected_return_qty = available_qty * multiplier;
-            let actual_return_qty = return_products.get(product_id).copied().unwrap_or(0.0);
+            let return_qty = return_products.get(product_id).copied().unwrap_or(0.0);
             
-            if (expected_return_qty - actual_return_qty).abs() > 0.001 {
-                return Err(format!(
-                    "Kit '{}' desbalanceado: se está devolviendo el {:.1}% del kit, pero el producto no coincide (Esperado: {:.2}, Recibido: {:.2})",
-                    kit_rule.name, multiplier * 100.0, expected_return_qty, actual_return_qty
-                ));
+            if kit_rule.triggers.contains(product_id) {
+                total_trigger_av += available_qty;
+                total_trigger_ret += return_qty;
+            } else {
+                total_gift_av += available_qty;
+                total_gift_ret += return_qty;
             }
+        }
+
+        if total_trigger_av < 0.001 {
+             return Err(format!("No hay productos principales disponibles para devolver del kit '{}'", kit_rule.name));
+        }
+
+        let multiplier = total_trigger_ret / total_trigger_av;
+        
+        // Validate Gifts Aggregated
+        let expected_total_gift_return = total_gift_av * multiplier;
+        
+        if total_gift_ret < expected_total_gift_return - 0.001 {
+             return Err(format!(
+                "Kit '{}' desbalanceado: Devuelves {:.1}% de los productos base, deberías devolver al menos {:.2} items de regalo, pero recibimos {:.2}.",
+                kit_rule.name, multiplier * 100.0, expected_total_gift_return, total_gift_ret
+            ));
         }
     }
     
@@ -330,26 +329,23 @@ fn manage_store_voucher(
     }
 }
 
-/// Helper to ensure products exist in DB and update their inventory stocks
 fn ensure_products_and_update_inventory(
     tx: &Connection,
-    validated_items: &[(ReturnItemRequest, String, String, String)], // item, name, code, actual_product_id
+    validated_items: &[(ReturnItemRequest, String, String, String)],
     store_id: &str,
 ) -> Result<(), String> {
-    // Bulk query existence
     let product_ids: Vec<&String> = validated_items.iter().map(|(_, _, _, pid)| pid).collect();
     if product_ids.is_empty() { return Ok(()); }
 
+    let mut stmt = tx.prepare(
+        "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3"
+    ).map_err(|e| e.to_string())?;
 
-
-    // Process updates
     for (item, product_name, _, actual_product_id) in validated_items {
         if item.unit_price <= 0.001 { continue; } 
         
-        tx.execute(
-            "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3",
-            params![item.quantity, actual_product_id, store_id]
-        ).map_err(|e| format!("Error actualizando inventario para {}: {}", product_name, e))?;
+        stmt.execute(params![item.quantity, actual_product_id, store_id])
+            .map_err(|e| format!("Error actualizando inventario para {}: {}", product_name, e))?;
     }
     Ok(())
 }
@@ -362,14 +358,12 @@ fn create_return_records(
     validated_items: &[(ReturnItemRequest, String, String, String)],
     return_id: &str
 ) -> Result<(), String> {
-    // Generate Folio
     let folio: i64 = tx.query_row(
         "SELECT COALESCE(MAX(folio), 0) + 1 FROM returns",
         [],
         |row| row.get(0)
     ).unwrap_or(1);
     
-    // Create Header
     tx.execute(
         "INSERT INTO returns (id, folio, sale_id, total, reason, notes, refund_method, user_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'store_voucher', ?7)",
         params![
@@ -384,22 +378,23 @@ fn create_return_records(
     ).map_err(|e| format!("Error creando registro de devolución: {}", e))?;
     
     // Create Items
+    let mut stmt = tx.prepare(
+        "INSERT INTO return_items (id, return_id, sale_item_id, product_id, quantity, unit_price, subtotal) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+    ).map_err(|e| e.to_string())?;
+
     for (item, _, _, actual_product_id) in validated_items {
         let return_item_id = Uuid::new_v4().to_string();
         let subtotal = item.unit_price * item.quantity;
         
-        tx.execute(
-            "INSERT INTO return_items (id, return_id, sale_item_id, product_id, quantity, unit_price, subtotal) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                return_item_id,
-                return_id,
-                item.sale_item_id,
-                actual_product_id,
-                item.quantity,
-                item.unit_price,
-                subtotal
-            ]
-        ).map_err(|e| format!("Error creando item de devolución: {}", e))?;
+        stmt.execute(params![
+            return_item_id,
+            return_id,
+            item.sale_item_id,
+            actual_product_id,
+            item.quantity,
+            item.unit_price,
+            subtotal
+        ]).map_err(|e| format!("Error creando item de devolución: {}", e))?;
     }
     Ok(())
 }
@@ -486,8 +481,6 @@ pub fn process_return(
         if item.quantity <= 0.0 { return Err(format!("Cantidad debe ser > 0 para {}", item.product_id)); }
     }
     
-    // Bulk Load Sale Data & Returned Data
-    // Map: id -> (quantity, name, code, pid, subtotal_paid)
     let sale_items_data: HashMap<String, (f64, String, String, String, f64)>; 
     let already_returned_map: HashMap<String, f64>;
     
@@ -541,7 +534,6 @@ pub fn process_return(
             return Err(format!("Exceso de devolución para '{}'. Disp: {:.2}, Solicitado: {}", name, available, item.quantity));
         }
         
-        // Use effective unit price from DB (net of discounts)
         let real_unit_price = if *orig_qty > 0.0001 { db_subtotal / orig_qty } else { 0.0 };
         
         let mut validated_item = item.clone();
