@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
-import { InventoryMovement, MovementsFilter, CreateInventoryMovementPayload } from "@/types/inventory-movements";
+import { InventoryMovement, MovementsFilter, CreateInventoryMovementPayload, BulkReceptionPayload } from "@/types/inventory-movements";
 
 export const getInventoryMovements = async (params: PaginationParams, filters?: MovementsFilter): Promise<PaginatedResponse<InventoryMovement>> => {
   try {
@@ -23,3 +23,11 @@ export const createInventoryMovement = async (payload: CreateInventoryMovementPa
     throw error;
   }
 };
+
+export async function processBulkReception(payload: BulkReceptionPayload): Promise<string> {
+  try {
+    return await invoke("process_bulk_reception", { payload });
+  } catch (error) {
+    throw error;
+  }
+}
