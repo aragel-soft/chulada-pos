@@ -10,7 +10,7 @@ import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import SalesPage from '@/features/dashboard/pages/SalesPage';
 import HistoryPage from '@/features/dashboard/pages/HistoryPage';
-import AddInventoryPage from '@/features/dashboard/pages/AddInventoryPage';
+import ReceptionPage from '@/features/dashboard/pages/ReceptionPage';
 import InventoryPage from '@/pages/InventoryPage';
 import CustomersPage from '@/pages/CustomersPage';
 import ReportsPage from '@/pages/ReportsPage';
@@ -72,10 +72,10 @@ const router = createBrowserRouter([
             )
           },
           {
-            path: "add_inventory",
+            path: "reception",
             element: (
-              <ProtectedRoute module="add_inventory:view">
-                <AddInventoryPage />
+              <ProtectedRoute module="inventory_movements:entry">
+                <ReceptionPage />
               </ProtectedRoute>
             )
           }
