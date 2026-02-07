@@ -77,23 +77,31 @@ export default function ReceptionPage() {
   return (
     <div className="h-full flex flex-col gap-4 p-1">
       {/* HEADER */}
-      <div className="flex gap-4 items-center shrink-0 bg-white p-3 rounded-lg border shadow-sm">
+      <div className="flex gap-4 items-center">
         <div className="flex-1">
           <ProductScannerInput
             onProductSelect={(product) => addItem(product)}
-            className="w-full max-w-3xl"
+            className="w-full"
             autoFocus={true}
           />
         </div>
 
-        <Button
-          onClick={() => setIsCreateProductOpen(true)}
-          variant="outline"
-          className="h-12 px-6"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Nuevo Producto
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button
+            onClick={() => setIsCreateProductOpen(true)}
+            className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Nuevo Producto
+          </Button>
+          
+          <Button
+            className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+            onClick={() => console.log("Logic for Modify")}
+          >
+            Modificar
+          </Button>
+        </div>
       </div>
 
       {/* BODY  */}
