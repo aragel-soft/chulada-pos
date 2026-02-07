@@ -12,16 +12,21 @@ export interface ReceptionItem {
   quantity: number;
   cost: number;
   retail_price: number;
+  wholesale_price: number;
 }
 
 interface ReceptionState {
   items: ReceptionItem[];
+  selectedIds: string[];
 
   addItem: (product: Product) => void;
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
   updateItemCost: (productId: string, cost: number) => void;
   clearReception: () => void;
+  toggleItemSelection: (productId: string) => void;
+  toggleAllSelection: (selected: boolean) => void;
+  clearSelection: () => void;
 
   getTotalQuantity: () => number;
   getTotalCost: () => number;
@@ -32,6 +37,7 @@ export const useReceptionStore = create<ReceptionState>()(
   persist(
     (set, get) => ({
       items: [],
+      selectedIds: [],
 
       addItem: (product: Product) => {
         set((state) => {
@@ -53,6 +59,7 @@ export const useReceptionStore = create<ReceptionState>()(
               quantity: 1,
               cost: product.purchase_price || 0,
               retail_price: product.retail_price,
+              wholesale_price: product.wholesale_price,
             };
             toast.success(`Producto agregado: ${product.name}`);
             return { items: [...state.items, newItem] };
@@ -63,6 +70,7 @@ export const useReceptionStore = create<ReceptionState>()(
       removeItem: (productId: string) => {
         set((state) => ({
           items: state.items.filter((item) => item.product_id !== productId),
+          selectedIds: state.selectedIds.filter(id => id !== productId)
         }));
         toast.info("Producto removido");
       },
@@ -86,24 +94,37 @@ export const useReceptionStore = create<ReceptionState>()(
       },
 
       clearReception: () => {
-        set({ items: [] });
+        set({ items: [], selectedIds: [] });
       },
 
-      getTotalQuantity: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+      toggleItemSelection: (productId) => {
+        set((state) => {
+            const isSelected = state.selectedIds.includes(productId);
+            return {
+                selectedIds: isSelected 
+                    ? state.selectedIds.filter(id => id !== productId)
+                    : [...state.selectedIds, productId]
+            };
+        });
       },
 
-      getTotalCost: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity * item.cost, 0);
+      toggleAllSelection: (selected) => {
+          set((state) => ({
+              selectedIds: selected ? state.items.map(i => i.product_id) : []
+          }));
       },
 
-      getPayloadItems: () => {
-        return get().items.map((item) => ({
+      clearSelection: () => {
+          set({ selectedIds: [] });
+      },
+
+      getTotalQuantity: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
+      getTotalCost: () => get().items.reduce((sum, item) => sum + item.quantity * item.cost, 0),
+      getPayloadItems: () => get().items.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
           new_cost: item.cost,
-        }));
-      },
+      })),
     }),
     {
       name: 'pos-reception-storage',

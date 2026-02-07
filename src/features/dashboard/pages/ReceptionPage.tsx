@@ -7,10 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
-import { CheckCircle2, Loader2, Plus, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  PlusCircle,
+  AlertTriangle,
+  Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import { processBulkReception } from "@/lib/api/inventory/inventory-movements";
 import { CreateProductDialog } from "@/features/inventory/components/products/CreateProductDialog";
+import { EditProductDialog } from "@/features/inventory/components/products/EditProductDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,10 +30,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function ReceptionPage() {
-  const { user } = useAuthStore();
+  const { user, can } = useAuthStore();
   const {
     items,
     addItem,
+    selectedIds,
+    clearSelection,
     getTotalQuantity,
     getTotalCost,
     getPayloadItems,
@@ -36,6 +45,8 @@ export default function ReceptionPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showZeroCostWarning, setShowZeroCostWarning] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const executeReception = async () => {
     if (!user?.id) return;
@@ -87,24 +98,33 @@ export default function ReceptionPage() {
         </div>
 
         <div className="flex gap-2 shrink-0">
-          <Button
-            onClick={() => setIsCreateProductOpen(true)}
-            className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nuevo Producto
-          </Button>
-          
-          <Button
-            className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-            onClick={() => console.log("Logic for Modify")}
-          >
-            Modificar
-          </Button>
+          {can("products:create") && (
+            <Button
+              onClick={() => setIsCreateProductOpen(true)}
+              className="rounded-r-md bg-[#480489] hover:bg-[#480489]/90 transition-all"
+            >
+              <PlusCircle className="w-5 h-5 mr-2" />
+              <span className="hidden sm:inline">Nuevo Producto</span>
+            </Button>
+          )}
+
+          {can("products:edit") && (
+            <Button
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+              disabled={selectedIds.length !== 1}
+              onClick={() => {
+                setEditingId(selectedIds[0]);
+                setIsEditProductOpen(true);
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Modificar Producto</span>
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* BODY  */}
+      {/* BODY */}
       <div className="flex-1 overflow-hidden">
         <ReceptionGrid />
       </div>
@@ -127,7 +147,7 @@ export default function ReceptionPage() {
 
         <Button
           size="lg"
-          className="w-[200px] font-bold text-md"
+          className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all w-[200px] font-bold text-md"
           disabled={items.length === 0 || isProcessing}
           onClick={handleProcessClick}
         >
@@ -140,7 +160,18 @@ export default function ReceptionPage() {
         </Button>
       </Card>
 
-      {/* Zero Cost Warning Dialog */}
+      {/* --- DIALOGS --- */}
+
+      <EditProductDialog
+        open={isEditProductOpen}
+        onOpenChange={setIsEditProductOpen}
+        productId={editingId}
+        variant="minimal"
+        onSuccess={() => {
+          clearSelection();
+        }}
+      />
+
       <AlertDialog
         open={showZeroCostWarning}
         onOpenChange={setShowZeroCostWarning}
