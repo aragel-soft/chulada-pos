@@ -60,9 +60,9 @@ pub fn upsert_customer(
     let is_new = customer.id.is_none();
 
     let duplicate_check_sql = if let Some(ref _id) = customer.id {
-        "SELECT id, name, deleted_at FROM customers WHERE phone = ?1 AND id != ?2 ORDER BY deleted_at DESC NULLS FIRST LIMIT 1"
+        "SELECT id, code, name, deleted_at FROM customers WHERE phone = ?1 AND id != ?2 ORDER BY deleted_at DESC NULLS FIRST LIMIT 1"
     } else {
-        "SELECT id, name, deleted_at FROM customers WHERE phone = ?1 ORDER BY deleted_at DESC NULLS FIRST LIMIT 1"
+        "SELECT id, code, name, deleted_at FROM customers WHERE phone = ?1 ORDER BY deleted_at DESC NULLS FIRST LIMIT 1"
     };
 
     let params: Vec<&dyn rusqlite::ToSql> = if let Some(ref id) = customer.id {
@@ -71,19 +71,20 @@ pub fn upsert_customer(
         vec![&customer.phone]
     };
 
-    let duplicate_result: Option<(String, String, Option<String>)> = tx.query_row(
+    let duplicate_result: Option<(String, Option<String>, String, Option<String>)> = tx.query_row(
         duplicate_check_sql,
         rusqlite::params_from_iter(params),
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
     ).optional().map_err(|e| e.to_string())?;
 
-    if let Some((existing_id, existing_name, deleted_at)) = duplicate_result {
+    if let Some((existing_id, existing_code, existing_name, deleted_at)) = duplicate_result {
         if deleted_at.is_some() {
             let should_ignore_deleted = !is_new || customer.force_create.unwrap_or(false);
             
             if !should_ignore_deleted {
                 let error_payload = serde_json::json!({
                     "id": existing_id,
+                    "code": existing_code,
                     "name": existing_name
                 });
                 return Err(format!("RESTORE_REQUIRED:{}", error_payload.to_string()));
