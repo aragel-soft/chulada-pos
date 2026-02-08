@@ -82,7 +82,7 @@ export const ReceptionRow = memo(
                   const val = parseFloat(e.target.value) || 0;
                   updateItemCost(item.product_id, val);
                 }}
-                className="h-8 pl-5 text-right font-mono"
+                className="h-8 pl-5 text-right font-medium"
               />
             </div>
           </TableCell>

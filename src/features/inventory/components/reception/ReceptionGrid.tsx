@@ -1,4 +1,4 @@
-import { useReceptionStore } from "@/stores/receptionStore";
+import { useReceptionStore, ReceptionItem } from "@/stores/receptionStore";
 import {
   Table,
   TableBody,
@@ -6,16 +6,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ReceptionRow } from "./ReceptionRow";
 import { PackageOpen } from "lucide-react";
-import { ReceptionItem } from "@/stores/receptionStore";
 
 export function ReceptionGrid() {
-  const { items, selectedIds, toggleAllSelection } = useReceptionStore();
-  const isAllSelected = items.length > 0 && selectedIds.length === items.length;
-  const isIndeterminate =
-    selectedIds.length > 0 && selectedIds.length < items.length;
+  const { items, selectedIds } = useReceptionStore();
 
   if (items.length === 0) {
     return (
@@ -29,29 +24,33 @@ export function ReceptionGrid() {
   }
 
   return (
-    <div className="border rounded-md h-full overflow-hidden flex flex-col bg-white">
+    <div className="border rounded-md h-full overflow-hidden flex flex-col bg-white shadow-sm">
       <div className="overflow-auto flex-1">
         <Table>
-          <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
-            <TableRow>
-              <TableHead className="w-[40px] px-2">
-                <Checkbox
-                  checked={
-                    isAllSelected || (isIndeterminate ? "indeterminate" : false)
-                  }
-                  onCheckedChange={(checked) => toggleAllSelection(!!checked)}
-                />
-              </TableHead>
+          <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
+            <TableRow className="hover:bg-transparent border-b">
+              {/* Empty Head for Checkbox Column alignment */}
+              <TableHead className="w-[40px] px-2 h-10 bg-background"></TableHead>
 
-              <TableHead className="w-[100px]">Código</TableHead>
-              <TableHead>Producto</TableHead>
-              <TableHead className="w-[120px] text-center">Cant. (+)</TableHead>
-              <TableHead className="w-[140px] text-right">
+              <TableHead className="w-[100px] px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                Código
+              </TableHead>
+              <TableHead className="px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                Producto
+              </TableHead>
+              <TableHead className="w-[120px] text-center px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                Cant. (+)
+              </TableHead>
+              <TableHead className="w-[140px] text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 Costo Unit.
               </TableHead>
-              <TableHead className="text-right">P. Venta</TableHead>
-              <TableHead className="text-right">Subtotal</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                P. Venta
+              </TableHead>
+              <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                Subtotal
+              </TableHead>
+              <TableHead className="w-[50px] px-4 py-2 h-10 bg-background"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

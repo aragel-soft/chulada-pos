@@ -4,8 +4,6 @@ import { useAuthStore } from "@/stores/authStore";
 import { ReceptionGrid } from "@/features/inventory/components/reception/ReceptionGrid";
 import { ProductScannerInput } from "@/features/inventory/components/reception/ProductScannerInput";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import {
   CheckCircle2,
@@ -130,35 +128,40 @@ export default function ReceptionPage() {
       </div>
 
       {/* FOOTER */}
-      <Card className="shrink-0 p-4 bg-slate-50 border-t flex items-center justify-between">
-        <div className="flex gap-8 items-center text-sm">
-          <div>
-            <span className="text-muted-foreground block">Artículos</span>
-            <span className="font-bold text-xl">{getTotalQuantity()}</span>
-          </div>
-          <Separator orientation="vertical" className="h-10" />
-          <div>
-            <span className="text-muted-foreground block">Total Compra</span>
-            <span className="font-bold text-xl text-primary">
-              {formatCurrency(getTotalCost())}
-            </span>
-          </div>
+      <div className="bg-white rounded-lg border p-4 shrink-0 grid grid-cols-3 gap-4 items-center shadow-sm">
+        <div>
+          <span className="text-xs text-muted-foreground block">Artículos</span>
+          <span className="text-xl font-bold text-zinc-700">
+            {getTotalQuantity()}
+          </span>
         </div>
 
-        <Button
-          size="lg"
-          className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all w-[200px] font-bold text-md"
-          disabled={items.length === 0 || isProcessing}
-          onClick={handleProcessClick}
-        >
-          {isProcessing ? (
-            <Loader2 className="w-5 h-5 animate-spin mr-2" />
-          ) : (
-            <CheckCircle2 className="w-5 h-5 mr-2" />
-          )}
-          Procesar Entrada
-        </Button>
-      </Card>
+        <div>
+          <span className="text-xs text-muted-foreground block">
+            Total Compra
+          </span>
+          <span className="text-xl font-bold text-primary">
+            {formatCurrency(getTotalCost())}
+          </span>
+        </div>
+
+        {/* Botón de Acción (Alineado a la derecha) */}
+        <div className="flex justify-end">
+          <Button
+            size="lg"
+            className="bg-[#480489] hover:bg-[#480489]/90 transition-all font-bold text-md px-8"
+            disabled={items.length === 0 || isProcessing}
+            onClick={handleProcessClick}
+          >
+            {isProcessing ? (
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 mr-2" />
+            )}
+            Procesar Entrada
+          </Button>
+        </div>
+      </div>
 
       {/* --- DIALOGS --- */}
 
@@ -178,7 +181,7 @@ export default function ReceptionPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+            <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" /> Costos en Cero Detectados
             </AlertDialogTitle>
             <AlertDialogDescription>
