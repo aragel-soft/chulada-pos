@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { ReceptionItem, useReceptionStore } from "@/stores/receptionStore";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -22,8 +22,52 @@ export const ReceptionRow = memo(
       toggleItemSelection,
       updateProductDetails,
     } = useReceptionStore();
+
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [qtyValue, setQtyValue] = useState(item.quantity.toString());
+    const [costValue, setCostValue] = useState(item.cost.toString());
+
+    useEffect(() => {
+      setQtyValue(item.quantity.toString());
+    }, [item.quantity]);
+
+    useEffect(() => {
+      setCostValue(item.cost.toString());
+    }, [item.cost]);
+
     const subtotal = item.quantity * item.cost;
+
+    const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === "" || /^\d+$/.test(val)) {
+        setQtyValue(val);
+      }
+    };
+
+    const handleQtyBlur = () => {
+      let val = parseInt(qtyValue);
+      if (isNaN(val) || val < 1) {
+        val = 1;
+        setQtyValue("1");
+      }
+      updateItemQuantity(item.product_id, val);
+    };
+
+    const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+        setCostValue(val);
+      }
+    };
+
+    const handleCostBlur = () => {
+      let val = parseFloat(costValue);
+      if (isNaN(val) || val < 0) {
+        val = 0;
+        setCostValue("0");
+      }
+      updateItemCost(item.product_id, val);
+    };
 
     return (
       <>
@@ -58,13 +102,11 @@ export const ReceptionRow = memo(
 
           <TableCell className="w-[120px]">
             <Input
-              type="number"
-              min={1}
-              value={item.quantity}
-              onChange={(e) => {
-                const val = parseInt(e.target.value) || 0;
-                updateItemQuantity(item.product_id, val);
-              }}
+              type="text"
+              inputMode="numeric"
+              value={qtyValue}
+              onChange={handleQtyChange}
+              onBlur={handleQtyBlur}
               className="h-8 text-center font-bold"
             />
           </TableCell>
@@ -75,14 +117,11 @@ export const ReceptionRow = memo(
                 $
               </span>
               <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={item.cost}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  updateItemCost(item.product_id, val);
-                }}
+                type="text"
+                inputMode="decimal"
+                value={costValue}
+                onChange={handleCostChange}
+                onBlur={handleCostBlur}
                 className="h-8 pl-5 text-right font-medium"
               />
             </div>
