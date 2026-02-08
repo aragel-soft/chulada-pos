@@ -19,12 +19,14 @@ export interface CustomerInput {
   address?: string | null;
   credit_limit: number;
   is_active?: boolean;
+  force_create?: boolean;
 }
 
 export interface RestoreRequiredError {
   code: "RESTORE_REQUIRED";
   payload: {
     id: string;
+    code: string | null;
     name: string;
   };
 }
