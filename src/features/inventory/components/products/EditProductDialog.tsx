@@ -34,7 +34,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
-
 import {
   productSchema,
   ProductFormValues,
@@ -45,14 +44,14 @@ import {
   getAllTags,
 } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
-import { UpdateProductPayload, ImageAction } from "@/types/inventory";
+import { UpdateProductPayload, ImageAction, Product } from "@/types/inventory";
 import { useAppImage } from "@/hooks/use-app-image";
 
 interface EditProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productId: string | null;
-  onSuccess: () => void;
+  onSuccess: (updatedProduct?: Product) => void;
   variant?: 'default' | 'minimal';
 }
 
@@ -161,12 +160,12 @@ export function EditProductDialog({
 
       return await updateProduct(payload);
     },
-    onSuccess: () => {
+    onSuccess: (data: Product) => {
       toast.success("Producto actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product", productId] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
-      onSuccess();
+      onSuccess(data);
       handleClose();
     },
     onError: (error: any) => {

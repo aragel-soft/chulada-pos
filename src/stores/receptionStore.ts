@@ -23,6 +23,7 @@ interface ReceptionState {
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
   updateItemCost: (productId: string, cost: number) => void;
+  updateProductDetails: (product: Product) => void;
   clearReception: () => void;
   toggleItemSelection: (productId: string) => void;
   toggleAllSelection: (selected: boolean) => void;
@@ -93,37 +94,54 @@ export const useReceptionStore = create<ReceptionState>()(
         }));
       },
 
+      updateProductDetails: (product: Product) => {
+        set((state) => ({
+          items: state.items.map((item) =>
+            item.product_id === product.id
+              ? {
+                ...item,
+                code: product.code,
+                name: product.name,
+                retail_price: product.retail_price,
+                wholesale_price: product.wholesale_price,
+                cost: product.purchase_price ?? 0
+              }
+              : item
+          ),
+        }));
+      },
+
       clearReception: () => {
         set({ items: [], selectedIds: [] });
       },
 
       toggleItemSelection: (productId) => {
         set((state) => {
-            const isSelected = state.selectedIds.includes(productId);
-            return {
-                selectedIds: isSelected 
-                    ? state.selectedIds.filter(id => id !== productId)
-                    : [...state.selectedIds, productId]
-            };
+          const isSelected = state.selectedIds.includes(productId);
+          return {
+            selectedIds: isSelected
+              ? state.selectedIds.filter(id => id !== productId)
+              : [...state.selectedIds, productId]
+          };
         });
       },
 
       toggleAllSelection: (selected) => {
-          set((state) => ({
-              selectedIds: selected ? state.items.map(i => i.product_id) : []
-          }));
+        set((state) => ({
+          selectedIds: selected ? state.items.map(i => i.product_id) : []
+        }));
       },
 
       clearSelection: () => {
-          set({ selectedIds: [] });
+        set({ selectedIds: [] });
       },
 
       getTotalQuantity: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
       getTotalCost: () => get().items.reduce((sum, item) => sum + item.quantity * item.cost, 0),
       getPayloadItems: () => get().items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          new_cost: item.cost,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        new_cost: item.cost,
       })),
     }),
     {

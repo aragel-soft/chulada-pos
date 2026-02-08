@@ -20,6 +20,7 @@ export const ReceptionRow = memo(
       updateItemQuantity,
       updateItemCost,
       toggleItemSelection,
+      updateProductDetails,
     } = useReceptionStore();
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const subtotal = item.quantity * item.cost;
@@ -112,8 +113,10 @@ export const ReceptionRow = memo(
           onOpenChange={setIsEditDialogOpen}
           productId={item.product_id}
           variant="minimal"
-          onSuccess={() => {
-
+          onSuccess={(updatedProduct) => {
+            if (updatedProduct) {
+              updateProductDetails(updatedProduct);
+            }
           }}
         />
       </>
@@ -124,7 +127,7 @@ export const ReceptionRow = memo(
       prev.item.quantity === next.item.quantity &&
       prev.item.cost === next.item.cost &&
       prev.item.product_id === next.item.product_id &&
-      prev.isSelected === next.isSelected 
+      prev.isSelected === next.isSelected
     );
   },
 );

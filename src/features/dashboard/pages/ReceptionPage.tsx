@@ -38,6 +38,7 @@ export default function ReceptionPage() {
     getTotalCost,
     getPayloadItems,
     clearReception,
+    updateProductDetails,
   } = useReceptionStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -170,7 +171,10 @@ export default function ReceptionPage() {
         onOpenChange={setIsEditProductOpen}
         productId={editingId}
         variant="minimal"
-        onSuccess={() => {
+        onSuccess={(updatedProduct) => {
+          if (updatedProduct) {
+            updateProductDetails(updatedProduct);
+          }
           clearSelection();
         }}
       />
