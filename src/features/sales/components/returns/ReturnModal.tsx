@@ -22,7 +22,10 @@ import { ReturnItem } from "@/types/returns";
 
 import { UI_COLORS } from "@/features/sales/constants/sales-design";
 
+import { useProcessReturn } from "@/features/sales/hooks/useProcessReturn";
+
 export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
+  const { processReturn, isProcessing: hookIsProcessing } = useProcessReturn();
 
   // --- WIZARD DESIGN ---
   const WIZARD_STEPS = [
@@ -32,12 +35,12 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(1);
+      setReturnItems([]);
       setSessionKey(prev => prev + 1);
     }
   }, [isOpen]);
@@ -47,18 +50,8 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
   };
   
   const handleConfirmReturn = async (reason: string, notes: string): Promise<string> => {
-    setIsProcessing(true);
-    try {
-      // TODO: Call backend to process return
-      console.log("Processing return:", { reason, notes, items: returnItems });
-      
-      // Simulate backend delay and response
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      return "UNDER_CONSTRUCTION";
-    } finally {
-      setIsProcessing(false);
-    }
+    const voucherCode = await processReturn(sale.id, returnItems, reason, notes);
+    return voucherCode;
   };
 
 
@@ -183,7 +176,7 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
               onBack={handleBack}
               onConfirm={handleConfirmReturn}
               onCancel={onClose}
-              isProcessing={isProcessing}
+              isProcessing={hookIsProcessing}
             />
           )}
         </div>

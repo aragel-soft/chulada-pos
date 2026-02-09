@@ -244,7 +244,6 @@ pub fn get_sale_details(
       s.id, s.folio, s.sale_date, s.status, s.payment_method, 
       s.subtotal, s.discount_percentage, s.discount_amount, s.total,
       s.cash_amount, s.card_transfer_amount, s.notes,
-      s.cancellation_reason, s.cancelled_at,
       u.username, u.avatar_url
     FROM sales s
     LEFT JOIN users u ON s.user_id = u.id
@@ -255,7 +254,7 @@ pub fn get_sale_details(
 
   let mut sale: SaleDetailView = stmt
     .query_row([&sale_id], |row| {
-      let raw_avatar: Option<String> = row.get(15)?;
+      let raw_avatar: Option<String> = row.get(13)?;
       let resolved_avatar = raw_avatar.map(|path| {
         if path.starts_with("http") {
           path
@@ -282,14 +281,31 @@ pub fn get_sale_details(
         card_amount: row.get(10).unwrap_or(0.0),
         change_returned: change,
         notes: row.get(11)?,
-        cancellation_reason: row.get(12)?,
-        cancelled_at: row.get(13)?,
-        user_name: row.get(14).unwrap_or("Desconocido".to_string()),
+        cancellation_reason: None,
+        cancelled_at: None,
+        user_name: row.get(12).unwrap_or("Desconocido".to_string()),
         user_avatar: resolved_avatar,
         items: Vec::new(),
       })
     })
     .map_err(|e| format!("Venta no encontrada: {}", e))?;
+
+  if sale.status == "cancelled" {
+    let cancellation_sql = "
+      SELECT r.reason, r.return_date
+      FROM returns r
+      WHERE r.sale_id = ?
+      ORDER BY r.return_date DESC
+      LIMIT 1
+    ";
+    
+    if let Ok((reason, date)) = conn.query_row(cancellation_sql, [&sale_id], |row| {
+      Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    }) {
+      sale.cancellation_reason = Some(reason);
+      sale.cancelled_at = Some(date);
+    }
+  }
 
   let items_sql = "
     SELECT 

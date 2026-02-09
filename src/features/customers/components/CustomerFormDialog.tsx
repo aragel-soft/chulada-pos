@@ -204,6 +204,31 @@ export function CustomerFormDialog({
     },
   });
 
+  const forceCreateMutation = useMutation({
+    mutationFn: () => {
+      const currentValues = form.getValues();
+      const payload: CustomerInput = {
+        ...currentValues,
+        id: null,
+        force_create: true,
+      };
+      return upsertCustomer(payload);
+    },
+    onSuccess: () => {
+      toast.success("Cliente creado exitosamente");
+      setRestoreError(null);
+      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+
+      if (onSuccess) {
+        onSuccess('create');
+      }
+    },
+    onError: (error: any) => {
+      toast.error(`Error al crear: ${error.message}`);
+    },
+  });
+
   const onSubmit = (values: CustomerFormValues) => {
     upsertMutation.mutate(values);
   };
@@ -414,20 +439,37 @@ export function CustomerFormDialog({
               El número de teléfono ingresado pertenece a un cliente eliminado anteriormente: 
               <br/>
               <span className="font-semibold text-foreground">
-                {restoreError?.name} (ID: {restoreError?.id?.slice(0, 8)}...)
+                {restoreError?.name} ({restoreError?.code || restoreError?.id})
               </span>
               <br/><br/>
               ¿Deseas restaurar su historial y actualizarlo con los datos nuevos que acabas de ingresar?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex gap-2 sm:gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button
+                variant="outline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  forceCreateMutation.mutate();
+                }}
+                disabled={forceCreateMutation.isPending || restoreMutation.isPending}
+            >
+              {forceCreateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                "Crear Nuevo"
+              )}
+            </Button>
             <AlertDialogAction 
                 onClick={(e) => {
                   e.preventDefault(); 
                   restoreMutation.mutate();
                 }}
-                disabled={restoreMutation.isPending}
+                disabled={restoreMutation.isPending || forceCreateMutation.isPending}
                 className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               {restoreMutation.isPending ? (
@@ -436,7 +478,7 @@ export function CustomerFormDialog({
                   Restaurando...
                 </>
               ) : (
-                "Sí, Restaurar Historial"
+                "Restaurar Historial"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

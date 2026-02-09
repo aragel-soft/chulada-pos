@@ -584,10 +584,9 @@ fn calculate_sale_items<'a>(
                     )),
                 };
                 
+                // Determine Unit Price (Base Price)
                 let unit_price = if item.price_type == "kit_item" {
                     0.0
-                } else if discount_percentage > 0.0 {
-                    retail
                 } else if item.price_type == "wholesale" { 
                     wholesale 
                 } else { 
@@ -595,21 +594,30 @@ fn calculate_sale_items<'a>(
                 };
                 
                 let gross_amount = unit_price * item.quantity;
-                let item_discount_val = gross_amount * (discount_percentage / 100.0);
+                
+                // Calculate Discount per Item
+                let item_discount_val = if item.price_type == "kit_item" {
+                    0.0
+                } else {
+                    gross_amount * (discount_percentage / 100.0)
+                };
+                
                 let net_amount = gross_amount - item_discount_val;
-
+                
                 total_gross += gross_amount;
                 total_item_discounts += item_discount_val;
-
+                
                 final_items.push(FinalItemData {
                     original_req: item,
-                    db_name,
-                    db_code,
+                    db_name: db_name.clone(),
+                    db_code: db_code.clone(),
                     unit_price,
                     item_discount_amt: item_discount_val,
                     item_subtotal: net_amount,
                 });
             }
+
+
         }
     }
     

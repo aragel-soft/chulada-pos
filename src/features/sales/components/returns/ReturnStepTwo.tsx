@@ -17,6 +17,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AppAvatar } from "@/components/ui/app-avatar";
 import { Badge } from "@/components/ui/badge";
 import { SaleDetail } from "@/types/sales-history";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+import { returnValidationSchema } from "./returnSchema";
+import { BADGE_CONFIGS, BUTTON_STYLES } from "@/features/sales/constants/sales-design";
+import { cn } from "@/lib/utils";
 
 interface ReturnStepTwoProps {
   sale: SaleDetail;
@@ -26,11 +39,6 @@ interface ReturnStepTwoProps {
   onCancel: () => void;
   isProcessing: boolean;
 }
-
-import { returnValidationSchema } from "./returnSchema";
-import { BADGE_CONFIGS, BUTTON_STYLES } from "@/features/sales/constants/sales-design";
-import { cn } from "@/lib/utils";
-
 
 export function ReturnStepTwo({
   sale,
@@ -44,10 +52,8 @@ export function ReturnStepTwo({
   const [notes, setNotes] = useState<string>("");
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   
-  // Separate errors into field-specific (for inline display) and general (for alerts)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
-  // Removed old errors state to avoid confusion
 
   const selectedItems = returnItems.filter(
     (item) => item.isSelected && item.returnQuantity > 0
@@ -73,7 +79,6 @@ export function ReturnStepTwo({
       const flattened = result.error.flatten();
       setFieldErrors(flattened.fieldErrors);
       
-      // Combine form-level errors and specific item errors into general errors for the alert
       const combinedGeneralErrors = [
         ...flattened.formErrors,
         ...(flattened.fieldErrors['items'] || [])
@@ -86,6 +91,10 @@ export function ReturnStepTwo({
     try {
       const code = await onConfirm(reason, notes);
       setVoucherCode(code);
+      
+      setTimeout(() => {
+        onCancel();
+      }, 100);
     } catch (err) {
       setGeneralErrors([String(err)]);
     }
@@ -123,9 +132,33 @@ export function ReturnStepTwo({
   return (
     <div className="flex flex-col h-full">
 
+      {/* ERROR MODAL */}
+      <AlertDialog open={generalErrors.length > 0} onOpenChange={(open) => !open && setGeneralErrors([])}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              Error de Validación
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 pt-2">
+              <p>Por favor corrige los siguientes problemas antes de continuar:</p>
+              <ul className="list-disc list-inside text-destructive font-medium space-y-1">
+                {generalErrors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setGeneralErrors([])} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex-1 flex gap-6 p-6 overflow-hidden">
-        {/* Left Column: Summary */}
+
         <div className="flex-[3] flex flex-col border rounded-lg overflow-hidden bg-white shadow-sm">
           <div className="p-4 bg-muted/30 border-b font-medium flex justify-between">
             <span>Resumen de Productos</span>
@@ -238,19 +271,6 @@ export function ReturnStepTwo({
                 />
               </div>
 
-              {generalErrors.length > 0 && (
-                <Alert variant="destructive" className="mt-2 text-sm">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error de Validación</AlertTitle>
-                  <AlertDescription>
-                    <ul className="list-disc list-inside mt-1">
-                      {generalErrors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
 
               <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
