@@ -27,7 +27,7 @@ export default function InventoryMovementsPage() {
   });
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const fetchMovements = async () => {
