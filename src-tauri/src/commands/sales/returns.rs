@@ -400,7 +400,6 @@ fn create_return_records(
 }
 
 /// Helper to calculate and update the sale's final status
-/// If reason is "cancellation" and sale is fully returned, status will be "cancelled"
 fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<(), String> {
     let mut sale_items_map: HashMap<String, (f64, f64)> = HashMap::new(); // id -> (original, returned)
     
@@ -445,7 +444,6 @@ fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<()
         if (*original - *returned).abs() > 0.001 { fully_returned = false; }
     }
     
-    // If reason is "cancellation" and all items are returned, use "cancelled" status
     let new_status = if fully_returned && has_returns && reason == "cancellation" { 
         "cancelled" 
     } else if fully_returned && has_returns { 
@@ -476,7 +474,6 @@ pub fn process_return(
     
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     
-    // Validate Sale Exists and get sale_date for cancellation check
     let sale_date: Option<String> = tx.query_row(
         "SELECT sale_date FROM sales WHERE id = ?", 
         [&payload.sale_id], 
@@ -485,9 +482,7 @@ pub fn process_return(
     
     let sale_date = sale_date.ok_or(format!("Venta no encontrada: {}", payload.sale_id))?;
     
-    // If reason is "cancellation", validate that sale is within 1 hour
     if payload.reason == "cancellation" {
-        // Parse the sale_date and check against current time
         let sale_datetime = chrono::NaiveDateTime::parse_from_str(&sale_date, "%Y-%m-%d %H:%M:%S")
             .or_else(|_| chrono::DateTime::parse_from_rfc3339(&sale_date).map(|dt| dt.naive_utc()))
             .map_err(|_| format!("Error parseando fecha de venta: {}", sale_date))?;
@@ -500,8 +495,7 @@ pub fn process_return(
         }
     }
     
-    // Validate Items & Available Quantities
-    let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new(); // item, name, code, pid
+    let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new();
     let mut available_quantities: HashMap<String, f64> = HashMap::new();
     
     for item in &payload.items {
