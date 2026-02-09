@@ -55,7 +55,6 @@ export default function InventoryMovementsPage() {
       setData(response.data);
       setTotalRows(response.total);
     } catch (error) {
-      console.error("Error cargando movimientos:", error);
     } finally {
       setIsLoading(false);
     }
