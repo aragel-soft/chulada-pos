@@ -8,24 +8,24 @@ import {
 import { SaleDetail } from "@/types/sales-history";
 import { ReturnStepOne } from "@/features/sales/components/returns/ReturnStepOne";
 import { ReturnStepTwo } from "@/features/sales/components/returns/ReturnStepTwo";
-import { CheckCircle2, RotateCcw } from "lucide-react";
+import { CheckCircle2, RotateCcw, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReturnItem } from "@/types/returns";
+import { UI_COLORS } from "@/features/sales/constants/sales-design";
+import { useProcessReturn } from "@/features/sales/hooks/useProcessReturn";
 
+export type ReturnModalMode = "return" | "cancellation";
 
 interface ReturnModalProps {
   sale: SaleDetail;
   isOpen: boolean;
   onClose: () => void;
+  mode?: ReturnModalMode;
 }
 
-import { ReturnItem } from "@/types/returns";
-
-import { UI_COLORS } from "@/features/sales/constants/sales-design";
-
-import { useProcessReturn } from "@/features/sales/hooks/useProcessReturn";
-
-export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
+export function ReturnModal({ sale, isOpen, onClose, mode = "return" }: ReturnModalProps) {
   const { processReturn, isProcessing: hookIsProcessing } = useProcessReturn();
+  const isCancellation = mode === "cancellation";
 
   // --- WIZARD DESIGN ---
   const WIZARD_STEPS = [
@@ -69,12 +69,16 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
         {/* --- HEADER --- */}
         <div className="p-6 pb-4 border-b bg-background">
           <DialogHeader className="mb-6 flex flex-row items-center gap-3 space-y-0">
-            <div className="p-2 rounded-full bg-purple-50"> 
-              <RotateCcw className="h-6 w-6 text-purple-800" />
+            <div className={cn("p-2 rounded-full", isCancellation ? "bg-red-50" : "bg-purple-50")}> 
+              {isCancellation ? (
+                <Ban className="h-6 w-6 text-red-700" />
+              ) : (
+                <RotateCcw className="h-6 w-6 text-purple-800" />
+              )}
             </div>
             <div className="flex flex-col">
               <DialogTitle className="text-xl font-bold text-foreground">
-                Procesar Devolución
+                {isCancellation ? "Cancelar Venta" : "Procesar Devolución"}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
                 Folio Venta: {sale.folio}
@@ -167,6 +171,7 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
               setReturnItems={setReturnItems}
               onNext={handleNext}
               onCancel={onClose}
+              mode={mode}
             />
           )}
           {currentStep === 2 && (
@@ -177,6 +182,7 @@ export function ReturnModal({ sale, isOpen, onClose }: ReturnModalProps) {
               onConfirm={handleConfirmReturn}
               onCancel={onClose}
               isProcessing={hookIsProcessing}
+              mode={mode}
             />
           )}
         </div>

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, User, X } from "lucide-react";
+import { Loader2, User, X, Ban } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,11 +38,18 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
   const { data: sale, isLoading } = useSaleDetail(saleId);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [cancellationModalOpen, setCancellationModalOpen] = useState(false);
 
   const daysSinceSale = sale
     ? differenceInDays(new Date(), new Date(sale.sale_date))
     : 999;
   const canReturn = daysSinceSale <= 30;
+  
+  // TODO: La validación de tiempo será ajustada cuando se corrija el problema de zona horaria en la base de datos.
+  const canCancel = daysSinceSale < 2 && sale?.status !== "cancelled" && sale?.status !== "fully_returned" && sale?.status !== "partial_return";
+  
+  // Hide buttons completely if sale is cancelled or fully returned
+  const showActionButtons = sale?.status !== "cancelled" && sale?.status !== "fully_returned";
   
   const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
   const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
@@ -136,6 +143,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </div>
             </div>
 
+            {showActionButtons && (
             <TooltipProvider>
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
@@ -153,17 +161,47 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                 {!canProcessReturn && (
                   <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
                     <p>
-                      {sale.status === "cancelled" 
-                        ? "No se pueden procesar devoluciones de ventas canceladas"
-                        : !canReturn
-                          ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
-                          : "Todos los items ya han sido devueltos"
+                      {!canReturn
+                        ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
+                        : "Todos los items ya han sido devueltos"
                       }
                     </p>
                   </TooltipContent>
                 )}
               </Tooltip>
             </TooltipProvider>
+            )}
+
+            {/* Cancel Sale Button - TODO: ajustar validación de tiempo cuando se corrija zona horaria en BD */}
+            {showActionButtons && (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="w-full mt-2 cursor-not-allowed">
+                    {can("history:devolution") && <Button
+                      variant="destructive"
+                      className="w-full pointer-events-auto gap-2"
+                      onClick={() => setCancellationModalOpen(true)}
+                      disabled={!canCancel}
+                    >
+                      <Ban className="h-4 w-4" />
+                      Cancelar Venta
+                    </Button>}
+                  </div>
+                </TooltipTrigger>
+                {(!canCancel && can("history:devolution")) && (
+                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                    <p>
+                      {sale.status === "partial_return"
+                        ? "No se puede cancelar una venta con devoluciones"
+                        : "Esta venta excede el tiempo permitido para cancelación"
+                      }
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+            )}
           </>
         )}
       </div>
@@ -173,6 +211,16 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
           sale={sale}
           isOpen={returnModalOpen}
           onClose={() => setReturnModalOpen(false)}
+          mode="return"
+        />
+      )}
+
+      {sale && (
+        <ReturnModal
+          sale={sale}
+          isOpen={cancellationModalOpen}
+          onClose={() => setCancellationModalOpen(false)}
+          mode="cancellation"
         />
       )}
 
