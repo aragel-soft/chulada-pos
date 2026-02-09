@@ -400,7 +400,8 @@ fn create_return_records(
 }
 
 /// Helper to calculate and update the sale's final status
-fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
+/// If reason is "cancellation" and sale is fully returned, status will be "cancelled"
+fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<(), String> {
     let mut sale_items_map: HashMap<String, (f64, f64)> = HashMap::new(); // id -> (original, returned)
     
     {
@@ -444,9 +445,16 @@ fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
         if (*original - *returned).abs() > 0.001 { fully_returned = false; }
     }
     
-    let new_status = if fully_returned && has_returns { "fully_returned" }
-                     else if has_returns { "partial_return" }
-                     else { "completed" };
+    // If reason is "cancellation" and all items are returned, use "cancelled" status
+    let new_status = if fully_returned && has_returns && reason == "cancellation" { 
+        "cancelled" 
+    } else if fully_returned && has_returns { 
+        "fully_returned" 
+    } else if has_returns { 
+        "partial_return" 
+    } else { 
+        "completed" 
+    };
     
     tx.execute(
         "UPDATE sales SET status = ?1 WHERE id = ?2",
@@ -468,10 +476,29 @@ pub fn process_return(
     
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     
-    // Validate Sale Exists
-    let sale_exists: bool = tx.query_row("SELECT 1 FROM sales WHERE id = ?", [&payload.sale_id], |_| Ok(true))
-        .optional().map_err(|e| e.to_string())?.unwrap_or(false);
-    if !sale_exists { return Err(format!("Venta no encontrada: {}", payload.sale_id)); }
+    // Validate Sale Exists and get sale_date for cancellation check
+    let sale_date: Option<String> = tx.query_row(
+        "SELECT sale_date FROM sales WHERE id = ?", 
+        [&payload.sale_id], 
+        |row| row.get(0)
+    ).optional().map_err(|e| e.to_string())?;
+    
+    let sale_date = sale_date.ok_or(format!("Venta no encontrada: {}", payload.sale_id))?;
+    
+    // If reason is "cancellation", validate that sale is within 1 hour
+    if payload.reason == "cancellation" {
+        // Parse the sale_date and check against current time
+        let sale_datetime = chrono::NaiveDateTime::parse_from_str(&sale_date, "%Y-%m-%d %H:%M:%S")
+            .or_else(|_| chrono::DateTime::parse_from_rfc3339(&sale_date).map(|dt| dt.naive_utc()))
+            .map_err(|_| format!("Error parseando fecha de venta: {}", sale_date))?;
+        
+        let now = Utc::now().naive_utc();
+        let hours_since_sale = (now - sale_datetime).num_hours();
+        
+        if hours_since_sale >= 1 {
+            return Err("Esta venta excede el tiempo permitido para cancelación (1 hora)".to_string());
+        }
+    }
     
     // Validate Items & Available Quantities
     let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new(); // item, name, code, pid
@@ -560,8 +587,8 @@ pub fn process_return(
     let return_id = Uuid::new_v4().to_string();
     create_return_records(&tx, &payload, return_total, &validated_items, &return_id)?;
     
-    // Update Sale Status
-    update_sale_status(&tx, &payload.sale_id)?;
+    // Update Sale Status (passes reason to detect cancellation)
+    update_sale_status(&tx, &payload.sale_id, &payload.reason)?;
     
     tx.commit().map_err(|e| e.to_string())?;
     
