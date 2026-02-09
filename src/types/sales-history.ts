@@ -46,6 +46,16 @@ export interface SaleDetail extends SaleMaster {
   cancellation_reason?: string;
   cancelled_at?: string;
   items: SaleHistoryItem[];
+  returns: ReturnSummary[];
+}
+
+export interface ReturnSummary {
+  id: string;
+  folio: number;
+  return_date: string;
+  total: number;
+  reason: string;
+  notes?: string;
 }
 
 export interface SaleHistoryItem {

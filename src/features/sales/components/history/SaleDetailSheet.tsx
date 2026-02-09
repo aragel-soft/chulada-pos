@@ -28,6 +28,15 @@ import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
 
+const RETURN_REASON_LABELS: Record<string, string> = {
+  quality: "Producto dañado / Mala calidad",
+  dissatisfied: "Cliente insatisfecho",
+  mistake: "Error en venta / Producto incorrecto",
+  change: "Cambio de parecer",
+  cancellation: "Cancelación de venta",
+  other: "Otro",
+};
+
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
@@ -250,13 +259,59 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
             </table>
 
             {/* NOTAS */}
-            <div className="space-y-2">
-              {sale.notes && (
-                <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
-                  <span className="font-semibold">Nota:</span> {sale.notes}
-                </div>
-              )}
-            </div>
+            {(sale.notes || sale.returns?.length > 0) && (
+              <div className="space-y-3 mt-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Notas</h3>
+                
+                {/* Nota de la venta */}
+                {sale.notes && (
+                  <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-yellow-800">Venta</span>
+                    </div>
+                    <p className="text-yellow-700">{sale.notes}</p>
+                  </div>
+                )}
+
+                {/* Notas de devoluciones/cancelaciones */}
+                {sale.returns?.map((ret) => {
+                  const reasonLabel = RETURN_REASON_LABELS[ret.reason] || ret.reason;
+                  
+                  return (
+                    <div 
+                      key={ret.id} 
+                      className={`p-3 rounded-md border text-sm ${
+                        ret.reason === "cancellation" 
+                          ? "bg-red-50 border-red-200" 
+                          : "bg-purple-50 border-purple-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold ${
+                            ret.reason === "cancellation" ? "text-red-800" : "text-purple-800"
+                          }`}>
+                            {ret.reason === "cancellation" ? "Cancelación" : "Devolución"}
+                          </span>
+                          <span className="text-muted-foreground">•</span>
+                          <span className={ret.reason === "cancellation" ? "text-red-700" : "text-purple-700"}>
+                            {reasonLabel}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(ret.return_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </span>
+                      </div>
+                      {ret.notes && (
+                        <p className={`mt-1 ${ret.reason === "cancellation" ? "text-red-600" : "text-purple-600"}`}>
+                          {ret.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : null}
       </ScrollArea>

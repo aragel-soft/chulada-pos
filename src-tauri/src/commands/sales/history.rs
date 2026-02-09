@@ -61,6 +61,7 @@ pub struct SaleDetailView {
   pub cancellation_reason: Option<String>,
   pub cancelled_at: Option<String>,
   pub items: Vec<SaleItemView>,
+  pub returns: Vec<ReturnSummary>,
 }
 
 #[derive(Serialize)]
@@ -79,6 +80,16 @@ pub struct SaleItemView {
   // Return tracking
   pub quantity_returned: f64,
   pub quantity_available: f64,
+}
+
+#[derive(Serialize)]
+pub struct ReturnSummary {
+  pub id: String,
+  pub folio: i64,
+  pub return_date: String,
+  pub total: f64,
+  pub reason: String,
+  pub notes: Option<String>,
 }
 
 #[tauri::command]
@@ -286,6 +297,7 @@ pub fn get_sale_details(
         user_name: row.get(12).unwrap_or("Desconocido".to_string()),
         user_avatar: resolved_avatar,
         items: Vec::new(),
+        returns: Vec::new(),
       })
     })
     .map_err(|e| format!("Venta no encontrada: {}", e))?;
@@ -363,6 +375,32 @@ pub fn get_sale_details(
 
   for item in items_iter {
     sale.items.push(item.map_err(|e| e.to_string())?);
+  }
+
+  // Query returns for this sale
+  let returns_sql = "
+    SELECT id, folio, return_date, total, reason, notes
+    FROM returns
+    WHERE sale_id = ?
+    ORDER BY return_date ASC
+  ";
+
+  let mut stmt_returns = conn.prepare(returns_sql).map_err(|e| e.to_string())?;
+  let returns_iter = stmt_returns
+    .query_map([&sale_id], |row| {
+      Ok(ReturnSummary {
+        id: row.get(0)?,
+        folio: row.get(1)?,
+        return_date: row.get(2)?,
+        total: row.get(3)?,
+        reason: row.get(4)?,
+        notes: row.get(5)?,
+      })
+    })
+    .map_err(|e| e.to_string())?;
+
+  for ret in returns_iter {
+    sale.returns.push(ret.map_err(|e| e.to_string())?);
   }
 
   Ok(sale)
