@@ -3,3 +3,4 @@ pub mod products;
 pub mod tags;
 pub mod kits;
 pub mod promotions;
+pub mod movements;
