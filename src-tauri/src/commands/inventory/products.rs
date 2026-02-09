@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 use std::collections::HashSet;
+use crate::database::DynamicQuery;
 
 #[derive(Serialize)]
 pub struct ProductView {
@@ -136,29 +137,6 @@ pub struct ProductFilters {
   pub tag_ids: Option<Vec<String>>,
   pub stock_status: Option<Vec<String>>, // 'out', 'low', 'ok'
   pub active_status: Option<Vec<String>>, // 'active', 'inactive'
-}
-
-
-struct DynamicQuery {
-  sql_parts: Vec<String>,
-  params: Vec<Box<dyn ToSql>>,
-}
-
-impl DynamicQuery {
-  fn new() -> Self {
-    Self {
-      sql_parts: Vec::new(),
-      params: Vec::new(),
-    }
-  }
-
-  fn add_condition(&mut self, sql: &str) {
-    self.sql_parts.push(sql.to_string());
-  }
-
-  fn add_param<T: ToSql + 'static>(&mut self, param: T) {
-    self.params.push(Box::new(param));
-  }
 }
 
 fn get_current_store_id(conn: &Connection) -> Result<String, String> {

@@ -211,11 +211,10 @@ export function FiltersPanel({
               <CommandList>
                 <CommandEmpty>No encontrado.</CommandEmpty>
                 <CommandGroup>
-                  {/* Opción para limpiar filtro */}
                   <CommandItem
                     value="all_users_reset"
                     onSelect={() => {
-                      actions.setUserId(null); // Asegúrate que tu action soporte esto
+                      actions.setUserId(null);
                       setOpenUserSelect(false);
                     }}
                   >
@@ -232,9 +231,8 @@ export function FiltersPanel({
                   {users.map((user: any) => (
                     <CommandItem
                       key={user.id}
-                      value={user.full_name || user.username} // Esto se usa para el filtrado interno del command
+                      value={user.full_name || user.username}
                       onSelect={() => {
-                        // Si ya estaba seleccionado, lo quitamos (toggle), si no, lo ponemos
                         actions.setUserId(
                           user.id === filters.user_id ? null : user.id,
                         );
