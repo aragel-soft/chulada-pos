@@ -129,3 +129,13 @@ impl DynamicQuery {
         self.params.push(Box::new(param));
     }
 }
+
+pub fn get_current_store_id(conn: &Connection) -> Result<String, String> {
+  let mut stmt = conn
+    .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+    .map_err(|e| e.to_string())?;
+  let store_id: String = stmt
+    .query_row([], |row| row.get(0))
+    .unwrap_or_else(|_| "store-main".to_string());
+  Ok(store_id)
+}
