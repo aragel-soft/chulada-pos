@@ -119,7 +119,6 @@ export function CreateInventoryMovementDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
       const message = typeof error === 'string' 
         ? error 
         : (error instanceof Error ? error.message : "Error al registrar movimiento");
