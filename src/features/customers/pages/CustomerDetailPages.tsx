@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft, User, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, AlertCircle, Wallet } from "lucide-react";
 import { format, subYears, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,14 @@ import { getCustomers } from "@/lib/api/customers";
 import { formatCurrency, cn } from "@/lib/utils";
 import { AccountMovement } from "@/types/account";
 import SalesHistoryModule from "@/features/sales/components/SalesHistoryModule";
+import { DebtPaymentModal } from "../components/DebtPaymentModal";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false); 
 
   const initialCustomer = location.state?.customer;
 
@@ -123,6 +126,11 @@ export default function CustomerDetailPage() {
     [],
   );
 
+  const handlePaymentSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["account-statement", id] });
+    queryClient.invalidateQueries({ queryKey: ["customer", id] });
+  };
+
   if (!customer && isLoadingCustomer) {
     return <CustomerDetailSkeleton />;
   }
@@ -140,7 +148,7 @@ export default function CustomerDetailPage() {
   }
 
   const currentBalance = statement?.current_balance ?? customer.current_balance;
-  const isDebt = currentBalance > 0;
+  const isDebt = currentBalance > 0.01;
   const balanceColorClass = isDebt ? "text-destructive" : "text-emerald-600";
 
   return (
@@ -180,12 +188,26 @@ export default function CustomerDetailPage() {
             </div>
           </div>
 
-          <div className="text-right">
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
-              Saldo Actual
-            </p>
-            <div className={`text-3xl font-bold ${balanceColorClass}`}>
-              {formatCurrency(currentBalance)}
+          <div className="flex items-end gap-4">
+            {/* Payment Button */}
+            {isDebt && (
+              <Button
+                size="lg"
+                onClick={() => setIsPaymentModalOpen(true)}
+                className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
+              >
+                <Wallet className="w-5 h-5 mr-2" />
+                Abonar a Deuda
+              </Button>
+            )}
+
+            <div className="text-right min-w-[120px]">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                Saldo Actual
+              </p>
+              <div className={`text-3xl font-bold ${balanceColorClass}`}>
+                {formatCurrency(currentBalance)}
+              </div>
             </div>
           </div>
         </div>
@@ -239,6 +261,15 @@ export default function CustomerDetailPage() {
           />
         </TabsContent>
       </Tabs>
+
+      {customer && (
+        <DebtPaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          customer={{ ...customer, current_balance: currentBalance }}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }
