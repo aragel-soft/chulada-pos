@@ -5,25 +5,34 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowLeft, User, AlertCircle, Wallet } from "lucide-react";
 import { format, subYears, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyablePhone } from "@/components/ui/copyable-phone";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { getCustomerAccountStatement } from "@/lib/api/account";
+import {
+  getCustomerAccountStatement,
+  registerDebtPayment,
+} from "@/lib/api/account";
 import { getCustomers } from "@/lib/api/customers";
 import { formatCurrency, cn } from "@/lib/utils";
 import { AccountMovement } from "@/types/account";
 import SalesHistoryModule from "@/features/sales/components/SalesHistoryModule";
-import { DebtPaymentModal } from "../components/DebtPaymentModal";
+import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
+import { useAuthStore } from "@/stores/authStore";
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false); 
+  const user = useAuthStore((state) => state.user);
+  const shift = useCashRegisterStore((state) => state.shift);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const initialCustomer = location.state?.customer;
 
@@ -126,9 +135,55 @@ export default function CustomerDetailPage() {
     [],
   );
 
-  const handlePaymentSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["account-statement", id] });
-    queryClient.invalidateQueries({ queryKey: ["customer", id] });
+  const handleProcessPayment = async (
+    method: string,
+    cashAmount: number,
+    cardAmount: number,
+    shouldPrint: boolean,
+    _customerId?: string,
+    notes?: string,
+  ) => {
+    if (!customer) return;
+
+    if (!shift || shift.status !== "open") {
+      toast.error("Caja cerrada. Debes abrir un turno para recibir pagos.");
+      return;
+    }
+    if (!user) {
+      toast.error("Sesión inválida. Recarga la página.");
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const apiMethod = method === "card_transfer" ? "card" : method;
+
+      await registerDebtPayment({
+        customer_id: customer.id,
+        user_id: user.id,
+        shift_id: shift.id.toString(),
+        total_amount: cashAmount + cardAmount,
+        payment_method: apiMethod as any,
+        cash_amount: cashAmount,
+        card_amount: cardAmount,
+        notes: notes || null,
+      });
+
+      toast.success("Abono registrado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["account-statement", id] });
+      queryClient.invalidateQueries({ queryKey: ["customer", id] });
+      setIsPaymentModalOpen(false);
+
+      if (shouldPrint) {
+        toast.info("Imprimiendo recibo...");
+        // TODO: Call printer service here
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al registrar el abono");
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   if (!customer && isLoadingCustomer) {
@@ -263,11 +318,14 @@ export default function CustomerDetailPage() {
       </Tabs>
 
       {customer && (
-        <DebtPaymentModal
+        <CheckoutModal
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
-          customer={{ ...customer, current_balance: currentBalance }}
-          onPaymentSuccess={handlePaymentSuccess}
+          total={currentBalance}
+          variant="debt"
+          defaultCustomerId={customer.id}
+          onProcessSale={handleProcessPayment}
+          isProcessing={isProcessingPayment}
         />
       )}
     </div>
