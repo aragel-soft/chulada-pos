@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, User, X } from "lucide-react";
+import { Loader2, User, X, Ban } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +28,15 @@ import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
 
+const RETURN_REASON_LABELS: Record<string, string> = {
+  quality: "Producto dañado / Mala calidad",
+  dissatisfied: "Cliente insatisfecho",
+  mistake: "Error en venta / Producto incorrecto",
+  change: "Cambio de parecer",
+  cancellation: "Cancelación de venta",
+  other: "Otro",
+};
+
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
@@ -38,11 +47,18 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
   const { data: sale, isLoading } = useSaleDetail(saleId);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [cancellationModalOpen, setCancellationModalOpen] = useState(false);
 
   const daysSinceSale = sale
     ? differenceInDays(new Date(), new Date(sale.sale_date))
     : 999;
   const canReturn = daysSinceSale <= 30;
+  
+  // TODO: La validación de tiempo será ajustada cuando se corrija el problema de zona horaria en la base de datos.
+  const canCancel = daysSinceSale < 2 && sale?.status !== "cancelled" && sale?.status !== "fully_returned" && sale?.status !== "partial_return";
+  
+  // Hide buttons completely if sale is cancelled or fully returned
+  const showActionButtons = sale?.status !== "cancelled" && sale?.status !== "fully_returned";
   
   const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
   const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
@@ -136,6 +152,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </div>
             </div>
 
+            {showActionButtons && (
             <TooltipProvider>
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
@@ -153,17 +170,47 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                 {!canProcessReturn && (
                   <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
                     <p>
-                      {sale.status === "cancelled" 
-                        ? "No se pueden procesar devoluciones de ventas canceladas"
-                        : !canReturn
-                          ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
-                          : "Todos los items ya han sido devueltos"
+                      {!canReturn
+                        ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
+                        : "Todos los items ya han sido devueltos"
                       }
                     </p>
                   </TooltipContent>
                 )}
               </Tooltip>
             </TooltipProvider>
+            )}
+
+            {/* Cancel Sale Button - TODO: ajustar validación de tiempo cuando se corrija zona horaria en BD */}
+            {showActionButtons && (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="w-full mt-2 cursor-not-allowed">
+                    {can("history:devolution") && <Button
+                      variant="destructive"
+                      className="w-full pointer-events-auto gap-2"
+                      onClick={() => setCancellationModalOpen(true)}
+                      disabled={!canCancel}
+                    >
+                      <Ban className="h-4 w-4" />
+                      Cancelar Venta
+                    </Button>}
+                  </div>
+                </TooltipTrigger>
+                {(!canCancel && can("history:devolution")) && (
+                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                    <p>
+                      {sale.status === "partial_return"
+                        ? "No se puede cancelar una venta con devoluciones"
+                        : "Esta venta excede el tiempo permitido para cancelación"
+                      }
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+            )}
           </>
         )}
       </div>
@@ -173,6 +220,16 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
           sale={sale}
           isOpen={returnModalOpen}
           onClose={() => setReturnModalOpen(false)}
+          mode="return"
+        />
+      )}
+
+      {sale && (
+        <ReturnModal
+          sale={sale}
+          isOpen={cancellationModalOpen}
+          onClose={() => setCancellationModalOpen(false)}
+          mode="cancellation"
         />
       )}
 
@@ -202,13 +259,59 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
             </table>
 
             {/* NOTAS */}
-            <div className="space-y-2">
-              {sale.notes && (
-                <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
-                  <span className="font-semibold">Nota:</span> {sale.notes}
-                </div>
-              )}
-            </div>
+            {(sale.notes || sale.returns?.length > 0) && (
+              <div className="space-y-3 mt-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Notas</h3>
+                
+                {/* Nota de la venta */}
+                {sale.notes && (
+                  <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-yellow-800">Venta</span>
+                    </div>
+                    <p className="text-yellow-700">{sale.notes}</p>
+                  </div>
+                )}
+
+                {/* Notas de devoluciones/cancelaciones */}
+                {sale.returns?.map((ret) => {
+                  const reasonLabel = RETURN_REASON_LABELS[ret.reason] || ret.reason;
+                  
+                  return (
+                    <div 
+                      key={ret.id} 
+                      className={`p-3 rounded-md border text-sm ${
+                        ret.reason === "cancellation" 
+                          ? "bg-red-50 border-red-200" 
+                          : "bg-purple-50 border-purple-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold ${
+                            ret.reason === "cancellation" ? "text-red-800" : "text-purple-800"
+                          }`}>
+                            {ret.reason === "cancellation" ? "Cancelación" : "Devolución"}
+                          </span>
+                          <span className="text-muted-foreground">•</span>
+                          <span className={ret.reason === "cancellation" ? "text-red-700" : "text-purple-700"}>
+                            {reasonLabel}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(ret.return_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </span>
+                      </div>
+                      {ret.notes && (
+                        <p className={`mt-1 ${ret.reason === "cancellation" ? "text-red-600" : "text-purple-600"}`}>
+                          {ret.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : null}
       </ScrollArea>

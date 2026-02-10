@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,6 +30,7 @@ import {
 import { returnValidationSchema } from "./returnSchema";
 import { BADGE_CONFIGS, BUTTON_STYLES } from "@/features/sales/constants/sales-design";
 import { cn } from "@/lib/utils";
+import type { ReturnModalMode } from "./ReturnModal";
 
 interface ReturnStepTwoProps {
   sale: SaleDetail;
@@ -38,6 +39,7 @@ interface ReturnStepTwoProps {
   onConfirm: (reason: string, notes: string) => Promise<string>;
   onCancel: () => void;
   isProcessing: boolean;
+  mode?: ReturnModalMode;
 }
 
 export function ReturnStepTwo({
@@ -47,13 +49,22 @@ export function ReturnStepTwo({
   onConfirm,
   onCancel,
   isProcessing,
+  mode = "return",
 }: ReturnStepTwoProps) {
-  const [reason, setReason] = useState<string>("");
+  const isCancellation = mode === "cancellation";
+  const [reason, setReason] = useState<string>(isCancellation ? "cancellation" : "");
   const [notes, setNotes] = useState<string>("");
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+
+  // Set reason to "cancellation" when mode changes
+  useEffect(() => {
+    if (isCancellation) {
+      setReason("cancellation");
+    }
+  }, [isCancellation]);
 
   const selectedItems = returnItems.filter(
     (item) => item.isSelected && item.returnQuantity > 0
@@ -234,13 +245,20 @@ export function ReturnStepTwo({
         {/* Right Column: Reason & Action */}
         <div className="flex-[2] flex flex-col gap-6">
           <div className="p-6 border rounded-lg bg-white shadow-sm h-full">
-            <h3 className="font-semibold mb-4 text-lg">Detalles de Devolución</h3>
+            <h3 className="font-semibold mb-4 text-lg">
+              {isCancellation ? "Detalles de Cancelación" : "Detalles de Devolución"}
+            </h3>
             
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reason">
-                  Motivo de la devolución <span className="text-red-500">*</span>
+                  {isCancellation ? "Motivo de cancelación" : "Motivo de la devolución"} <span className="text-red-500">*</span>
                 </Label>
+                {isCancellation ? (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800 font-medium">
+                    Cancelación de venta
+                  </div>
+                ) : (
                 <Select value={reason} onValueChange={setReason}>
                   <SelectTrigger id="reason" className={fieldErrors?.reason ? "border-red-500" : ""}>
                     <SelectValue placeholder="Selecciona un motivo" />
@@ -253,6 +271,7 @@ export function ReturnStepTwo({
                     <SelectItem value="other">Otro</SelectItem>
                   </SelectContent>
                 </Select>
+                )}
                 {fieldErrors?.reason && (
                   <p className="text-sm font-medium text-destructive">
                     {fieldErrors.reason[0]}
@@ -285,27 +304,38 @@ export function ReturnStepTwo({
       </div>
 
       <div className="border-t bg-white p-6 flex justify-between items-center">
-        <Button 
-          variant="outline" 
-          onClick={onBack} 
-          disabled={isProcessing}
-          className="h-11 px-6 border-slate-200 hover:bg-slate-50 font-semibold text-slate-600 gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Atrás
-        </Button>
+        {isCancellation ? (
+          <Button 
+            variant="outline" 
+            onClick={onCancel} 
+            disabled={isProcessing}
+            className="h-11 px-6 border-slate-200 hover:bg-slate-50 font-semibold text-slate-600 gap-2"
+          >
+            Cancelar
+          </Button>
+        ) : (
+          <Button 
+            variant="outline" 
+            onClick={onBack} 
+            disabled={isProcessing}
+            className="h-11 px-6 border-slate-200 hover:bg-slate-50 font-semibold text-slate-600 gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Atrás
+          </Button>
+        )}
 
         <Button 
           variant="destructive"
           onClick={handleConfirm} 
           disabled={isProcessing}
-          className={cn(BUTTON_STYLES.destructive, "bg-purple-900 hover:bg-purple-950")}
+          className={cn(BUTTON_STYLES.destructive, isCancellation ? "bg-red-700 hover:bg-red-800" : "bg-purple-900 hover:bg-purple-950")}
         >
           {isProcessing ? (
             "Procesando..."
           ) : (
             <>
-              Confirmar Devolución
+              {isCancellation ? "Confirmar Cancelación" : "Confirmar Devolución"}
               <Check className="h-4 w-4" />
             </>
           )}
