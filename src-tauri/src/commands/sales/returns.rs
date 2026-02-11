@@ -468,6 +468,7 @@ fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<()
 
 #[tauri::command]
 pub fn process_return(
+    app_handle: tauri::AppHandle,
     db: State<Mutex<Connection>>,
     payload: ProcessReturnRequest,
 ) -> Result<ReturnResponse, String> {
@@ -589,6 +590,17 @@ pub fn process_return(
     update_sale_status(&tx, &payload.sale_id, &payload.reason)?;
     
     tx.commit().map_err(|e| e.to_string())?;
+
+    // Auto-Print Voucher if generated
+    if !voucher_code.is_empty() {
+        let app_handle_clone = app_handle.clone();
+        let sale_id_clone = payload.sale_id.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(e) = crate::printer_utils::print_voucher_from_db(app_handle_clone, sale_id_clone) {
+                eprintln!("Error auto-printing voucher: {}", e);
+            }
+        });
+    }
     
     Ok(ReturnResponse {
         return_id,
