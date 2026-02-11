@@ -32,5 +32,6 @@ directories = "6.0.0"
 printers = "2.2.1"
 image = "0.25.9"
 
+
 [dev-dependencies]
 tauri-driver = "0.1"

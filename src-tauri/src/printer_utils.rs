@@ -82,6 +82,126 @@ pub fn image_bytes_to_escpos(bytes: &[u8], max_width: u32) -> Result<Vec<u8>, St
     convert_image_to_escpos(img, max_width)
 }
 
+/// Generates a CODE128 barcode as a raster image for ESC/POS printers.
+/// Pure Rust implementation — no external barcode crate needed.
+pub fn generate_barcode_escpos(data: &str, max_width: u32) -> Result<Vec<u8>, String> {
+    use image::{GrayImage, Luma};
+
+    let encoded = encode_code128b(data)?;
+
+    // Render barcode as image
+    let bar_width: u32 = 2;
+    let bar_height: u32 = 80;
+    let padding: u32 = 20;
+    let img_width = (encoded.len() as u32 * bar_width) + (padding * 2);
+    let img_height = bar_height;
+
+    let mut img = GrayImage::from_pixel(img_width, img_height, Luma([255u8]));
+
+    for (i, &bar) in encoded.iter().enumerate() {
+        if bar == 1 {
+            let x_start = padding + (i as u32 * bar_width);
+            for dx in 0..bar_width {
+                for y in 0..bar_height {
+                    img.put_pixel(x_start + dx, y, Luma([0u8]));
+                }
+            }
+        }
+    }
+
+    let dynamic_img = DynamicImage::ImageLuma8(img);
+    convert_image_to_escpos(dynamic_img, max_width)
+}
+
+/// CODE128 Code Set B encoder — supports ASCII 32-127 (letters, digits, symbols)
+fn encode_code128b(data: &str) -> Result<Vec<u8>, String> {
+    // CODE128 bar patterns: each symbol = 6 bars (3 black + 3 white) = 11 modules
+    const PATTERNS: &[[u8; 6]; 107] = &[
+        [2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2], // 0-4
+        [1,3,1,2,2,2],[1,2,2,2,1,3],[1,2,2,3,1,2],[1,3,2,2,1,2],[2,2,1,2,1,3], // 5-9
+        [2,2,1,3,1,2],[2,3,1,2,1,2],[1,1,2,2,3,2],[1,2,2,1,3,2],[1,2,2,2,3,1], // 10-14
+        [1,1,3,2,2,2],[1,2,3,1,2,2],[1,2,3,2,2,1],[2,2,3,2,1,1],[2,2,1,1,3,2], // 15-19
+        [2,2,1,2,3,1],[2,1,3,2,1,2],[2,2,3,1,1,2],[3,1,2,1,3,1],[3,1,1,2,2,2], // 20-24
+        [3,2,1,1,2,2],[3,2,1,2,2,1],[3,1,2,2,1,2],[3,2,2,1,1,2],[3,2,2,2,1,1], // 25-29
+        [2,1,2,1,2,3],[2,1,2,3,2,1],[2,3,2,1,2,1],[1,1,1,3,2,3],[1,3,1,1,2,3], // 30-34
+        [1,3,1,3,2,1],[1,1,2,3,1,3],[1,3,2,1,1,3],[1,3,2,3,1,1],[2,1,1,3,1,3], // 35-39
+        [2,3,1,1,1,3],[2,3,1,3,1,1],[1,1,2,1,3,3],[1,1,2,3,3,1],[1,3,2,1,3,1], // 40-44
+        [1,1,3,1,2,3],[1,1,3,3,2,1],[1,3,3,1,2,1],[3,1,3,1,2,1],[2,1,1,3,3,1], // 45-49
+        [2,3,1,1,3,1],[2,1,3,1,1,3],[2,1,3,3,1,1],[2,1,3,1,3,1],[3,1,1,1,2,3], // 50-54
+        [3,1,1,3,2,1],[3,3,1,1,2,1],[3,1,2,1,1,3],[3,1,2,3,1,1],[3,3,2,1,1,1], // 55-59
+        [3,1,4,1,1,1],[2,2,1,4,1,1],[4,3,1,1,1,1],[1,1,1,2,2,4],[1,1,1,4,2,2], // 60-64
+        [1,2,1,1,2,4],[1,2,1,4,2,1],[1,4,1,1,2,2],[1,4,1,2,2,1],[1,1,2,2,1,4], // 65-69
+        [1,1,2,4,1,2],[1,2,2,1,1,4],[1,2,2,4,1,1],[1,4,2,1,1,2],[1,4,2,2,1,1], // 70-74
+        [2,4,1,2,1,1],[2,2,1,1,1,4],[4,1,3,1,1,1],[2,4,1,1,1,2],[1,3,4,1,1,1], // 75-79
+        [1,1,1,2,4,2],[1,2,1,1,4,2],[1,2,1,2,4,1],[1,1,4,2,1,2],[1,2,4,1,1,2], // 80-84
+        [1,2,4,2,1,1],[4,1,1,2,1,2],[4,2,1,1,1,2],[4,2,1,2,1,1],[2,1,2,1,4,1], // 85-89
+        [2,1,4,1,2,1],[4,1,2,1,2,1],[1,1,1,1,4,3],[1,1,1,3,4,1],[1,3,1,1,4,1], // 90-94
+        [1,1,4,1,1,3],[1,1,4,3,1,1],[4,1,1,1,1,3],[4,1,1,3,1,1],[1,1,3,1,4,1], // 95-99
+        [1,1,4,1,3,1],[3,1,1,1,4,1],[4,1,1,1,3,1],[2,1,1,4,1,2],[2,1,1,2,1,4], // 100-104
+        [2,1,1,2,3,2],[2,3,3,1,1,1],                                             // 105-106
+    ];
+    const STOP: [u8; 7] = [2,3,3,1,1,1,2]; // Stop pattern (13 modules)
+
+    let start_code = 104u32; // Start Code B
+    let mut values: Vec<u32> = Vec::new();
+
+    for ch in data.chars() {
+        let ascii = ch as u32;
+        if ascii < 32 || ascii > 127 {
+            return Err(format!("Carácter no soportado en CODE128B: '{}'", ch));
+        }
+        values.push(ascii - 32);
+    }
+
+    // Calculate checksum
+    let mut checksum = start_code;
+    for (i, &val) in values.iter().enumerate() {
+        checksum += val * (i as u32 + 1);
+    }
+    checksum %= 103;
+
+    // Build bar pattern
+    let mut bars: Vec<u8> = Vec::new();
+    
+    // Quiet zone
+    for _ in 0..10 { bars.push(0); }
+
+    // Start pattern
+    let pattern_to_bars = |pattern: &[u8], bars: &mut Vec<u8>| {
+        let mut is_bar = true; // starts with a bar (black)
+        for &width in pattern {
+            for _ in 0..width {
+                bars.push(if is_bar { 1 } else { 0 });
+            }
+            is_bar = !is_bar;
+        }
+    };
+
+    pattern_to_bars(&PATTERNS[start_code as usize], &mut bars);
+
+    // Data patterns
+    for &val in &values {
+        pattern_to_bars(&PATTERNS[val as usize], &mut bars);
+    }
+
+    // Checksum pattern
+    pattern_to_bars(&PATTERNS[checksum as usize], &mut bars);
+
+    // Stop pattern
+    let mut is_bar = true;
+    for &width in STOP.iter() {
+        for _ in 0..width {
+            bars.push(if is_bar { 1 } else { 0 });
+        }
+        is_bar = !is_bar;
+    }
+
+    // Quiet zone
+    for _ in 0..10 { bars.push(0); }
+
+    Ok(bars)
+}
+
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use printers::common::base::job::PrinterJobOptions;
@@ -213,6 +333,213 @@ pub fn print_sale_from_db(
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
+}
+
+pub fn print_voucher_from_db(
+    app_handle: tauri::AppHandle,
+    sale_id: String,
+) -> Result<(), String> {
+    use crate::commands::settings::business::fetch_business_settings;
+    use crate::commands::settings::hardware::load_settings;
+    use rusqlite::{Connection, OptionalExtension};
+
+    let db_state: State<Mutex<Connection>> = app_handle.state();
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    // Fetch voucher data
+    let voucher_data: Option<(String, f64, f64, bool, String, Option<String>)> = conn.query_row(
+        "SELECT sv.code, sv.initial_balance, sv.current_balance, sv.is_active, sv.created_at, sv.expires_at
+         FROM store_vouchers sv
+         WHERE sv.sale_id = ?1
+         ORDER BY sv.created_at DESC
+         LIMIT 1",
+        [&sale_id],
+        |row| Ok((
+            row.get::<_, String>(0)?,    // code
+            row.get::<_, f64>(1)?,       // initial_balance
+            row.get::<_, f64>(2)?,       // current_balance
+            row.get::<_, bool>(3)?,      // is_active
+            row.get::<_, String>(4)?,    // created_at
+            row.get::<_, Option<String>>(5)?, // expires_at
+        ))
+    ).optional().map_err(|e| format!("Error consultando vale: {}", e))?;
+
+    let (code, _initial_balance, current_balance, is_active, created_at, expires_at) = 
+        voucher_data.ok_or("No se encontró vale para esta venta".to_string())?;
+
+    if !is_active {
+        return Err("El vale ya no está activo".to_string());
+    }
+
+    // Fetch sale folio
+    let sale_folio: String = conn.query_row(
+        "SELECT folio FROM sales WHERE id = ?1",
+        [&sale_id],
+        |row| row.get(0)
+    ).map_err(|e| format!("Venta no encontrada: {}", e))?;
+
+    // Fetch business settings
+    let settings = fetch_business_settings(&conn)
+        .unwrap_or_else(|_| crate::commands::settings::business::BusinessSettings {
+            store_name: "".to_string(),
+            logical_store_name: "store-main".to_string(),
+            store_address: "".to_string(),
+            ticket_header: "".to_string(),
+            ticket_footer: "".to_string(),
+            ticket_footer_lines: "".to_string(),
+            default_cash_fund: 0.0,
+            max_cash_limit: 0.0,
+            currency_symbol: "$".to_string(),
+            tax_rate: 0.0,
+            apply_tax: false,
+            logo_path: "".to_string(),
+        });
+
+    drop(conn); // Unlock DB before printing
+
+    let hardware_config = load_settings(app_handle.clone())
+        .unwrap_or_else(|_| Default::default());
+
+    let printers_list = printers::get_printers();
+    let printer = printers_list
+        .iter()
+        .find(|p| p.name == hardware_config.printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+
+    let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
+    let (max_width, max_chars) = if width_val == 58 { (384, 32) } else { (512, 48) };
+
+    let mut job_content = Vec::new();
+
+    // Init
+    job_content.extend_from_slice(b"\x1B\x40"); // Initialize
+    job_content.extend_from_slice(b"\x1B\x74\x00"); // Code table PC437
+
+    // LOGO
+    let mut logo_cmds: Option<Vec<u8>> = None;
+    if !settings.logo_path.is_empty() {
+        let logo_path_str = if settings.logo_path.contains("images/settings") {
+            if let Ok(app_dir) = app_handle.path().app_data_dir() {
+                app_dir.join(&settings.logo_path).to_string_lossy().to_string()
+            } else {
+                settings.logo_path.clone()
+            }
+        } else {
+            settings.logo_path.clone()
+        };
+
+        if Path::new(&logo_path_str).exists() {
+            let suffix = if max_width <= 384 { "_58.bin" } else { "_80.bin" };
+            let path_obj = Path::new(&logo_path_str);
+            if let Some(stem) = path_obj.file_stem() {
+                let parent = path_obj.parent().unwrap_or(Path::new(""));
+                let bin_path = parent.join(format!("{}{}", stem.to_string_lossy(), suffix));
+                if bin_path.exists() {
+                    if let Ok(bin_data) = std::fs::read(&bin_path) {
+                        logo_cmds = Some(bin_data);
+                    }
+                }
+            }
+            if logo_cmds.is_none() {
+                match image_to_escpos(&logo_path_str, max_width) {
+                    Ok(cmds) => logo_cmds = Some(cmds),
+                    Err(e) => println!("Warning: Failed to process logo: {}", e),
+                }
+            }
+        }
+    }
+
+    if let Some(cmds) = logo_cmds {
+        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+        job_content.extend_from_slice(&cmds);
+        job_content.extend_from_slice(b"\n");
+    }
+
+    // STORE INFO
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    if !settings.store_name.is_empty() {
+        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
+        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    }
+    if !settings.store_address.is_empty() {
+        job_content.extend_from_slice(format!("{}\n", settings.store_address).as_bytes());
+    }
+    job_content.extend_from_slice(b"\n");
+
+    // SEPARATOR
+    let separator = "=".repeat(max_chars as usize);
+    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+
+    // VOUCHER TITLE
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+    job_content.extend_from_slice(b"\x1D\x21\x11"); // Double height+width
+    job_content.extend_from_slice(b"VALE DE TIENDA\n");
+    job_content.extend_from_slice(b"\x1D\x21\x00"); // Normal size
+    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(b"\n");
+
+    // VOUCHER CODE
+    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+    job_content.extend_from_slice(format!("Codigo: {}\n", remove_accents(&code)).as_bytes());
+    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+
+    // BARCODE as raster image (works on all ESC/POS printers)
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    if let Ok(barcode_cmds) = generate_barcode_escpos(&code, max_width) {
+        job_content.extend_from_slice(&barcode_cmds);
+        job_content.extend_from_slice(b"\n");
+    }
+
+    // SEPARATOR
+    let dash_separator = "-".repeat(max_chars as usize);
+    job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
+
+    // BALANCE
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+    job_content.extend_from_slice(b"\x1D\x21\x01"); // Double height
+    job_content.extend_from_slice(format!("SALDO: ${:.2}\n", current_balance).as_bytes());
+    job_content.extend_from_slice(b"\x1D\x21\x00"); // Normal size
+    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(b"\n");
+
+    job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
+
+    // DETAILS
+    job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
+    job_content.extend_from_slice(format!("Venta original: {}\n", remove_accents(&sale_folio)).as_bytes());
+    job_content.extend_from_slice(format!("Fecha emision: {}\n", remove_accents(&created_at)).as_bytes());
+    if let Some(ref exp) = expires_at {
+        job_content.extend_from_slice(format!("Vigencia: {}\n", remove_accents(exp)).as_bytes());
+    } else {
+        job_content.extend_from_slice(b"Vigencia: Sin fecha de expiracion\n");
+    }
+    job_content.extend_from_slice(b"\n");
+
+    // NOTICE
+    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    job_content.extend_from_slice(b"Este vale es valido para compras\n");
+    job_content.extend_from_slice(b"en tienda. No es canjeable\n");
+    job_content.extend_from_slice(b"por efectivo.\n");
+
+    // FOOTER
+    if !settings.ticket_footer.is_empty() {
+        job_content.extend_from_slice(b"\n");
+        job_content.extend_from_slice(settings.ticket_footer.as_bytes());
+        job_content.extend_from_slice(b"\n");
+    }
+
+    // Cut
+    job_content.extend_from_slice(b"\n\n\n\x1D\x56\x42\x00");
+
+    // Send
+    printer
+        .print(&job_content, PrinterJobOptions::none())
+        .map_err(|e| format!("Error imprimiendo vale: {:?}", e))?;
+
+    Ok(())
 }
 
 pub fn print_ticket(

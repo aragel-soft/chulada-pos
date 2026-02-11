@@ -137,3 +137,16 @@ pub async fn print_sale_ticket(
     .map_err(|e| format!("Error en hilo de impresión: {}", e))?
     .map(|_| "Ticket enviado a imprimir".to_string())
 }
+
+#[command]
+pub async fn print_return_voucher(
+    app_handle: AppHandle,
+    sale_id: String,
+    _db: tauri::State<'_, std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::printer_utils::print_voucher_from_db(app_handle, sale_id)
+    }).await
+    .map_err(|e| format!("Error en hilo de impresión: {}", e))?
+    .map(|_| "Vale enviado a imprimir".to_string())
+}
