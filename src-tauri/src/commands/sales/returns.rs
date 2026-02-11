@@ -30,11 +30,8 @@ pub struct ReturnResponse {
     pub total: f64,
 }
 
-fn generate_voucher_code() -> String {
-    let now = Utc::now();
-    let timestamp = now.format("%Y%m%d").to_string();
-    let time_suffix = now.format("%H%M%S").to_string();
-    format!("VT-{}-{}", timestamp, time_suffix)
+fn generate_voucher_code(sale_folio: &str) -> String {
+    format!("V{}", sale_folio)
 }
 
 fn get_store_id(tx: &Connection) -> Result<String, String> {
@@ -317,8 +314,15 @@ fn manage_store_voucher(
         
         Ok(existing_code)
     } else {
+        // Fetch sale folio for the voucher code
+        let sale_folio: String = tx.query_row(
+            "SELECT folio FROM sales WHERE id = ?1",
+            [sale_id],
+            |row| row.get(0)
+        ).map_err(|e| format!("Error obteniendo folio: {}", e))?;
+
         let new_voucher_id = Uuid::new_v4().to_string();
-        let new_voucher_code = generate_voucher_code();
+        let new_voucher_code = generate_voucher_code(&sale_folio);
         
         tx.execute(
             "INSERT INTO store_vouchers (id, sale_id, code, initial_balance, current_balance, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",

@@ -90,7 +90,7 @@ pub fn generate_barcode_escpos(data: &str, max_width: u32) -> Result<Vec<u8>, St
     let encoded = encode_code128b(data)?;
 
     // Render barcode as image
-    let bar_width: u32 = 2;
+    let bar_width: u32 = 3;
     let bar_height: u32 = 80;
     let padding: u32 = 20;
     let img_width = (encoded.len() as u32 * bar_width) + (padding * 2);
@@ -526,10 +526,10 @@ pub fn print_voucher_from_db(
 
     // VOUCHER CODE
     job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
-    job_content.extend_from_slice(format!("Codigo: {}\n", remove_accents(&code)).as_bytes());
+    job_content.extend_from_slice(format!("Codigo: {}\n", code).as_bytes());
     job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
 
-    // BARCODE as raster image (works on all ESC/POS printers)
+    // BARCODE as raster image
     job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
     if let Ok(barcode_cmds) = generate_barcode_escpos(&code, max_width) {
         job_content.extend_from_slice(&barcode_cmds);
