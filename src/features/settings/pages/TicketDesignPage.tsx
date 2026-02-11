@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Printer, Save, FileText, ImageIcon, Settings2, CheckCircle2, Upload, X } from "lucide-react";
+import { Printer, Save, FileText, ImageIcon, Settings2, Upload, X } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import {
@@ -476,7 +476,7 @@ export default function TicketDesignPage() {
                             <img
                               src={logoPreview}
                               alt="Logo"
-                              className="max-w-[80%] max-h-24 object-contain grayscale contrast-125"
+                              className="w-[35%] max-h-24 object-contain grayscale contrast-125"
                               style={{ imageRendering: "pixelated" }}
                             />
                           </div>
