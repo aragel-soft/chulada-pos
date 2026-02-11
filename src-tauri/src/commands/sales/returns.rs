@@ -513,7 +513,7 @@ pub fn process_return(
         let item_ids: Vec<&String> = payload.items.iter().map(|i| &i.sale_item_id).collect();
         let ph = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         
-        let q_sale = format!("SELECT id, quantity, product_name, product_code, product_id, subtotal FROM sale_items WHERE id IN ({}) AND sale_id = ?", ph);
+        let q_sale = format!("SELECT id, quantity, product_name, product_code, product_id, total FROM sale_items WHERE id IN ({}) AND sale_id = ?", ph);
         let mut stmt = tx.prepare(&q_sale).map_err(|e| e.to_string())?;
         let mut params: Vec<&dyn rusqlite::ToSql> = item_ids.iter().map(|id| *id as &dyn rusqlite::ToSql).collect();
         params.push(&payload.sale_id);
@@ -524,7 +524,7 @@ pub fn process_return(
             r.get::<_, String>(2)?,  // product_name
             r.get::<_, String>(3)?,  // product_code
             r.get::<_, String>(4)?,  // product_id
-            r.get::<_, f64>(5)?      // subtotal (paid amount)
+            r.get::<_, f64>(5)?      // total (net amount per line)
         ))).map_err(|e| e.to_string())?;
         
         let mut map = HashMap::new();
@@ -561,8 +561,11 @@ pub fn process_return(
         
         let real_unit_price = if *orig_qty > 0.0001 { db_subtotal / orig_qty } else { 0.0 };
         
+        // Use net price directly (it already includes any line discount)
+        let refund_unit_price = real_unit_price;
+        
         let mut validated_item = item.clone();
-        validated_item.unit_price = real_unit_price;
+        validated_item.unit_price = refund_unit_price;
         
         validated_items.push((validated_item, name.clone(), code.clone(), pid.clone()));
     }

@@ -836,8 +836,9 @@ pub fn print_ticket(
         let mut total_returns: f64 = 0.0;
         for ret in &data.returns {
             let clean_name = remove_accents(&ret.product_name);
-            let desc_display = if clean_name.chars().count() > desc_w {
-                clean_name.chars().take(desc_w).collect::<String>()
+            let ret_desc_w = desc_w - 1; // 1 char less for the "-" prefix
+            let desc_display = if clean_name.chars().count() > ret_desc_w {
+                clean_name.chars().take(ret_desc_w).collect::<String>()
             } else {
                 clean_name
             };
@@ -847,7 +848,7 @@ pub fn print_ticket(
                 format!(
                     "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
                     qty_str, desc_display, sub_str,
-                    w_qty = qty_w, w_desc = desc_w, w_tot = total_w
+                    w_qty = qty_w + 1, w_desc = ret_desc_w, w_tot = total_w
                 ).as_bytes()
             );
             total_returns += ret.subtotal;
