@@ -220,6 +220,7 @@ pub struct TicketData {
     pub paid_amount: f64,
     pub change: f64,
     pub customer_name: Option<String>,
+    pub returns: Vec<ReturnDeduction>,
 }
 
 pub struct TicketItem {
@@ -232,7 +233,11 @@ pub struct TicketItem {
     pub promotion_name: Option<String>,
 }
 
-
+pub struct ReturnDeduction {
+    pub product_name: String,
+    pub quantity: f64,
+    pub subtotal: f64,
+}
 
 pub fn print_sale_from_db(
     app_handle: tauri::AppHandle,
@@ -244,6 +249,20 @@ pub fn print_sale_from_db(
 
     let db_state: State<Mutex<Connection>> = app_handle.state();
     let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    // Validate sale status
+    let sale_status: String = conn.query_row(
+        "SELECT status FROM sales WHERE id = ?1",
+        [&sale_id],
+        |row| row.get(0)
+    ).map_err(|e| format!("Venta no encontrada: {}", e))?;
+
+    if sale_status == "cancelled" {
+        return Err("No se puede reimprimir el ticket de una venta cancelada".to_string());
+    }
+    if sale_status == "fully_returned" {
+        return Err("No se puede reimprimir el ticket de una venta con devolución total".to_string());
+    }
 
     // Fetch Sale Data & Settings from DB
     let (sale_info, items, business_settings) = {
@@ -309,6 +328,30 @@ pub fn print_sale_from_db(
         (sale_row, items, settings)
     };
 
+    // Fetch return deductions if any
+    let mut returns: Vec<ReturnDeduction> = Vec::new();
+    if sale_status == "partial_return" {
+        let mut ret_stmt = conn.prepare(
+            "SELECT si.product_name, ri.quantity, ri.subtotal
+             FROM return_items ri
+             JOIN sale_items si ON ri.sale_item_id = si.id
+             WHERE si.sale_id = ?1
+             ORDER BY si.product_name"
+        ).map_err(|e| e.to_string())?;
+
+        let ret_iter = ret_stmt.query_map([&sale_id], |row| {
+            Ok(ReturnDeduction {
+                product_name: row.get(0)?,
+                quantity: row.get(1)?,
+                subtotal: row.get(2)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        for r in ret_iter {
+            returns.push(r.map_err(|e| e.to_string())?);
+        }
+    }
+
     drop(conn); // Unlock DB before printing
 
     let (folio, date_str, subtotal, discount, total, cash, card) = sale_info;
@@ -329,7 +372,8 @@ pub fn print_sale_from_db(
         total,
         paid_amount,
         change,
-        customer_name: None, 
+        customer_name: None,
+        returns,
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
@@ -777,6 +821,45 @@ pub fn print_ticket(
     
     job_content.extend_from_slice(format!("EFECTIVO/PAGO: {:>10.2}\n", data.paid_amount).as_bytes());
     job_content.extend_from_slice(format!("CAMBIO: {:>10.2}\n", data.change).as_bytes());
+
+    // RETURN DEDUCTIONS (only for partial returns)
+    if !data.returns.is_empty() {
+        job_content.extend_from_slice(b"\n");
+        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(b"DEVOLUCIONES\n");
+        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+
+        job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
+        let mut total_returns: f64 = 0.0;
+        for ret in &data.returns {
+            let clean_name = remove_accents(&ret.product_name);
+            let desc_display = if clean_name.chars().count() > desc_w {
+                clean_name.chars().take(desc_w).collect::<String>()
+            } else {
+                clean_name
+            };
+            let qty_str = format!("-{:<.2}", ret.quantity);
+            let sub_str = format!("-{:.2}", ret.subtotal);
+            job_content.extend_from_slice(
+                format!(
+                    "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
+                    qty_str, desc_display, sub_str,
+                    w_qty = qty_w, w_desc = desc_w, w_tot = total_w
+                ).as_bytes()
+            );
+            total_returns += ret.subtotal;
+        }
+
+        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+        job_content.extend_from_slice(b"\x1B\x61\x02"); // Right align
+        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        let adjusted_total = data.total - total_returns;
+        job_content.extend_from_slice(format!("TOTAL AJUSTADO: {:>10.2}\n", adjusted_total).as_bytes());
+        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    }
 
     // FOOTER
     job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
