@@ -3,14 +3,77 @@ use image::DynamicImage;
 use std::sync::Mutex;
 use tauri::State;
 
-// TODO: CHECK IN A BETTER PRITER WITH LOGOS WITH ALOT OF BLACK IN IT
-pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<u8>, String> {
-    let safe_width = if max_width > 400 { 512 } else { 384 };
+// ESC/POS Command Constants
+const CMD_INIT: &[u8] = b"\x1B\x40";
+const CMD_CODE_TABLE_PC437: &[u8] = b"\x1B\x74\x00";
+const CMD_ALIGN_LEFT: &[u8] = b"\x1B\x61\x00";
+const CMD_ALIGN_CENTER: &[u8] = b"\x1B\x61\x01";
+const CMD_ALIGN_RIGHT: &[u8] = b"\x1B\x61\x02";
+const CMD_BOLD_ON: &[u8] = b"\x1B\x45\x01";
+const CMD_BOLD_OFF: &[u8] = b"\x1B\x45\x00";
+const CMD_SIZE_NORMAL: &[u8] = b"\x1D\x21\x00";
+const CMD_SIZE_DOUBLE_H: &[u8] = b"\x1D\x21\x01";
+const CMD_SIZE_DOUBLE_HW: &[u8] = b"\x1D\x21\x11";
+const CMD_CUT: &[u8] = b"\n\n\n\x1D\x56\x42\x00";
 
-    let mut target_width = safe_width;
+/// Helper to resolve and process logo commands from path
+/// TODO: CHECK IN A BETTER PRITER WITH LOGOS WITH ALOT OF BLACK IN IT
+pub fn resolve_logo_bytes(app_handle: &tauri::AppHandle, logo_path: &str, max_width: u32) -> Option<Vec<u8>> {
+    if logo_path.is_empty() { return None; }
+    
+    use std::path::Path;
+    use tauri::Manager;
+    
+    let logo_path_str = if logo_path.contains("images/settings") {
+        if let Ok(app_dir) = app_handle.path().app_data_dir() {
+            app_dir.join(logo_path).to_string_lossy().to_string()
+        } else {
+            logo_path.to_string()
+        }
+    } else {
+        logo_path.to_string()
+    };
+    
+     if Path::new(&logo_path_str).exists() {
+         let path_obj = Path::new(&logo_path_str);
+         if let Some(stem) = path_obj.file_stem() {
+             let parent = path_obj.parent().unwrap_or(Path::new(""));
+             // Dynamic flush: use exact width for binary suffix to support custom sizes
+             let bin_filename = format!("{}_{}.bin", stem.to_string_lossy(), max_width);
+             let bin_path = parent.join(bin_filename);
+             
+             // Try to read pre-converted binary
+             if bin_path.exists() {
+                 if let Ok(bin_data) = std::fs::read(&bin_path) {
+                     return Some(bin_data);
+                 }
+             }
+             
+             // Fallback to runtime conversion AND caching
+             match image_to_escpos(&logo_path_str, max_width) {
+                 Ok(cmds) => {
+                     // Try to save for cache
+                     if let Err(e) = std::fs::write(&bin_path, &cmds) {
+                         println!("Warning: Failed to save cached logo: {}", e);
+                     }
+                     return Some(cmds);
+                 },
+                 Err(e) => println!("Warning: Failed to process logo: {}", e),
+             }
+         }
+    }
+    None
+}
+
+
+pub fn convert_image_to_escpos(img: DynamicImage, max_width: u32) -> Result<Vec<u8>, String> {
+    // Force target width to be multiple of 8
+    let mut target_width = max_width;
     if target_width % 8 != 0 {
         target_width -= target_width % 8;
     }
+    // Ensure minimum width of 8
+    if target_width < 8 { target_width = 8; }
 
     let aspect_ratio = img.height() as f64 / img.width() as f64;
     let target_height = (target_width as f64 * aspect_ratio) as u32;
@@ -205,7 +268,7 @@ fn encode_code128b(data: &str) -> Result<Vec<u8>, String> {
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use printers::common::base::job::PrinterJobOptions;
-use std::path::Path;
+
 use tauri::Manager;
 
 pub struct TicketData {
@@ -226,11 +289,11 @@ pub struct TicketData {
 pub struct TicketItem {
     pub quantity: f64,
     pub description: String,
-    #[allow(dead_code)]
     pub unit_price: f64,
     pub total: f64,
     pub promotion_id: Option<String>,
     pub promotion_name: Option<String>,
+    pub id: String,
 }
 
 pub struct ReturnDeduction {
@@ -265,7 +328,7 @@ pub fn print_sale_from_db(
     }
 
     // Fetch Sale Data & Settings from DB
-    let (sale_info, items, business_settings) = {
+    let (sale_info, original_items, business_settings) = {
         // Fetch Settings
         let settings = fetch_business_settings(&conn)
              .unwrap_or_else(|_| crate::commands::settings::business::BusinessSettings {
@@ -285,7 +348,7 @@ pub fn print_sale_from_db(
 
         // Fetch Header
         let sale_row = conn.query_row(
-            "SELECT folio, created_at, subtotal, discount_amount, total, cash_amount, card_transfer_amount 
+            "SELECT folio, created_at, subtotal, discount_amount, total, cash_amount, card_transfer_amount, discount_percentage 
              FROM sales WHERE id = ?1",
             [&sale_id],
             |row| {
@@ -293,17 +356,18 @@ pub fn print_sale_from_db(
                     row.get::<_, String>(0)?, // folio
                     row.get::<_, String>(1)?, // created_at
                     row.get::<_, f64>(2)?,    // subtotal
-                    row.get::<_, f64>(3)?,    // discount
+                    row.get::<_, f64>(3)?,    // discount_amount
                     row.get::<_, f64>(4)?,    // total
                     row.get::<_, f64>(5)?,    // cash
                     row.get::<_, f64>(6)?,    // card
+                    row.get::<_, f64>(7)?,    // discount_percentage
                 ))
             }
         ).map_err(|e| format!("Venta no encontrada: {}", e))?;
 
         // Fetch Items with promotion info
         let mut stmt = conn.prepare(
-            "SELECT si.product_name, si.quantity, si.unit_price, si.subtotal, si.promotion_id, p.name
+            "SELECT si.product_name, si.quantity, si.unit_price, si.subtotal, si.promotion_id, p.name, si.id
              FROM sale_items si
              LEFT JOIN promotions p ON si.promotion_id = p.id
              WHERE si.sale_id = ?1"
@@ -317,6 +381,7 @@ pub fn print_sale_from_db(
                  total: row.get(3)?,
                  promotion_id: row.get(4).ok(),
                  promotion_name: row.get(5).ok(),
+                 id: row.get(6)?,
              })
         }).map_err(|e| e.to_string())?;
 
@@ -328,33 +393,58 @@ pub fn print_sale_from_db(
         (sale_row, items, settings)
     };
 
-    // Fetch return deductions if any
-    let mut returns: Vec<ReturnDeduction> = Vec::new();
-    if sale_status == "partial_return" {
+    // Calculate Returns Map
+    let mut returns_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    if sale_status == "partial_return" { 
         let mut ret_stmt = conn.prepare(
-            "SELECT si.product_name, ri.quantity, ri.subtotal
-             FROM return_items ri
-             JOIN sale_items si ON ri.sale_item_id = si.id
-             WHERE si.sale_id = ?1
-             ORDER BY si.product_name"
+            "SELECT sale_item_id, SUM(quantity) FROM return_items 
+             WHERE return_id IN (SELECT id FROM returns WHERE sale_id = ?1) 
+             GROUP BY sale_item_id"
         ).map_err(|e| e.to_string())?;
 
         let ret_iter = ret_stmt.query_map([&sale_id], |row| {
-            Ok(ReturnDeduction {
-                product_name: row.get(0)?,
-                quantity: row.get(1)?,
-                subtotal: row.get(2)?,
-            })
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
         }).map_err(|e| e.to_string())?;
 
         for r in ret_iter {
-            returns.push(r.map_err(|e| e.to_string())?);
+            let (sid, qty) = r.map_err(|e| e.to_string())?;
+            returns_map.insert(sid, qty);
         }
     }
 
     drop(conn); // Unlock DB before printing
 
-    let (folio, date_str, subtotal, discount, total, cash, card) = sale_info;
+    let (folio, date_str, orig_subtotal, orig_discount_amt, orig_total, cash, card, discount_percentage) = sale_info;
+    
+    
+    let (final_items, subtotal, discount, total) = if returns_map.is_empty() {
+        (original_items, orig_subtotal, orig_discount_amt, orig_total)
+    } else {
+        let mut filtered_items = Vec::new();
+        let mut new_subtotal = 0.0;
+        
+        for item in original_items {
+            let returned_qty = returns_map.get(&item.id).copied().unwrap_or(0.0);
+            let actual_qty = item.quantity - returned_qty;
+            
+            if actual_qty > 0.001 {
+                let line_subtotal = actual_qty * item.unit_price; // Gross line total
+                new_subtotal += line_subtotal;
+                
+                filtered_items.push(TicketItem {
+                    quantity: actual_qty,
+                    total: line_subtotal, 
+                    ..item
+                });
+            }
+        }
+
+        let new_discount_amt = new_subtotal * (discount_percentage / 100.0);
+        let new_total = new_subtotal - new_discount_amt;
+        
+        (filtered_items, new_subtotal, new_discount_amt, new_total)
+    };
+    
     let paid_amount = cash + card;
     let change = if paid_amount > total { paid_amount - total } else { 0.0 };
 
@@ -366,14 +456,14 @@ pub fn print_sale_from_db(
         hardware_config: hardware_config.clone(),
         folio: folio.clone(),
         date: date_str,
-        items,
+        items: final_items,
         subtotal,
         discount,
         total,
         paid_amount,
         change,
         customer_name: None,
-        returns,
+        returns: Vec::new(), 
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
@@ -456,81 +546,49 @@ pub fn print_voucher_from_db(
     let mut job_content = Vec::new();
 
     // Init
-    job_content.extend_from_slice(b"\x1B\x40"); // Initialize
-    job_content.extend_from_slice(b"\x1B\x74\x00"); // Code table PC437
+    job_content.extend_from_slice(CMD_INIT);
+    job_content.extend_from_slice(CMD_CODE_TABLE_PC437);
 
     // LOGO
-    let mut logo_cmds: Option<Vec<u8>> = None;
-    if !settings.logo_path.is_empty() {
-        let logo_path_str = if settings.logo_path.contains("images/settings") {
-            if let Ok(app_dir) = app_handle.path().app_data_dir() {
-                app_dir.join(&settings.logo_path).to_string_lossy().to_string()
-            } else {
-                settings.logo_path.clone()
-            }
-        } else {
-            settings.logo_path.clone()
-        };
-
-        if Path::new(&logo_path_str).exists() {
-            let suffix = if max_width <= 384 { "_58.bin" } else { "_80.bin" };
-            let path_obj = Path::new(&logo_path_str);
-            if let Some(stem) = path_obj.file_stem() {
-                let parent = path_obj.parent().unwrap_or(Path::new(""));
-                let bin_path = parent.join(format!("{}{}", stem.to_string_lossy(), suffix));
-                if bin_path.exists() {
-                    if let Ok(bin_data) = std::fs::read(&bin_path) {
-                        logo_cmds = Some(bin_data);
-                    }
-                }
-            }
-            if logo_cmds.is_none() {
-                match image_to_escpos(&logo_path_str, max_width) {
-                    Ok(cmds) => logo_cmds = Some(cmds),
-                    Err(e) => println!("Warning: Failed to process logo: {}", e),
-                }
-            }
-        }
-    }
-
-    if let Some(cmds) = logo_cmds {
-        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    let logo_width = (max_width as f64 * 0.5) as u32; // 50% width
+    if let Some(cmds) = resolve_logo_bytes(&app_handle, &settings.logo_path, logo_width) {
+        job_content.extend_from_slice(CMD_ALIGN_CENTER);
         job_content.extend_from_slice(&cmds);
         job_content.extend_from_slice(b"\n");
     }
 
     // STORE INFO
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
     if !settings.store_name.is_empty() {
-        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(CMD_BOLD_ON);
         job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
-        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+        job_content.extend_from_slice(CMD_BOLD_OFF);
     }
     if !settings.store_address.is_empty() {
         job_content.extend_from_slice(format!("{}\n", settings.store_address).as_bytes());
     }
-    job_content.extend_from_slice(b"\n");
+
 
     // SEPARATOR
     let separator = "=".repeat(max_chars as usize);
     job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
 
     // VOUCHER TITLE
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
-    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
-    job_content.extend_from_slice(b"\x1D\x21\x11"); // Double height+width
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
+    job_content.extend_from_slice(CMD_BOLD_ON);
+    job_content.extend_from_slice(CMD_SIZE_DOUBLE_HW);
     job_content.extend_from_slice(b"VALE DE TIENDA\n");
-    job_content.extend_from_slice(b"\x1D\x21\x00"); // Normal size
-    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(CMD_SIZE_NORMAL);
+    job_content.extend_from_slice(CMD_BOLD_OFF);
     job_content.extend_from_slice(b"\n");
 
     // VOUCHER CODE
-    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+    job_content.extend_from_slice(CMD_BOLD_ON);
     job_content.extend_from_slice(format!("Codigo: {}\n", code).as_bytes());
-    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(CMD_BOLD_OFF);
 
     // BARCODE as raster image
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
     if let Ok(barcode_cmds) = generate_barcode_escpos(&code, max_width) {
         job_content.extend_from_slice(&barcode_cmds);
         job_content.extend_from_slice(b"\n");
@@ -541,18 +599,18 @@ pub fn print_voucher_from_db(
     job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
 
     // BALANCE
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
-    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
-    job_content.extend_from_slice(b"\x1D\x21\x01"); // Double height
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
+    job_content.extend_from_slice(CMD_BOLD_ON);
+    job_content.extend_from_slice(CMD_SIZE_DOUBLE_H);
     job_content.extend_from_slice(format!("SALDO: ${:.2}\n", current_balance).as_bytes());
-    job_content.extend_from_slice(b"\x1D\x21\x00"); // Normal size
-    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(CMD_SIZE_NORMAL);
+    job_content.extend_from_slice(CMD_BOLD_OFF);
     job_content.extend_from_slice(b"\n");
 
     job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
 
     // DETAILS
-    job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
+    job_content.extend_from_slice(CMD_ALIGN_LEFT);
     job_content.extend_from_slice(format!("Venta original: {}\n", remove_accents(&sale_folio)).as_bytes());
     job_content.extend_from_slice(format!("Fecha emision: {}\n", remove_accents(&created_at)).as_bytes());
     if let Some(ref exp) = expires_at {
@@ -563,7 +621,7 @@ pub fn print_voucher_from_db(
     job_content.extend_from_slice(b"\n");
 
     // NOTICE
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
     job_content.extend_from_slice(b"Este vale es valido para compras\n");
     job_content.extend_from_slice(b"en tienda. No es canjeable\n");
     job_content.extend_from_slice(b"por efectivo.\n");
@@ -576,7 +634,7 @@ pub fn print_voucher_from_db(
     }
 
     // Cut
-    job_content.extend_from_slice(b"\n\n\n\x1D\x56\x42\x00");
+    job_content.extend_from_slice(CMD_CUT);
 
     // Send
     printer
@@ -601,67 +659,29 @@ pub fn print_ticket(
     let mut job_content = Vec::new();
 
     // Init configuration
-    job_content.extend_from_slice(b"\x1B\x40"); // Initialize
-    job_content.extend_from_slice(b"\x1B\x74\x00"); // Code table PC437
+    job_content.extend_from_slice(CMD_INIT);
+    job_content.extend_from_slice(CMD_CODE_TABLE_PC437);
 
     // LOGO
     let width_val = data.hardware_config.printer_width.parse::<u32>().unwrap_or(80);
     let (max_width, max_chars) = if width_val == 58 { (384, 32) } else { (512, 48) };
-
-    let mut logo_cmds: Option<Vec<u8>> = None;
     let settings = &data.business_settings;
 
-    if !settings.logo_path.is_empty() {
-         let logo_path_str = if settings.logo_path.contains("images/settings") {
-            if let Ok(app_dir) = app_handle.path().app_data_dir() {
-                app_dir
-                    .join(&settings.logo_path)
-                    .to_string_lossy()
-                    .to_string()
-            } else {
-                settings.logo_path.clone()
-            }
-        } else {
-            settings.logo_path.clone()
-        };
-
-        if Path::new(&logo_path_str).exists() {
-             let suffix = if max_width <= 384 { "_58.bin" } else { "_80.bin" };
-             let path_obj = Path::new(&logo_path_str);
-             
-             if let Some(stem) = path_obj.file_stem() {
-                 let parent = path_obj.parent().unwrap_or(Path::new(""));
-                 let bin_path = parent.join(format!("{}{}", stem.to_string_lossy(), suffix));
-                 if bin_path.exists() {
-                     if let Ok(bin_data) = std::fs::read(&bin_path) {
-                         logo_cmds = Some(bin_data);
-                     }
-                 }
-             }
-
-             if logo_cmds.is_none() {
-                 match image_to_escpos(&logo_path_str, max_width) {
-                     Ok(cmds) => logo_cmds = Some(cmds),
-                     Err(e) => println!("Warning: Failed to process logo: {}", e),
-                 }
-             }
-        }
-    }
-
-    if let Some(cmds) = logo_cmds {
-        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
+    let logo_width = (max_width as f64 * 0.5) as u32; // 50% width
+    if let Some(cmds) = resolve_logo_bytes(&app_handle, &settings.logo_path, logo_width) {
+        job_content.extend_from_slice(CMD_ALIGN_CENTER);
         job_content.extend_from_slice(&cmds);
         job_content.extend_from_slice(b"\n");
     }
 
     // STORE INFO
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
     
     // Store Name
     if !settings.store_name.is_empty() {
-        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(CMD_BOLD_ON);
         job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
-        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+        job_content.extend_from_slice(CMD_BOLD_OFF);
     }
 
     // Store Address
@@ -678,7 +698,7 @@ pub fn print_ticket(
     }
 
     // TICKET INFO
-    job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
+    job_content.extend_from_slice(CMD_ALIGN_LEFT);
     job_content.extend_from_slice(format!("Folio: {}\n", data.folio).as_bytes());
     job_content.extend_from_slice(format!("Fecha: {}\n", data.date).as_bytes());
     if let Some(cust) = data.customer_name {
@@ -733,9 +753,9 @@ pub fn print_ticket(
             
             // Promo header (explicitly marked as COMBO)
             let promo_header = format!("COMBO: {}", remove_accents(promo_name));
-            job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+            job_content.extend_from_slice(CMD_BOLD_ON);
             job_content.extend_from_slice(format!("{}\n", promo_header).as_bytes());
-            job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+            job_content.extend_from_slice(CMD_BOLD_OFF);
             
             // Items in promo (indented)
             let mut promo_total = 0.0;
@@ -806,14 +826,14 @@ pub fn print_ticket(
     job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
     
     // TOTALS
-    job_content.extend_from_slice(b"\x1B\x61\x02"); // Right align
+    job_content.extend_from_slice(CMD_ALIGN_RIGHT);
     job_content.extend_from_slice(format!("SUBTOTAL: {:>10.2}\n", data.subtotal).as_bytes());
     if data.discount > 0.0 {
         job_content.extend_from_slice(format!("DESCUENTO: {:>10.2}\n", data.discount).as_bytes());
     }
-    job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+    job_content.extend_from_slice(CMD_BOLD_ON);
     job_content.extend_from_slice(format!("TOTAL: {:>10.2}\n", data.total).as_bytes());
-    job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+    job_content.extend_from_slice(CMD_BOLD_OFF);
     
     // Total Items Count
     let total_items_count: f64 = data.items.iter().map(|i| i.quantity).sum();
@@ -826,13 +846,13 @@ pub fn print_ticket(
     if !data.returns.is_empty() {
         job_content.extend_from_slice(b"\n");
         job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
-        job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
-        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(CMD_ALIGN_CENTER);
+        job_content.extend_from_slice(CMD_BOLD_ON);
         job_content.extend_from_slice(b"DEVOLUCIONES\n");
-        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+        job_content.extend_from_slice(CMD_BOLD_OFF);
         job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
 
-        job_content.extend_from_slice(b"\x1B\x61\x00"); // Left align
+        job_content.extend_from_slice(CMD_ALIGN_LEFT);
         let mut total_returns: f64 = 0.0;
         for ret in &data.returns {
             let clean_name = remove_accents(&ret.product_name);
@@ -855,15 +875,15 @@ pub fn print_ticket(
         }
 
         job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
-        job_content.extend_from_slice(b"\x1B\x61\x02"); // Right align
-        job_content.extend_from_slice(b"\x1B\x45\x01"); // Bold on
+        job_content.extend_from_slice(CMD_ALIGN_RIGHT);
+        job_content.extend_from_slice(CMD_BOLD_ON);
         let adjusted_total = data.total - total_returns;
         job_content.extend_from_slice(format!("TOTAL AJUSTADO: {:>10.2}\n", adjusted_total).as_bytes());
-        job_content.extend_from_slice(b"\x1B\x45\x00"); // Bold off
+        job_content.extend_from_slice(CMD_BOLD_OFF);
     }
 
     // FOOTER
-    job_content.extend_from_slice(b"\x1B\x61\x01"); // Center align
+    job_content.extend_from_slice(CMD_ALIGN_CENTER);
     if !settings.ticket_footer.is_empty() {
         job_content.extend_from_slice(b"\n");
         job_content.extend_from_slice(settings.ticket_footer.as_bytes());
@@ -871,7 +891,7 @@ pub fn print_ticket(
     }
 
     // Cut
-    job_content.extend_from_slice(b"\n\n\n\x1D\x56\x42\x00");
+    job_content.extend_from_slice(CMD_CUT);
 
     // Send
     printer
