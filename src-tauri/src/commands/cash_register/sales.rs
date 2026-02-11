@@ -48,8 +48,8 @@ struct FinalItemData<'a> {
     db_code: String,
     unit_price: f64,
     item_discount_amt: f64,
-    item_subtotal: f64, // GROSS: Unit Price * Quantity
-    item_total: f64,    // NET: Subtotal - Discount
+    item_subtotal: f64,
+    item_total: f64,
 }
 
 fn get_sequence(conn: &Connection) -> Result<i64, String> {
@@ -615,8 +615,8 @@ fn calculate_sale_items<'a>(
                     db_code: db_code.clone(),
                     unit_price,
                     item_discount_amt: item_discount_val,
-                    item_subtotal: gross_amount, // GROSS
-                    item_total: net_amount,      // NET
+                    item_subtotal: gross_amount,
+                    item_total: net_amount,
                 });
             }
 

@@ -529,8 +529,8 @@ pub fn process_return(
         
         let mut map = HashMap::new();
         for r in rows {
-            let (id, q, n, c, pid, subtotal) = r.map_err(|e| e.to_string())?;
-            map.insert(id, (q, n, c, pid, subtotal));
+            let (id, q, n, c, pid, total) = r.map_err(|e| e.to_string())?;
+            map.insert(id, (q, n, c, pid, total));
         }
         sale_items_data = map;
         
@@ -548,7 +548,7 @@ pub fn process_return(
     }
 
     for item in &payload.items {
-        let (orig_qty, name, code, pid, db_subtotal) = sale_items_data.get(&item.sale_item_id)
+        let (orig_qty, name, code, pid, db_total) = sale_items_data.get(&item.sale_item_id)
             .ok_or(format!("Item no encontrado: {}", item.sale_item_id))?;
             
         let returned_so_far = already_returned_map.get(&item.sale_item_id).copied().unwrap_or(0.0);
@@ -559,13 +559,10 @@ pub fn process_return(
             return Err(format!("Exceso de devolución para '{}'. Disp: {:.2}, Solicitado: {}", name, available, item.quantity));
         }
         
-        let real_unit_price = if *orig_qty > 0.0001 { db_subtotal / orig_qty } else { 0.0 };
-        
-        // Use net price directly (it already includes any line discount)
-        let refund_unit_price = real_unit_price;
+        let real_unit_price = if *orig_qty > 0.0001 { db_total / orig_qty } else { 0.0 };
         
         let mut validated_item = item.clone();
-        validated_item.unit_price = refund_unit_price;
+        validated_item.unit_price = real_unit_price;
         
         validated_items.push((validated_item, name.clone(), code.clone(), pid.clone()));
     }
