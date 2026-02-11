@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, User, X, Ban } from "lucide-react";
+import { Loader2, User, X, Ban, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +28,7 @@ import { ProductImagePreview } from "@/features/inventory/components/products/Pr
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
+import { printSaleTicket, printReturnVoucher } from "@/lib/api/cash-register/sales";
 
 const RETURN_REASON_LABELS: Record<string, string> = {
   quality: "Producto dañado / Mala calidad",
@@ -354,6 +356,79 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </div>
             )}
           </div>
+
+          {/* Reprint Buttons */}
+          {can('history:devolution') && (
+            <div className="flex gap-2 mt-3 pt-3 border-t border-dashed">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        disabled={sale.status === 'cancelled' || sale.status === 'fully_returned'}
+                        onClick={() => printSaleTicket(sale.id)
+                          .then(() => toast.success('Ticket enviado a imprimir'))
+                          .catch((e) => toast.error('Error al reimprimir', { description: String(e) }))}
+                      >
+                        <Printer className="h-3.5 w-3.5 mr-1.5" />
+                        Reimprimir Ticket
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {(sale.status === 'cancelled' || sale.status === 'fully_returned') && (
+                    <TooltipContent>
+                      <p>
+                        {sale.status === 'cancelled'
+                          ? 'No se puede reimprimir una venta cancelada'
+                          : 'No se puede reimprimir una venta con devolución total'}
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+
+              {sale.voucher && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                          disabled={
+                            sale.voucher.is_used ||
+                            sale.voucher.is_expired ||
+                            !sale.voucher.is_active
+                          }
+                          onClick={() => printReturnVoucher(sale.id)
+                            .then(() => toast.success('Vale enviado a imprimir'))
+                            .catch((e) => toast.error('Error al reimprimir vale', { description: String(e) }))}
+                        >
+                          <Printer className="h-3.5 w-3.5 mr-1.5" />
+                          Reimprimir Vale
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {(sale.voucher.is_used || sale.voucher.is_expired || !sale.voucher.is_active) && (
+                      <TooltipContent>
+                        <p>
+                          {sale.voucher.is_used
+                            ? 'Vale ya utilizado'
+                            : sale.voucher.is_expired
+                              ? 'Vale expirado'
+                              : 'Vale inactivo'}
+                        </p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
