@@ -852,19 +852,16 @@ pub fn process_sale(
     // Handle Voucher Deduction & Recording
     if let Some(v_id) = voucher_id_used {
         if voucher_amount_used > 0.0 {
-            // Deduct from voucher
             tx.execute(
                 "UPDATE store_vouchers SET current_balance = current_balance - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
                 params![voucher_amount_used, v_id]
             ).map_err(|e| format!("Error actualizando saldo del vale: {}", e))?;
 
-            // Check if fully redeemed
             tx.execute(
                 "UPDATE store_vouchers SET is_active = 0, used_at = CURRENT_TIMESTAMP WHERE id = ?1 AND current_balance <= 0",
                 params![v_id]
             ).map_err(|e| format!("Error marcando vale como redimido: {}", e))?;
 
-            // Insert into sale_vouchers
             let sv_id = Uuid::new_v4().to_string();
             tx.execute(
                 "INSERT INTO sale_vouchers (id, sale_id, voucher_id, amount) VALUES (?1, ?2, ?3, ?4)",
