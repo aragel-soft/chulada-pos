@@ -40,6 +40,7 @@ export interface SaleDetail extends SaleMaster {
   discount_global_amount: number;
   cash_amount: number;
   card_amount: number;
+  voucher_amount: number;
   change_returned: number;
   notes?: string;
   user_avatar?: string;
