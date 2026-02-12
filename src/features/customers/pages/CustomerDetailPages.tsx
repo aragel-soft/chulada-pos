@@ -208,7 +208,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="flex flex-col h-full p-4 mt-2 gap-4 bg-background animate-in fade-in duration-300">
-      {/* Header Compacto */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4 mt-2">
         <div className="flex items-center gap-4">
           <Button
