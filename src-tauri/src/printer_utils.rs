@@ -613,12 +613,14 @@ pub fn print_voucher_from_db(
     job_content.extend_from_slice(CMD_ALIGN_LEFT);
     job_content.extend_from_slice(format!("Venta original: {}\n", remove_accents(&sale_folio)).as_bytes());
     job_content.extend_from_slice(format!("Fecha emision: {}\n", remove_accents(&created_at)).as_bytes());
-    if let Some(ref exp) = expires_at {
-        job_content.extend_from_slice(format!("Vigencia: {}\n", remove_accents(exp)).as_bytes());
-    } else {
-        job_content.extend_from_slice(b"Vigencia: Sin fecha de expiracion\n");
-    }
-    job_content.extend_from_slice(b"\n");
+
+    // FOR THE MOMENT, THE VOUCHERS DON'T HAVE AN EXPIRATION DATE
+    // if let Some(ref exp) = expires_at {
+    //     job_content.extend_from_slice(format!("Vigencia: {}\n", remove_accents(exp)).as_bytes());
+    // } else {
+    //     job_content.extend_from_slice(b"Vigencia: Sin fecha de expiracion\n");
+    // }
+    // job_content.extend_from_slice(b"\n");
 
     // NOTICE
     job_content.extend_from_slice(CMD_ALIGN_CENTER);
