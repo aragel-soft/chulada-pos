@@ -23,6 +23,8 @@ interface ReceptionState {
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
   updateItemCost: (productId: string, cost: number) => void;
+  updateItemRetailPrice: (productId: string, price: number) => void;
+  updateItemWholesalePrice: (productId: string, price: number) => void;
   updateProductDetails: (product: Product) => void;
   clearReception: () => void;
   toggleItemSelection: (productId: string) => void;
@@ -94,6 +96,24 @@ export const useReceptionStore = create<ReceptionState>()(
         }));
       },
 
+      updateItemRetailPrice: (productId: string, price: number) => {
+        if (price < 0) return;
+        set((state) => ({
+          items: state.items.map((item) =>
+            item.product_id === productId ? { ...item, retail_price: price } : item
+          ),
+        }));
+      },
+
+      updateItemWholesalePrice: (productId: string, price: number) => {
+        if (price < 0) return;
+        set((state) => ({
+          items: state.items.map((item) =>
+            item.product_id === productId ? { ...item, wholesale_price: price } : item
+          ),
+        }));
+      },
+
       updateProductDetails: (product: Product) => {
         set((state) => ({
           items: state.items.map((item) =>
@@ -142,6 +162,8 @@ export const useReceptionStore = create<ReceptionState>()(
         product_id: item.product_id,
         quantity: item.quantity,
         new_cost: item.cost,
+        new_retail_price: item.retail_price,
+        new_wholesale_price: item.wholesale_price,
       })),
     }),
     {

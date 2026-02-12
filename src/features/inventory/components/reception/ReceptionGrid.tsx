@@ -44,8 +44,11 @@ export function ReceptionGrid() {
               <TableHead className="w-[140px] text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 Costo Unit.
               </TableHead>
-              <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+              <TableHead className="w-[130px] text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 P. Venta
+              </TableHead>
+              <TableHead className="w-[130px] text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+                P. Mayoreo
               </TableHead>
               <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 Subtotal
