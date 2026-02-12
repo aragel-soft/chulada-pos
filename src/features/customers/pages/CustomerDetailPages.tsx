@@ -244,18 +244,6 @@ export default function CustomerDetailPage() {
           </div>
 
           <div className="flex items-end gap-4">
-            {/* Payment Button */}
-            {isDebt && (
-              <Button
-                size="lg"
-                onClick={() => setIsPaymentModalOpen(true)}
-                className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
-              >
-                <Wallet className="w-5 h-5 mr-2" />
-                Abonar a Deuda
-              </Button>
-            )}
-
             <div className="text-right min-w-[120px]">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 Saldo Actual
@@ -305,6 +293,17 @@ export default function CustomerDetailPage() {
               manualSorting={false}
               initialPageSize={16}
               showColumnFilters={false}
+              actions={
+                isDebt && (
+                  <Button
+                    onClick={() => setIsPaymentModalOpen(true)}
+                    className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
+                  >
+                    <Wallet className="w-4 h-4 mr-2" />
+                    Abonar a Deuda
+                  </Button>
+                )
+              }
             />
           </div>
         </TabsContent>
@@ -317,6 +316,7 @@ export default function CustomerDetailPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Modal Integration */}
       {customer && (
         <CheckoutModal
           isOpen={isPaymentModalOpen}
