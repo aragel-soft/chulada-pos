@@ -49,6 +49,7 @@ struct FinalItemData<'a> {
     unit_price: f64,
     item_discount_amt: f64,
     item_subtotal: f64,
+    item_total: f64,
 }
 
 fn get_sequence(conn: &Connection) -> Result<i64, String> {
@@ -571,6 +572,7 @@ fn calculate_sale_items<'a>(
                     unit_price,
                     item_discount_amt: 0.0,
                     item_subtotal: allocated_price,
+                    item_total: allocated_price,
                 });
             }
         } else {
@@ -613,7 +615,8 @@ fn calculate_sale_items<'a>(
                     db_code: db_code.clone(),
                     unit_price,
                     item_discount_amt: item_discount_val,
-                    item_subtotal: net_amount,
+                    item_subtotal: gross_amount,
+                    item_total: net_amount,
                 });
             }
 
@@ -733,8 +736,8 @@ pub fn process_sale(
             "INSERT INTO sale_items (
                 id, sale_id, product_id, product_name, product_code, quantity, 
                 unit_price, price_type, discount_percentage, discount_amount, 
-                subtotal, kit_option_id, promotion_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                subtotal, kit_option_id, promotion_id, total
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 item_id,
                 sale_id,
@@ -748,7 +751,8 @@ pub fn process_sale(
                 data.item_discount_amt,
                 data.item_subtotal,
                 item.kit_option_id,
-                item.promotion_id
+                item.promotion_id,
+                data.item_total
             ],
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;
     }

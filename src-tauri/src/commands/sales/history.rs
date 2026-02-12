@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
@@ -61,6 +61,8 @@ pub struct SaleDetailView {
   pub cancellation_reason: Option<String>,
   pub cancelled_at: Option<String>,
   pub items: Vec<SaleItemView>,
+  pub returns: Vec<ReturnSummary>,
+  pub voucher: Option<VoucherInfo>,
 }
 
 #[derive(Serialize)]
@@ -79,6 +81,29 @@ pub struct SaleItemView {
   // Return tracking
   pub quantity_returned: f64,
   pub quantity_available: f64,
+}
+
+#[derive(Serialize)]
+pub struct ReturnSummary {
+  pub id: String,
+  pub folio: i64,
+  pub return_date: String,
+  pub total: f64,
+  pub reason: String,
+  pub notes: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct VoucherInfo {
+  pub id: String,
+  pub code: String,
+  pub initial_balance: f64,
+  pub current_balance: f64,
+  pub is_active: bool,
+  pub is_used: bool,
+  pub is_expired: bool,
+  pub created_at: String,
+  pub expires_at: Option<String>,
 }
 
 #[tauri::command]
@@ -286,6 +311,8 @@ pub fn get_sale_details(
         user_name: row.get(12).unwrap_or("Desconocido".to_string()),
         user_avatar: resolved_avatar,
         items: Vec::new(),
+        returns: Vec::new(),
+        voucher: None,
       })
     })
     .map_err(|e| format!("Venta no encontrada: {}", e))?;
@@ -364,6 +391,58 @@ pub fn get_sale_details(
   for item in items_iter {
     sale.items.push(item.map_err(|e| e.to_string())?);
   }
+
+  // Query returns for this sale
+  let returns_sql = "
+    SELECT id, folio, return_date, total, reason, notes
+    FROM returns
+    WHERE sale_id = ?
+    ORDER BY return_date ASC
+  ";
+
+  let mut stmt_returns = conn.prepare(returns_sql).map_err(|e| e.to_string())?;
+  let returns_iter = stmt_returns
+    .query_map([&sale_id], |row| {
+      Ok(ReturnSummary {
+        id: row.get(0)?,
+        folio: row.get(1)?,
+        return_date: row.get(2)?,
+        total: row.get(3)?,
+        reason: row.get(4)?,
+        notes: row.get(5)?,
+      })
+    })
+    .map_err(|e| e.to_string())?;
+
+  for ret in returns_iter {
+    sale.returns.push(ret.map_err(|e| e.to_string())?);
+  }
+
+  // Query voucher for this sale
+  let voucher_sql = "
+    SELECT id, code, initial_balance, current_balance, is_active,
+           used_at IS NOT NULL as is_used,
+           CASE WHEN expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP THEN 1 ELSE 0 END as is_expired,
+           created_at, expires_at
+    FROM store_vouchers
+    WHERE sale_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  ";
+
+  sale.voucher = conn.query_row(voucher_sql, [&sale_id], |row| {
+    Ok(VoucherInfo {
+      id: row.get(0)?,
+      code: row.get(1)?,
+      initial_balance: row.get(2)?,
+      current_balance: row.get(3)?,
+      is_active: row.get(4)?,
+      is_used: row.get(5)?,
+      is_expired: row.get(6)?,
+      created_at: row.get(7)?,
+      expires_at: row.get(8)?,
+    })
+  }).optional().map_err(|e| format!("Error consultando vale: {}", e))?;
 
   Ok(sale)
 }

@@ -30,11 +30,8 @@ pub struct ReturnResponse {
     pub total: f64,
 }
 
-fn generate_voucher_code() -> String {
-    let now = Utc::now();
-    let timestamp = now.format("%Y%m%d").to_string();
-    let time_suffix = now.format("%H%M%S").to_string();
-    format!("VT-{}-{}", timestamp, time_suffix)
+fn generate_voucher_code(sale_folio: &str) -> String {
+    format!("V{}", sale_folio)
 }
 
 fn get_store_id(tx: &Connection) -> Result<String, String> {
@@ -317,8 +314,15 @@ fn manage_store_voucher(
         
         Ok(existing_code)
     } else {
+        // Fetch sale folio for the voucher code
+        let sale_folio: String = tx.query_row(
+            "SELECT folio FROM sales WHERE id = ?1",
+            [sale_id],
+            |row| row.get(0)
+        ).map_err(|e| format!("Error obteniendo folio: {}", e))?;
+
         let new_voucher_id = Uuid::new_v4().to_string();
-        let new_voucher_code = generate_voucher_code();
+        let new_voucher_code = generate_voucher_code(&sale_folio);
         
         tx.execute(
             "INSERT INTO store_vouchers (id, sale_id, code, initial_balance, current_balance, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",
@@ -400,7 +404,7 @@ fn create_return_records(
 }
 
 /// Helper to calculate and update the sale's final status
-fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
+fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<(), String> {
     let mut sale_items_map: HashMap<String, (f64, f64)> = HashMap::new(); // id -> (original, returned)
     
     {
@@ -444,9 +448,15 @@ fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
         if (*original - *returned).abs() > 0.001 { fully_returned = false; }
     }
     
-    let new_status = if fully_returned && has_returns { "fully_returned" }
-                     else if has_returns { "partial_return" }
-                     else { "completed" };
+    let new_status = if fully_returned && has_returns && reason == "cancellation" { 
+        "cancelled" 
+    } else if fully_returned && has_returns { 
+        "fully_returned" 
+    } else if has_returns { 
+        "partial_return" 
+    } else { 
+        "completed" 
+    };
     
     tx.execute(
         "UPDATE sales SET status = ?1 WHERE id = ?2",
@@ -458,6 +468,7 @@ fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub fn process_return(
+    app_handle: tauri::AppHandle,
     db: State<Mutex<Connection>>,
     payload: ProcessReturnRequest,
 ) -> Result<ReturnResponse, String> {
@@ -468,13 +479,28 @@ pub fn process_return(
     
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     
-    // Validate Sale Exists
-    let sale_exists: bool = tx.query_row("SELECT 1 FROM sales WHERE id = ?", [&payload.sale_id], |_| Ok(true))
-        .optional().map_err(|e| e.to_string())?.unwrap_or(false);
-    if !sale_exists { return Err(format!("Venta no encontrada: {}", payload.sale_id)); }
+    let sale_date: Option<String> = tx.query_row(
+        "SELECT sale_date FROM sales WHERE id = ?", 
+        [&payload.sale_id], 
+        |row| row.get(0)
+    ).optional().map_err(|e| e.to_string())?;
     
-    // Validate Items & Available Quantities
-    let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new(); // item, name, code, pid
+    let sale_date = sale_date.ok_or(format!("Venta no encontrada: {}", payload.sale_id))?;
+    
+    if payload.reason == "cancellation" {
+        let sale_datetime = chrono::NaiveDateTime::parse_from_str(&sale_date, "%Y-%m-%d %H:%M:%S")
+            .or_else(|_| chrono::DateTime::parse_from_rfc3339(&sale_date).map(|dt| dt.naive_utc()))
+            .map_err(|_| format!("Error parseando fecha de venta: {}", sale_date))?;
+        
+        let now = Utc::now().naive_utc();
+        let hours_since_sale = (now - sale_datetime).num_hours();
+        
+        if hours_since_sale >= 1 {
+            return Err("Esta venta excede el tiempo permitido para cancelación (1 hora)".to_string());
+        }
+    }
+    
+    let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new();
     let mut available_quantities: HashMap<String, f64> = HashMap::new();
     
     for item in &payload.items {
@@ -488,7 +514,7 @@ pub fn process_return(
         let item_ids: Vec<&String> = payload.items.iter().map(|i| &i.sale_item_id).collect();
         let ph = item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         
-        let q_sale = format!("SELECT id, quantity, product_name, product_code, product_id, subtotal FROM sale_items WHERE id IN ({}) AND sale_id = ?", ph);
+        let q_sale = format!("SELECT id, quantity, product_name, product_code, product_id, total FROM sale_items WHERE id IN ({}) AND sale_id = ?", ph);
         let mut stmt = tx.prepare(&q_sale).map_err(|e| e.to_string())?;
         let mut params: Vec<&dyn rusqlite::ToSql> = item_ids.iter().map(|id| *id as &dyn rusqlite::ToSql).collect();
         params.push(&payload.sale_id);
@@ -499,13 +525,13 @@ pub fn process_return(
             r.get::<_, String>(2)?,  // product_name
             r.get::<_, String>(3)?,  // product_code
             r.get::<_, String>(4)?,  // product_id
-            r.get::<_, f64>(5)?      // subtotal (paid amount)
+            r.get::<_, f64>(5)?      // total (net amount per line)
         ))).map_err(|e| e.to_string())?;
         
         let mut map = HashMap::new();
         for r in rows {
-            let (id, q, n, c, pid, subtotal) = r.map_err(|e| e.to_string())?;
-            map.insert(id, (q, n, c, pid, subtotal));
+            let (id, q, n, c, pid, total) = r.map_err(|e| e.to_string())?;
+            map.insert(id, (q, n, c, pid, total));
         }
         sale_items_data = map;
         
@@ -523,7 +549,7 @@ pub fn process_return(
     }
 
     for item in &payload.items {
-        let (orig_qty, name, code, pid, db_subtotal) = sale_items_data.get(&item.sale_item_id)
+        let (orig_qty, name, code, pid, db_total) = sale_items_data.get(&item.sale_item_id)
             .ok_or(format!("Item no encontrado: {}", item.sale_item_id))?;
             
         let returned_so_far = already_returned_map.get(&item.sale_item_id).copied().unwrap_or(0.0);
@@ -534,7 +560,7 @@ pub fn process_return(
             return Err(format!("Exceso de devolución para '{}'. Disp: {:.2}, Solicitado: {}", name, available, item.quantity));
         }
         
-        let real_unit_price = if *orig_qty > 0.0001 { db_subtotal / orig_qty } else { 0.0 };
+        let real_unit_price = if *orig_qty > 0.0001 { db_total / orig_qty } else { 0.0 };
         
         let mut validated_item = item.clone();
         validated_item.unit_price = real_unit_price;
@@ -560,10 +586,21 @@ pub fn process_return(
     let return_id = Uuid::new_v4().to_string();
     create_return_records(&tx, &payload, return_total, &validated_items, &return_id)?;
     
-    // Update Sale Status
-    update_sale_status(&tx, &payload.sale_id)?;
+    // Update Sale Status (passes reason to detect cancellation)
+    update_sale_status(&tx, &payload.sale_id, &payload.reason)?;
     
     tx.commit().map_err(|e| e.to_string())?;
+
+    // Auto-Print Voucher if generated
+    if !voucher_code.is_empty() {
+        let app_handle_clone = app_handle.clone();
+        let sale_id_clone = payload.sale_id.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(e) = crate::printer_utils::print_voucher_from_db(app_handle_clone, sale_id_clone) {
+                eprintln!("Error auto-printing voucher: {}", e);
+            }
+        });
+    }
     
     Ok(ReturnResponse {
         return_id,

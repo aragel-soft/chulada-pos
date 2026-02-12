@@ -46,6 +46,29 @@ export interface SaleDetail extends SaleMaster {
   cancellation_reason?: string;
   cancelled_at?: string;
   items: SaleHistoryItem[];
+  returns: ReturnSummary[];
+  voucher?: VoucherInfo;
+}
+
+export interface ReturnSummary {
+  id: string;
+  folio: number;
+  return_date: string;
+  total: number;
+  reason: string;
+  notes?: string;
+}
+
+export interface VoucherInfo {
+  id: string;
+  code: string;
+  initial_balance: number;
+  current_balance: number;
+  is_active: boolean;
+  is_used: boolean;
+  is_expired: boolean;
+  created_at: string;
+  expires_at?: string;
 }
 
 export interface SaleHistoryItem {
