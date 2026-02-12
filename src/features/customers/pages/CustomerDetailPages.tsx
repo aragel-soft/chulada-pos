@@ -208,50 +208,44 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="flex flex-col h-full p-4 mt-2 gap-4 bg-background animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col gap-4 border-b pb-4">
-        <div className="flex items-center gap-2">
+      {/* Header Compacto */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4 mt-2">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
-            size="sm"
-            className="-ml-2 text-muted-foreground hover:text-foreground"
+            size="icon"
+            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={() => navigate(-1)}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Clientes
+            <ArrowLeft className="h-6 w-6" />
           </Button>
-        </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <User className="h-7 w-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                {customer.name}
-              </h1>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                <Badge
-                  variant="outline"
-                  className="font-mono text-xs font-normal"
-                >
-                  {customer.code || "S/C"}
-                </Badge>
-                <CopyablePhone phone={customer.phone} />
-              </div>
+          <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <User className="h-7 w-7" />
+          </div>
+          
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              {customer.name}
+            </h1>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+              <Badge
+                variant="outline"
+                className="font-mono text-xs font-normal"
+              >
+                {customer.code || "S/C"}
+              </Badge>
+              <CopyablePhone phone={customer.phone} />
             </div>
           </div>
+        </div>
 
-          <div className="flex items-end gap-4">
-            <div className="text-right min-w-[120px]">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                Saldo Actual
-              </p>
-              <div className={`text-3xl font-bold ${balanceColorClass}`}>
-                {formatCurrency(currentBalance)}
-              </div>
-            </div>
+        <div className="text-right min-w-[120px]">
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            Saldo Actual
+          </p>
+          <div className={`text-3xl font-bold ${balanceColorClass}`}>
+            {formatCurrency(currentBalance)}
           </div>
         </div>
       </div>
@@ -337,6 +331,7 @@ function CustomerDetailSkeleton() {
     <div className="p-6 space-y-6 h-full bg-background">
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
           <Skeleton className="h-16 w-16 rounded-full" />
           <div className="space-y-2">
             <Skeleton className="h-6 w-48" />
