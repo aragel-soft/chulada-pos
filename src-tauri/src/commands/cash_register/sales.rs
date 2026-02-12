@@ -31,6 +31,63 @@ pub struct SaleRequest {
     pub notes: Option<String>,
     pub items: Vec<SaleItemRequest>,
     pub should_print: bool,
+    pub voucher_code: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VoucherValidationResponse {
+    pub id: String,
+    pub code: String,
+    pub initial_balance: f64,
+    pub current_balance: f64,
+    pub is_active: bool,
+    pub expires_at: Option<String>,
+}
+
+#[tauri::command]
+pub fn validate_voucher(
+    db: State<Mutex<Connection>>,
+    code: String,
+) -> Result<VoucherValidationResponse, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    
+    let voucher = conn.query_row(
+        "SELECT id, code, initial_balance, current_balance, is_active, expires_at 
+         FROM store_vouchers 
+         WHERE code = ?1",
+        [&code],
+        |row| {
+            Ok(VoucherValidationResponse {
+                id: row.get(0)?,
+                code: row.get(1)?,
+                initial_balance: row.get(2)?,
+                current_balance: row.get(3)?,
+                is_active: row.get(4)?,
+                expires_at: row.get(5)?,
+            })
+        }
+    ).optional().map_err(|e| e.to_string())?;
+
+    match voucher {
+        Some(v) => {
+            if !v.is_active {
+                return Err("El vale no está activo.".to_string());
+            }
+            if v.current_balance <= 0.0 {
+                return Err("El vale no tiene saldo disponible.".to_string());
+            }
+            if let Some(expiry) = &v.expires_at {
+                let expiry_date = chrono::NaiveDateTime::parse_from_str(expiry, "%Y-%m-%d %H:%M:%S")
+                    .map_err(|_| "Error formateando fecha de expiración".to_string())?;
+                let now = chrono::Local::now().naive_local();
+                if now > expiry_date {
+                    return Err("El vale ha expirado.".to_string());
+                }
+            }
+            Ok(v)
+        },
+        None => Err("Vale no encontrado.".to_string()),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +96,7 @@ pub struct SaleResponse {
     pub folio: String,
     pub total: f64,
     pub change: f64,
+    pub voucher_used: f64,
 }
 
 // Helper struct for inserting items
@@ -663,10 +721,44 @@ pub fn process_sale(
     
     let final_total = total_gross - total_item_discounts;
 
+    // VOUCHER PROCESSING
+    let mut voucher_amount_used = 0.0;
+    let mut voucher_id_used: Option<String> = None;
+
+    if let Some(code) = &payload.voucher_code {
+         let (v_id, v_balance, v_active, v_expiry): (String, f64, bool, Option<String>) = tx.query_row(
+            "SELECT id, current_balance, is_active, expires_at FROM store_vouchers WHERE code = ?",
+            [code],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        ).map_err(|_| "Vale no encontrado.".to_string())?;
+
+        // Re-validate inside transaction to be safe
+        if !v_active { return Err("El vale no está activo.".to_string()); }
+        if v_balance <= 0.0 { return Err("El vale no tiene saldo disponible.".to_string()); }
+        if let Some(expiry) = v_expiry {
+             let expiry_date = chrono::NaiveDateTime::parse_from_str(&expiry, "%Y-%m-%d %H:%M:%S")
+                    .map_err(|_| "Error verificando fecha expiración".to_string())?;
+             if chrono::Local::now().naive_local() > expiry_date {
+                 return Err("El vale ha expirado.".to_string());
+             }
+        }
+
+        // Calculate amount to use: Min(SaleTotal, VoucherBalance)
+        // Note: If mixed payment, we assume voucher is applied first to reduce pending total.
+        // But logic should be: TotalPaid = Cash + Card + Voucher.
+        // If Cash + Card is already covering everything, voucher might not be needed? 
+        // Requirement: "El monto aplicado del vale debe ser el menor entre: saldo y total pendiente".
+        // Here we assume "Total Pendiente" is the FinalTotal because calculations happen before payment check.
+        
+        let max_applicable = if v_balance > final_total { final_total } else { v_balance };
+        voucher_amount_used = max_applicable;
+        voucher_id_used = Some(v_id);
+    }
+
     // Validate Payment
-    let total_paid = payload.cash_amount + payload.card_transfer_amount;
+    let total_paid = payload.cash_amount + payload.card_transfer_amount + voucher_amount_used;
     if total_paid < final_total - 0.01 {
-      return Err(format!("Pago insuficiente. Total calculado: ${:.2}, Pagado: ${:.2}", final_total, total_paid));
+      return Err(format!("Pago insuficiente. Total calculado: ${:.2}, Pagado: ${:.2} (Incluye ${:.2} de vale)", final_total, total_paid, voucher_amount_used));
     }
 
     // Credit Validation
@@ -757,6 +849,30 @@ pub fn process_sale(
         ).map_err(|e| format!("Error insertando item {}: {}", data.db_name, e))?;
     }
 
+    // Handle Voucher Deduction & Recording
+    if let Some(v_id) = voucher_id_used {
+        if voucher_amount_used > 0.0 {
+            // Deduct from voucher
+            tx.execute(
+                "UPDATE store_vouchers SET current_balance = current_balance - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+                params![voucher_amount_used, v_id]
+            ).map_err(|e| format!("Error actualizando saldo del vale: {}", e))?;
+
+            // Check if fully redeemed
+            tx.execute(
+                "UPDATE store_vouchers SET is_active = 0, used_at = CURRENT_TIMESTAMP WHERE id = ?1 AND current_balance <= 0",
+                params![v_id]
+            ).map_err(|e| format!("Error marcando vale como redimido: {}", e))?;
+
+            // Insert into sale_vouchers
+            let sv_id = Uuid::new_v4().to_string();
+            tx.execute(
+                "INSERT INTO sale_vouchers (id, sale_id, voucher_id, amount) VALUES (?1, ?2, ?3, ?4)",
+                params![sv_id, sale_id, v_id, voucher_amount_used]
+            ).map_err(|e| format!("Error registrando uso de vale: {}", e))?;
+        }
+    }
+
     // Commit
     tx.commit().map_err(|e| e.to_string())?;
     
@@ -779,6 +895,7 @@ pub fn process_sale(
         folio,
         total: final_total,
         change,
+        voucher_used: voucher_amount_used,
     })
 }
 
