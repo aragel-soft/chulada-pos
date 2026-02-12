@@ -281,6 +281,9 @@ pub struct TicketData {
     pub discount: f64,
     pub total: f64,
     pub paid_amount: f64,
+    pub cash_amount: f64,
+    pub card_amount: f64,
+    pub voucher_amount: f64,
     pub change: f64,
     pub customer_name: Option<String>,
     pub returns: Vec<ReturnDeduction>,
@@ -393,6 +396,13 @@ pub fn print_sale_from_db(
         (sale_row, items, settings)
     };
 
+    // Calculate Voucher Amount
+    let voucher_amount: f64 = conn.query_row(
+        "SELECT IFNULL(SUM(amount), 0.0) FROM sale_vouchers WHERE sale_id = ?1",
+        [&sale_id],
+        |row| row.get(0)
+    ).unwrap_or(0.0);
+
     // Calculate Returns Map
     let mut returns_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
     if sale_status == "partial_return" { 
@@ -445,7 +455,7 @@ pub fn print_sale_from_db(
         (filtered_items, new_subtotal, new_discount_amt, new_total)
     };
     
-    let paid_amount = cash + card;
+    let paid_amount = cash + card + voucher_amount;
     let change = if paid_amount > total { paid_amount - total } else { 0.0 };
 
     let hardware_config = load_settings(app_handle.clone())
@@ -460,7 +470,11 @@ pub fn print_sale_from_db(
         subtotal,
         discount,
         total,
+
         paid_amount,
+        cash_amount: cash,
+        card_amount: card,
+        voucher_amount,
         change,
         customer_name: None,
         returns: Vec::new(), 
@@ -841,7 +855,16 @@ pub fn print_ticket(
     let total_items_count: f64 = data.items.iter().map(|i| i.quantity).sum();
     job_content.extend_from_slice(format!("TOTAL ARTICULOS: {:>10.2}\n", total_items_count).as_bytes());
     
-    job_content.extend_from_slice(format!("EFECTIVO/PAGO: {:>10.2}\n", data.paid_amount).as_bytes());
+    // Payment Methods Breakdown
+    if data.cash_amount > 0.0 {
+        job_content.extend_from_slice(format!("EFECTIVO: {:>10.2}\n", data.cash_amount).as_bytes());
+    }
+    if data.card_amount > 0.0 {
+        job_content.extend_from_slice(format!("TARJETA: {:>10.2}\n", data.card_amount).as_bytes());
+    }
+    if data.voucher_amount > 0.0 {
+        job_content.extend_from_slice(format!("VALE: {:>10.2}\n", data.voucher_amount).as_bytes());
+    }
     job_content.extend_from_slice(format!("CAMBIO: {:>10.2}\n", data.change).as_bytes());
 
     // RETURN DEDUCTIONS (only for partial returns)
