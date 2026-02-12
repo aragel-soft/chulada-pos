@@ -8,7 +8,7 @@ import {
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle, Search, User, Check, AlertCircle } from "lucide-react";
+import { Wallet, CreditCard, Banknote, Coins, Lock, Loader2, Printer, XCircle, Search, User, Check, AlertCircle, Ticket as TicketIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -17,6 +17,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getCustomers } from "@/lib/api/customers";
 import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
+import { validateVoucher } from "@/lib/api/cash-register/sales";
+import { VoucherValidationResponse } from "@/types/sale";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -27,7 +29,8 @@ interface CheckoutModalProps {
     cashAmount: number,
     cardAmount: number,
     shouldPrint: boolean,
-    customerId?: string
+    customerId?: string,
+    voucherCode?: string
   ) => Promise<void>;
   isProcessing: boolean;
 }
@@ -57,6 +60,13 @@ export function CheckoutModal({
 
   const cashInputRef = useRef<HTMLInputElement>(null);
   const cardInputRef = useRef<HTMLInputElement>(null);
+  const voucherInputRef = useRef<HTMLInputElement>(null);
+
+  // Voucher State
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherData, setVoucherData] = useState<VoucherValidationResponse | null>(null);
+  const [isVoucherOpen, setIsVoucherOpen] = useState(false);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
 
   // Reset state on open
   useEffect(() => {
@@ -66,6 +76,9 @@ export function CheckoutModal({
       setCardAmount("");
       setSelectedCustomer(null);
       setCustomerSearchQuery("");
+      setVoucherCode("");
+      setVoucherData(null);
+      setIsVoucherOpen(false);
       setTimeout(() => cashInputRef.current?.focus(), 100);
     }
   }, [isOpen, total]);
@@ -74,26 +87,57 @@ export function CheckoutModal({
   const numericCash = parseFloat(cashAmount) || 0;
   const numericCard = parseFloat(cardAmount) || 0;
 
+  // Voucher Logic
+  const handleValidateVoucher = async () => {
+      if (!voucherCode.trim()) return;
+      setIsValidatingVoucher(true);
+      try {
+          const voucher = await validateVoucher(voucherCode);
+          setVoucherData(voucher);
+          setIsVoucherOpen(false);
+          setVoucherCode(""); // Clear input
+          toast.success("Vale aplicado correctamente");
+      } catch (error: any) {
+          toast.error(error?.toString() || "Error al validar vale");
+          setVoucherData(null);
+      } finally {
+          setIsValidatingVoucher(false);
+      }
+  };
+
+  const removeVoucher = () => {
+      setVoucherData(null);
+  };
+
+  // Calculations with Voucher
+  const voucherBalance = voucherData?.current_balance || 0;
+  // Amount applied is Min(Total, VoucherBalance)
+  const voucherAppliedAmount = voucherData ? Math.min(total, voucherBalance) : 0;
+  
+  // Remaining total to pay after voucher
+  const remainingTotal = Math.max(0, total - voucherAppliedAmount);
+
   // Update logic based on method
   useEffect(() => {
     if (method === "card_transfer") {
-      setCardAmount(total.toString());
+      setCardAmount(remainingTotal.toString());
       setCashAmount("0");
     } else if (method == "cash") {
         setCardAmount("0");
     }
-  }, [method, total]);
+  }, [method, remainingTotal]);
 
   // Auto-calculate Card amount in Mixed mode
   useEffect(() => {
     if (method === "mixed") {
         const currentCash = parseFloat(cashAmount) || 0;
-        const remaining = Math.max(0, total - currentCash);
+        const remaining = Math.max(0, remainingTotal - currentCash);
         
+        // Exact calculation to avoid floating point issues
         const newCardVal = remaining > 0 ? remaining.toFixed(2) : "0";
         setCardAmount(newCardVal);
     }
-  }, [cashAmount, method, total]);
+  }, [cashAmount, method, remainingTotal]);
 
   // Search Customers
   useEffect(() => {
@@ -168,33 +212,51 @@ export function CheckoutModal({
   }, [isOpen, customerSearchOpen]);
 
 
+
+
+  // Re-calculate change and missing based on remainingTotal
   const calculateChange = () => {
     if (method === "cash") {
-      return numericCash - total;
+      return numericCash - remainingTotal;
     }
     if (method === "mixed") {
-      return (numericCash + numericCard) - total;
+      return (numericCash + numericCard) - remainingTotal;
     }
     return 0;
   };
 
   const change = calculateChange();
-  const missing = total - (numericCash + numericCard);
+  const missing = remainingTotal - (numericCash + numericCard);
   
   const isCreditLimitExceeded = () => {
       if (!selectedCustomer) return false;
-      return (selectedCustomer.current_balance + total) > selectedCustomer.credit_limit;
+      return (selectedCustomer.current_balance + remainingTotal) > selectedCustomer.credit_limit;
   };
 
   const isValid = () => {
+      if (remainingTotal === 0 && voucherData) return true; // Fully paid by voucher
+
       if (method === "credit") {
           return !!selectedCustomer && !isCreditLimitExceeded();
       }
       if (method === "card_transfer") return true; 
-      if (method === "cash") return numericCash >= total - 0.01; // tolerance
-      if (method === "mixed") return (numericCash + numericCard) >= total - 0.01;
+      if (method === "cash") return numericCash >= remainingTotal - 0.01; // tolerance
+      if (method === "mixed") return (numericCash + numericCard) >= remainingTotal - 0.01;
       return false;
   };
+
+  // Update default amounts when voucher changes
+  useEffect(() => {
+      if (method === "cash") {
+          setCashAmount(remainingTotal.toString());
+      } else if (method === "card_transfer") {
+          setCardAmount(remainingTotal.toString());
+      } else if (method === "mixed") {
+         // Reset mixed or adjust? Let's reset for safety or adjust card
+         setCashAmount("");
+         setCardAmount(remainingTotal.toString());
+      }
+  }, [voucherAppliedAmount, method, remainingTotal]); // Depend on voucherAppliedAmount
 
   const handleConfirm = (shouldPrint: boolean) => {
       if (isProcessing) return;
@@ -209,7 +271,14 @@ export function CheckoutModal({
           return;
       }
       
-      onProcessSale(method, numericCash, numericCard, shouldPrint, selectedCustomer?.id);
+      onProcessSale(
+          method, 
+          numericCash, 
+          numericCard, 
+          shouldPrint, 
+          selectedCustomer?.id,
+          voucherData?.code // Pass voucher code
+      );
   };
 
   const addQuickCash = (amount: number) => {
@@ -230,9 +299,16 @@ export function CheckoutModal({
             </span>
             <div className="text-right">
               <p className="text-sm text-muted-foreground uppercase tracking-widest font-semibold">Total a Pagar</p>
-              <p className="text-5xl font-extrabold text-[#480489] tabular-nums">
-                {formatCurrency(total)}
-              </p>
+              <div className="flex flex-col items-end">
+                {voucherData && (
+                    <span className="text-sm text-green-600 font-bold strike-through decoration-zinc-400 decoration-2">
+                        {formatCurrency(total)}
+                    </span>
+                )}
+                <p className="text-5xl font-extrabold text-[#480489] tabular-nums">
+                    {formatCurrency(remainingTotal)}
+                </p>
+              </div>
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -267,6 +343,70 @@ export function CheckoutModal({
               icon={<Lock className="w-5 h-5" />}
               label="Crédito a Cliente"
             />
+            
+            <div className="pt-4 border-t mt-4">
+                 {!voucherData ? (
+                    <Dialog open={isVoucherOpen} onOpenChange={setIsVoucherOpen}>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Aplicar Vale de Tienda</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Código del Vale / Escanear</label>
+                                    <input
+                                        ref={voucherInputRef}
+                                        className="w-full text-2xl font-bold p-3 border rounded-md uppercase tracking-wider text-center"
+                                        placeholder="VALE-XXXX"
+                                        value={voucherCode}
+                                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleValidateVoucher();
+                                        }}
+                                        autoFocus
+                                    />
+                                </div>
+                                <Button 
+                                    className="w-full h-12 text-lg bg-[#480489] hover:bg-[#360368]"
+                                    onClick={handleValidateVoucher}
+                                    disabled={!voucherCode || isValidatingVoucher}
+                                >
+                                    {isValidatingVoucher ? <Loader2 className="animate-spin mr-2"/> : "Validar y Aplicar"}
+                                </Button>
+                            </div>
+                        </DialogContent>
+                        <Button 
+                            variant="outline" 
+                            className="w-full justify-start gap-3 h-12 text-zinc-600 border-dashed border-2 hover:border-[#480489] hover:text-[#480489] hover:bg-purple-50"
+                            onClick={() => setIsVoucherOpen(true)}
+                        >
+                            <TicketIcon className="w-5 h-5" />
+                            <span className="font-semibold">Usar Vale de Tienda</span>
+                        </Button>
+                    </Dialog>
+                 ) : (
+                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 relative group">
+                         <div className="flex justify-between items-start">
+                             <div>
+                                 <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Vale Aplicado</p>
+                                 <p className="font-mono font-bold text-green-900">{voucherData.code}</p>
+                                 <p className="text-xs text-green-600 mt-1">Saldo rest.: {formatCurrency(Math.max(0, voucherData.current_balance - voucherAppliedAmount))}</p>
+                             </div>
+                             <div className="text-right">
+                                 <p className="text-lg font-bold text-green-700">-{formatCurrency(voucherAppliedAmount)}</p>
+                             </div>
+                         </div>
+                         <Button
+                            variant="ghost" 
+                            size="icon"
+                            className="absolute -top-2 -right-2 bg-white shadow-sm border rounded-full w-6 h-6 hover:bg-red-50 hover:text-red-600"
+                            onClick={removeVoucher}
+                         >
+                             <XCircle className="w-4 h-4" />
+                         </Button>
+                     </div>
+                 )}
+            </div>
           </div>
 
           {/*Inputs & Details */}
@@ -363,13 +503,13 @@ export function CheckoutModal({
                                  </div>
                                  <div className="flex justify-between text-sm">
                                      <span>+ Esta Venta:</span>
-                                     <span className="font-bold">{formatCurrency(total)}</span>
+                                     <span className="font-bold">{formatCurrency(remainingTotal)}</span>
                                  </div>
                                  <div className="h-px bg-black/10 my-2" />
                                  <div className="flex justify-between text-base font-bold">
                                      <span>Nuevo Saldo:</span>
                                      <span className={isCreditLimitExceeded() ? "text-red-600" : "text-zinc-900"}>
-                                         {formatCurrency(selectedCustomer.current_balance + total)}
+                                         {formatCurrency(selectedCustomer.current_balance + remainingTotal)}
                                      </span>
                                  </div>
                                  <div className="flex justify-between text-sm pt-2 text-muted-foreground">
@@ -381,7 +521,7 @@ export function CheckoutModal({
                              {isCreditLimitExceeded() && (
                                  <div className="mt-4 bg-red-100 text-red-800 p-3 rounded-md text-sm font-semibold flex items-center gap-2">
                                      <XCircle className="w-4 h-4" />
-                                     Límite de crédito excedido por {formatCurrency((selectedCustomer.current_balance + total) - selectedCustomer.credit_limit)}
+                                     Límite de crédito excedido por {formatCurrency((selectedCustomer.current_balance + remainingTotal) - selectedCustomer.credit_limit)}
                                  </div>
                              )}
                          </div>
@@ -432,7 +572,7 @@ export function CheckoutModal({
                 <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
                     <CreditCard className="w-24 h-24 opacity-20" />
                     <p className="text-xl font-medium">Cobro exacto a tarjeta</p>
-                    <p className="text-3xl font-bold text-zinc-900">{formatCurrency(total)}</p>
+                    <p className="text-3xl font-bold text-zinc-900">{formatCurrency(remainingTotal)}</p>
                 </div>
             )}
 

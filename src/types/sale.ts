@@ -24,6 +24,7 @@ export interface SaleResponse {
   id: string;
   folio: string;
   total: number;
+  change: number;
   voucher_used: number;
 }
 
