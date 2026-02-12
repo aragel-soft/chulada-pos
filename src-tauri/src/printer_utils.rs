@@ -280,13 +280,11 @@ pub struct TicketData {
     pub subtotal: f64,
     pub discount: f64,
     pub total: f64,
-    pub paid_amount: f64,
     pub cash_amount: f64,
     pub card_amount: f64,
     pub voucher_amount: f64,
     pub change: f64,
     pub customer_name: Option<String>,
-    pub returns: Vec<ReturnDeduction>,
 }
 
 pub struct TicketItem {
@@ -299,10 +297,102 @@ pub struct TicketItem {
     pub id: String,
 }
 
-pub struct ReturnDeduction {
-    pub product_name: String,
-    pub quantity: f64,
-    pub subtotal: f64,
+// --- Builder & Helpers ---
+
+pub struct ReceiptBuilder {
+    pub content: Vec<u8>,
+    pub max_width: u32,
+    pub max_chars: usize,
+}
+
+impl ReceiptBuilder {
+    pub fn new(printer_width_mm: u32) -> Self {
+        let (max_width, max_chars) = if printer_width_mm == 58 { (384, 32) } else { (512, 48) };
+        Self {
+            content: Vec::new(),
+            max_width,
+            max_chars,
+        }
+    }
+
+    pub fn init(&mut self) {
+        self.content.extend_from_slice(CMD_INIT);
+        self.content.extend_from_slice(CMD_CODE_TABLE_PC437);
+    }
+
+    pub fn align_left(&mut self) { self.content.extend_from_slice(CMD_ALIGN_LEFT); }
+    pub fn align_center(&mut self) { self.content.extend_from_slice(CMD_ALIGN_CENTER); }
+    pub fn align_right(&mut self) { self.content.extend_from_slice(CMD_ALIGN_RIGHT); }
+
+    pub fn set_bold(&mut self, on: bool) {
+        self.content.extend_from_slice(if on { CMD_BOLD_ON } else { CMD_BOLD_OFF });
+    }
+
+    pub fn set_size_normal(&mut self) { self.content.extend_from_slice(CMD_SIZE_NORMAL); }
+    pub fn set_size_double_h(&mut self) { self.content.extend_from_slice(CMD_SIZE_DOUBLE_H); }
+    pub fn set_size_double_hw(&mut self) { self.content.extend_from_slice(CMD_SIZE_DOUBLE_HW); }
+
+    pub fn add_text(&mut self, text: &str) {
+        self.content.extend_from_slice(text.as_bytes());
+    }
+
+    pub fn add_text_ln(&mut self, text: &str) {
+        self.content.extend_from_slice(format!("{}\n", text).as_bytes());
+    }
+
+    pub fn add_image(&mut self, bytes: &[u8]) {
+        self.content.extend_from_slice(bytes);
+        self.content.extend_from_slice(b"\n");
+    }
+
+    pub fn add_separator(&mut self, char: char) {
+        let sep = char.to_string().repeat(self.max_chars);
+        self.add_text_ln(&sep);
+    }
+
+    pub fn cut(&mut self) {
+        self.content.extend_from_slice(CMD_CUT);
+    }
+
+    pub fn build(self) -> Vec<u8> {
+        self.content
+    }
+}
+
+fn print_store_header(builder: &mut ReceiptBuilder, settings: &BusinessSettings, app_handle: &tauri::AppHandle) {
+    // LOGO
+    let logo_width = (builder.max_width as f64 * 0.5) as u32; 
+    if let Some(cmds) = resolve_logo_bytes(app_handle, &settings.logo_path, logo_width) {
+        builder.align_center();
+        builder.add_image(&cmds);
+    }
+
+    // STORE INFO
+    builder.align_center();
+    if !settings.store_name.is_empty() {
+        builder.set_bold(true);
+        builder.add_text_ln(&settings.store_name);
+        builder.set_bold(false);
+    }
+    if !settings.store_address.is_empty() {
+        builder.add_text_ln(&settings.store_address);
+    }
+    builder.add_text("\n");
+
+    // HEADER MESSAGE
+    if !settings.ticket_header.is_empty() {
+        builder.add_text_ln(&settings.ticket_header);
+        builder.add_text("\n");
+    }
+}
+
+fn print_receipt_footer(builder: &mut ReceiptBuilder, settings: &BusinessSettings) {
+    builder.align_center();
+    if !settings.ticket_footer.is_empty() {
+        builder.add_text("\n");
+        builder.add_text_ln(&settings.ticket_footer);
+        builder.add_text("\n");
+    }
 }
 
 pub fn print_sale_from_db(
@@ -470,14 +560,11 @@ pub fn print_sale_from_db(
         subtotal,
         discount,
         total,
-
-        paid_amount,
         cash_amount: cash,
         card_amount: card,
         voucher_amount,
         change,
         customer_name: None,
-        returns: Vec::new(), 
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
@@ -555,106 +642,75 @@ pub fn print_voucher_from_db(
         .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
 
     let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
-    let (max_width, max_chars) = if width_val == 58 { (384, 32) } else { (512, 48) };
+    let mut builder = ReceiptBuilder::new(width_val);
+    
+    builder.init();
 
-    let mut job_content = Vec::new();
+    // HEADER
+    print_store_header(&mut builder, &settings, &app_handle);
 
-    // Init
-    job_content.extend_from_slice(CMD_INIT);
-    job_content.extend_from_slice(CMD_CODE_TABLE_PC437);
-
-    // LOGO
-    let logo_width = (max_width as f64 * 0.5) as u32; // 50% width
-    if let Some(cmds) = resolve_logo_bytes(&app_handle, &settings.logo_path, logo_width) {
-        job_content.extend_from_slice(CMD_ALIGN_CENTER);
-        job_content.extend_from_slice(&cmds);
-        job_content.extend_from_slice(b"\n");
-    }
-
-    // STORE INFO
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    if !settings.store_name.is_empty() {
-        job_content.extend_from_slice(CMD_BOLD_ON);
-        job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
-        job_content.extend_from_slice(CMD_BOLD_OFF);
-    }
-    if !settings.store_address.is_empty() {
-        job_content.extend_from_slice(format!("{}\n", settings.store_address).as_bytes());
-    }
-
-
-    // SEPARATOR
-    let separator = "=".repeat(max_chars as usize);
-    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+    builder.add_separator('=');
 
     // VOUCHER TITLE
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    job_content.extend_from_slice(CMD_BOLD_ON);
-    job_content.extend_from_slice(CMD_SIZE_DOUBLE_HW);
-    job_content.extend_from_slice(b"VALE DE TIENDA\n");
-    job_content.extend_from_slice(CMD_SIZE_NORMAL);
-    job_content.extend_from_slice(CMD_BOLD_OFF);
-    job_content.extend_from_slice(b"\n");
+    builder.align_center();
+    builder.set_bold(true);
+    builder.set_size_double_hw();
+    builder.add_text_ln("VALE DE TIENDA");
+    builder.set_size_normal();
+    builder.set_bold(false);
+    builder.add_text("\n");
 
     // VOUCHER CODE
-    job_content.extend_from_slice(CMD_BOLD_ON);
-    job_content.extend_from_slice(format!("Codigo: {}\n", code).as_bytes());
-    job_content.extend_from_slice(CMD_BOLD_OFF);
+    builder.set_bold(true);
+    builder.add_text_ln(&format!("Codigo: {}", code));
+    builder.set_bold(false);
 
-    // BARCODE as raster image
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    if let Ok(barcode_cmds) = generate_barcode_escpos(&code, max_width) {
-        job_content.extend_from_slice(&barcode_cmds);
-        job_content.extend_from_slice(b"\n");
+    // BARCODE
+    builder.align_center();
+    if let Ok(barcode_cmds) = generate_barcode_escpos(&code, builder.max_width) {
+        builder.add_image(&barcode_cmds);
     }
 
-    // SEPARATOR
-    let dash_separator = "-".repeat(max_chars as usize);
-    job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
+    builder.add_separator('-');
 
     // BALANCE
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    job_content.extend_from_slice(CMD_BOLD_ON);
-    job_content.extend_from_slice(CMD_SIZE_DOUBLE_H);
-    job_content.extend_from_slice(format!("SALDO: ${:.2}\n", current_balance).as_bytes());
-    job_content.extend_from_slice(CMD_SIZE_NORMAL);
-    job_content.extend_from_slice(CMD_BOLD_OFF);
-    job_content.extend_from_slice(b"\n");
+    builder.align_center();
+    builder.set_bold(true);
+    builder.set_size_double_h();
+    builder.add_text_ln(&format!("SALDO: ${:.2}", current_balance));
+    builder.set_size_normal();
+    builder.set_bold(false);
+    builder.add_text("\n");
 
-    job_content.extend_from_slice(format!("{}\n", dash_separator).as_bytes());
+    builder.add_separator('-');
 
     // DETAILS
-    job_content.extend_from_slice(CMD_ALIGN_LEFT);
-    job_content.extend_from_slice(format!("Venta original: {}\n", remove_accents(&sale_folio)).as_bytes());
-    job_content.extend_from_slice(format!("Fecha emision: {}\n", remove_accents(&created_at)).as_bytes());
+    builder.align_left();
+    builder.add_text_ln(&format!("Venta original: {}", remove_accents(&sale_folio)));
+    builder.add_text_ln(&format!("Fecha emision: {}", remove_accents(&created_at)));
 
     // FOR THE MOMENT, THE VOUCHERS DON'T HAVE AN EXPIRATION DATE
     // if let Some(ref exp) = expires_at {
-    //     job_content.extend_from_slice(format!("Vigencia: {}\n", remove_accents(exp)).as_bytes());
+    //     builder.add_text_ln(format!("Vigencia: {}", remove_accents(exp)));
     // } else {
-    //     job_content.extend_from_slice(b"Vigencia: Sin fecha de expiracion\n");
+    //     builder.add_text_ln("Vigencia: Sin fecha de expiracion");
     // }
-    // job_content.extend_from_slice(b"\n");
+    // builder.add_text("\n");
 
     // NOTICE
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    job_content.extend_from_slice(b"Este vale es valido para compras\n");
-    job_content.extend_from_slice(b"en tienda. No es canjeable\n");
-    job_content.extend_from_slice(b"por efectivo.\n");
+    builder.align_center();
+    builder.add_text_ln("Este vale es valido para compras");
+    builder.add_text_ln("en tienda. No es canjeable");
+    builder.add_text_ln("por efectivo.");
 
     // FOOTER
-    if !settings.ticket_footer.is_empty() {
-        job_content.extend_from_slice(b"\n");
-        job_content.extend_from_slice(settings.ticket_footer.as_bytes());
-        job_content.extend_from_slice(b"\n");
-    }
+    print_receipt_footer(&mut builder, &settings);
 
-    // Cut
-    job_content.extend_from_slice(CMD_CUT);
+    builder.cut();
 
     // Send
     printer
-        .print(&job_content, PrinterJobOptions::none())
+        .print(&builder.build(), PrinterJobOptions::none())
         .map_err(|e| format!("Error imprimiendo vale: {:?}", e))?;
 
     Ok(())
@@ -666,91 +722,60 @@ pub fn print_ticket(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
 
+    // --- Refactored Implementation using ReceiptBuilder ---
+
     let printers_list = printers::get_printers();
     let printer = printers_list
         .iter()
         .find(|p| p.name == printer_name)
         .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
-    let mut job_content = Vec::new();
-
-    // Init configuration
-    job_content.extend_from_slice(CMD_INIT);
-    job_content.extend_from_slice(CMD_CODE_TABLE_PC437);
-
-    // LOGO
     let width_val = data.hardware_config.printer_width.parse::<u32>().unwrap_or(80);
-    let (max_width, max_chars) = if width_val == 58 { (384, 32) } else { (512, 48) };
+    let mut builder = ReceiptBuilder::new(width_val);
     let settings = &data.business_settings;
 
-    let logo_width = (max_width as f64 * 0.5) as u32; // 50% width
-    if let Some(cmds) = resolve_logo_bytes(&app_handle, &settings.logo_path, logo_width) {
-        job_content.extend_from_slice(CMD_ALIGN_CENTER);
-        job_content.extend_from_slice(&cmds);
-        job_content.extend_from_slice(b"\n");
-    }
+    builder.init();
 
-    // STORE INFO
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    
-    // Store Name
-    if !settings.store_name.is_empty() {
-        job_content.extend_from_slice(CMD_BOLD_ON);
-        job_content.extend_from_slice(format!("{}\n", settings.store_name).as_bytes());
-        job_content.extend_from_slice(CMD_BOLD_OFF);
-    }
-
-    // Store Address
-    if !settings.store_address.is_empty() {
-        job_content.extend_from_slice(format!("{}\n", settings.store_address).as_bytes());
-    }
-    
-    job_content.extend_from_slice(b"\n");
-
-    // HEADER
-    if !settings.ticket_header.is_empty() {
-        job_content.extend_from_slice(settings.ticket_header.as_bytes());
-        job_content.extend_from_slice(b"\n\n");
-    }
+    // HEADER & STORE INFO
+    print_store_header(&mut builder, settings, &app_handle);
 
     // TICKET INFO
-    job_content.extend_from_slice(CMD_ALIGN_LEFT);
-    job_content.extend_from_slice(format!("Folio: {}\n", data.folio).as_bytes());
-    job_content.extend_from_slice(format!("Fecha: {}\n", data.date).as_bytes());
-    if let Some(cust) = data.customer_name {
-        job_content.extend_from_slice(format!("Cliente: {}\n", cust).as_bytes());
+    builder.align_left();
+    builder.add_text_ln(&format!("Folio: {}", data.folio));
+    builder.add_text_ln(&format!("Fecha: {}", data.date));
+    let total_items_count: f64 = data.items.iter().map(|i| i.quantity).sum();
+    builder.add_text_ln(&format!("TOTAL ARTICULOS: {:>10.2}", total_items_count));
+    if let Some(cust) = &data.customer_name {
+        builder.add_text_ln(&format!("Cliente: {}", cust));
     }
 
-    // ITEMS
-    
+    // ITEMS HEADER
     let qty_w = 4;
     let total_w = 9; 
     let sp = 1;
-    let desc_w = max_chars as usize - qty_w - total_w - (sp * 2);
+    let desc_w = builder.max_chars - qty_w - total_w - (sp * 2);
     
-    // Separator line
-    let separator = "-".repeat(max_chars as usize);
-    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+    builder.add_separator('-');
     
-    // Headers
     let header_qty = "CANT";
     let header_desc = "DESCRIPCION";
     let header_imp = "IMPORTE";
     
     let header_line = format!(
-        "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n", 
+        "{:<w_qty$} {:<w_desc$} {:>w_tot$}", 
         header_qty, header_desc, header_imp,
         w_qty = qty_w, w_desc = desc_w, w_tot = total_w
     );
-    // Truncate if header labels are too long
-    if header_line.len() > max_chars as usize + 1 {
-         job_content.extend_from_slice(b"CANT DESCRIPCION IMPORTE\n");
+    // Truncate header if too long
+    if header_line.len() > builder.max_chars + 1 {
+         builder.add_text_ln("CANT DESCRIPCION IMPORTE");
     } else {
-         job_content.extend_from_slice(header_line.as_bytes());
+         builder.add_text_ln(&header_line);
     }
 
-    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+    builder.add_separator('-');
 
+    // ITEMS LOOP
     // Group items by promotion_id
     use std::collections::HashMap;
     let mut promo_groups: HashMap<Option<String>, Vec<&TicketItem>> = HashMap::new();
@@ -767,13 +792,12 @@ pub fn print_ticket(
                 .map(|s| s.as_str())
                 .unwrap_or("Promocion");
             
-            // Promo header (explicitly marked as COMBO)
-            let promo_header = format!("COMBO: {}", remove_accents(promo_name));
-            job_content.extend_from_slice(CMD_BOLD_ON);
-            job_content.extend_from_slice(format!("{}\n", promo_header).as_bytes());
-            job_content.extend_from_slice(CMD_BOLD_OFF);
+            // Promo header
+            builder.set_bold(true);
+            builder.add_text_ln(&format!("COMBO: {}", remove_accents(promo_name)));
+            builder.set_bold(false);
             
-            // Items in promo (indented)
+            // Items in promo
             let mut promo_total = 0.0;
             for item in &items_group {
                 let clean_desc = remove_accents(&item.description);
@@ -784,29 +808,24 @@ pub fn print_ticket(
                 };
                 
                 let quantity_str = format!("{:<.2}", item.quantity);
-                let line = format!("  {}x {}\n", quantity_str, desc_display);
-                job_content.extend_from_slice(line.as_bytes());
+                builder.add_text_ln(&format!("  {}x {}", quantity_str, desc_display));
                 promo_total += item.total;
             }
             
-            // Promo total
-            let promo_total_line = format!("  Precio Promo: {:>10.2}\n", promo_total);
-            job_content.extend_from_slice(promo_total_line.as_bytes());
-            job_content.extend_from_slice(b"\n"); // Extra spacing
+            builder.add_text_ln(&format!("  Precio Promo: {:>10.2}", promo_total));
+            builder.add_text("\n");
             
         } else {
-            // NORMAL ITEMS - Consolidate duplicates
-            // Group by (description, unit_price) and sum quantities
+            // NORMAL ITEMS - Consolidate
             let mut consolidated: HashMap<(String, String), (f64, f64)> = HashMap::new();
             
             for item in &items_group {
                 let key = (item.description.clone(), format!("{:.2}", item.unit_price));
                 let entry = consolidated.entry(key).or_insert((0.0, 0.0));
-                entry.0 += item.quantity; // sum quantities
-                entry.1 += item.total;     // sum totals
+                entry.0 += item.quantity;
+                entry.1 += item.total;
             }
             
-            // Print consolidated items
             for ((description, _unit_price_str), (total_qty, total_amount)) in consolidated {
                 let quantity_str = format!("{:<.2}", total_qty);
                 let quantity_display = if quantity_str.len() > qty_w {
@@ -824,103 +843,51 @@ pub fn print_ticket(
                     clean_desc
                 };
 
-                job_content.extend_from_slice(
-                     format!(
-                         "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
-                         quantity_display,
-                         desc_display,
-                         total_str,
-                         w_qty = qty_w, 
-                         w_desc = desc_w, 
-                         w_tot = total_w
-                     ).as_bytes()
-                );
+                builder.add_text_ln(&format!(
+                     "{:<w_qty$} {:<w_desc$} {:>w_tot$}",
+                     quantity_display,
+                     desc_display,
+                     total_str,
+                     w_qty = qty_w, 
+                     w_desc = desc_w, 
+                     w_tot = total_w
+                 ));
             }
         }
     }
     
-    job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
+    builder.add_separator('-');
     
     // TOTALS
-    job_content.extend_from_slice(CMD_ALIGN_RIGHT);
-    job_content.extend_from_slice(format!("SUBTOTAL: {:>10.2}\n", data.subtotal).as_bytes());
+    builder.align_right();
+    builder.add_text_ln(&format!("SUBTOTAL: {:>10.2}", data.subtotal));
     if data.discount > 0.0 {
-        job_content.extend_from_slice(format!("DESCUENTO: {:>10.2}\n", data.discount).as_bytes());
+        builder.add_text_ln(&format!("DESCUENTO: {:>10.2}", data.discount));
     }
-    job_content.extend_from_slice(CMD_BOLD_ON);
-    job_content.extend_from_slice(format!("TOTAL: {:>10.2}\n", data.total).as_bytes());
-    job_content.extend_from_slice(CMD_BOLD_OFF);
+    builder.set_bold(true);
+    builder.add_text_ln(&format!("TOTAL: {:>10.2}", data.total));
+    builder.set_bold(false);
     
-    // Total Items Count
-    let total_items_count: f64 = data.items.iter().map(|i| i.quantity).sum();
-    job_content.extend_from_slice(format!("TOTAL ARTICULOS: {:>10.2}\n", total_items_count).as_bytes());
-    
-    // Payment Methods Breakdown
+    // Payment Methods
     if data.cash_amount > 0.0 {
-        job_content.extend_from_slice(format!("EFECTIVO: {:>10.2}\n", data.cash_amount).as_bytes());
+        builder.add_text_ln(&format!("EFECTIVO: {:>10.2}", data.cash_amount));
     }
     if data.card_amount > 0.0 {
-        job_content.extend_from_slice(format!("TARJETA: {:>10.2}\n", data.card_amount).as_bytes());
+        builder.add_text_ln(&format!("TARJETA: {:>10.2}", data.card_amount));
     }
     if data.voucher_amount > 0.0 {
-        job_content.extend_from_slice(format!("VALE: {:>10.2}\n", data.voucher_amount).as_bytes());
+        builder.add_text_ln(&format!("VALE: {:>10.2}", data.voucher_amount));
     }
-    job_content.extend_from_slice(format!("CAMBIO: {:>10.2}\n", data.change).as_bytes());
-
-    // RETURN DEDUCTIONS (only for partial returns)
-    if !data.returns.is_empty() {
-        job_content.extend_from_slice(b"\n");
-        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
-        job_content.extend_from_slice(CMD_ALIGN_CENTER);
-        job_content.extend_from_slice(CMD_BOLD_ON);
-        job_content.extend_from_slice(b"DEVOLUCIONES\n");
-        job_content.extend_from_slice(CMD_BOLD_OFF);
-        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
-
-        job_content.extend_from_slice(CMD_ALIGN_LEFT);
-        let mut total_returns: f64 = 0.0;
-        for ret in &data.returns {
-            let clean_name = remove_accents(&ret.product_name);
-            let ret_desc_w = desc_w - 1; // 1 char less for the "-" prefix
-            let desc_display = if clean_name.chars().count() > ret_desc_w {
-                clean_name.chars().take(ret_desc_w).collect::<String>()
-            } else {
-                clean_name
-            };
-            let qty_str = format!("-{:<.2}", ret.quantity);
-            let sub_str = format!("-{:.2}", ret.subtotal);
-            job_content.extend_from_slice(
-                format!(
-                    "{:<w_qty$} {:<w_desc$} {:>w_tot$}\n",
-                    qty_str, desc_display, sub_str,
-                    w_qty = qty_w + 1, w_desc = ret_desc_w, w_tot = total_w
-                ).as_bytes()
-            );
-            total_returns += ret.subtotal;
-        }
-
-        job_content.extend_from_slice(format!("{}\n", separator).as_bytes());
-        job_content.extend_from_slice(CMD_ALIGN_RIGHT);
-        job_content.extend_from_slice(CMD_BOLD_ON);
-        let adjusted_total = data.total - total_returns;
-        job_content.extend_from_slice(format!("TOTAL AJUSTADO: {:>10.2}\n", adjusted_total).as_bytes());
-        job_content.extend_from_slice(CMD_BOLD_OFF);
-    }
+    builder.add_text_ln(&format!("CAMBIO: {:>10.2}", data.change));
 
     // FOOTER
-    job_content.extend_from_slice(CMD_ALIGN_CENTER);
-    if !settings.ticket_footer.is_empty() {
-        job_content.extend_from_slice(b"\n");
-        job_content.extend_from_slice(settings.ticket_footer.as_bytes());
-        job_content.extend_from_slice(b"\n");
-    }
+    print_receipt_footer(&mut builder, settings);
 
-    // Cut
-    job_content.extend_from_slice(CMD_CUT);
+    builder.cut();
 
     // Send
     printer
-        .print(&job_content, PrinterJobOptions::none())
+        .print(&builder.build(), PrinterJobOptions::none())
         .map_err(|e| format!("Error imprimiendo: {:?}", e))?;
 
     Ok(())
