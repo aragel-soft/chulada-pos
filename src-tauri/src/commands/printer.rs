@@ -2,8 +2,7 @@ use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use crate::printer_utils;
 use printers::common::base::job::PrinterJobOptions;
-use std::path::Path;
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle};
 
 #[command]
 pub async fn test_print_ticket(
@@ -30,58 +29,22 @@ pub async fn test_print_ticket(
         // LOGO
         let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
         let max_width = if width_val == 58 { 384 } else { 512 };
+        let logo_width = (max_width as f64 * 0.5) as u32; // 50% width
 
-        let mut logo_cmds: Option<Vec<u8>> = None;
-
-        if let Some(bytes) = logo_bytes {
-            match printer_utils::image_bytes_to_escpos(&bytes, max_width) {
-                Ok(cmds) => logo_cmds = Some(cmds),
-                Err(e) => println!("Warning: Failed to process provided logo bytes: {}", e),
-            }
-        } else if !settings.logo_path.is_empty() {
-            let logo_path_str = if settings.logo_path.contains("images/settings") {
-                if let Ok(app_dir) = app_handle.path().app_data_dir() {
-                    app_dir
-                        .join(&settings.logo_path)
-                        .to_string_lossy()
-                        .to_string()
-                } else {
-                    settings.logo_path.clone()
-                }
-            } else {
-                settings.logo_path.clone()
-            };
-
-            if Path::new(&logo_path_str).exists() {
-                let suffix = if max_width <= 384 {
-                    "_58.bin"
-                } else {
-                    "_80.bin"
-                };
-
-                let path_obj = Path::new(&logo_path_str);
-                if let Some(stem) = path_obj.file_stem() {
-                    let parent = path_obj.parent().unwrap_or(Path::new(""));
-                    let bin_filename = format!("{}{}", stem.to_string_lossy(), suffix);
-                    let bin_path = parent.join(bin_filename);
-
-                    if bin_path.exists() {
-                        if let Ok(bin_data) = std::fs::read(&bin_path) {
-                          logo_cmds = Some(bin_data);
-                        }
-                    }
-                }
-
-                if logo_cmds.is_none() {
-                    match printer_utils::image_to_escpos(&logo_path_str, max_width) {
-                        Ok(cmds) => logo_cmds = Some(cmds),
-                        Err(e) => println!("Warning: Failed to process logo from path: {}", e),
-                    }
+        let logo_cmds: Option<Vec<u8>> = if let Some(bytes) = logo_bytes {
+            match printer_utils::image_bytes_to_escpos(&bytes, logo_width) {
+                Ok(cmds) => Some(cmds),
+                Err(e) => {
+                    println!("Warning: Failed to process provided logo bytes: {}", e);
+                    None
                 }
             }
-        }
+        } else {
+            printer_utils::resolve_logo_bytes(&app_handle, &settings.logo_path, logo_width)
+        };
 
         if let Some(cmds) = logo_cmds {
+            job_content.extend_from_slice(b"\x1B\x61\x01"); // Center
             job_content.extend_from_slice(&cmds);
             job_content.extend_from_slice(b"\n");
         }
@@ -136,4 +99,17 @@ pub async fn print_sale_ticket(
     }).await
     .map_err(|e| format!("Error en hilo de impresión: {}", e))?
     .map(|_| "Ticket enviado a imprimir".to_string())
+}
+
+#[command]
+pub async fn print_return_voucher(
+    app_handle: AppHandle,
+    sale_id: String,
+    _db: tauri::State<'_, std::sync::Mutex<rusqlite::Connection>>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::printer_utils::print_voucher_from_db(app_handle, sale_id)
+    }).await
+    .map_err(|e| format!("Error en hilo de impresión: {}", e))?
+    .map(|_| "Vale enviado a imprimir".to_string())
 }

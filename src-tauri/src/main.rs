@@ -43,6 +43,7 @@ fn main() {
             commands::settings::hardware::test_cash_drawer,
             commands::printer::test_print_ticket,
             commands::printer::print_sale_ticket,
+            commands::printer::print_return_voucher,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
