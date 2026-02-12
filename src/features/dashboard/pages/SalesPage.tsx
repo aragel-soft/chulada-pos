@@ -173,7 +173,7 @@ export default function SalesPage() {
           setLastSale({
               id: result.id,
               total: result.total,
-              paid: cashAmount + cardAmount,
+              paid: cashAmount + cardAmount + (result.voucher_used || 0),
               change: result.change,
               method,
               folio: result.folio
