@@ -497,7 +497,7 @@ pub fn print_voucher_from_db(
             row.get::<_, Option<String>>(5)?, // expires_at
         ))
     ).optional().map_err(|e| format!("Error consultando vale: {}", e))?;
-
+# [allow(unused_variables)] // only for the moment, we don't use expires_at
     let (code, _initial_balance, current_balance, is_active, created_at, expires_at) = 
         voucher_data.ok_or("No se encontró vale para esta venta".to_string())?;
 
