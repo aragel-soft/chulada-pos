@@ -25,6 +25,10 @@ export interface ShiftDetailsDto {
   movements: CashMovementDto[];
   total_movements_in: number;
   total_movements_out: number;
+  total_sales: number;
+  total_cash: number;
+  total_card: number;
+  theoretical_cash: number;
 }
 export interface CreateCashMovementRequest {
   shift_id: number;

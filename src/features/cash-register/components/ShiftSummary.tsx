@@ -20,10 +20,6 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
   if (isLoading) return <div>Cargando detalles...</div>;
   if (!shiftDetails) return <div>No se encontró información del turno.</div>;
 
-  const calculateTheoreticalCash = () => {
-    return shiftDetails.shift.initial_cash + shiftDetails.total_movements_in - shiftDetails.total_movements_out;
-  };
-
   return (
     <div className="flex flex-col md:flex-row gap-6 h-full">
       {/* Left: Stats */}
@@ -43,23 +39,26 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-zinc-100 border border-zinc-200 opacity-70">
-            <span className="text-sm text-zinc-600 font-medium">Ventas (Total)</span>
-            <div className="text-2xl font-bold text-zinc-700">
-              $0.00*
+          <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100">
+            <span className="text-sm text-indigo-600 font-medium">Ventas Totales</span>
+            <div className="text-2xl font-bold text-indigo-700">
+              {formatCurrency(shiftDetails.total_sales)}
             </div>
-            <span className="text-[10px] text-zinc-400">*Pendiente integración</span>
+             <div className="text-xs text-indigo-400 mt-1 flex gap-2">
+                <span>Efe: {formatCurrency(shiftDetails.total_cash)}</span>
+                <span>Tar: {formatCurrency(shiftDetails.total_card)}</span>
+             </div>
           </div>
 
           <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-            <span className="text-sm text-green-600 font-medium">Entradas</span>
+            <span className="text-sm text-green-600 font-medium">Entradas (Movs)</span>
             <div className="text-2xl font-bold text-green-700">
               {formatCurrency(shiftDetails.total_movements_in)}
             </div>
           </div>
 
           <div className="p-4 rounded-lg bg-red-50 border border-red-100">
-            <span className="text-sm text-red-600 font-medium">Salidas</span>
+            <span className="text-sm text-red-600 font-medium">Salidas (Movs)</span>
             <div className="text-2xl font-bold text-red-700">
               {formatCurrency(shiftDetails.total_movements_out)}
             </div>
@@ -68,11 +67,15 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
 
         <div className="space-y-2">
           <div className="flex justify-between items-center p-3 rounded-lg bg-zinc-50 font-medium">
-            <span>Efectivo Teórico</span>
-            <span className="text-xl">{formatCurrency(calculateTheoreticalCash())}</span>
+            <span>Efectivo Teórico en Caja</span>
+            <span className="text-xl">{formatCurrency(shiftDetails.theoretical_cash)}</span>
           </div>
+          <div className="text-xs text-zinc-400 px-3">
+            (Inicial + Ventas Efec. + Entradas - Salidas)
+          </div>
+          
           {shiftDetails.shift.status === 'closed' && (
-            <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 font-medium border border-purple-100 text-purple-900">
+            <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 font-medium border border-purple-100 text-purple-900 mt-4">
               <span>Cierre Real</span>
               <span className="text-xl">{formatCurrency(shiftDetails.shift.final_cash || 0)}</span>
             </div>
