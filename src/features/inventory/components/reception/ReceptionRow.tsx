@@ -11,10 +11,11 @@ import { EditProductDialog } from "@/features/inventory/components/products/Edit
 interface ReceptionRowProps {
   item: ReceptionItem;
   isSelected: boolean;
+  purchasePriceVisible?: boolean;
 }
 
 export const ReceptionRow = memo(
-  ({ item, isSelected }: ReceptionRowProps) => {
+  ({ item, isSelected, purchasePriceVisible }: ReceptionRowProps) => {
     const {
       removeItem,
       updateItemQuantity,
@@ -155,7 +156,8 @@ export const ReceptionRow = memo(
             />
           </TableCell>
 
-          <TableCell className="w-[140px]">
+          {purchasePriceVisible && (
+                      <TableCell className="w-[140px]">
             <div className="relative">
               <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
                 $
@@ -170,6 +172,7 @@ export const ReceptionRow = memo(
               />
             </div>
           </TableCell>
+          )}
 
           <TableCell className="w-[130px]">
             <div className="relative">
