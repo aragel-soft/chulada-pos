@@ -1,8 +1,9 @@
-// This component is only for testing purposes, it could be removed in the future
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { AppAvatar } from "@/components/ui/app-avatar";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { format } from "date-fns";
 
@@ -15,6 +16,7 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
     queryKey: ["shiftDetails", shiftId],
     queryFn: () => getShiftDetails(shiftId),
     enabled: !!shiftId,
+    refetchInterval: 5000, // Update every 5 seconds for real-time monitoring
   });
 
   if (isLoading) return <div>Cargando detalles...</div>;
@@ -25,10 +27,28 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
       {/* Left: Stats */}
       <div className="flex-1 space-y-6">
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 p-4 rounded-lg bg-zinc-50 border border-zinc-100">
-            <span className="text-sm text-zinc-500">Fecha Apertura</span>
-            <div className="font-medium">
-              {format(new Date(shiftDetails.shift.opening_date), "dd MMMM yyyy, HH:mm:ss")}
+          <div className="col-span-2 p-4 rounded-lg bg-zinc-50 border border-zinc-100 flex justify-between items-center">
+            <div>
+              <span className="text-sm text-zinc-500 block">Fecha Apertura</span>
+              <div className="font-medium">
+                {format(new Date(shiftDetails.shift.opening_date), "dd MMMM yyyy, HH:mm:ss")}
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-sm text-zinc-500 block mb-1">Abierto por</span>
+              <Button
+                variant="outline"
+                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 bg-white hover:bg-gray-50"
+              >
+                <AppAvatar
+                  name={shiftDetails.shift.opening_user_name || 'Usuario'}
+                  path={shiftDetails.shift.opening_user_avatar}
+                  className="h-8 w-8"
+                />
+                <span className="hidden md:block font-medium text-zinc-700">
+                  {shiftDetails.shift.opening_user_name || "Usuario Desconocido"}
+                </span>
+              </Button>
             </div>
           </div>
 
@@ -71,7 +91,7 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
             <span className="text-xl">{formatCurrency(shiftDetails.theoretical_cash)}</span>
           </div>
           <div className="text-xs text-zinc-400 px-3">
-            (Inicial + Ventas Efec. + Entradas - Salidas)
+            (Inicial + Ventas Efectivo + Entradas - Salidas)
           </div>
           
           {shiftDetails.shift.status === 'closed' && (

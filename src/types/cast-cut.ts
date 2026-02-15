@@ -3,6 +3,8 @@ export interface ShiftDto {
   initial_cash: number;
   opening_date: string;
   opening_user_id: string;
+  opening_user_name?: string;
+  opening_user_avatar?: string;
   status: string;
   code?: string;
   final_cash?: number;

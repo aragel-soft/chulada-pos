@@ -37,9 +37,10 @@ pub fn get_shift_details(
     // 1. Get Shift
     let mut stmt = conn
         .prepare(
-            "SELECT id, initial_cash, opening_date, opening_user_id, status, code 
-         FROM cash_register_shifts 
-         WHERE id = ?1",
+            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
+         FROM cash_register_shifts s
+         LEFT JOIN users u ON s.opening_user_id = u.id
+         WHERE s.id = ?1",
         )
         .map_err(|e| e.to_string())?;
 
@@ -50,6 +51,8 @@ pub fn get_shift_details(
                 initial_cash: row.get(1)?,
                 opening_date: row.get(2)?,
                 opening_user_id: row.get(3)?,
+                opening_user_name: row.get(6)?,
+                opening_user_avatar: row.get(7).unwrap_or(None),
                 status: row.get(4)?,
                 code: row.get(5).unwrap_or(None),
             })
@@ -132,10 +135,11 @@ pub fn get_closed_shifts(
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, initial_cash, opening_date, opening_user_id, status, code 
-         FROM cash_register_shifts 
-         WHERE status = 'closed'
-         ORDER BY closing_date DESC
+            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
+         FROM cash_register_shifts s
+         LEFT JOIN users u ON s.opening_user_id = u.id
+         WHERE s.status = 'closed'
+         ORDER BY s.closing_date DESC
          LIMIT ?1 OFFSET ?2",
         )
         .map_err(|e| e.to_string())?;
@@ -147,6 +151,8 @@ pub fn get_closed_shifts(
                 initial_cash: row.get(1)?,
                 opening_date: row.get(2)?,
                 opening_user_id: row.get(3)?,
+                opening_user_name: row.get(6)?,
+                opening_user_avatar: row.get(7).unwrap_or(None),
                 status: row.get(4)?,
                 code: row.get(5).unwrap_or(None),
             })
