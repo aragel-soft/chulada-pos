@@ -29,8 +29,12 @@ export const ReceptionRow = memo(
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [qtyValue, setQtyValue] = useState(item.quantity.toString());
     const [costValue, setCostValue] = useState(item.cost.toString());
-    const [retailValue, setRetailValue] = useState(item.retail_price.toString());
-    const [wholesaleValue, setWholesaleValue] = useState(item.wholesale_price.toString());
+    const [retailValue, setRetailValue] = useState(
+      item.retail_price.toString(),
+    );
+    const [wholesaleValue, setWholesaleValue] = useState(
+      item.wholesale_price.toString(),
+    );
 
     useEffect(() => {
       setQtyValue(item.quantity.toString());
@@ -157,21 +161,21 @@ export const ReceptionRow = memo(
           </TableCell>
 
           {purchasePriceVisible && (
-                      <TableCell className="w-[140px]">
-            <div className="relative">
-              <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
-                $
-              </span>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={costValue}
-                onChange={handleCostChange}
-                onBlur={handleCostBlur}
-                className="h-8 pl-5 text-right font-medium"
-              />
-            </div>
-          </TableCell>
+            <TableCell className="w-[140px]">
+              <div className="relative">
+                <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
+                  $
+                </span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={costValue}
+                  onChange={handleCostChange}
+                  onBlur={handleCostBlur}
+                  className="h-8 pl-5 text-right font-medium"
+                />
+              </div>
+            </TableCell>
           )}
 
           <TableCell className="w-[130px]">
@@ -206,9 +210,11 @@ export const ReceptionRow = memo(
             </div>
           </TableCell>
 
-          <TableCell className="text-right font-bold text-foreground">
-            {formatCurrency(subtotal)}
-          </TableCell>
+          {purchasePriceVisible && (
+            <TableCell className="text-right font-bold text-foreground">
+              {formatCurrency(subtotal)}
+            </TableCell>
+          )}
 
           <TableCell>
             <Button

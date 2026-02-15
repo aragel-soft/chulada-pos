@@ -53,9 +53,9 @@ export function ReceptionGrid() {
               <TableHead className="w-[130px] text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 P. Mayoreo
               </TableHead>
-              <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
+              {can('products:purchase_price') && ( <TableHead className="text-right px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 Subtotal
-              </TableHead>
+              </TableHead>)}
               <TableHead className="w-[50px] px-4 py-2 h-10 bg-background"></TableHead>
             </TableRow>
           </TableHeader>

@@ -129,24 +129,25 @@ export default function ReceptionPage() {
       </div>
 
       {/* FOOTER */}
-      <div className="bg-white rounded-lg border p-4 shrink-0 grid grid-cols-3 gap-4 items-center shadow-sm">
+      <div className="bg-white rounded-lg border p-4 shrink-0 flex justify-between items-center shadow-sm">
         <div>
           <span className="text-xs text-muted-foreground block">Artículos</span>
           <span className="text-xl font-bold text-zinc-700">
             {getTotalQuantity()}
           </span>
         </div>
+        
+        {can("products:purchase_price") && (
+          <div className="text-center">
+            <span className="text-xs text-muted-foreground block">
+              Total Compra
+            </span>
+            <span className="text-xl font-bold text-primary">
+              {formatCurrency(getTotalCost())}
+            </span>
+          </div>
+        )}
 
-        <div>
-          <span className="text-xs text-muted-foreground block">
-            Total Compra
-          </span>
-          <span className="text-xl font-bold text-primary">
-            {formatCurrency(getTotalCost())}
-          </span>
-        </div>
-
-        {/* Botón de Acción (Alineado a la derecha) */}
         <div className="flex justify-end">
           <Button
             size="lg"
