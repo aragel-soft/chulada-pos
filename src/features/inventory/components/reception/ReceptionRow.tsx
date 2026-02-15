@@ -11,14 +11,17 @@ import { EditProductDialog } from "@/features/inventory/components/products/Edit
 interface ReceptionRowProps {
   item: ReceptionItem;
   isSelected: boolean;
+  purchasePriceVisible?: boolean;
 }
 
 export const ReceptionRow = memo(
-  ({ item, isSelected }: ReceptionRowProps) => {
+  ({ item, isSelected, purchasePriceVisible }: ReceptionRowProps) => {
     const {
       removeItem,
       updateItemQuantity,
       updateItemCost,
+      updateItemRetailPrice,
+      updateItemWholesalePrice,
       toggleItemSelection,
       updateProductDetails,
     } = useReceptionStore();
@@ -26,6 +29,12 @@ export const ReceptionRow = memo(
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [qtyValue, setQtyValue] = useState(item.quantity.toString());
     const [costValue, setCostValue] = useState(item.cost.toString());
+    const [retailValue, setRetailValue] = useState(
+      item.retail_price.toString(),
+    );
+    const [wholesaleValue, setWholesaleValue] = useState(
+      item.wholesale_price.toString(),
+    );
 
     useEffect(() => {
       setQtyValue(item.quantity.toString());
@@ -34,6 +43,14 @@ export const ReceptionRow = memo(
     useEffect(() => {
       setCostValue(item.cost.toString());
     }, [item.cost]);
+
+    useEffect(() => {
+      setRetailValue(item.retail_price.toString());
+    }, [item.retail_price]);
+
+    useEffect(() => {
+      setWholesaleValue(item.wholesale_price.toString());
+    }, [item.wholesale_price]);
 
     const subtotal = item.quantity * item.cost;
 
@@ -67,6 +84,38 @@ export const ReceptionRow = memo(
         setCostValue("0");
       }
       updateItemCost(item.product_id, val);
+    };
+
+    const handleRetailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+        setRetailValue(val);
+      }
+    };
+
+    const handleRetailBlur = () => {
+      let val = parseFloat(retailValue);
+      if (isNaN(val) || val < 0) {
+        val = 0;
+        setRetailValue("0");
+      }
+      updateItemRetailPrice(item.product_id, val);
+    };
+
+    const handleWholesaleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+        setWholesaleValue(val);
+      }
+    };
+
+    const handleWholesaleBlur = () => {
+      let val = parseFloat(wholesaleValue);
+      if (isNaN(val) || val < 0) {
+        val = 0;
+        setWholesaleValue("0");
+      }
+      updateItemWholesalePrice(item.product_id, val);
     };
 
     return (
@@ -111,7 +160,25 @@ export const ReceptionRow = memo(
             />
           </TableCell>
 
-          <TableCell className="w-[140px]">
+          {purchasePriceVisible && (
+            <TableCell className="w-[140px]">
+              <div className="relative">
+                <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
+                  $
+                </span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={costValue}
+                  onChange={handleCostChange}
+                  onBlur={handleCostBlur}
+                  className="h-8 pl-5 text-right font-medium"
+                />
+              </div>
+            </TableCell>
+          )}
+
+          <TableCell className="w-[130px]">
             <div className="relative">
               <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
                 $
@@ -119,21 +186,35 @@ export const ReceptionRow = memo(
               <Input
                 type="text"
                 inputMode="decimal"
-                value={costValue}
-                onChange={handleCostChange}
-                onBlur={handleCostBlur}
+                value={retailValue}
+                onChange={handleRetailChange}
+                onBlur={handleRetailBlur}
                 className="h-8 pl-5 text-right font-medium"
               />
             </div>
           </TableCell>
 
-          <TableCell className="text-right text-muted-foreground">
-            {formatCurrency(item.retail_price)}
+          <TableCell className="w-[130px]">
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
+                $
+              </span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={wholesaleValue}
+                onChange={handleWholesaleChange}
+                onBlur={handleWholesaleBlur}
+                className="h-8 pl-5 text-right font-medium"
+              />
+            </div>
           </TableCell>
 
-          <TableCell className="text-right font-bold text-foreground">
-            {formatCurrency(subtotal)}
-          </TableCell>
+          {purchasePriceVisible && (
+            <TableCell className="text-right font-bold text-foreground">
+              {formatCurrency(subtotal)}
+            </TableCell>
+          )}
 
           <TableCell>
             <Button
@@ -165,6 +246,8 @@ export const ReceptionRow = memo(
     return (
       prev.item.quantity === next.item.quantity &&
       prev.item.cost === next.item.cost &&
+      prev.item.retail_price === next.item.retail_price &&
+      prev.item.wholesale_price === next.item.wholesale_price &&
       prev.item.product_id === next.item.product_id &&
       prev.isSelected === next.isSelected
     );

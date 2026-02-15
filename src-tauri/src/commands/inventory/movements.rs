@@ -55,6 +55,8 @@ pub struct ReceptionItem {
   pub product_id: String,
   pub quantity: i64,
   pub new_cost: f64,
+  pub new_retail_price: f64,
+  pub new_wholesale_price: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -305,25 +307,32 @@ pub fn process_bulk_reception(
       return Err(format!("El costo para el producto {} no puede ser negativo", item.product_id));
     }
 
-    let (current_stock, min_stock, current_purchase_price): (i64, i64, f64) = tx
+    let (current_stock, min_stock, current_purchase_price, current_retail_price, current_wholesale_price): (i64, i64, f64, f64, f64) = tx
       .query_row(
         "SELECT 
            COALESCE(si.stock, 0), 
            COALESCE(si.minimum_stock, 5),
-           p.purchase_price
+           p.purchase_price,
+           p.retail_price,
+           p.wholesale_price
          FROM products p
          LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?1
          WHERE p.id = ?2",
         rusqlite::params![store_id, item.product_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
       )
       .map_err(|e| format!("Error consultando producto {}: {}", item.product_id, e))?;
 
-    if (item.new_cost - current_purchase_price).abs() > 0.001 {
+    // Check if any price changed
+    let cost_changed = (item.new_cost - current_purchase_price).abs() > 0.001;
+    let retail_changed = (item.new_retail_price - current_retail_price).abs() > 0.001;
+    let wholesale_changed = (item.new_wholesale_price - current_wholesale_price).abs() > 0.001;
+
+    if cost_changed || retail_changed || wholesale_changed {
       tx.execute(
-        "UPDATE products SET purchase_price = ?1 WHERE id = ?2",
-        rusqlite::params![item.new_cost, item.product_id],
-      ).map_err(|e| format!("Error actualizando costo producto {}: {}", item.product_id, e))?;
+        "UPDATE products SET purchase_price = ?1, retail_price = ?2, wholesale_price = ?3 WHERE id = ?4",
+        rusqlite::params![item.new_cost, item.new_retail_price, item.new_wholesale_price, item.product_id],
+      ).map_err(|e| format!("Error actualizando precios producto {}: {}", item.product_id, e))?;
     }
 
     let new_stock = current_stock + item.quantity;

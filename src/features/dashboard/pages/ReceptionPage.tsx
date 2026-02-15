@@ -75,8 +75,9 @@ export default function ReceptionPage() {
 
   const handleProcessClick = () => {
     const hasZeroCost = items.some((i) => i.cost <= 0);
+    const canViewCosts = can("products:purchase_price");
 
-    if (hasZeroCost) {
+    if (hasZeroCost && canViewCosts) {
       setShowZeroCostWarning(true);
       return;
     }
@@ -129,7 +130,7 @@ export default function ReceptionPage() {
       </div>
 
       {/* FOOTER */}
-      <div className="bg-white rounded-lg border p-4 shrink-0 grid grid-cols-3 gap-4 items-center shadow-sm">
+      <div className="bg-white rounded-lg border p-4 shrink-0 flex justify-between items-center shadow-sm">
         <div>
           <span className="text-xs text-muted-foreground block">Artículos</span>
           <span className="text-xl font-bold text-zinc-700">
@@ -137,16 +138,17 @@ export default function ReceptionPage() {
           </span>
         </div>
 
-        <div>
-          <span className="text-xs text-muted-foreground block">
-            Total Compra
-          </span>
-          <span className="text-xl font-bold text-primary">
-            {formatCurrency(getTotalCost())}
-          </span>
-        </div>
+        {can("products:purchase_price") && (
+          <div className="text-center">
+            <span className="text-xs text-muted-foreground block">
+              Total Compra
+            </span>
+            <span className="text-xl font-bold text-primary">
+              {formatCurrency(getTotalCost())}
+            </span>
+          </div>
+        )}
 
-        {/* Botón de Acción (Alineado a la derecha) */}
         <div className="flex justify-end">
           <Button
             size="lg"
@@ -164,8 +166,6 @@ export default function ReceptionPage() {
         </div>
       </div>
 
-      {/* --- DIALOGS --- */}
-
       <EditProductDialog
         open={isEditProductOpen}
         onOpenChange={setIsEditProductOpen}
@@ -179,30 +179,32 @@ export default function ReceptionPage() {
         }}
       />
 
-      <AlertDialog
-        open={showZeroCostWarning}
-        onOpenChange={setShowZeroCostWarning}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> Costos en Cero Detectados
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Algunos productos tienen un costo de compra de <b>$0.00</b>.
-              <br />
-              <br />
-              ¿Deseas continuar y registrar estos productos con costo cero?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Revisar Costos</AlertDialogCancel>
-            <AlertDialogAction onClick={() => executeReception()}>
-              Confirmar Entrada
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {can("products:purchase_price") && (
+        <AlertDialog
+          open={showZeroCostWarning}
+          onOpenChange={setShowZeroCostWarning}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Costos en Cero Detectados
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Algunos productos tienen un costo de compra de <b>$0.00</b>.
+                <br />
+                <br />
+                ¿Deseas continuar y registrar estos productos con costo cero?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Revisar Costos</AlertDialogCancel>
+              <AlertDialogAction onClick={() => executeReception()}>
+                Confirmar Entrada
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <CreateProductDialog
         open={isCreateProductOpen}
