@@ -68,7 +68,7 @@ export const CatalogSearch = ({
           size="icon"
           className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-zinc-100 rounded-full text-muted-foreground hover:text-destructive transition-colors"
           onClick={handleClear}
-          title="Limpiar búsqueda (Esc)"
+          title="Limpiar búsqueda"
         >
           <X className="h-4 w-4" />
         </Button>
