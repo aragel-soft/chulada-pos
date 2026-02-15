@@ -13,3 +13,14 @@ export interface AccountStatement {
   current_balance: number;
   movements: AccountMovement[];
 }
+
+export interface DebtPaymentRequest {
+  customer_id: string;
+  user_id: string;
+  shift_id: string;
+  total_amount: number;
+  cash_amount: number;
+  card_amount: number;
+  payment_method: 'cash' | 'card' | 'mixed' | 'transfer';
+  notes: string | null;
+}

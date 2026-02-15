@@ -1,26 +1,38 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft, User, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, AlertCircle, Wallet } from "lucide-react";
 import { format, subYears, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyablePhone } from "@/components/ui/copyable-phone";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { getCustomerAccountStatement } from "@/lib/api/account";
+import {
+  getCustomerAccountStatement,
+  registerDebtPayment,
+} from "@/lib/api/account";
 import { getCustomers } from "@/lib/api/customers";
 import { formatCurrency, cn } from "@/lib/utils";
 import { AccountMovement } from "@/types/account";
 import SalesHistoryModule from "@/features/sales/components/SalesHistoryModule";
+import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
+import { useAuthStore } from "@/stores/authStore";
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const shift = useCashRegisterStore((state) => state.shift);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const initialCustomer = location.state?.customer;
 
@@ -123,6 +135,56 @@ export default function CustomerDetailPage() {
     [],
   );
 
+  const handleProcessPayment = async (
+    method: string,
+    cashAmount: number,
+    cardAmount: number,
+    shouldPrint: boolean,
+    _customerId?: string,
+    notes?: string,
+  ) => {
+    if (!customer) return;
+
+    if (!shift || shift.status !== "open") {
+      toast.error("Caja cerrada. Debes abrir un turno para recibir pagos.");
+      return;
+    }
+    if (!user) {
+      toast.error("Sesión inválida. Recarga la página.");
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const apiMethod = method === "card_transfer" ? "card" : method;
+
+      await registerDebtPayment({
+        customer_id: customer.id,
+        user_id: user.id,
+        shift_id: shift.id.toString(),
+        total_amount: cashAmount + cardAmount,
+        payment_method: apiMethod as any,
+        cash_amount: cashAmount,
+        card_amount: cardAmount,
+        notes: notes || null,
+      });
+
+      toast.success("Abono registrado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["account-statement", id] });
+      queryClient.invalidateQueries({ queryKey: ["customer", id] });
+      setIsPaymentModalOpen(false);
+
+      if (shouldPrint) {
+        toast.info("Imprimiendo recibo...");
+        // TODO: Call printer service here
+      }
+    } catch (error) {
+      toast.error("Error al registrar el abono");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   if (!customer && isLoadingCustomer) {
     return <CustomerDetailSkeleton />;
   }
@@ -140,53 +202,49 @@ export default function CustomerDetailPage() {
   }
 
   const currentBalance = statement?.current_balance ?? customer.current_balance;
-  const isDebt = currentBalance > 0;
+  const isDebt = currentBalance > 0.01;
   const balanceColorClass = isDebt ? "text-destructive" : "text-emerald-600";
 
   return (
     <div className="flex flex-col h-full p-4 mt-2 gap-4 bg-background animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col gap-4 border-b pb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b pb-4 mt-2">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
-            size="sm"
-            className="-ml-2 text-muted-foreground hover:text-foreground"
+            size="icon"
+            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={() => navigate(-1)}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Clientes
+            <ArrowLeft className="h-6 w-6" />
           </Button>
-        </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <User className="h-7 w-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                {customer.name}
-              </h1>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                <Badge
-                  variant="outline"
-                  className="font-mono text-xs font-normal"
-                >
-                  {customer.code || "S/C"}
-                </Badge>
-                <CopyablePhone phone={customer.phone} />
-              </div>
+          <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <User className="h-7 w-7" />
+          </div>
+          
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              {customer.name}
+            </h1>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+              <Badge
+                variant="outline"
+                className="font-mono text-xs font-normal"
+              >
+                {customer.code || "S/C"}
+              </Badge>
+              <CopyablePhone phone={customer.phone} />
             </div>
           </div>
+        </div>
 
-          <div className="text-right">
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
-              Saldo Actual
-            </p>
-            <div className={`text-3xl font-bold ${balanceColorClass}`}>
-              {formatCurrency(currentBalance)}
-            </div>
+        <div className="text-right min-w-[120px]">
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            Saldo Actual
+          </p>
+          <div className={`text-3xl font-bold ${balanceColorClass}`}>
+            {formatCurrency(currentBalance)}
           </div>
         </div>
       </div>
@@ -228,6 +286,17 @@ export default function CustomerDetailPage() {
               manualSorting={false}
               initialPageSize={16}
               showColumnFilters={false}
+              actions={
+                isDebt && (
+                  <Button
+                    onClick={() => setIsPaymentModalOpen(true)}
+                    className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
+                  >
+                    <Wallet className="w-4 h-4 mr-2" />
+                    Abonar a Deuda
+                  </Button>
+                )
+              }
             />
           </div>
         </TabsContent>
@@ -239,6 +308,19 @@ export default function CustomerDetailPage() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Modal Integration */}
+      {customer && (
+        <CheckoutModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          total={currentBalance}
+          variant="debt"
+          defaultCustomerId={customer.id}
+          onProcessSale={handleProcessPayment}
+          isProcessing={isProcessingPayment}
+        />
+      )}
     </div>
   );
 }
@@ -248,6 +330,7 @@ function CustomerDetailSkeleton() {
     <div className="p-6 space-y-6 h-full bg-background">
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
           <Skeleton className="h-16 w-16 rounded-full" />
           <div className="space-y-2">
             <Skeleton className="h-6 w-48" />

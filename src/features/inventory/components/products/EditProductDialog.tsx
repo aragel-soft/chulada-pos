@@ -34,7 +34,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
-
 import {
   productSchema,
   ProductFormValues,
@@ -45,14 +44,15 @@ import {
   getAllTags,
 } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
-import { UpdateProductPayload, ImageAction } from "@/types/inventory";
+import { UpdateProductPayload, ImageAction, Product } from "@/types/inventory";
 import { useAppImage } from "@/hooks/use-app-image";
 
 interface EditProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productId: string | null;
-  onSuccess: () => void;
+  onSuccess: (updatedProduct?: Product) => void;
+  variant?: 'default' | 'minimal';
 }
 
 export function EditProductDialog({
@@ -60,6 +60,7 @@ export function EditProductDialog({
   onOpenChange,
   productId,
   onSuccess,
+  variant = 'default',
 }: EditProductDialogProps) {
   const queryClient = useQueryClient();
   const { can } = useAuthStore();
@@ -91,13 +92,13 @@ export function EditProductDialog({
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: ["categories"],
     queryFn: getAllCategories,
-    enabled: open,
+    enabled: open && variant === 'default', 
   });
 
   const { data: availableTags = [] } = useQuery({
     queryKey: ["tags"],
     queryFn: getAllTags,
-    enabled: open,
+    enabled: open && variant === 'default',
   });
 
   const { data: product, isLoading: loadingProduct } = useQuery({
@@ -159,12 +160,12 @@ export function EditProductDialog({
 
       return await updateProduct(payload);
     },
-    onSuccess: () => {
+    onSuccess: (data: Product) => {
       toast.success("Producto actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product", productId] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
-      onSuccess();
+      onSuccess(data);
       handleClose();
     },
     onError: (error: any) => {
@@ -274,91 +275,180 @@ export function EditProductDialog({
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                <div className="md:col-span-2 flex flex-col gap-5">
-                  <div className="flex flex-col gap-3">
-                    <Label>Imagen del Producto</Label>
-                    {!imagePreview ? (
-                      <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
-                        <Upload className="w-10 h-10 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground font-medium">
-                          Clic para subir
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleImageChange}
-                        />
-                      </label>
-                    ) : (
-                      <div className="relative h-56 rounded-lg overflow-hidden border border-border group">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-contain bg-muted/20"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={handleRemoveImage}
-                          >
-                            <X className="w-4 h-4 mr-2" /> Quitar
-                          </Button>
-                        </div>
-                        {imageAction === "Replace" && (
-                          <Badge className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600 border-0 text-white">
-                            Nueva
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="tags"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Etiquetas</FormLabel>
-                        <FormControl>
-                          <TagInput
-                            availableTags={availableTags}
-                            selectedTags={field.value}
-                            onTagsChange={field.onChange}
-                            placeholder="+ Etiqueta"
+              {variant === 'default' && (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+                  <div className="md:col-span-2 flex flex-col gap-5">
+                    <div className="flex flex-col gap-3">
+                      <Label>Imagen del Producto</Label>
+                      {!imagePreview ? (
+                        <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
+                          <Upload className="w-10 h-10 text-muted-foreground mb-2" />
+                          <span className="text-sm text-muted-foreground font-medium">
+                            Clic para subir
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageChange}
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        </label>
+                      ) : (
+                        <div className="relative h-56 rounded-lg overflow-hidden border border-border group">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-contain bg-muted/20"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={handleRemoveImage}
+                            >
+                              <X className="w-4 h-4 mr-2" /> Quitar
+                            </Button>
+                          </div>
+                          {imageAction === "Replace" && (
+                            <Badge className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600 border-0 text-white">
+                              Nueva
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-                <div className="md:col-span-3 space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="code"
+                      name="tags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Etiquetas</FormLabel>
+                          <FormControl>
+                            <TagInput
+                              availableTags={availableTags}
+                              selectedTags={field.value}
+                              onTagsChange={field.onChange}
+                              placeholder="+ Etiqueta"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="md:col-span-3 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="!text-foreground">
+                              Código Interno{" "}
+                              <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Ej: TINT-001" 
+                                maxLength={16}
+                                {...field}
+                                onChange={(e) => {
+                                  const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+                                  field.onChange(cleanValue);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="is_active"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="px-3">Estatus</FormLabel>
+                            <div className="flex items-center gap-2 h-10 rounded-md px-3 bg-muted/10">
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <span className="text-sm text-muted-foreground">
+                                {field.value ? "Activo" : "Inactivo"}
+                              </span>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                        control={form.control}
+                        name="barcode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="!text-foreground">Código de Barras</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Escanea el código..." 
+                                maxLength={32}
+                                {...field}
+                                onChange={(e) => {
+                                  const cleanValue = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                                  field.onChange(cleanValue);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                    <FormField
+                      control={form.control}
+                      name="category_id"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="!text-foreground">
-                            Código Interno{" "}
-                            <span className="text-destructive">*</span>
+                            Categoría <span className="text-destructive">*</span>
                           </FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Ej: TINT-001" 
-                              maxLength={16}
-                              {...field}
-                              onChange={(e) => {
-                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_]/g, "");
-                                field.onChange(cleanValue);
-                              }}
-                            />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={loadingCategories}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue
+                                  placeholder={
+                                    loadingCategories ? "..." : "Selecciona"
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  <Badge 
+                                    variant="outline" 
+                                    className="font-normal border-0 px-2"
+                                    style={{ 
+                                      backgroundColor: (cat.color || '#64748b') + '20',
+                                      color: cat.color || '#64748b', 
+                                    }}
+                                  >
+                                    {cat.name}
+                                  </Badge>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -366,113 +456,26 @@ export function EditProductDialog({
 
                     <FormField
                       control={form.control}
-                      name="is_active"
+                      name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="px-3">Estatus</FormLabel>
-                          <div className="flex items-center gap-2 h-10 rounded-md px-3 bg-muted/10">
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <span className="text-sm text-muted-foreground">
-                              {field.value ? "Activo" : "Inactivo"}
-                            </span>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                      control={form.control}
-                      name="barcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="!text-foreground">Código de Barras</FormLabel>
+                          <FormLabel>Descripción</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="Escanea el código..." 
-                              maxLength={32}
+                            <Textarea
                               {...field}
-                              onChange={(e) => {
-                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
-                                field.onChange(cleanValue);
-                              }}
+                              placeholder="Detalles adicionales del producto..."
+                              className="min-h-[80px]"
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                  <FormField
-                    control={form.control}
-                    name="category_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-foreground">
-                          Categoría <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={loadingCategories}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={
-                                  loadingCategories ? "..." : "Selecciona"
-                                }
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <Badge 
-                                  variant="outline" 
-                                  className="font-normal border-0 px-2"
-                                  style={{ 
-                                    backgroundColor: (cat.color || '#64748b') + '20',
-                                    color: cat.color || '#64748b', 
-                                  }}
-                                >
-                                  {cat.name}
-                                </Badge>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descripción</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder="Detalles adicionales del producto..."
-                            className="min-h-[80px]"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <Separator />
+              {variant === 'default' && <Separator />}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
