@@ -32,8 +32,6 @@ pub fn get_sales_report_kpis(
 ) -> Result<ReportKpis, String> {
     let conn = init_database(&app_handle).map_err(|e| e.to_string())?;
 
-    // 1. Venta Bruta y Transacciones
-    // Nota: Filtramos estrictamente por 'completed' según requerimiento.
     let kpi_query = r#"
         SELECT 
             COALESCE(SUM(total), 0.0) as gross_sales,
@@ -49,9 +47,6 @@ pub fn get_sales_report_kpis(
         })
         .map_err(|e| e.to_string())?;
 
-    // 2. Utilidad Estimada
-    // Lógica: (Venta Total del Item) - (Cantidad * Costo Actual del Producto)
-    // Usamos el costo actual (p.purchase_price) porque no tenemos histórico.
     let profit_query = r#"
         SELECT 
             COALESCE(SUM(si.total - (si.quantity * COALESCE(p.purchase_price, 0))), 0.0) as estimated_profit
@@ -68,7 +63,6 @@ pub fn get_sales_report_kpis(
         })
         .map_err(|e| e.to_string())?;
 
-    // 3. Ticket Promedio
     let average_ticket = if transaction_count > 0 {
         gross_sales / transaction_count as f64
     } else {
@@ -91,7 +85,6 @@ pub fn get_sales_chart_data(
 ) -> Result<Vec<ChartDataPoint>, String> {
     let conn = init_database(&app_handle).map_err(|e| e.to_string())?;
 
-    // Usamos 'localtime' para agrupar por el día del usuario, no UTC.
     let sql = r#"
         SELECT 
             strftime('%Y-%m-%d', created_at, 'localtime') as day, 
@@ -129,7 +122,6 @@ pub fn get_sales_by_category(
 ) -> Result<Vec<CategoryDataPoint>, String> {
     let conn = init_database(&app_handle).map_err(|e| e.to_string())?;
 
-    // Primero obtenemos el total global de este periodo para calcular porcentajes
     let total_period_sales: f64 = conn.query_row(
         "SELECT COALESCE(SUM(total), 0) FROM sales WHERE created_at BETWEEN ?1 AND ?2 AND status = 'completed'",
         params![from_date, to_date],
@@ -163,7 +155,7 @@ pub fn get_sales_by_category(
             Ok(CategoryDataPoint {
                 category_name: row.get(0)?,
                 total_sales: category_total,
-                percentage: (percentage * 100.0).round() / 100.0, // Redondear a 2 decimales
+                percentage: (percentage * 100.0).round() / 100.0, 
             })
         })
         .map_err(|e| e.to_string())?;
