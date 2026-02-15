@@ -144,7 +144,7 @@ export default function SalesPage() {
     if (tickets.length === 0) createTicket();
   }, [tickets.length, createTicket]);
 
-  const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number, shouldPrint: boolean, customerId?: string, voucherCode?: string, _notes?: string) => {
+  const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number, shouldPrint: boolean, customerId?: string, voucherCode?: string, notes?: string) => {
       if (!user?.id || !shift?.id || !activeTicket) return;
 
       const result = await processSale(
@@ -157,7 +157,8 @@ export default function SalesPage() {
           shouldPrint,
           activeTicket.discountPercentage,
           customerId,
-          voucherCode
+          voucherCode,
+          notes
       );
 
       if (result) {

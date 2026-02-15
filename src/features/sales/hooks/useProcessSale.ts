@@ -17,7 +17,8 @@ export function useProcessSale() {
     shouldPrint: boolean,
     discountPercentage: number = 0,
     customerId?: string,
-    voucherCode?: string
+    voucherCode?: string,
+    notes?: string
   ): Promise<SaleResponse | null> => {
     setIsProcessing(true);
     try {
@@ -38,7 +39,7 @@ export function useProcessSale() {
         payment_method: paymentMethod, // 'cash', 'card_transfer', 'credit', 'mixed'
         cash_amount: cashAmount,
         card_transfer_amount: cardAmount,
-        notes: null,
+        notes: notes?.trim() || null,
         items: saleItems,
         should_print: shouldPrint,
         voucher_code: voucherCode,

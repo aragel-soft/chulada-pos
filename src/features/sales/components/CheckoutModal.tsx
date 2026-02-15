@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Save,
   Ticket as TicketIcon,
+  StickyNote,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -44,8 +46,8 @@ import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
 import { validateVoucher } from "@/lib/api/cash-register/sales";
 import { VoucherValidationResponse } from "@/types/sale";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -87,6 +89,7 @@ export function CheckoutModal({
   const [cashAmount, setCashAmount] = useState<string>("");
   const [cardAmount, setCardAmount] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null,
   );
@@ -120,6 +123,7 @@ export function CheckoutModal({
       setVoucherCode("");
       setVoucherData(null);
       setIsVoucherOpen(false);
+      setIsNotesOpen(false);
       if (isShiftOpen) {
         setTimeout(() => cashInputRef.current?.focus(), 100);
       }
@@ -450,7 +454,7 @@ export function CheckoutModal({
 
             <div className="flex h-[480px]">
               {/* Left: Methods */}
-              <div className="w-1/3 bg-zinc-100/50 border-r p-4 space-y-3">
+              <div className="w-1/3 bg-zinc-100/50 border-r p-4 space-y-3 overflow-y-auto">
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
                   Forma de Pago
                 </p>
@@ -583,6 +587,64 @@ export function CheckoutModal({
                     )}
                   </div>
                 )}
+
+                {/* Notes Section (both variants) */}
+                <div className="pt-3 border-t mt-3">
+                  {!isNotesOpen && !notes.trim() ? (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3 h-10 text-zinc-500 border-dashed border-2 hover:border-[#480489] hover:text-[#480489] hover:bg-purple-50 text-sm"
+                      onClick={() => setIsNotesOpen(true)}
+                    >
+                      <StickyNote className="w-4 h-4" />
+                      <span className="font-medium">Agregar Nota</span>
+                    </Button>
+                  ) : isNotesOpen ? (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                          Nota
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+                          onClick={() => setIsNotesOpen(false)}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder={variant === "debt" ? "Folio, referencia..." : "Observaciones..."}
+                        className="w-full text-sm border rounded-lg p-2.5 resize-none h-[72px] focus:outline-none focus:ring-2 focus:ring-[#480489]/30 focus:border-[#480489] transition-all placeholder:text-zinc-400"
+                        autoFocus
+                        maxLength={200}
+                      />
+                      <p className="text-[10px] text-zinc-400 text-right">
+                        {notes.length}/200
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 relative group">
+                      <div className="flex items-start gap-2">
+                        <StickyNote className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                        <p className="text-xs text-amber-800 leading-relaxed line-clamp-2 flex-1">
+                          {notes}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 shrink-0 text-amber-500 hover:text-[#480489]"
+                          onClick={() => setIsNotesOpen(true)}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right: Content */}
@@ -939,18 +1001,7 @@ export function CheckoutModal({
                     </div>
                   )}
 
-                {/* NOTES INPUT */}
-                {variant === "debt" && (
-                  <div className="pt-2">
-                    <Label className="mb-2 block">Notas / Referencia</Label>
-                    <Input
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Folio, referencia..."
-                      className="h-12 text-lg"
-                    />
-                  </div>
-                )}
+
               </div>
             </div>
 
