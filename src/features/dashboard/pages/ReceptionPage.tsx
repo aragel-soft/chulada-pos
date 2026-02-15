@@ -75,8 +75,9 @@ export default function ReceptionPage() {
 
   const handleProcessClick = () => {
     const hasZeroCost = items.some((i) => i.cost <= 0);
+    const canViewCosts = can("products:purchase_price");
 
-    if (hasZeroCost) {
+    if (hasZeroCost && canViewCosts) {
       setShowZeroCostWarning(true);
       return;
     }
@@ -136,7 +137,7 @@ export default function ReceptionPage() {
             {getTotalQuantity()}
           </span>
         </div>
-        
+
         {can("products:purchase_price") && (
           <div className="text-center">
             <span className="text-xs text-muted-foreground block">
@@ -165,8 +166,6 @@ export default function ReceptionPage() {
         </div>
       </div>
 
-      {/* --- DIALOGS --- */}
-
       <EditProductDialog
         open={isEditProductOpen}
         onOpenChange={setIsEditProductOpen}
@@ -180,30 +179,32 @@ export default function ReceptionPage() {
         }}
       />
 
-      <AlertDialog
-        open={showZeroCostWarning}
-        onOpenChange={setShowZeroCostWarning}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> Costos en Cero Detectados
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Algunos productos tienen un costo de compra de <b>$0.00</b>.
-              <br />
-              <br />
-              ¿Deseas continuar y registrar estos productos con costo cero?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Revisar Costos</AlertDialogCancel>
-            <AlertDialogAction onClick={() => executeReception()}>
-              Confirmar Entrada
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {can("products:purchase_price") && (
+        <AlertDialog
+          open={showZeroCostWarning}
+          onOpenChange={setShowZeroCostWarning}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Costos en Cero Detectados
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Algunos productos tienen un costo de compra de <b>$0.00</b>.
+                <br />
+                <br />
+                ¿Deseas continuar y registrar estos productos con costo cero?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Revisar Costos</AlertDialogCancel>
+              <AlertDialogAction onClick={() => executeReception()}>
+                Confirmar Entrada
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <CreateProductDialog
         open={isCreateProductOpen}
