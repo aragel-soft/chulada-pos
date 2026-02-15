@@ -54,6 +54,7 @@ pub struct SaleDetailView {
   pub total: f64,
   pub cash_amount: f64,
   pub card_amount: f64, // card_transfer_amount in DB
+  pub voucher_amount: f64,
   pub change_returned: f64,
   pub notes: Option<String>,
   pub user_name: String,
@@ -292,6 +293,19 @@ pub fn get_sale_details(
       let total: f64 = row.get(8)?;
       let change = if cash > total { cash - total } else { 0.0 };
 
+      let voucher_sql = "
+        SELECT 
+          SUM(v.amount)
+        FROM sale_vouchers v
+        WHERE v.sale_id = ?
+      ";
+
+      let voucher_amount = conn
+        .query_row(voucher_sql, [&sale_id], |row| row.get(0))
+        .unwrap_or(0.0);
+
+      println!("voucher_amount: {}", voucher_amount);
+
       Ok(SaleDetailView {
         id: row.get(0)?,
         folio: row.get(1)?,
@@ -304,6 +318,7 @@ pub fn get_sale_details(
         total,
         cash_amount: cash,
         card_amount: row.get(10).unwrap_or(0.0),
+        voucher_amount: voucher_amount,
         change_returned: change,
         notes: row.get(11)?,
         cancellation_reason: None,

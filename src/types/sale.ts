@@ -17,6 +17,7 @@ export interface SaleRequest {
   notes: string | null;
   items: SaleItemRequest[];
   should_print: boolean;
+  voucher_code?: string;
 }
 
 export interface SaleResponse {
@@ -24,4 +25,14 @@ export interface SaleResponse {
   folio: string;
   total: number;
   change: number;
+  voucher_used: number;
+}
+
+export interface VoucherValidationResponse {
+  id: string;
+  code: string;
+  initial_balance: number;
+  current_balance: number;
+  is_active: boolean;
+  expires_at: string | null;
 }

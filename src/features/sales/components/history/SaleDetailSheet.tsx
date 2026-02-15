@@ -340,21 +340,35 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
             <span>{formatCurrency(sale.total)}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground">
+          <div className="grid grid-cols-4 gap-2 mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground">
             <div className="flex flex-col">
               <span>Efectivo</span>
               <span className="font-mono text-black">
                 {formatCurrency(sale.cash_amount)}
               </span>
             </div>
-            {(sale.card_amount > 0 || sale.payment_method === "mixed") && (
-              <div className="flex flex-col text-right">
+            {sale.card_amount > 0 ? (
+              <div className="flex flex-col text-center">
                 <span>Tarjeta / Transf</span>
                 <span className="font-mono text-black">
                   {formatCurrency(sale.card_amount)}
                 </span>
               </div>
-            )}
+            ) : <div></div>}
+            {sale.voucher_amount > 0 ? (
+              <div className="flex flex-col text-center">
+                <span>Vale</span>
+                <span className="font-mono text-black">
+                  {formatCurrency(sale.voucher_amount)}
+                </span>
+              </div>
+            ) : <div></div>}
+            <div className="flex flex-col text-right">
+              <span>Cambio</span>
+              <span className="font-mono text-black">
+                {formatCurrency(sale.change_returned)}
+              </span>
+            </div>
           </div>
 
           {/* Reprint Buttons */}

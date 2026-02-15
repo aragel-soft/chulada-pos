@@ -88,6 +88,7 @@ fn main() {
             commands::cash_register::details::get_shift_details,
             commands::cash_register::details::get_closed_shifts,
             commands::cash_register::sales::process_sale,
+            commands::cash_register::sales::validate_voucher,
             // Settings - Business
             commands::settings::business::get_business_settings,
             commands::settings::business::update_business_settings,
