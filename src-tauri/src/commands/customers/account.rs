@@ -31,7 +31,7 @@ pub struct DebtPaymentRequest {
   pub total_amount: f64,
   pub cash_amount: f64,
   pub card_amount: f64,
-  pub payment_method: String, // 'cash', 'card', 'mixed', 'transfer'
+  pub payment_method: String, // 'cash', 'card', 'mixed'
   pub notes: Option<String>,
 }
 
