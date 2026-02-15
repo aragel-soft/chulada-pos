@@ -179,7 +179,6 @@ export default function CustomerDetailPage() {
         // TODO: Call printer service here
       }
     } catch (error) {
-      console.error(error);
       toast.error("Error al registrar el abono");
     } finally {
       setIsProcessingPayment(false);
