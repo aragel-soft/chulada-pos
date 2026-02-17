@@ -79,6 +79,7 @@ fn main() {
             // Inventory - Movements
             commands::inventory::movements::get_inventory_movements,
             commands::inventory::movements::create_inventory_movement,
+            commands::inventory::movements::process_bulk_reception,
             // Cash Register
             commands::cash_register::shifts::get_active_shift,
             commands::cash_register::shifts::open_shift,
@@ -97,6 +98,7 @@ fn main() {
             commands::customers::customers::restore_customer,
             commands::customers::customers::delete_customers,
             commands::customers::account::get_customer_account_statement,
+            commands::customers::account::register_debt_payment,
             // Sales - History
             commands::sales::history::get_sales_history,
             commands::sales::history::get_sale_details,

@@ -50,6 +50,21 @@ pub struct CreateInventoryMovementPayload {
   pub notes: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReceptionItem {
+  pub product_id: String,
+  pub quantity: i64,
+  pub new_cost: f64,
+  pub new_retail_price: f64,
+  pub new_wholesale_price: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BulkReceptionPayload {
+  pub items: Vec<ReceptionItem>,
+  pub user_id: String,
+}
+
 #[tauri::command]
 pub fn get_inventory_movements(
   db_state: State<'_, Mutex<Connection>>,
@@ -272,4 +287,88 @@ pub fn create_inventory_movement(
 
   tx.commit().map_err(|e| format!("Error en commit: {}", e))?;
   Ok(())
+}
+
+#[tauri::command]
+pub fn process_bulk_reception(
+  db_state: State<'_, Mutex<Connection>>,
+  payload: BulkReceptionPayload,
+) -> Result<String, String> {
+  let mut conn = db_state.lock().unwrap();
+  let store_id = get_current_store_id(&conn)?;
+
+  let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+  for item in payload.items {
+    if item.quantity <= 0 {
+      return Err(format!("La cantidad para el producto {} debe ser mayor a 0", item.product_id));
+    }
+    if item.new_cost < 0.0 {
+      return Err(format!("El costo para el producto {} no puede ser negativo", item.product_id));
+    }
+
+    let (current_stock, min_stock, current_purchase_price, current_retail_price, current_wholesale_price): (i64, i64, f64, f64, f64) = tx
+      .query_row(
+        "SELECT 
+           COALESCE(si.stock, 0), 
+           COALESCE(si.minimum_stock, 5),
+           p.purchase_price,
+           p.retail_price,
+           p.wholesale_price
+         FROM products p
+         LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?1
+         WHERE p.id = ?2",
+        rusqlite::params![store_id, item.product_id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+      )
+      .map_err(|e| format!("Error consultando producto {}: {}", item.product_id, e))?;
+
+    // Check if any price changed
+    let cost_changed = (item.new_cost - current_purchase_price).abs() > 0.001;
+    let retail_changed = (item.new_retail_price - current_retail_price).abs() > 0.001;
+    let wholesale_changed = (item.new_wholesale_price - current_wholesale_price).abs() > 0.001;
+
+    if cost_changed || retail_changed || wholesale_changed {
+      tx.execute(
+        "UPDATE products SET purchase_price = ?1, retail_price = ?2, wholesale_price = ?3 WHERE id = ?4",
+        rusqlite::params![item.new_cost, item.new_retail_price, item.new_wholesale_price, item.product_id],
+      ).map_err(|e| format!("Error actualizando precios producto {}: {}", item.product_id, e))?;
+    }
+
+    let new_stock = current_stock + item.quantity;
+    let movement_id = Uuid::new_v4().to_string();
+
+    tx.execute(
+      "INSERT INTO inventory_movements (
+        id, product_id, store_id, user_id, type, reason, 
+        quantity, previous_stock, new_stock, cost, created_at
+      ) VALUES (?1, ?2, ?3, ?4, 'IN', 'PURCHASE', ?5, ?6, ?7, ?8, CURRENT_TIMESTAMP)",
+      rusqlite::params![
+        movement_id,
+        item.product_id,
+        store_id,
+        payload.user_id,
+        item.quantity,
+        current_stock,
+        new_stock,
+        item.new_cost
+      ],
+    ).map_err(|e| format!("Error creando movimiento para {}: {}", item.product_id, e))?;
+
+    let affected = tx.execute(
+      "UPDATE store_inventory SET stock = ?1 WHERE product_id = ?2 AND store_id = ?3",
+      rusqlite::params![new_stock, item.product_id, store_id],
+    ).map_err(|e| format!("Error actualizando stock para {}: {}", item.product_id, e))?;
+
+    if affected == 0 {
+      tx.execute(
+        "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock) 
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![Uuid::new_v4().to_string(), store_id, item.product_id, new_stock, min_stock],
+      ).map_err(|e| format!("Error inicializando inventario para {}: {}", item.product_id, e))?;
+    }
+  }
+
+  tx.commit().map_err(|e| format!("Error al procesar la recepción: {}", e))?;
+  Ok("Recepción procesada correctamente".to_string())
 }
