@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
-
+import { AppAvatar } from "@/components/ui/app-avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftMod
 import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
 import { PastShiftsList } from "@/features/cash-register/components/PastShiftsList";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -188,14 +189,31 @@ export default function CashRegisterPage() {
                 </div>
               ) : (
                 <div className="h-full flex flex-col">
-                  <div className="px-6 py-4 border-b flex justify-between items-center bg-zinc-50/30">
-                    <div>
-                      <h3 className="font-semibold text-lg">Turno Activo #{shift.code || shift.id}</h3>
-                      <p className="text-sm text-muted-foreground">Detalle de movimientos y efectivo del turno actual.</p>
+                  <div className="px-6 py-3 border-b flex justify-between items-center bg-zinc-50/30">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <h3 className="font-semibold text-lg">Turno Activo #{shift.code || shift.id}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(shift.opening_date), "dd MMM yyyy, HH:mm")}
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-200">
+                        En Curso
+                      </span>
                     </div>
-                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-200">
-                      En Curso
-                    </span>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2 h-auto py-1 pl-1 pr-2.5 rounded-full border-gray-200 bg-white hover:bg-gray-50 cursor-default"
+                    >
+                      <AppAvatar
+                        name={shift.opening_user_name || "Usuario"}
+                        path={shift.opening_user_avatar}
+                        className="h-7 w-7"
+                      />
+                      <span className="text-sm font-medium text-zinc-700">
+                        {shift.opening_user_name || "Desconocido"}
+                      </span>
+                    </Button>
                   </div>
                   <div className="flex-1 overflow-hidden p-6 bg-white">
                     <ShiftSummary shiftId={shift.id} />

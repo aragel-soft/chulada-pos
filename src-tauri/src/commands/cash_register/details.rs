@@ -1,4 +1,3 @@
-// this file is temporary, only for testing purposes
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -24,6 +23,11 @@ pub struct ShiftDetailsDto {
     pub total_sales: f64,
     pub total_cash: f64,
     pub total_card: f64,
+    pub total_credit: f64,
+    pub total_voucher_sales: f64,
+    pub total_debt_payments: f64,
+    pub debt_payments_cash: f64,
+    pub debt_payments_card: f64,
     pub theoretical_cash: f64,
 }
 
@@ -97,7 +101,7 @@ pub fn get_shift_details(
         movements.push(m);
     }
 
-    // 3. Get Sales Totals
+    // 3. Sales Totals
     let (total_sales, total_cash_sales, total_card_sales): (f64, f64, f64) = conn.query_row(
         "SELECT 
             COALESCE(SUM(total), 0.0), 
@@ -109,9 +113,42 @@ pub fn get_shift_details(
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
     ).unwrap_or((0.0, 0.0, 0.0));
 
-    // 4. Calculate Theoretical Cash
-    // Initial Cash + Cash Sales + In Movements - Out Movements
-    let theoretical_cash = shift.initial_cash + total_cash_sales + total_movements_in - total_movements_out;
+    // 4. Credit Sales
+    let total_credit: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total), 0.0)
+         FROM sales 
+         WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND status != 'cancelled'",
+        [shift_id],
+        |row| row.get(0)
+    ).unwrap_or(0.0);
+
+    // 5. Discounts // TODO: wait for voucher sales implementation
+    // let total_voucher_sales: f64 = conn.query_row(
+    //     "SELECT COALESCE(SUM(discount_amount), 0.0)
+    //      FROM sales 
+    //      WHERE cash_register_shift_id = ?1 AND status = 'completed'",
+    //     [shift_id],
+    //     |row| row.get(0)
+    // ).unwrap_or(0.0);
+
+    // 6. Debt Payments
+    let (total_debt_payments, debt_payments_cash, debt_payments_card): (f64, f64, f64) = conn.query_row(
+        "SELECT 
+            COALESCE(SUM(amount), 0.0),
+            COALESCE(SUM(cash_amount), 0.0),
+            COALESCE(SUM(card_transfer_amount), 0.0)
+         FROM debt_payments 
+         WHERE cash_register_shift_id = ?1",
+        [shift_id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+    ).unwrap_or((0.0, 0.0, 0.0));
+
+    // 7. Theoretical Cash = Inicial + Ventas Efectivo + Abonos Efectivo + Entradas - Salidas
+    let theoretical_cash = shift.initial_cash 
+        + total_cash_sales 
+        + debt_payments_cash 
+        + total_movements_in 
+        - total_movements_out;
 
     Ok(ShiftDetailsDto {
         shift,
@@ -121,6 +158,11 @@ pub fn get_shift_details(
         total_sales,
         total_cash: total_cash_sales,
         total_card: total_card_sales,
+        total_credit,
+        total_voucher_sales: 0.0,
+        total_debt_payments,
+        debt_payments_cash,
+        debt_payments_card,
         theoretical_cash,
     })
 }

@@ -2,10 +2,105 @@ import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { AppAvatar } from "@/components/ui/app-avatar";
+import {
+  Banknote,
+  CreditCard,
+  HandCoins,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Calculator,
+  Receipt,
+  type LucideIcon,
+} from "lucide-react";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { format } from "date-fns";
+import type { CashMovementDto } from "@/types/cast-cut";
+
+// ── Reusable helpers ─────────────────────────────────────────────
+
+interface StatRowProps {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  color?: string;
+  prefix?: "+" | "-";
+}
+
+/** A single row: icon + label ···· formatted value */
+function StatRow({ icon: Icon, label, value, color = "text-zinc-500", prefix }: StatRowProps) {
+  const valueColor = color === "text-zinc-500" ? "text-zinc-700" : color;
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className={`${color} flex items-center gap-1.5`}>
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </span>
+      <span className={`font-medium ${valueColor}`}>
+        {prefix && `${prefix} `}{formatCurrency(value)}
+      </span>
+    </div>
+  );
+}
+
+interface SummaryCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+  iconColor: string;
+}
+
+/** A highlighted single-value card (Fondo Inicial, Entradas, Salidas) */
+function SummaryCard({ icon: Icon, label, value, bgColor, borderColor, textColor, iconColor }: SummaryCardProps) {
+  return (
+    <div className={`p-4 rounded-lg ${bgColor} border ${borderColor} flex justify-between items-center`}>
+      <div className="flex items-center gap-2">
+        <Icon className={`h-5 w-5 ${iconColor}`} />
+        <span className={`text-sm font-medium ${textColor}`}>{label}</span>
+      </div>
+      <span className={`text-xl font-bold ${textColor}`}>
+        {formatCurrency(value)}
+      </span>
+    </div>
+  );
+}
+
+/** A single movement list item */
+function MovementItem({ movement }: { movement: CashMovementDto }) {
+  const isIn = movement.type_ === "IN";
+  return (
+    <div className="p-4 hover:bg-zinc-50 transition-colors">
+      <div className="flex items-start justify-between mb-1">
+        <Badge
+          variant="outline"
+          className={isIn
+            ? "bg-green-50 text-green-700 border-green-200"
+            : "bg-red-50 text-red-700 border-red-200"
+          }
+        >
+          {isIn ? "Entrada" : "Salida"}
+        </Badge>
+        <span className="text-xs text-zinc-400">
+          {format(new Date(movement.created_at), "HH:mm")}
+        </span>
+      </div>
+      <div className="flex justify-between items-baseline">
+        <span className="font-medium text-zinc-700">{movement.concept}</span>
+        <span className={`font-bold ${isIn ? "text-green-600" : "text-red-600"}`}>
+          {isIn ? "+" : "-"}{formatCurrency(movement.amount)}
+        </span>
+      </div>
+      {movement.description && (
+        <p className="text-xs text-zinc-500 mt-1 italic line-clamp-2">
+          {movement.description}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ──────────────────────────────────────────────
 
 interface ShiftSummaryProps {
   shiftId: number;
@@ -16,128 +111,126 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
     queryKey: ["shiftDetails", shiftId],
     queryFn: () => getShiftDetails(shiftId),
     enabled: !!shiftId,
-    refetchInterval: 5000, // Update every 5 seconds for real-time monitoring
+    refetchInterval: 5000,
   });
 
-  if (isLoading) return <div>Cargando detalles...</div>;
-  if (!shiftDetails) return <div>No se encontró información del turno.</div>;
+  if (isLoading) return <div className="p-8 text-center text-zinc-400">Cargando detalles...</div>;
+  if (!shiftDetails) return <div className="p-8 text-center text-zinc-400">No se encontró información del turno.</div>;
+
+  const d = shiftDetails;
+
+  /** Lines that compose the theoretical cash breakdown */
+  const theoreticalBreakdown = [
+    { label: "Fondo Inicial", value: d.shift.initial_cash, prefix: "+" as const },
+    { label: "Ventas Efectivo", value: d.total_cash, prefix: "+" as const },
+    { label: "Abonos Efectivo", value: d.debt_payments_cash, prefix: "+" as const },
+    { label: "Entradas", value: d.total_movements_in, prefix: "+" as const },
+    { label: "Salidas", value: d.total_movements_out, prefix: "-" as const },
+  ];
 
   return (
     <div className="flex flex-col md:flex-row gap-6 h-full">
       {/* Left: Stats */}
-      <div className="flex-1 space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 p-4 rounded-lg bg-zinc-50 border border-zinc-100 flex justify-between items-center">
-            <div>
-              <span className="text-sm text-zinc-500 block">Fecha Apertura</span>
-              <div className="font-medium">
-                {format(new Date(shiftDetails.shift.opening_date), "dd MMMM yyyy, HH:mm:ss")}
+      <div className="flex-1 space-y-5 overflow-y-auto">
+        {/* Fondo Inicial */}
+        <SummaryCard
+          icon={Banknote} label="Fondo Inicial" value={d.shift.initial_cash}
+          bgColor="bg-blue-50" borderColor="border-blue-100"
+          textColor="text-blue-700" iconColor="text-blue-500"
+        />
+
+        {/* Ventas + Abonos side by side */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Ventas */}
+          <div className="rounded-lg border border-zinc-100 overflow-hidden">
+            <div className="px-4 py-2.5 bg-zinc-50 border-b border-zinc-100 flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-zinc-500" />
+              <span className="text-sm font-medium text-zinc-600">Ventas</span>
+            </div>
+            <div className="p-3 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-zinc-600">Total</span>
+                <span className="font-bold text-zinc-800">{formatCurrency(d.total_sales)}</span>
               </div>
-            </div>
-            <div className="text-right">
-              <span className="text-sm text-zinc-500 block mb-1">Abierto por</span>
-              <Button
-                variant="outline"
-                className="flex items-center gap-3 h-auto py-1.5 pl-1.5 pr-3 rounded-full border-gray-200 bg-white hover:bg-gray-50"
-              >
-                <AppAvatar
-                  name={shiftDetails.shift.opening_user_name || 'Usuario'}
-                  path={shiftDetails.shift.opening_user_avatar}
-                  className="h-8 w-8"
-                />
-                <span className="hidden md:block font-medium text-zinc-700">
-                  {shiftDetails.shift.opening_user_name || "Usuario Desconocido"}
-                </span>
-              </Button>
+              <div className="h-px bg-zinc-100" />
+              <StatRow icon={Banknote} label="Efectivo" value={d.total_cash} />
+              <StatRow icon={CreditCard} label="Tarjeta" value={d.total_card} />
+              <StatRow icon={HandCoins} label="Crédito" value={d.total_credit} color="text-amber-600" />
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-            <span className="text-sm text-blue-600 font-medium">Fondo Inicial</span>
-            <div className="text-2xl font-bold text-blue-700">
-              {formatCurrency(shiftDetails.shift.initial_cash)}
+          {/* Abonos */}
+          <div className="rounded-lg border border-teal-100 overflow-hidden">
+            <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HandCoins className="h-4 w-4 text-teal-600" />
+                <span className="text-sm font-medium text-teal-700">Abonos</span>
+              </div>
+              <span className="font-bold text-teal-700">{formatCurrency(d.total_debt_payments)}</span>
             </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100">
-            <span className="text-sm text-indigo-600 font-medium">Ventas Totales</span>
-            <div className="text-2xl font-bold text-indigo-700">
-              {formatCurrency(shiftDetails.total_sales)}
-            </div>
-             <div className="text-xs text-indigo-400 mt-1 flex gap-2">
-                <span>Efe: {formatCurrency(shiftDetails.total_cash)}</span>
-                <span>Tar: {formatCurrency(shiftDetails.total_card)}</span>
-             </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-            <span className="text-sm text-green-600 font-medium">Entradas (Movs)</span>
-            <div className="text-2xl font-bold text-green-700">
-              {formatCurrency(shiftDetails.total_movements_in)}
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-red-50 border border-red-100">
-            <span className="text-sm text-red-600 font-medium">Salidas (Movs)</span>
-            <div className="text-2xl font-bold text-red-700">
-              {formatCurrency(shiftDetails.total_movements_out)}
+            <div className="p-3 space-y-1.5">
+              <StatRow icon={Banknote} label="Efectivo" value={d.debt_payments_cash} />
+              <StatRow icon={CreditCard} label="Tarjeta" value={d.debt_payments_card} />
             </div>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex justify-between items-center p-3 rounded-lg bg-zinc-50 font-medium">
-            <span>Efectivo Teórico en Caja</span>
-            <span className="text-xl">{formatCurrency(shiftDetails.theoretical_cash)}</span>
+        {/* Movimientos Manuales */}
+        <div className="grid grid-cols-2 gap-3">
+          <SummaryCard
+            icon={ArrowDownCircle} label="Entradas" value={d.total_movements_in}
+            bgColor="bg-green-50" borderColor="border-green-100"
+            textColor="text-green-700" iconColor="text-green-500"
+          />
+          <SummaryCard
+            icon={ArrowUpCircle} label="Salidas" value={d.total_movements_out}
+            bgColor="bg-red-50" borderColor="border-red-100"
+            textColor="text-red-700" iconColor="text-red-500"
+          />
+        </div>
+
+        {/* Efectivo Teórico + Cierre Real */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border-2 border-zinc-200 overflow-hidden">
+            <div className="px-3 py-2.5 bg-zinc-100 flex justify-between items-center">
+              <div className="flex items-center gap-1.5">
+                <Calculator className="h-5 w-5 text-zinc-600" />
+                <span className="font-semibold text-zinc-800">Efectivo Teórico</span>
+              </div>
+              <span className="text-2xl font-bold text-zinc-900">
+                {formatCurrency(d.theoretical_cash)}
+              </span>
+            </div>
+            <div className="p-3 space-y-1 text-sm text-zinc-500 bg-zinc-50">
+              {theoreticalBreakdown.map((row) => (
+                <div key={row.label} className="flex justify-between">
+                  <span>{row.label}</span>
+                  <span>{row.prefix} {formatCurrency(row.value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="text-xs text-zinc-400 px-3">
-            (Inicial + Ventas Efectivo + Entradas - Salidas)
-          </div>
-          
-          {shiftDetails.shift.status === 'closed' && (
-            <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 font-medium border border-purple-100 text-purple-900 mt-4">
-              <span>Cierre Real</span>
-              <span className="text-xl">{formatCurrency(shiftDetails.shift.final_cash || 0)}</span>
+
+          {d.shift.status === "closed" && (
+            <div className="rounded-lg bg-purple-50 border border-purple-100 p-4 flex flex-col justify-center items-center text-purple-900">
+              <span className="text-sm font-medium mb-1">Cierre Real</span>
+              <span className="text-xl font-bold">{formatCurrency(d.shift.final_cash || 0)}</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Right: Movements List */}
-      <div className="w-full md:w-[350px] flex flex-col bg-zinc-50/30 border rounded-lg overflow-hidden h-[500px]">
+      <div className="w-full md:w-[350px] flex flex-col bg-zinc-50/30 border rounded-lg overflow-hidden md:h-auto md:max-h-[calc(100vh-200px)]">
         <div className="p-3 border-b text-sm font-medium text-zinc-500 bg-white">
-          Movimientos ({shiftDetails.movements.length})
+          Movimientos ({d.movements.length})
         </div>
         <ScrollArea className="flex-1 bg-white">
           <div className="divide-y divide-zinc-100">
-            {shiftDetails.movements.map((move) => (
-              <div key={move.id} className="p-4 hover:bg-zinc-50 transition-colors">
-                <div className="flex items-start justify-between mb-1">
-                  <Badge variant="outline" className={`
-                    ${move.type_ === 'IN'
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-red-50 text-red-700 border-red-200'}
-                  `}>
-                    {move.type_ === 'IN' ? 'Entrada' : 'Salida'}
-                  </Badge>
-                  <span className="text-xs text-zinc-400">
-                    {format(new Date(move.created_at), "HH:mm")}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline">
-                  <span className="font-medium text-zinc-700">{move.concept}</span>
-                  <span className={`font-bold ${move.type_ === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
-                    {move.type_ === 'IN' ? '+' : '-'}{formatCurrency(move.amount)}
-                  </span>
-                </div>
-                {move.description && (
-                  <p className="text-xs text-zinc-500 mt-1 italic line-clamp-2">
-                    {move.description}
-                  </p>
-                )}
-              </div>
+            {d.movements.map((move) => (
+              <MovementItem key={move.id} movement={move} />
             ))}
-            {shiftDetails.movements.length === 0 && (
+            {d.movements.length === 0 && (
               <div className="p-8 text-center text-zinc-400 text-sm">
                 No hay movimientos registrados
               </div>

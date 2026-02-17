@@ -30,6 +30,11 @@ export interface ShiftDetailsDto {
   total_sales: number;
   total_cash: number;
   total_card: number;
+  total_credit: number;
+  total_voucher_sales: number;
+  total_debt_payments: number;
+  debt_payments_cash: number;
+  debt_payments_card: number;
   theoretical_cash: number;
 }
 export interface CreateCashMovementRequest {
