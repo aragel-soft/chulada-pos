@@ -6,7 +6,7 @@ export interface ReportKpis {
 }
 
 export interface ChartDataPoint {
-  day: string; 
+  day: string;
   total_sales: number;
 }
 
@@ -14,6 +14,12 @@ export interface CategoryDataPoint {
   category_name: string;
   total_sales: number;
   percentage: number;
+}
+
+export interface SalesReport {
+  kpis: ReportKpis;
+  sales_chart: ChartDataPoint[];
+  category_chart: CategoryDataPoint[];
 }
 
 export interface DateRange {
