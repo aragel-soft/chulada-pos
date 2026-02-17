@@ -27,3 +27,16 @@ export interface CreateInventoryMovementPayload {
   reason: string;
   notes?: string;
 }
+
+export interface ReceptionItemPayload {
+  product_id: string;
+  quantity: number;
+  new_cost: number;
+  new_retail_price: number;
+  new_wholesale_price: number;
+}
+
+export interface BulkReceptionPayload {
+  items: ReceptionItemPayload[];
+  user_id: string;
+}

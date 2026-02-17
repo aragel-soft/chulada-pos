@@ -29,10 +29,7 @@ export default function DashboardPage() {
   const dashboardTabs = [
     { value: "sales", label: "Venta", permission: "sales:view" },
     { value: "history", label: "Historial", permission: "history:view" },
-    {
-      value: "add_inventory",
-      label: "Añadir Inventario",
-      permission: "add_inventory:view",
+    { value: "reception", label: "Añadir Inventario", permission: "inventory_movements:entry",
     },
   ].filter((tab) => can(tab.permission));
 
