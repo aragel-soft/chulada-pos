@@ -87,9 +87,8 @@ export function SalesTrendChart({ data }: SalesTrendChartProps) {
                 />
                 <Bar
                   dataKey="total_sales"
-                  fill="currentColor"
+                  fill="#480489"
                   radius={[4, 4, 0, 0]}
-                  className="fill-primary"
                 />
               </BarChart>
             </ResponsiveContainer>

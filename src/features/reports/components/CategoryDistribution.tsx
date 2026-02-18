@@ -1,3 +1,12 @@
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 import { CategoryDataPoint } from "@/types/reports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -6,14 +15,14 @@ interface CategoryDistributionProps {
 }
 
 const CATEGORY_COLORS = [
-  "bg-primary",
-  "bg-blue-500",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-rose-500",
-  "bg-violet-500",
-  "bg-cyan-500",
-  "bg-orange-500",
+  "#7c3aed", // primary / violet-600
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#f43f5e", // rose-500
+  "#8b5cf6", // violet-500
+  "#06b6d4", // cyan-500
+  "#f97316", // orange-500
 ];
 
 const formatCurrency = (value: number) =>
@@ -22,6 +31,70 @@ const formatCurrency = (value: number) =>
     currency: "MXN",
   }).format(value);
 
+const RADIAN = Math.PI / 180;
+
+const renderCustomLabel = (props: PieLabelRenderProps) => {
+  const cx = Number(props.cx ?? 0);
+  const cy = Number(props.cy ?? 0);
+  const midAngle = Number(props.midAngle ?? 0);
+  const innerRadius = Number(props.innerRadius ?? 0);
+  const outerRadius = Number(props.outerRadius ?? 0);
+  const percent = Number(props.percent ?? 0);
+
+  if (percent < 0.05) return null;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={12}
+      fontWeight={600}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
+const CustomTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: CategoryDataPoint;
+  }>;
+}) => {
+  if (active && payload && payload.length) {
+    const item = payload[0].payload;
+    return (
+      <div
+        style={{
+          borderRadius: "8px",
+          border: "1px solid hsl(var(--border))",
+          backgroundColor: "hsl(var(--popover))",
+          color: "hsl(var(--popover-foreground))",
+          padding: "8px 12px",
+          fontSize: "13px",
+        }}
+      >
+        <p className="font-semibold">{item.category_name}</p>
+        <p className="text-muted-foreground">
+          {formatCurrency(item.total_sales)} · {item.percentage}%
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function CategoryDistribution({ data }: CategoryDistributionProps) {
   return (
     <Card className="col-span-3">
@@ -29,36 +102,42 @@ export function CategoryDistribution({ data }: CategoryDistributionProps) {
         <CardTitle>Ventas por Categoría</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {data.map((item, index) => (
-            <div key={item.category_name} className="space-y-1.5">
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-medium truncate mr-2">
-                  {item.category_name}
-                </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-muted-foreground text-xs">
-                    {formatCurrency(item.total_sales)}
-                  </span>
-                  <span className="font-semibold w-12 text-right">
-                    {item.percentage}%
-                  </span>
-                </div>
-              </div>
-              <div className="h-2 w-full rounded-full bg-secondary">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    CATEGORY_COLORS[index % CATEGORY_COLORS.length]
-                  }`}
-                  style={{ width: `${Math.max(item.percentage, 1)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-          {data.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
+        <div className="h-[300px] w-full">
+          {data.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               No hay datos de categorías para este periodo.
-            </p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  dataKey="total_sales"
+                  nameKey="category_name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  strokeWidth={2}
+                  stroke="hsl(var(--card))"
+                >
+                  {data.map((_entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: "12px", paddingTop: "12px" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
           )}
         </div>
       </CardContent>
