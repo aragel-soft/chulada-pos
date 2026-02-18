@@ -122,14 +122,15 @@ pub fn get_shift_details(
         |row| row.get(0)
     ).unwrap_or(0.0);
 
-    // 5. Discounts // TODO: wait for voucher sales implementation
-    // let total_voucher_sales: f64 = conn.query_row(
-    //     "SELECT COALESCE(SUM(discount_amount), 0.0)
-    //      FROM sales 
-    //      WHERE cash_register_shift_id = ?1 AND status = 'completed'",
-    //     [shift_id],
-    //     |row| row.get(0)
-    // ).unwrap_or(0.0);
+    // 5. Voucher amounts used in sales
+    let total_voucher_sales: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(sv.amount), 0.0)
+         FROM sale_vouchers sv
+         INNER JOIN sales s ON sv.sale_id = s.id
+         WHERE s.cash_register_shift_id = ?1 AND s.status = 'completed'",
+        [shift_id],
+        |row| row.get(0)
+    ).unwrap_or(0.0);
 
     // 6. Debt Payments
     let (total_debt_payments, debt_payments_cash, debt_payments_card): (f64, f64, f64) = conn.query_row(
@@ -159,7 +160,7 @@ pub fn get_shift_details(
         total_cash: total_cash_sales,
         total_card: total_card_sales,
         total_credit,
-        total_voucher_sales: 0.0,
+        total_voucher_sales,
         total_debt_payments,
         debt_payments_cash,
         debt_payments_card,

@@ -10,6 +10,7 @@ import {
   ArrowUpCircle,
   Calculator,
   Receipt,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
@@ -156,6 +157,7 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
               <StatRow icon={Banknote} label="Efectivo" value={d.total_cash} />
               <StatRow icon={CreditCard} label="Tarjeta" value={d.total_card} />
               <StatRow icon={HandCoins} label="Crédito" value={d.total_credit} color="text-amber-600" />
+              <StatRow icon={Ticket} label="Vales" value={d.total_voucher_sales} color="text-purple-600" />
             </div>
           </div>
 
