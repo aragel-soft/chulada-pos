@@ -20,6 +20,8 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
+  Receipt,
+  Ticket,
 } from "lucide-react";
 import type { ShiftDetailsDto } from "@/types/cast-cut";
 import { getCloseShiftSchema, type CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
@@ -154,10 +156,10 @@ export function CloseShiftStepOne({
             {/* ── LEFT COLUMN: Theoretical info (read-only) ── */}
             <div className="space-y-4">
               {/* Cash theoretical breakdown */}
-              <div className="rounded-lg border border-zinc-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-50 border-b flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-semibold text-zinc-700">Desglose Teórico del Efectivo</span>
+              <div className="rounded-lg border border-green-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-green-50 border-b border-green-200 flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-semibold text-green-800">Desglose Teórico del Efectivo</span>
                 </div>
                 <div className="p-4 space-y-2">
                   <InfoRow icon={Banknote} label="Fondo Inicial" value={d.shift.initial_cash} prefix="+" />
@@ -176,10 +178,10 @@ export function CloseShiftStepOne({
               </div>
 
               {/* Card theoretical breakdown */}
-              <div className="rounded-lg border border-zinc-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-50 border-b flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-semibold text-zinc-700">Tarjeta Teórica</span>
+              <div className="rounded-lg border border-blue-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-200 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-800">Tarjeta Teórica</span>
                 </div>
                 <div className="p-4 space-y-2">
                   <InfoRow icon={CreditCard} label="Ventas con Tarjeta" value={d.total_card_sales} prefix="+" />
@@ -194,28 +196,15 @@ export function CloseShiftStepOne({
                 </div>
               </div>
 
-              {/* Cash withdrawal */}
-              <div className="rounded-lg border-2 border-emerald-200 overflow-hidden bg-emerald-50">
-                <div className="p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-emerald-700" />
-                    <div>
-                      <span className="text-sm font-semibold text-emerald-800 block">
-                        Monto a Retirar de Caja
-                      </span>
-                      <span className="text-xs text-emerald-600">
-                        Ventas efectivo + Abonos efectivo
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-emerald-800">
-                    {formatCurrency(cashWithdrawal)}
-                  </span>
+              {/* Other sales info */}
+              <div className="rounded-lg border border-amber-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-800">Otros Métodos (Solo Informativo)</span>
                 </div>
-                <div className="px-4 pb-3">
-                  <p className="text-xs text-emerald-700 bg-emerald-100 rounded px-2 py-1">
-                    Debe retirarse TODO el efectivo generado por ventas y abonos
-                  </p>
+                <div className="p-4 space-y-2">
+                  <InfoRow icon={Receipt} label="Ventas a Crédito" value={d.total_credit_sales} />
+                  <InfoRow icon={Ticket} label="Uso de Vales" value={d.total_voucher_sales} />
                 </div>
               </div>
             </div>

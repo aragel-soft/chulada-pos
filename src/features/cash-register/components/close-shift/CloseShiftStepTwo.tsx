@@ -34,7 +34,7 @@ import type { CloseShiftFormValues } from "@/features/cash-register/schemas/clos
 function DiffBadge({ diff }: { diff: number }) {
   if (Math.abs(diff) < 0.01) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800">
         <CheckCircle2 className="h-3 w-3" /> Cuadrada
       </span>
     );
@@ -43,7 +43,7 @@ function DiffBadge({ diff }: { diff: number }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium",
         isPositive
           ? "bg-blue-100 text-blue-800"
           : "bg-red-100 text-red-800"
@@ -198,17 +198,27 @@ export function CloseShiftStepTwo({
               </div>
 
               {/* Cash withdrawal */}
-              <div className="rounded-lg border-2 border-emerald-200 overflow-hidden bg-emerald-50">
+<div className="rounded-lg border-2 border-emerald-200 overflow-hidden bg-emerald-50">
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Wallet className="h-5 w-5 text-emerald-700" />
-                    <span className="text-sm font-semibold text-emerald-800">
-                      Monto a Retirar
-                    </span>
+                    <div>
+                      <span className="text-sm font-semibold text-emerald-800 block">
+                        Monto a Retirar de Caja
+                      </span>
+                      <span className="text-xs text-emerald-600">
+                        Ventas efectivo + Abonos efectivo
+                      </span>
+                    </div>
                   </div>
                   <span className="text-2xl font-bold text-emerald-800">
                     {formatCurrency(cashWithdrawal)}
                   </span>
+                </div>
+                <div className="px-4 pb-3">
+                  <p className="text-xs text-emerald-700 bg-emerald-100 rounded px-2 py-1">
+                    Debe retirarse TODO el efectivo generado por ventas y abonos
+                  </p>
                 </div>
               </div>
             </div>
@@ -286,9 +296,7 @@ export function CloseShiftStepTwo({
                   <SummaryRow label="Efectivo" value={formatCurrency(d.total_cash_sales)} />
                   <SummaryRow label="Tarjeta" value={formatCurrency(d.total_card_sales)} />
                   <SummaryRow label="Crédito" value={formatCurrency(d.total_credit_sales)} />
-                  {d.total_voucher_sales > 0 && (
-                    <SummaryRow label="Vales" value={formatCurrency(d.total_voucher_sales)} />
-                  )}
+                  <SummaryRow label="Vales" value={formatCurrency(d.total_voucher_sales)} />
                 </div>
               </div>
 
