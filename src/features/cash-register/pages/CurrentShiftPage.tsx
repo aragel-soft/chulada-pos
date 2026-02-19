@@ -41,7 +41,7 @@ export default function CurrentShiftPage() {
 
     setIsClosing(true);
     try {
-      await closeShift(amount, user.id);
+      await closeShift({ finalCash: amount, cardTerminalTotal: 0 }, user.id);
       toast.success("Caja cerrada correctamente.");
       setIsCloseDialogOpen(false);
       setFinalCash("");
