@@ -22,6 +22,7 @@ pub struct CategoryDataPoint {
     pub category_name: String,
     pub total_sales: f64,
     pub percentage: f64,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -128,18 +129,20 @@ fn fetch_categories(
                     THEN (category_total * 100.0 / SUM(category_total) OVER())
                     ELSE 0.0
                 END,
-            2) as percentage
+            2) as percentage,
+            color
         FROM (
             SELECT 
                 c.name as category_name,
-                COALESCE(SUM(si.total), 0.0) as category_total
+                COALESCE(SUM(si.total), 0.0) as category_total,
+                c.color
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
             JOIN categories c ON p.category_id = c.id
             WHERE s.created_at BETWEEN ?1 AND ?2 
               AND s.status = 'completed'
-            GROUP BY c.id, c.name
+            GROUP BY c.id, c.name, c.color
         )
         ORDER BY category_total DESC
     "#;
@@ -151,6 +154,7 @@ fn fetch_categories(
                 category_name: row.get(0)?,
                 total_sales: row.get(1)?,
                 percentage: row.get(2)?,
+                color: row.get(3)?,
             })
         })
         .map_err(|e| e.to_string())?;

@@ -14,6 +14,7 @@ export interface CategoryDataPoint {
   category_name: string;
   total_sales: number;
   percentage: number;
+  color?: string;
 }
 
 export interface SalesReport {

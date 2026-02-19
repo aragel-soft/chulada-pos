@@ -14,8 +14,8 @@ interface CategoryDistributionProps {
   data: CategoryDataPoint[];
 }
 
-const CATEGORY_COLORS = [
-  "#7c3aed", // primary / violet-600
+const FALLBACK_COLORS = [
+  "#7c3aed", // violet-600
   "#3b82f6", // blue-500
   "#10b981", // emerald-500
   "#f59e0b", // amber-500
@@ -122,10 +122,10 @@ export function CategoryDistribution({ data }: CategoryDistributionProps) {
                   strokeWidth={2}
                   stroke="hsl(var(--card))"
                 >
-                  {data.map((_entry, index) => (
+                  {data.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                      fill={entry.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
                     />
                   ))}
                 </Pie>
