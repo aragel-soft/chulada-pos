@@ -4,53 +4,17 @@ import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { AppAvatar } from "@/components/ui/app-avatar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, Scissors } from "lucide-react";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
 import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
+import { CloseShiftModal } from "@/features/cash-register/components/close-shift/CloseShiftModal";
 import { format } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 export default function CurrentShiftPage() {
-  const { shift, closeShift, isLoading } = useCashRegisterStore();
-  const { user, can } = useAuthStore();
+  const { shift, isLoading } = useCashRegisterStore();
+  const { can } = useAuthStore();
 
-  // Close Shift Form State
-  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
-  const [finalCash, setFinalCash] = useState<string>("");
-  const [isClosing, setIsClosing] = useState(false);
-
-  const handleCloseShift = async () => {
-    if (!user?.id || !shift) return;
-
-    const amount = parseFloat(finalCash);
-    if (isNaN(amount) || amount < 0) {
-      toast.error("Por favor ingrese un monto válido.");
-      return;
-    }
-
-    setIsClosing(true);
-    try {
-      await closeShift({ finalCash: amount, cardTerminalTotal: 0 }, user.id);
-      toast.success("Caja cerrada correctamente.");
-      setIsCloseDialogOpen(false);
-      setFinalCash("");
-    } catch (error) {
-      toast.error("Error al cerrar caja", { description: String(error) });
-    } finally {
-      setIsClosing(false);
-    }
-  };
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
   if (isLoading) {
     return <div className="p-8 flex items-center justify-center"><Loader2 className="animate-spin mr-2" /> Cargando información de caja...</div>;
@@ -90,52 +54,13 @@ export default function CurrentShiftPage() {
         
         <div className="flex items-center gap-2">
            {can('cash_register:close') && (
-            <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Lock className="mr-2 h-4 w-4" /> Realizar Corte
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-zinc-900" />
-                    Confirmar Cierre de Turno
-                  </DialogTitle>
-                  <DialogDescription>
-                    Ingrese el monto total de efectivo contado en caja.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="final-cash">Efectivo Final (Real)</Label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
-                      <Input
-                        id="final-cash"
-                        className="pl-8 text-lg font-medium"
-                        type="number"
-                        step="0.5"
-                        value={finalCash}
-                        onChange={(e) => setFinalCash(e.target.value)}
-                        placeholder="0.00"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCloseDialogOpen(false)}>Cancelar</Button>
-                  <Button
-                    className="bg-[#480489] hover:bg-[#360368] text-white"
-                    onClick={handleCloseShift}
-                    disabled={isClosing || !finalCash}
-                  >
-                    {isClosing ? "Cerrando..." : "Confirmar y Cerrar"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsCloseModalOpen(true)}
+            >
+              <Scissors className="mr-2 h-4 w-4" /> Realizar Corte
+            </Button>
            )}
 
           <Button
@@ -156,6 +81,13 @@ export default function CurrentShiftPage() {
       <div className="flex-1 overflow-hidden p-6 bg-white">
         <ShiftSummary shiftId={shift.id} />
       </div>
+
+      {/* Close Shift Modal */}
+      <CloseShiftModal
+        shiftId={shift.id}
+        isOpen={isCloseModalOpen}
+        onClose={() => setIsCloseModalOpen(false)}
+      />
     </div>
   );
 }
