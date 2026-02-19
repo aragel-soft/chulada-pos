@@ -22,6 +22,9 @@ import {
   Check,
   AlertCircle,
   Save,
+  Ticket as TicketIcon,
+  StickyNote,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -41,8 +44,10 @@ import {
 import { getCustomers } from "@/lib/api/customers";
 import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { validateVoucher } from "@/lib/api/cash-register/sales";
+import { VoucherValidationResponse } from "@/types/sale";
+
+
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -57,6 +62,7 @@ interface CheckoutModalProps {
     cardAmount: number,
     shouldPrint: boolean,
     customerId?: string,
+    voucherCode?: string,
     notes?: string,
   ) => Promise<void>;
   isProcessing: boolean;
@@ -83,6 +89,7 @@ export function CheckoutModal({
   const [cashAmount, setCashAmount] = useState<string>("");
   const [cardAmount, setCardAmount] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null,
   );
@@ -94,6 +101,14 @@ export function CheckoutModal({
 
   const cashInputRef = useRef<HTMLInputElement>(null);
   const cardInputRef = useRef<HTMLInputElement>(null);
+  const voucherInputRef = useRef<HTMLInputElement>(null);
+
+  // Voucher State (only for sale variant)
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherData, setVoucherData] =
+    useState<VoucherValidationResponse | null>(null);
+  const [isVoucherOpen, setIsVoucherOpen] = useState(false);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
 
   const isShiftOpen = shift && shift.status === "open";
 
@@ -105,6 +120,10 @@ export function CheckoutModal({
       setNotes("");
       setSelectedCustomer(null);
       setCustomerSearchQuery("");
+      setVoucherCode("");
+      setVoucherData(null);
+      setIsVoucherOpen(false);
+      setIsNotesOpen(false);
       if (isShiftOpen) {
         setTimeout(() => cashInputRef.current?.focus(), 100);
       }
@@ -114,13 +133,46 @@ export function CheckoutModal({
   const numericCash = parseFloat(cashAmount) || 0;
   const numericCard = parseFloat(cardAmount) || 0;
   const currentPaymentSum = numericCash + numericCard;
-  const displayTotal = variant === "sale" ? total : currentPaymentSum;
   const debtLimit = variant === "debt" ? total : Infinity;
 
+  // --- Voucher Logic (sale only) ---
+  const handleValidateVoucher = async () => {
+    if (!voucherCode.trim()) return;
+    setIsValidatingVoucher(true);
+    try {
+      const voucher = await validateVoucher(voucherCode);
+      setVoucherData(voucher);
+      setIsVoucherOpen(false);
+      setVoucherCode("");
+      toast.success("Vale aplicado correctamente");
+    } catch (error: any) {
+      toast.error(error?.toString() || "Error al validar vale");
+      setVoucherData(null);
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const removeVoucher = () => {
+    setVoucherData(null);
+  };
+
+  // Calculations with Voucher (sale variant only)
+  const voucherBalance = voucherData?.current_balance || 0;
+  const voucherAppliedAmount =
+    variant === "sale" && voucherData ? Math.min(total, voucherBalance) : 0;
+  const remainingTotal =
+    variant === "sale" ? Math.max(0, total - voucherAppliedAmount) : total;
+
+  // Display total: for sale it's the remaining (after voucher), for debt it's what the user is paying
+  const displayTotal =
+    variant === "sale" ? remainingTotal : currentPaymentSum;
+
+  // Update amounts when method changes
   useEffect(() => {
     if (method === "card_transfer") {
       if (variant === "sale") {
-        setCardAmount(total.toString());
+        setCardAmount(remainingTotal.toString());
         setCashAmount("0");
       } else {
         const valToMove = numericCash > 0 ? numericCash.toString() : "";
@@ -133,15 +185,30 @@ export function CheckoutModal({
         setCashAmount(numericCard.toString());
       }
     }
-  }, [method, total, variant]);
+  }, [method, variant]);
 
+  // Auto-calculate card in mixed mode for sale
   useEffect(() => {
     if (method === "mixed" && variant === "sale") {
       const currentCash = parseFloat(cashAmount) || 0;
-      const remaining = Math.max(0, total - currentCash);
-      setCardAmount(remaining > 0 ? remaining.toFixed(2) : "0");
+      const remaining = Math.max(0, remainingTotal - currentCash);
+      const newCardVal = remaining > 0 ? remaining.toFixed(2) : "0";
+      setCardAmount(newCardVal);
     }
-  }, [cashAmount, method, total, variant]);
+  }, [cashAmount, method, remainingTotal, variant]);
+
+  // Update default amounts when voucher changes (sale only)
+  useEffect(() => {
+    if (variant !== "sale" || !voucherData) return;
+    if (method === "cash") {
+      setCashAmount(remainingTotal.toString());
+    } else if (method === "card_transfer") {
+      setCardAmount(remainingTotal.toString());
+    } else if (method === "mixed") {
+      setCashAmount("");
+      setCardAmount(remainingTotal.toString());
+    }
+  }, [voucherAppliedAmount]);
 
   useEffect(() => {
     async function searchCustomers() {
@@ -165,7 +232,10 @@ export function CheckoutModal({
     if (method === "credit") searchCustomers();
   }, [debouncedSearch, method, isOpen]);
 
-  const handleNumericInput = (value: string, setter: (val: string) => void) => {
+  const handleNumericInput = (
+    value: string,
+    setter: (val: string) => void,
+  ) => {
     if (value === "" || /^\d*\.?\d*$/.test(value)) setter(value);
   };
 
@@ -218,31 +288,45 @@ export function CheckoutModal({
     [isOpen, customerSearchOpen],
   );
 
+  // Change calculation
   const calculateChange = () => {
     if (variant === "debt") return 0;
-    if (method === "cash") return numericCash - total;
-    if (method === "mixed") return numericCash + numericCard - total;
+    if (method === "cash") return numericCash - remainingTotal;
+    if (method === "mixed")
+      return numericCash + numericCard - remainingTotal;
     return 0;
   };
   const change = calculateChange();
-  const missing = variant === "sale" ? total - (numericCash + numericCard) : 0;
+
+  const missing =
+    variant === "sale"
+      ? remainingTotal - (numericCash + numericCard)
+      : 0;
 
   const isCreditLimitExceeded = () => {
     if (!selectedCustomer) return false;
     return (
-      selectedCustomer.current_balance + total > selectedCustomer.credit_limit
+      selectedCustomer.current_balance + remainingTotal >
+      selectedCustomer.credit_limit
     );
   };
 
   const isValid = () => {
     if (!isShiftOpen) return false;
+
+    // If fully paid by voucher (sale only)
+    if (variant === "sale" && remainingTotal === 0 && voucherData) return true;
+
     if (method === "credit")
       return !!selectedCustomer && !isCreditLimitExceeded();
+
     if (variant === "sale") {
       if (method === "card_transfer") return true;
-      if (method === "cash") return numericCash >= total - 0.01;
-      if (method === "mixed") return numericCash + numericCard >= total - 0.01;
+      if (method === "cash") return numericCash >= remainingTotal - 0.01;
+      if (method === "mixed")
+        return numericCash + numericCard >= remainingTotal - 0.01;
     } else {
+      // debt variant
       if (currentPaymentSum <= 0) return false;
       if (currentPaymentSum > debtLimit + 0.01) return false;
       return true;
@@ -255,18 +339,25 @@ export function CheckoutModal({
       if (!isShiftOpen) toast.error("Caja cerrada");
       else if (variant === "debt" && currentPaymentSum > debtLimit)
         toast.error("El abono excede la deuda");
-      else toast.error("Monto inválido");
+      else if (method === "credit") {
+        if (!selectedCustomer) toast.error("Seleccione un cliente");
+        else if (isCreditLimitExceeded())
+          toast.error("Límite de crédito excedido");
+      } else toast.error("Monto insuficiente para cubrir el total");
       return;
     }
+
     const customerId =
       variant === "debt" ? defaultCustomerId : selectedCustomer?.id;
     let finalMethod = method === "card_transfer" ? "card" : method;
+
     onProcessSale(
       finalMethod,
       numericCash,
       numericCard,
       shouldPrint,
       customerId,
+      voucherData?.code,
       notes,
     );
   };
@@ -332,22 +423,30 @@ export function CheckoutModal({
                   <p className="text-sm text-muted-foreground uppercase tracking-widest font-semibold">
                     {variant === "sale" ? "Total a Pagar" : "Monto del Abono"}
                   </p>
-                  <div className="flex items-baseline justify-end gap-2">
-                    <p
-                      className={cn(
-                        "text-5xl font-extrabold tabular-nums",
-                        variant === "debt" && currentPaymentSum > debtLimit
-                          ? "text-red-500"
-                          : "text-[#480489]",
-                      )}
-                    >
-                      {formatCurrency(displayTotal)}
-                    </p>
-                    {variant === "debt" && (
-                      <span className="text-sm text-muted-foreground font-medium">
-                        / {formatCurrency(debtLimit)} (Deuda)
+                  <div className="flex flex-col items-end">
+                    {variant === "sale" && voucherData && (
+                      <span className="text-sm text-green-600 font-bold line-through decoration-zinc-400 decoration-2">
+                        {formatCurrency(total)}
                       </span>
                     )}
+                    <div className="flex items-baseline justify-end gap-2">
+                      <p
+                        className={cn(
+                          "text-5xl font-extrabold tabular-nums",
+                          variant === "debt" &&
+                            currentPaymentSum > debtLimit
+                            ? "text-red-500"
+                            : "text-[#480489]",
+                        )}
+                      >
+                        {formatCurrency(displayTotal)}
+                      </p>
+                      {variant === "debt" && (
+                        <span className="text-sm text-muted-foreground font-medium">
+                          / {formatCurrency(debtLimit)} (Deuda)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </DialogTitle>
@@ -355,7 +454,7 @@ export function CheckoutModal({
 
             <div className="flex h-[480px]">
               {/* Left: Methods */}
-              <div className="w-1/3 bg-zinc-100/50 border-r p-4 space-y-3">
+              <div className="w-1/3 bg-zinc-100/50 border-r p-4 space-y-3 overflow-y-auto">
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
                   Forma de Pago
                 </p>
@@ -386,6 +485,166 @@ export function CheckoutModal({
                     label="Crédito a Cliente"
                   />
                 )}
+
+                {/* Voucher Section (sale only) */}
+                {variant === "sale" && (
+                  <div className="pt-4 border-t mt-4">
+                    {!voucherData ? (
+                      <Dialog
+                        open={isVoucherOpen}
+                        onOpenChange={setIsVoucherOpen}
+                      >
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>
+                              Aplicar Vale de Tienda
+                            </DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">
+                                Código del Vale / Escanear
+                              </label>
+                              <input
+                                ref={voucherInputRef}
+                                className="w-full text-2xl font-bold p-3 border rounded-md uppercase tracking-wider text-center"
+                                placeholder="VALE-XXXX"
+                                value={voucherCode}
+                                onChange={(e) =>
+                                  setVoucherCode(
+                                    e.target.value.toUpperCase(),
+                                  )
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")
+                                    handleValidateVoucher();
+                                }}
+                                autoFocus
+                              />
+                            </div>
+                            <Button
+                              className="w-full h-12 text-lg bg-[#480489] hover:bg-[#360368]"
+                              onClick={handleValidateVoucher}
+                              disabled={
+                                !voucherCode || isValidatingVoucher
+                              }
+                            >
+                              {isValidatingVoucher ? (
+                                <Loader2 className="animate-spin mr-2" />
+                              ) : (
+                                "Validar y Aplicar"
+                              )}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start gap-3 h-12 text-zinc-600 border-dashed border-2 hover:border-[#480489] hover:text-[#480489] hover:bg-purple-50"
+                          onClick={() => setIsVoucherOpen(true)}
+                        >
+                          <TicketIcon className="w-5 h-5" />
+                          <span className="font-semibold">
+                            Usar Vale de Tienda
+                          </span>
+                        </Button>
+                      </Dialog>
+                    ) : (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 relative group">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-xs font-bold text-green-700 uppercase tracking-wide">
+                              Vale Aplicado
+                            </p>
+                            <p className="font-mono font-bold text-green-900">
+                              {voucherData.code}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              Saldo rest.:{" "}
+                              {formatCurrency(
+                                Math.max(
+                                  0,
+                                  voucherData.current_balance -
+                                    voucherAppliedAmount,
+                                ),
+                              )}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-700">
+                              -{formatCurrency(voucherAppliedAmount)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute -top-2 -right-2 bg-white shadow-sm border rounded-full w-6 h-6 hover:bg-red-50 hover:text-red-600"
+                          onClick={removeVoucher}
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Notes Section (both variants) */}
+                <div className="pt-3 border-t mt-3">
+                  {!isNotesOpen && !notes.trim() ? (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3 h-10 text-zinc-500 border-dashed border-2 hover:border-[#480489] hover:text-[#480489] hover:bg-purple-50 text-sm"
+                      onClick={() => setIsNotesOpen(true)}
+                    >
+                      <StickyNote className="w-4 h-4" />
+                      <span className="font-medium">Agregar Nota</span>
+                    </Button>
+                  ) : isNotesOpen ? (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                          Nota
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+                          onClick={() => setIsNotesOpen(false)}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder={variant === "debt" ? "Folio, referencia..." : "Observaciones..."}
+                        className="w-full text-sm border rounded-lg p-2.5 resize-none h-[72px] focus:outline-none focus:ring-2 focus:ring-[#480489]/30 focus:border-[#480489] transition-all placeholder:text-zinc-400"
+                        autoFocus
+                        maxLength={200}
+                      />
+                      <p className="text-[10px] text-zinc-400 text-right">
+                        {notes.length}/200
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 relative group">
+                      <div className="flex items-start gap-2">
+                        <StickyNote className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                        <p className="text-xs text-amber-800 leading-relaxed line-clamp-2 flex-1">
+                          {notes}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 shrink-0 text-amber-500 hover:text-[#480489]"
+                          onClick={() => setIsNotesOpen(true)}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right: Content */}
@@ -514,13 +773,15 @@ export function CheckoutModal({
                           <div className="flex justify-between">
                             <span>Saldo Actual:</span>
                             <span className="font-medium">
-                              {formatCurrency(selectedCustomer.current_balance)}
+                              {formatCurrency(
+                                selectedCustomer.current_balance,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span>+ Compra:</span>
                             <span className="font-bold">
-                              {formatCurrency(total)}
+                              {formatCurrency(remainingTotal)}
                             </span>
                           </div>
                           <div className="h-px bg-black/10 my-2" />
@@ -534,7 +795,8 @@ export function CheckoutModal({
                               }
                             >
                               {formatCurrency(
-                                selectedCustomer.current_balance + total,
+                                selectedCustomer.current_balance +
+                                  remainingTotal,
                               )}
                             </span>
                           </div>
@@ -550,7 +812,7 @@ export function CheckoutModal({
                             <XCircle className="w-4 h-4" /> Excedido por{" "}
                             {formatCurrency(
                               selectedCustomer.current_balance +
-                                total -
+                                remainingTotal -
                                 selectedCustomer.credit_limit,
                             )}
                           </div>
@@ -623,7 +885,7 @@ export function CheckoutModal({
                           Cobro exacto a tarjeta
                         </p>
                         <p className="text-3xl font-bold text-zinc-900">
-                          {formatCurrency(total)}
+                          {formatCurrency(remainingTotal)}
                         </p>
                       </>
                     ) : (
@@ -659,7 +921,10 @@ export function CheckoutModal({
                             symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                             value={cashAmount}
                             onChange={(e) =>
-                              handleNumericInput(e.target.value, setCashAmount)
+                              handleNumericInput(
+                                e.target.value,
+                                setCashAmount,
+                              )
                             }
                             placeholder="0.00"
                             autoFocus
@@ -682,7 +947,10 @@ export function CheckoutModal({
                             symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                             value={cardAmount}
                             onChange={(e) =>
-                              handleNumericInput(e.target.value, setCardAmount)
+                              handleNumericInput(
+                                e.target.value,
+                                setCardAmount,
+                              )
                             }
                             readOnly={variant === "sale"}
                             tabIndex={variant === "sale" ? -1 : 0}
@@ -733,18 +1001,7 @@ export function CheckoutModal({
                     </div>
                   )}
 
-                {/* NOTES INPUT */}
-                {variant === "debt" && (
-                  <div className="pt-2">
-                    <Label className="mb-2 block">Notas / Referencia</Label>
-                    <Input
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Folio, referencia..."
-                      className="h-12 text-lg"
-                    />
-                  </div>
-                )}
+
               </div>
             </div>
 
@@ -774,7 +1031,7 @@ export function CheckoutModal({
                   )}
                   {variant === "sale"
                     ? "Cobrar sin Ticket (F2)"
-                    : "Guardar (F2)"}
+                    : "Abonar (F2)"}
                 </Button>
                 <Button
                   size="lg"
@@ -789,7 +1046,7 @@ export function CheckoutModal({
                   )}
                   {variant === "sale"
                     ? "Cobrar e Imprimir (F1)"
-                    : "Guardar e Imprimir (F1)"}
+                    : "Abonar e Imprimir (F1)"}
                 </Button>
               </div>
             </div>

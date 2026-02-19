@@ -141,6 +141,7 @@ export default function CustomerDetailPage() {
     cardAmount: number,
     shouldPrint: boolean,
     _customerId?: string,
+    _voucherCode?: string,
     notes?: string,
   ) => {
     if (!customer) return;
