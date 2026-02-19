@@ -291,7 +291,6 @@ pub fn get_sale_details(
 
       let cash: f64 = row.get(9).unwrap_or(0.0);
       let total: f64 = row.get(8)?;
-      let change = if cash > total { cash - total } else { 0.0 };
 
       let voucher_sql = "
         SELECT 
@@ -304,8 +303,7 @@ pub fn get_sale_details(
         .query_row(voucher_sql, [&sale_id], |row| row.get(0))
         .unwrap_or(0.0);
 
-      println!("voucher_amount: {}", voucher_amount);
-
+      let change = if cash > total { cash - total + voucher_amount } else { 0.0 };
       Ok(SaleDetailView {
         id: row.get(0)?,
         folio: row.get(1)?,
