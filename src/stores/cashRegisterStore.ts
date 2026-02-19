@@ -28,7 +28,6 @@ export const useCashRegisterStore = create<CashRegisterState>()(
           const shift = await invoke<ShiftDto | null>('get_active_shift');
           set({ shift, isLoading: false });
         } catch (err) {
-          console.error('Error checking active shift:', err);
           set({ error: 'Error al verificar turno activo', isLoading: false });
         }
       },
@@ -39,7 +38,6 @@ export const useCashRegisterStore = create<CashRegisterState>()(
           const shift = await invoke<ShiftDto>('open_shift', { initialCash, userId });
           set({ shift, isLoading: false });
         } catch (err) {
-          console.error('Error opening shift:', err);
           set({ error: err as string, isLoading: false });
           throw err;
         }
@@ -61,7 +59,6 @@ export const useCashRegisterStore = create<CashRegisterState>()(
           set({ shift: updatedShift, isLoading: false });
           return updatedShift;
         } catch (err) {
-          console.error('Error closing shift:', err);
           set({ error: err as string, isLoading: false });
           throw err;
         }
