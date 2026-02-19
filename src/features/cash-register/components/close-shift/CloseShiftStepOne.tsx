@@ -91,8 +91,8 @@ export function CloseShiftStepOne({
   const d = details;
 
   // Form state
-  const [finalCash, setFinalCash] = useState(initialValues?.final_cash?.toString() ?? "");
-  const [cardTerminalTotal, setCardTerminalTotal] = useState(initialValues?.card_terminal_total?.toString() ?? "");
+  const [finalCash, setFinalCash] = useState(initialValues?.final_cash?.toString() ?? "0");
+  const [cardTerminalTotal, setCardTerminalTotal] = useState(initialValues?.card_terminal_total?.toString() ?? "0");
   const [terminalConfirmed, setTerminalConfirmed] = useState(initialValues?.terminal_cut_confirmed ?? false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [submitted, setSubmitted] = useState(false);
@@ -231,7 +231,7 @@ export function CloseShiftStepOne({
                   {/* Cash input */}
                   <div className="space-y-1.5">
                     <Label htmlFor="close-final-cash" className="text-sm font-medium">
-                      Efectivo contado físicamente
+                      Efectivo contado físicamente <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative flex items-center">
                       <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
@@ -257,7 +257,7 @@ export function CloseShiftStepOne({
                   {/* Card input */}
                   <div className="space-y-1.5">
                     <Label htmlFor="close-card-total" className="text-sm font-medium">
-                      Monto reportado por terminal bancaria
+                      Monto reportado por terminal bancaria <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative flex items-center">
                       <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
@@ -288,7 +288,7 @@ export function CloseShiftStepOne({
                     />
                     <div className="space-y-0.5">
                       <Label htmlFor="terminal-confirmed" className="text-sm cursor-pointer">
-                        Confirmo que realicé el corte de la terminal bancaria
+                        Confirmo que realicé el corte de la terminal bancaria <span className="text-red-500">*</span>
                       </Label>
                       {submitted && errors.terminal_cut_confirmed && (
                         <p className="text-xs text-red-600">{errors.terminal_cut_confirmed}</p>
