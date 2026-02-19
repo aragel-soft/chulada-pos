@@ -10,8 +10,9 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { CloseShiftStepOne } from "./CloseShiftStepOne";
+import { CloseShiftStepTwo } from "./CloseShiftStepTwo";
 import type { CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
-import type { ShiftDetailsDto } from "@/types/cast-cut";
+import type { ShiftDetailsDto, ShiftDto } from "@/types/cast-cut";
 
 
 const WIZARD_STEPS = [
@@ -56,6 +57,10 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
     } else {
       onClose();
     }
+  };
+
+  const handleConfirmed = (_closedShift: ShiftDto) => {
+    onClose();
   };
 
   return (
@@ -169,13 +174,12 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
           )}
 
           {!isLoading && details && currentStep === 2 && formValues && (
-            <div className="p-6 text-center text-muted-foreground">
-              {/* Step 2 placeholder — will be implemented in commit 4 */}
-              <p>Step 2 en construcción...</p>
-              <button onClick={handleBack} className="mt-4 underline text-sm">
-                ← Volver al paso 1
-              </button>
-            </div>
+            <CloseShiftStepTwo
+              details={details}
+              formValues={formValues}
+              onBack={handleBack}
+              onConfirmed={handleConfirmed}
+            />
           )}
         </div>
       </DialogContent>
