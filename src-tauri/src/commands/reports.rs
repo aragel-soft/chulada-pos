@@ -1,3 +1,4 @@
+use crate::database::get_current_store_id;
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -30,6 +31,34 @@ pub struct SalesReport {
     pub kpis: ReportKpis,
     pub sales_chart: Vec<ChartDataPoint>,
     pub category_chart: Vec<CategoryDataPoint>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TopSellingProduct {
+    pub ranking: i64,
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub quantity_sold: f64,
+    pub total_revenue: f64,
+    pub percentage_of_total: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeadStockProduct {
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub current_stock: i64,
+    pub purchase_price: f64,
+    pub stagnant_value: f64,
+    pub last_sale_date: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CatalogReport {
+    pub top_sellers: Vec<TopSellingProduct>,
+    pub dead_stock: Vec<DeadStockProduct>,
 }
 
 fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
@@ -179,5 +208,143 @@ pub fn get_sales_report(
         kpis,
         sales_chart,
         category_chart,
+    })
+}
+
+fn fetch_top_sellers(
+    conn: &Connection,
+    from_date: &str,
+    to_date: &str,
+    limit: i64,
+) -> Result<Vec<TopSellingProduct>, String> {
+    let sql = r#"
+        WITH product_sales AS (
+            SELECT 
+                si.product_id,
+                p.name as product_name,
+                p.code as product_code,
+                COALESCE(c.name, 'Sin Categoría') as category_name,
+                SUM(si.quantity) as quantity_sold,
+                SUM(si.total) as total_revenue
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE s.created_at BETWEEN ?1 AND ?2
+              AND s.status != 'cancelled'
+            GROUP BY si.product_id, p.name, p.code, c.name
+        ),
+        grand_total AS (
+            SELECT COALESCE(SUM(total_revenue), 0.0) as total FROM product_sales
+        )
+        SELECT 
+            ROW_NUMBER() OVER (ORDER BY ps.total_revenue DESC) as ranking,
+            ps.product_name,
+            ps.product_code,
+            ps.category_name,
+            ps.quantity_sold,
+            ps.total_revenue,
+            CASE 
+                WHEN gt.total > 0 THEN ROUND((ps.total_revenue * 100.0 / gt.total), 2)
+                ELSE 0.0
+            END as percentage_of_total
+        FROM product_sales ps, grand_total gt
+        ORDER BY ps.total_revenue DESC
+        LIMIT ?3
+    "#;
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![from_date, to_date, limit], |row| {
+            Ok(TopSellingProduct {
+                ranking: row.get(0)?,
+                product_name: row.get(1)?,
+                product_code: row.get(2)?,
+                category_name: row.get(3)?,
+                quantity_sold: row.get(4)?,
+                total_revenue: row.get(5)?,
+                percentage_of_total: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+fn fetch_dead_stock(
+    conn: &Connection,
+    from_date: &str,
+    to_date: &str,
+    store_id: &str,
+) -> Result<Vec<DeadStockProduct>, String> {
+    let sql = r#"
+        SELECT 
+            p.name as product_name,
+            p.code as product_code,
+            COALESCE(c.name, 'Sin Categoría') as category_name,
+            inv.stock as current_stock,
+            COALESCE(p.purchase_price, 0.0) as purchase_price,
+            ROUND(inv.stock * COALESCE(p.purchase_price, 0.0), 2) as stagnant_value,
+            (
+                SELECT MAX(s2.created_at)
+                FROM sale_items si2
+                JOIN sales s2 ON si2.sale_id = s2.id
+                WHERE si2.product_id = p.id
+                  AND s2.status != 'cancelled'
+            ) as last_sale_date
+        FROM products p
+        JOIN store_inventory inv ON p.id = inv.product_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE inv.store_id = ?3
+          AND inv.stock > 0
+          AND p.is_active = 1
+          AND p.deleted_at IS NULL
+          AND p.id NOT IN (
+              SELECT DISTINCT si.product_id
+              FROM sale_items si
+              JOIN sales s ON si.sale_id = s.id
+              WHERE s.created_at BETWEEN ?1 AND ?2
+                AND s.status != 'cancelled'
+          )
+        ORDER BY stagnant_value DESC
+    "#;
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![from_date, to_date, store_id], |row| {
+            Ok(DeadStockProduct {
+                product_name: row.get(0)?,
+                product_code: row.get(1)?,
+                category_name: row.get(2)?,
+                current_stock: row.get(3)?,
+                purchase_price: row.get(4)?,
+                stagnant_value: row.get(5)?,
+                last_sale_date: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_catalog_report(
+    db: State<Mutex<Connection>>,
+    from_date: String,
+    to_date: String,
+    limit: Option<i64>,
+) -> Result<CatalogReport, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let seller_limit = limit.unwrap_or(50);
+    let store_id = get_current_store_id(&conn)?;
+
+    let top_sellers = fetch_top_sellers(&conn, &from_date, &to_date, seller_limit)?;
+    let dead_stock = fetch_dead_stock(&conn, &from_date, &to_date, &store_id)?;
+
+    Ok(CatalogReport {
+        top_sellers,
+        dead_stock,
     })
 }
