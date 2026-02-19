@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 
 import { useReportsData } from "@/hooks/use-report-data";
 
-const reportTabs = [
+const reportTabs: { value: string; label: string; disabled?: boolean }[] = [
   { value: "finanzas", label: "Finanzas" },
-  { value: "inventario", label: "Inventario (Próximamente)", disabled: true },
+  { value: "catalogo", label: "Catálogo" },
 ];
 
 export default function ReportsPage() {
