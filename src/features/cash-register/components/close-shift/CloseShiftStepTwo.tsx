@@ -147,7 +147,6 @@ export function CloseShiftStepTwo({
       toast.success("Corte de caja realizado exitosamente");
       onConfirmed(closedShift);
     } catch (err) {
-      console.error("Error closing shift:", err);
       toast.error("Error al cerrar el turno", {
         description: String(err),
       });
