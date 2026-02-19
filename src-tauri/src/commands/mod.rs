@@ -6,3 +6,4 @@ pub mod settings;
 pub mod customers;
 pub mod sales;
 pub mod kit_utils;
+pub mod reports;
