@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   TrendingUp,
   TrendingDown,
-  Wallet,
   Receipt,
   Ticket,
 } from "lucide-react";
@@ -103,7 +102,6 @@ export function CloseShiftStepOne({
   // Theoretical values
   const expectedCash = d.theoretical_cash;
   const cardExpectedTotal = d.total_card_sales + d.debt_payments_card;
-  const cashWithdrawal = d.total_cash_sales + d.debt_payments_cash;
 
   // Real-time differences
   const finalCashNum = parseFloat(finalCash) || 0;
