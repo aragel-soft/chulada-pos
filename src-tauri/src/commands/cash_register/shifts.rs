@@ -9,6 +9,8 @@ pub struct ShiftDto {
     pub initial_cash: f64,
     pub opening_date: String,
     pub opening_user_id: String,
+    pub opening_user_name: Option<String>,
+    pub opening_user_avatar: Option<String>,
     pub status: String,
     pub code: Option<String>,
 }
@@ -19,9 +21,10 @@ pub fn get_active_shift(db: State<Mutex<Connection>>) -> Result<Option<ShiftDto>
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, initial_cash, opening_date, opening_user_id, status, code 
-         FROM cash_register_shifts 
-         WHERE status = 'open' 
+            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
+         FROM cash_register_shifts s
+         LEFT JOIN users u ON s.opening_user_id = u.id
+         WHERE s.status = 'open' 
          LIMIT 1",
         )
         .map_err(|e| e.to_string())?;
@@ -33,6 +36,8 @@ pub fn get_active_shift(db: State<Mutex<Connection>>) -> Result<Option<ShiftDto>
                 initial_cash: row.get(1)?,
                 opening_date: row.get(2)?,
                 opening_user_id: row.get(3)?,
+                opening_user_name: row.get(6)?,
+                opening_user_avatar: row.get(7).unwrap_or(None),
                 status: row.get(4)?,
                 code: row.get(5).unwrap_or(None),
             })
@@ -123,11 +128,20 @@ pub fn open_shift(
 
     let id = conn.last_insert_rowid();
 
+    // Fetch user name and avatar
+    let (user_name, user_avatar): (Option<String>, Option<String>) = conn.query_row(
+        "SELECT full_name, avatar_url FROM users WHERE id = ?",
+        [&user_id],
+        |row| Ok((row.get(0)?, row.get(1)?))
+    ).optional().unwrap_or(None).unwrap_or((None, None));
+
     Ok(ShiftDto {
         id,
         initial_cash,
         opening_date: now_str,
         opening_user_id: user_id,
+        opening_user_name: user_name,
+        opening_user_avatar: user_avatar,
         status: "open".to_string(),
         code: Some(code),
     })
@@ -163,9 +177,10 @@ pub fn close_shift(
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, initial_cash, opening_date, opening_user_id, status, code 
-         FROM cash_register_shifts 
-         WHERE id = ?1",
+            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
+         FROM cash_register_shifts s
+         LEFT JOIN users u ON s.opening_user_id = u.id
+         WHERE s.id = ?1",
         )
         .map_err(|e| e.to_string())?;
 
@@ -176,6 +191,8 @@ pub fn close_shift(
                 initial_cash: row.get(1)?,
                 opening_date: row.get(2)?,
                 opening_user_id: row.get(3)?,
+                opening_user_name: row.get(6)?,
+                opening_user_avatar: row.get(7).unwrap_or(None),
                 status: row.get(4)?,
                 code: row.get(5).unwrap_or(None),
             })
