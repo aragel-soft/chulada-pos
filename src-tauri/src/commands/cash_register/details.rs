@@ -20,10 +20,11 @@ pub struct ShiftDetailsDto {
     pub movements: Vec<CashMovementDto>,
     pub total_movements_in: f64,
     pub total_movements_out: f64,
+    pub sales_count: i64,
     pub total_sales: f64,
-    pub total_cash: f64,
-    pub total_card: f64,
-    pub total_credit: f64,
+    pub total_cash_sales: f64,
+    pub total_card_sales: f64,
+    pub total_credit_sales: f64,
     pub total_voucher_sales: f64,
     pub total_debt_payments: f64,
     pub debt_payments_cash: f64,
@@ -38,7 +39,7 @@ pub fn get_shift_details(
 ) -> Result<ShiftDetailsDto, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    // 1. Get Shift
+    // Get Shift
     let mut stmt = conn
         .prepare(
             "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
@@ -63,7 +64,7 @@ pub fn get_shift_details(
         })
         .map_err(|_| "Turno no encontrado".to_string())?;
 
-    // 2. Get Movements
+    // Get Movements
     let mut stmt_mov = conn
         .prepare(
             "SELECT id, cash_register_shift_id, type, amount, concept, description, created_at 
@@ -101,28 +102,28 @@ pub fn get_shift_details(
         movements.push(m);
     }
 
-    // 3. Sales Totals
-    let (total_sales, total_cash_sales, total_card_sales): (f64, f64, f64) = conn.query_row(
+    // Sales Totals
+    let (sales_count, total_sales, total_card_sales): (i64, f64, f64) = conn.query_row(
         "SELECT 
+            COUNT(*),
             COALESCE(SUM(total), 0.0), 
-            COALESCE(SUM(cash_amount), 0.0), 
             COALESCE(SUM(card_transfer_amount), 0.0)
          FROM sales 
          WHERE cash_register_shift_id = ?1 AND status = 'completed'",
         [shift_id],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    ).unwrap_or((0.0, 0.0, 0.0));
+    ).unwrap_or((0, 0.0, 0.0));
 
-    // 4. Credit Sales
-    let total_credit: f64 = conn.query_row(
+    // Credit Sales
+    let total_credit_sales: f64 = conn.query_row(
         "SELECT COALESCE(SUM(total), 0.0)
          FROM sales 
-         WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND status != 'cancelled'",
+         WHERE cash_register_shift_id = ?1 AND payment_method = 'credit'",
         [shift_id],
         |row| row.get(0)
     ).unwrap_or(0.0);
 
-    // 5. Voucher amounts used in sales
+    // Voucher amounts used in sales
     let total_voucher_sales: f64 = conn.query_row(
         "SELECT COALESCE(SUM(sv.amount), 0.0)
          FROM sale_vouchers sv
@@ -132,7 +133,7 @@ pub fn get_shift_details(
         |row| row.get(0)
     ).unwrap_or(0.0);
 
-    // 6. Debt Payments
+    // Debt Payments
     let (total_debt_payments, debt_payments_cash, debt_payments_card): (f64, f64, f64) = conn.query_row(
         "SELECT 
             COALESCE(SUM(amount), 0.0),
@@ -144,7 +145,10 @@ pub fn get_shift_details(
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
     ).unwrap_or((0.0, 0.0, 0.0));
 
-    // 7. Theoretical Cash = Inicial + Ventas Efectivo + Abonos Efectivo + Entradas - Salidas
+    // Total cash sales
+    let total_cash_sales = total_sales - total_card_sales - total_credit_sales - total_voucher_sales;
+
+    // Theoretical Cash
     let theoretical_cash = shift.initial_cash 
         + total_cash_sales 
         + debt_payments_cash 
@@ -156,10 +160,11 @@ pub fn get_shift_details(
         movements,
         total_movements_in,
         total_movements_out,
+        sales_count,
         total_sales,
-        total_cash: total_cash_sales,
-        total_card: total_card_sales,
-        total_credit,
+        total_cash_sales,
+        total_card_sales,
+        total_credit_sales,
         total_voucher_sales,
         total_debt_payments,
         debt_payments_cash,

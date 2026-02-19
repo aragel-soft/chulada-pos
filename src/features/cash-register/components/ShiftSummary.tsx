@@ -123,7 +123,7 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
   /** Lines that compose the theoretical cash breakdown */
   const theoreticalBreakdown = [
     { label: "Fondo Inicial", value: d.shift.initial_cash, prefix: "+" as const },
-    { label: "Ventas Efectivo", value: d.total_cash, prefix: "+" as const },
+    { label: "Ventas Efectivo", value: d.total_cash_sales, prefix: "+" as const },
     { label: "Abonos Efectivo", value: d.debt_payments_cash, prefix: "+" as const },
     { label: "Entradas", value: d.total_movements_in, prefix: "+" as const },
     { label: "Salidas", value: d.total_movements_out, prefix: "-" as const },
@@ -144,9 +144,12 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
         <div className="grid grid-cols-2 gap-3">
           {/* Ventas */}
           <div className="rounded-lg border border-zinc-100 overflow-hidden">
-            <div className="px-4 py-2.5 bg-zinc-50 border-b border-zinc-100 flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-zinc-500" />
-              <span className="text-sm font-medium text-zinc-600">Ventas</span>
+            <div className="px-4 py-2.5 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm font-medium text-zinc-600">Ventas</span>
+              </div>
+              <span className="text-xs text-zinc-400 font-medium">{d.sales_count} ventas</span>
             </div>
             <div className="p-3 space-y-1.5">
               <div className="flex justify-between items-center">
@@ -154,9 +157,9 @@ export function ShiftSummary({ shiftId }: ShiftSummaryProps) {
                 <span className="font-bold text-zinc-800">{formatCurrency(d.total_sales)}</span>
               </div>
               <div className="h-px bg-zinc-100" />
-              <StatRow icon={Banknote} label="Efectivo" value={d.total_cash} />
-              <StatRow icon={CreditCard} label="Tarjeta" value={d.total_card} />
-              <StatRow icon={HandCoins} label="Crédito" value={d.total_credit} color="text-amber-600" />
+              <StatRow icon={Banknote} label="Efectivo" value={d.total_cash_sales} />
+              <StatRow icon={CreditCard} label="Tarjeta" value={d.total_card_sales} />
+              <StatRow icon={HandCoins} label="Crédito" value={d.total_credit_sales} color="text-amber-600" />
               <StatRow icon={Ticket} label="Vales" value={d.total_voucher_sales} color="text-purple-600" />
             </div>
           </div>

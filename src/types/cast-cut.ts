@@ -27,10 +27,11 @@ export interface ShiftDetailsDto {
   movements: CashMovementDto[];
   total_movements_in: number;
   total_movements_out: number;
+  sales_count: number;
   total_sales: number;
-  total_cash: number;
-  total_card: number;
-  total_credit: number;
+  total_cash_sales: number;
+  total_card_sales: number;
+  total_credit_sales: number;
   total_voucher_sales: number;
   total_debt_payments: number;
   debt_payments_cash: number;
