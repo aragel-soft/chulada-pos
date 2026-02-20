@@ -14,6 +14,7 @@ const reportTabs = [
   { value: "finances", label: "Finanzas" },
   { value: "top-sellers", label: "Más Vendidos" },
   { value: "dead-stock", label: "Sin Movimiento" },
+  { value: "inventory", label: "Inventario" },
 ];
 
 export default function ReportsPage() {
@@ -34,7 +35,7 @@ export default function ReportsPage() {
   return (
     <ReportsProvider value={{ dateRange }}>
       <div className="flex flex-col h-full p-4 gap-1">
-        <div className="flex-none flex justify-between items-center">
+        <div className="flex-none flex justify-between items-center print:hidden">
           <h1 className="text-3xl font-bold mt-2">Reportes</h1>
           <div className="flex items-center space-x-2">
             <DateRangeSelector
@@ -45,7 +46,7 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="flex-none w-full">
+        <div className="flex-none w-full print:hidden">
           <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
             <TabsList
               className="

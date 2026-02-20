@@ -90,3 +90,58 @@ body {
   overscroll-behavior: none;
   overflow: hidden;
 }
+
+/* ── Print Styles ─────────────────────────────────────────────────── */
+@media print {
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Hide app shell: sidebar, header, spacer, tabs, date selector */
+  [data-sidebar],
+  header,
+  nav,
+  .h-18,
+  [data-radix-scroll-area-viewport] {
+    overflow: visible !important;
+  }
+
+  /* Remove layout constraints so content flows naturally */
+  .flex.h-screen,
+  .flex-1.overflow-hidden,
+  [data-sidebar-inset],
+  .flex-1.overflow-hidden.min-h-0 {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Table styling for clean print */
+  table {
+    width: 100% !important;
+    font-size: 11px !important;
+    border-collapse: collapse !important;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #ccc !important;
+    padding: 4px 8px !important;
+  }
+
+  /* Force B&W for ink savings */
+  * {
+    color: #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Restore header colors for badges in print */
+  table th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+}

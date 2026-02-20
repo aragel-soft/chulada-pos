@@ -34,10 +34,12 @@ export function RootLayout() {
     <SidebarProvider open={isSidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="flex h-screen w-full overflow-hidden">
         <Header />
-        <AppSidebar />
+        <div className="print:hidden">
+          <AppSidebar />
+        </div>
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="h-18 min-h-[48px] w-full" />
+          <div className="h-18 min-h-[48px] w-full print:hidden" />
           <SidebarInset className="flex-1 overflow-hidden">
             <Outlet />
           </SidebarInset>
