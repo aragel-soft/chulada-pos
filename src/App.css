@@ -100,16 +100,19 @@ body {
     height: auto !important;
   }
 
-  /* Remove layout constraints so content flows naturally */
-  .flex.h-screen,
-  .flex-1.overflow-hidden,
-  [data-sidebar-inset],
-  .flex-1.overflow-hidden.min-h-0,
-  [data-radix-scroll-area-viewport] {
-    display: block !important;
+  /* Remove ALL layout constraints — every div must flow freely in print */
+  * {
     overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Prevent table rows from being split across pages */
+  table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Hide DataTableLayout toolbar (filters/actions bar) and pagination */
