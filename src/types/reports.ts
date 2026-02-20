@@ -33,6 +33,7 @@ export interface TopSellingProduct {
   product_name: string;
   product_code: string;
   category_name: string;
+  category_color: string | null;
   quantity_sold: number;
   total_revenue: number;
   percentage_of_total: number;
@@ -42,6 +43,7 @@ export interface DeadStockProduct {
   product_name: string;
   product_code: string;
   category_name: string;
+  category_color: string | null;
   current_stock: number;
   purchase_price: number;
   stagnant_value: number;

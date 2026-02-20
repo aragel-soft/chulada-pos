@@ -38,8 +38,16 @@ export const topSellersColumns: ColumnDef<TopSellingProduct>[] = [
     accessorKey: "category_name",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Categoría" />,
     cell: ({ row }) => (
-      <Badge variant="outline" className="font-normal">
-        {row.getValue("category_name")}
+      <Badge
+        variant="outline"
+        className="text-[10px] px-2 py-0 h-5 font-medium border-0"
+        style={{
+          backgroundColor:
+            (row.original.category_color || "#64748b") + "20",
+          color: row.original.category_color || "#64748b",
+        }}
+      >
+        {row.original.category_name || "General"}
       </Badge>
     ),
   },

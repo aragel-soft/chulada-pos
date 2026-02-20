@@ -39,6 +39,7 @@ pub struct TopSellingProduct {
     pub product_name: String,
     pub product_code: String,
     pub category_name: String,
+    pub category_color: Option<String>,
     pub quantity_sold: f64,
     pub total_revenue: f64,
     pub percentage_of_total: f64,
@@ -49,6 +50,7 @@ pub struct DeadStockProduct {
     pub product_name: String,
     pub product_code: String,
     pub category_name: String,
+    pub category_color: Option<String>,
     pub current_stock: i64,
     pub purchase_price: f64,
     pub stagnant_value: f64,
@@ -229,7 +231,7 @@ pub fn get_top_selling_products(
                 .enumerate()
                 .map(|(i, _)| format!("?{}", i + 4))
                 .collect();
-            format!("AND p.category_id IN ({})", placeholders.join(", "))
+            format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
         _ => String::new(),
     };
@@ -239,9 +241,11 @@ pub fn get_top_selling_products(
         WITH product_sales AS (
             SELECT 
                 si.product_id,
+                p.category_id,
                 p.name as product_name,
                 p.code as product_code,
                 COALESCE(c.name, 'Sin Categoría') as category_name,
+                c.color as category_color,
                 SUM(si.quantity) as quantity_sold,
                 SUM(si.total) as total_revenue
             FROM sale_items si
@@ -250,8 +254,7 @@ pub fn get_top_selling_products(
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE s.created_at BETWEEN ?1 AND ?2
               AND s.status != 'cancelled'
-              {}
-            GROUP BY si.product_id, p.name, p.code, c.name
+            GROUP BY si.product_id, p.category_id, p.name, p.code, c.name, c.color
         ),
         grand_total AS (
             SELECT COALESCE(SUM(total_revenue), 0.0) as total FROM product_sales
@@ -261,6 +264,7 @@ pub fn get_top_selling_products(
             ps.product_name,
             ps.product_code,
             ps.category_name,
+            ps.category_color,
             ps.quantity_sold,
             ps.total_revenue,
             CASE 
@@ -268,6 +272,8 @@ pub fn get_top_selling_products(
                 ELSE 0.0
             END as percentage_of_total
         FROM product_sales ps, grand_total gt
+        WHERE 1=1
+          {}
         ORDER BY ps.total_revenue DESC
         LIMIT ?3
     "#,
@@ -296,9 +302,10 @@ pub fn get_top_selling_products(
                 product_name: row.get(1)?,
                 product_code: row.get(2)?,
                 category_name: row.get(3)?,
-                quantity_sold: row.get(4)?,
-                total_revenue: row.get(5)?,
-                percentage_of_total: row.get(6)?,
+                category_color: row.get(4)?,
+                quantity_sold: row.get(5)?,
+                total_revenue: row.get(6)?,
+                percentage_of_total: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -335,6 +342,7 @@ pub fn get_dead_stock_report(
             p.name as product_name,
             p.code as product_code,
             COALESCE(c.name, 'Sin Categoría') as category_name,
+            c.color as category_color,
             inv.stock as current_stock,
             COALESCE(p.purchase_price, 0.0) as purchase_price,
             ROUND(inv.stock * COALESCE(p.purchase_price, 0.0), 2) as stagnant_value,
@@ -383,10 +391,11 @@ pub fn get_dead_stock_report(
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
                 category_name: row.get(2)?,
-                current_stock: row.get(3)?,
-                purchase_price: row.get(4)?,
-                stagnant_value: row.get(5)?,
-                last_sale_date: row.get(6)?,
+                category_color: row.get(3)?,
+                current_stock: row.get(4)?,
+                purchase_price: row.get(5)?,
+                stagnant_value: row.get(6)?,
+                last_sale_date: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
