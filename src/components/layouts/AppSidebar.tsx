@@ -1,4 +1,4 @@
-import { Home, Package, Users, ClipboardList, Settings } from 'lucide-react';
+import { Home, Package, Users, ClipboardList, Settings, ChartBarBig } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -49,7 +49,7 @@ const mainNavItems: NavItem[] = [
   },
   {
     title: 'Reportes',
-    icon: ClipboardList,
+    icon: ChartBarBig,
     path: '/reports',
     permission: 'reports:view',
   },
