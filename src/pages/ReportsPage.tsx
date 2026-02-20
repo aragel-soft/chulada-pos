@@ -6,12 +6,14 @@ import { DateRangeSelector } from "@/components/ui/date-range-selector";
 import { KPICards } from "@/features/reports/components/KPICards";
 import { SalesTrendChart } from "@/features/reports/components/SalesTrendChart";
 import { CategoryDistribution } from "@/features/reports/components/CategoryDistribution";
+import { CatalogReportTab } from "@/features/reports/components/CatalogReportTab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useReportsData } from "@/hooks/use-report-data";
+import { useCatalogReport } from "@/hooks/use-catalog-report";
 
 const reportTabs: { value: string; label: string; disabled?: boolean }[] = [
   { value: "finanzas", label: "Finanzas" },
@@ -25,7 +27,16 @@ export default function ReportsPage() {
     to: new Date(),
   });
 
-  const { data, isLoading, error, refetch } = useReportsData(dateRange);
+  const salesReport = useReportsData(dateRange);
+  const catalogReport = useCatalogReport(dateRange);
+
+  const isLoading = salesReport.isLoading || catalogReport.isLoading;
+  const error = salesReport.error || catalogReport.error;
+
+  const handleRefresh = () => {
+    salesReport.refetch();
+    catalogReport.refetch();
+  };
 
   return (
     <div className="flex flex-col h-full p-4 gap-1">
@@ -40,7 +51,7 @@ export default function ReportsPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             disabled={isLoading}
             title="Actualizar"
           >
@@ -103,13 +114,20 @@ export default function ReportsPage() {
       <div className="flex-1 overflow-auto min-h-0 space-y-4 pt-4">
         {currentTab === "finanzas" && (
           <>
-            <KPICards data={data.kpis} />
+            <KPICards data={salesReport.data.kpis} />
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-              <SalesTrendChart data={data.sales_chart} />
-              <CategoryDistribution data={data.category_chart} />
+              <SalesTrendChart data={salesReport.data.sales_chart} />
+              <CategoryDistribution data={salesReport.data.category_chart} />
             </div>
           </>
+        )}
+
+        {currentTab === "catalogo" && (
+          <CatalogReportTab
+            data={catalogReport.data}
+            isLoading={catalogReport.isLoading}
+          />
         )}
 
         {error && (
