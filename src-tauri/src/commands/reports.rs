@@ -57,12 +57,6 @@ pub struct DeadStockProduct {
     pub last_sale_date: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CatalogReport {
-    pub top_sellers: Vec<TopSellingProduct>,
-    pub dead_stock: Vec<DeadStockProduct>,
-}
-
 fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
     let sql = r#"
         SELECT 
