@@ -29,6 +29,9 @@ import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage
 import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
 import CustomerDetailPage from '@/features/customers/pages/CustomerDetailPages';
 import InventoryMovementsPage from '@/features/inventory/pages/InventoryMovementsPage';
+import FinancesPage from '@/features/reports/pages/FinancesPage';
+import TopSellersPage from '@/features/reports/pages/TopSellersPage';
+import DeadStockPage from '@/features/reports/pages/DeadStockPage';
 
 // --- Componente de ejemplo para settings ---
 const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
@@ -194,6 +197,24 @@ const router = createBrowserRouter([
             <ReportsPage />
           </ProtectedRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="finances" replace />,
+          },
+          {
+            path: "finances",
+            element: <FinancesPage />,
+          },
+          {
+            path: "top-sellers",
+            element: <TopSellersPage />,
+          },
+          {
+            path: "dead-stock",
+            element: <DeadStockPage />,
+          },
+        ],
       },
 
       // --- Rutas Anidadas para Settings ---
