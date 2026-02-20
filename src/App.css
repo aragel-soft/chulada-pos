@@ -93,29 +93,34 @@ body {
 
 /* ── Print Styles ─────────────────────────────────────────────────── */
 @media print {
-  html, body {
+
+  html,
+  body {
     overflow: visible !important;
     height: auto !important;
-  }
-
-  /* Hide app shell: sidebar, header, spacer, tabs, date selector */
-  [data-sidebar],
-  header,
-  nav,
-  .h-18,
-  [data-radix-scroll-area-viewport] {
-    overflow: visible !important;
   }
 
   /* Remove layout constraints so content flows naturally */
   .flex.h-screen,
   .flex-1.overflow-hidden,
   [data-sidebar-inset],
-  .flex-1.overflow-hidden.min-h-0 {
+  .flex-1.overflow-hidden.min-h-0,
+  [data-radix-scroll-area-viewport] {
     display: block !important;
     overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
+  }
+
+  /* Hide DataTableLayout toolbar (filters/actions bar) and pagination */
+  /* The toolbar container: first child of DataTableLayout with p-4 border-b */
+  .flex-none.p-4.border-b {
+    display: none !important;
+  }
+
+  /* Hide pagination footer */
+  .flex-none.border-t.bg-background {
+    display: none !important;
   }
 
   /* Table styling for clean print */
@@ -127,8 +132,16 @@ body {
 
   table th,
   table td {
-    border: 1px solid #ccc !important;
+    border: 1px solid #999 !important;
     padding: 4px 8px !important;
+  }
+
+  /* Reset column header button styles for print — remove negative margin and ghost styling */
+  table th button {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    font-weight: 600 !important;
   }
 
   /* Force B&W for ink savings */
@@ -139,9 +152,19 @@ body {
     text-shadow: none !important;
   }
 
-  /* Restore header colors for badges in print */
+  /* Reset Tailwind border-b on thead/tr to avoid doubled borders in collapse mode */
+  table thead,
+  table tr {
+    border: none !important;
+  }
+
+  /* Table header row styling - th gets gray bg, children stay transparent */
   table th {
     background: #f3f4f6 !important;
     font-weight: 600 !important;
+  }
+
+  table th * {
+    background: transparent !important;
   }
 }

@@ -187,16 +187,16 @@ export function DataTable<TData, TValue>({
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">
-        <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
+        <TableHeader className="sticky top-0 z-20 bg-background shadow-sm print:static print:shadow-none print:bg-transparent">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow
               key={headerGroup.id}
-              className="hover:bg-transparent border-b"
+              className="hover:bg-transparent border-b print:border-0"
             >
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
-                  className="px-4 py-2 whitespace-nowrap h-10 bg-background"
+                  className="px-4 py-2 whitespace-nowrap h-10 bg-background print:bg-transparent"
                 >
                   {header.isPlaceholder
                     ? null
