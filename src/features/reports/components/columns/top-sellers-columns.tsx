@@ -14,11 +14,9 @@ export const topSellersColumns: ColumnDef<TopSellingProduct>[] = [
     accessorKey: "ranking",
     header: ({ column }) => <DataTableColumnHeader column={column} title="#" />,
     cell: ({ row }) => {
-      const rank = row.getValue("ranking") as number;
-      const medals: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
       return (
         <span className="font-bold text-center block w-8">
-          {medals[rank] || `${rank}`}
+          { row.getValue("ranking")}
         </span>
       );
     },

@@ -211,12 +211,16 @@ pub fn get_sales_report(
     })
 }
 
-fn fetch_top_sellers(
-    conn: &Connection,
-    from_date: &str,
-    to_date: &str,
-    limit: i64,
+#[tauri::command]
+pub fn get_top_selling_products(
+    db: State<Mutex<Connection>>,
+    from_date: String,
+    to_date: String,
+    limit: Option<i64>,
 ) -> Result<Vec<TopSellingProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let seller_limit = limit.unwrap_or(50);
+
     let sql = r#"
         WITH product_sales AS (
             SELECT 
@@ -255,7 +259,7 @@ fn fetch_top_sellers(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![from_date, to_date, limit], |row| {
+        .query_map(params![from_date, to_date, seller_limit], |row| {
             Ok(TopSellingProduct {
                 ranking: row.get(0)?,
                 product_name: row.get(1)?,
@@ -272,12 +276,15 @@ fn fetch_top_sellers(
         .map_err(|e| e.to_string())
 }
 
-fn fetch_dead_stock(
-    conn: &Connection,
-    from_date: &str,
-    to_date: &str,
-    store_id: &str,
+#[tauri::command]
+pub fn get_dead_stock_report(
+    db: State<Mutex<Connection>>,
+    from_date: String,
+    to_date: String,
 ) -> Result<Vec<DeadStockProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
     let sql = r#"
         SELECT 
             p.name as product_name,
@@ -327,24 +334,4 @@ fn fetch_dead_stock(
 
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn get_catalog_report(
-    db: State<Mutex<Connection>>,
-    from_date: String,
-    to_date: String,
-    limit: Option<i64>,
-) -> Result<CatalogReport, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    let seller_limit = limit.unwrap_or(50);
-    let store_id = get_current_store_id(&conn)?;
-
-    let top_sellers = fetch_top_sellers(&conn, &from_date, &to_date, seller_limit)?;
-    let dead_stock = fetch_dead_stock(&conn, &from_date, &to_date, &store_id)?;
-
-    Ok(CatalogReport {
-        top_sellers,
-        dead_stock,
-    })
 }

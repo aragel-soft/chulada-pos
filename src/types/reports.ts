@@ -47,8 +47,3 @@ export interface DeadStockProduct {
   stagnant_value: number;
   last_sale_date: string | null;
 }
-
-export interface CatalogReport {
-  top_sellers: TopSellingProduct[];
-  dead_stock: DeadStockProduct[];
-}

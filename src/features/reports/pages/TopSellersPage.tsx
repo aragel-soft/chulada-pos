@@ -1,25 +1,17 @@
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { topSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
-import { useCatalogReport } from "@/hooks/use-catalog-report";
+import { useTopSellers } from "@/hooks/use-top-sellers";
 import { useReportsContext } from "@/features/reports/context/ReportsContext";
 
 export default function TopSellersPage() {
   const { dateRange } = useReportsContext();
-  const { data, isLoading, error } = useCatalogReport(dateRange);
+  const { data, isLoading, error } = useTopSellers(dateRange);
 
   return (
-    <div className="flex flex-col gap-4 h-full pt-2">
-      {data.top_sellers.length > 0 && (
-        <div className="flex items-center gap-2 text-sm px-1">
-          <span className="text-muted-foreground">
-            Top {data.top_sellers.length} productos por ingreso en el periodo seleccionado
-          </span>
-        </div>
-      )}
-
+    <div className="flex flex-col gap-4 h-full">
       <DataTable
         columns={topSellersColumns}
-        data={data.top_sellers}
+        data={data}
         isLoading={isLoading}
         searchPlaceholder="Buscar producto..."
         initialSorting={[{ id: "total_revenue", desc: true }]}
