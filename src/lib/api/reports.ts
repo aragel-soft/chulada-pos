@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { SalesReport, TopSellingProduct, DeadStockProduct } from "@/types/reports";
+import { SalesReport, TopSellingProduct, DeadStockProduct, InventoryValuation, LowStockProduct } from "@/types/reports";
 
 const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
@@ -47,5 +47,21 @@ export const getDeadStockReport = async (
     });
   } catch (error) {
     throw new Error(`Error fetching dead stock report: ${error}`);
+  }
+};
+
+export const getInventoryValuation = async (): Promise<InventoryValuation> => {
+  try {
+    return await invoke<InventoryValuation>("get_inventory_valuation");
+  } catch (error) {
+    throw new Error(`Error fetching inventory valuation: ${error}`);
+  }
+};
+
+export const getLowStockProducts = async (): Promise<LowStockProduct[]> => {
+  try {
+    return await invoke<LowStockProduct[]>("get_low_stock_products");
+  } catch (error) {
+    throw new Error(`Error fetching low stock products: ${error}`);
   }
 };
