@@ -12,7 +12,6 @@ export const useTopSellers = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Stabilize categoryIds reference to avoid infinite re-renders
   const categoryKey = JSON.stringify(categoryIds ?? []);
   const stableCategoryIds = useRef(categoryIds);
   stableCategoryIds.current = categoryIds;
@@ -38,7 +37,6 @@ export const useTopSellers = (
     } finally {
       setIsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange, categoryKey]);
 
   useEffect(() => {
