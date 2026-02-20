@@ -157,7 +157,7 @@ export function DataTable<TData, TValue>({
     }
 
     return (
-      <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="flex flex-col sm:flex-row gap-4 w-full print:hidden">
         <div className="relative flex-1 min-w-[300px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <DebouncedInput
@@ -187,16 +187,16 @@ export function DataTable<TData, TValue>({
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">
-        <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
+        <TableHeader className="sticky top-0 z-20 bg-background shadow-sm print:static print:shadow-none print:bg-transparent">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow
               key={headerGroup.id}
-              className="hover:bg-transparent border-b"
+              className="hover:bg-transparent border-b print:border-0"
             >
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
-                  className="px-4 py-2 whitespace-nowrap h-10 bg-background"
+                  className="px-4 py-2 whitespace-nowrap h-10 bg-background print:bg-transparent"
                 >
                   {header.isPlaceholder
                     ? null

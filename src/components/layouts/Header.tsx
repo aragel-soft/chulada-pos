@@ -54,7 +54,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-18 border-b bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+    <header className="h-18 border-b bg-white shadow-sm fixed top-0 left-0 right-0 z-50 print:hidden">
       <div className="h-full px-4 flex items-center justify-between">
         {/* Left Section: Hamburger + Logo */}
         <div className="flex items-center gap-3">

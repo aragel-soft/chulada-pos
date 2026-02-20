@@ -107,6 +107,10 @@ fn main() {
             commands::sales::returns::process_return,
             // Reports
             commands::reports::get_sales_report,
+            commands::reports::get_top_selling_products,
+            commands::reports::get_dead_stock_report,
+            commands::reports::get_inventory_valuation,
+            commands::reports::get_low_stock_products,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

@@ -1,3 +1,4 @@
+use crate::database::get_current_store_id;
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -30,6 +31,50 @@ pub struct SalesReport {
     pub kpis: ReportKpis,
     pub sales_chart: Vec<ChartDataPoint>,
     pub category_chart: Vec<CategoryDataPoint>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TopSellingProduct {
+    pub ranking: i64,
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub category_color: Option<String>,
+    pub quantity_sold: f64,
+    pub total_revenue: f64,
+    pub percentage_of_total: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeadStockProduct {
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub category_color: Option<String>,
+    pub current_stock: i64,
+    pub purchase_price: f64,
+    pub stagnant_value: f64,
+    pub last_sale_date: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InventoryValuation {
+    pub total_cost: f64,
+    pub total_retail: f64,
+    pub projected_profit: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LowStockProduct {
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub category_color: Option<String>,
+    pub current_stock: i64,
+    pub minimum_stock: i64,
+    pub suggested_order: i64,
+    pub purchase_price: f64,
+    pub retail_price: f64,
 }
 
 fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
@@ -180,4 +225,272 @@ pub fn get_sales_report(
         sales_chart,
         category_chart,
     })
+}
+
+#[tauri::command]
+pub fn get_top_selling_products(
+    db: State<Mutex<Connection>>,
+    from_date: String,
+    to_date: String,
+    limit: Option<i64>,
+    category_ids: Option<Vec<String>>,
+) -> Result<Vec<TopSellingProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let seller_limit = limit.unwrap_or(50);
+
+    let category_filter = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 4))
+                .collect();
+            format!("AND ps.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let sql = format!(
+        r#"
+        WITH product_sales AS (
+            SELECT 
+                si.product_id,
+                p.category_id,
+                p.name as product_name,
+                p.code as product_code,
+                COALESCE(c.name, 'Sin Categoría') as category_name,
+                c.color as category_color,
+                SUM(si.quantity) as quantity_sold,
+                SUM(si.total) as total_revenue
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE s.created_at BETWEEN ?1 AND ?2
+              AND s.status != 'cancelled'
+            GROUP BY si.product_id, p.category_id, p.name, p.code, c.name, c.color
+        ),
+        grand_total AS (
+            SELECT COALESCE(SUM(total_revenue), 0.0) as total FROM product_sales
+        )
+        SELECT 
+            ROW_NUMBER() OVER (ORDER BY ps.total_revenue DESC) as ranking,
+            ps.product_name,
+            ps.product_code,
+            ps.category_name,
+            ps.category_color,
+            ps.quantity_sold,
+            ps.total_revenue,
+            CASE 
+                WHEN gt.total > 0 THEN ROUND((ps.total_revenue * 100.0 / gt.total), 2)
+                ELSE 0.0
+            END as percentage_of_total
+        FROM product_sales ps, grand_total gt
+        WHERE 1=1
+          {}
+        ORDER BY ps.total_revenue DESC
+        LIMIT ?3
+    "#,
+        category_filter
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(from_date),
+        Box::new(to_date),
+        Box::new(seller_limit),
+    ];
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            bind_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        bind_params.iter().map(|p| p.as_ref()).collect();
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(TopSellingProduct {
+                ranking: row.get(0)?,
+                product_name: row.get(1)?,
+                product_code: row.get(2)?,
+                category_name: row.get(3)?,
+                category_color: row.get(4)?,
+                quantity_sold: row.get(5)?,
+                total_revenue: row.get(6)?,
+                percentage_of_total: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_dead_stock_report(
+    db: State<Mutex<Connection>>,
+    from_date: String,
+    to_date: String,
+    category_ids: Option<Vec<String>>,
+) -> Result<Vec<DeadStockProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
+    let category_filter = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 4))
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let sql = format!(
+        r#"
+        SELECT 
+            p.name as product_name,
+            p.code as product_code,
+            COALESCE(c.name, 'Sin Categoría') as category_name,
+            c.color as category_color,
+            inv.stock as current_stock,
+            COALESCE(p.purchase_price, 0.0) as purchase_price,
+            ROUND(inv.stock * COALESCE(p.purchase_price, 0.0), 2) as stagnant_value,
+            (
+                SELECT MAX(s2.created_at)
+                FROM sale_items si2
+                JOIN sales s2 ON si2.sale_id = s2.id
+                WHERE si2.product_id = p.id
+                  AND s2.status != 'cancelled'
+            ) as last_sale_date
+        FROM products p
+        JOIN store_inventory inv ON p.id = inv.product_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE inv.store_id = ?3
+          AND inv.stock > 0
+          AND p.is_active = 1
+          AND p.deleted_at IS NULL
+          AND p.id NOT IN (
+              SELECT DISTINCT si.product_id
+              FROM sale_items si
+              JOIN sales s ON si.sale_id = s.id
+              WHERE s.created_at BETWEEN ?1 AND ?2
+                AND s.status != 'cancelled'
+          )
+          {}
+        ORDER BY stagnant_value DESC
+    "#,
+        category_filter
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> =
+        vec![Box::new(from_date), Box::new(to_date), Box::new(store_id)];
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            bind_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        bind_params.iter().map(|p| p.as_ref()).collect();
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(DeadStockProduct {
+                product_name: row.get(0)?,
+                product_code: row.get(1)?,
+                category_name: row.get(2)?,
+                category_color: row.get(3)?,
+                current_stock: row.get(4)?,
+                purchase_price: row.get(5)?,
+                stagnant_value: row.get(6)?,
+                last_sale_date: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_inventory_valuation(db: State<Mutex<Connection>>) -> Result<InventoryValuation, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
+    let sql = r#"
+        SELECT 
+            COALESCE(SUM(MAX(i.stock, 0) * COALESCE(p.purchase_price, 0)), 0.0) as total_cost,
+            COALESCE(SUM(MAX(i.stock, 0) * COALESCE(p.retail_price, 0)), 0.0) as total_retail
+        FROM products p
+        JOIN store_inventory i ON p.id = i.product_id
+        WHERE p.deleted_at IS NULL 
+          AND i.stock > 0
+          AND i.store_id = ?1
+    "#;
+
+    conn.query_row(sql, params![store_id], |row| {
+        let total_cost: f64 = row.get(0)?;
+        let total_retail: f64 = row.get(1)?;
+        Ok(InventoryValuation {
+            total_cost,
+            total_retail,
+            projected_profit: total_retail - total_cost,
+        })
+    })
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_low_stock_products(
+    db: State<Mutex<Connection>>,
+) -> Result<Vec<LowStockProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
+    let sql = r#"
+        SELECT 
+            p.name as product_name,
+            p.code as product_code,
+            COALESCE(c.name, 'Sin Categoría') as category_name,
+            c.color as category_color,
+            i.stock as current_stock,
+            COALESCE(i.minimum_stock, 5) as minimum_stock,
+            MAX(COALESCE(i.minimum_stock, 5) * 2 - i.stock, 0) as suggested_order,
+            COALESCE(p.purchase_price, 0.0) as purchase_price,
+            COALESCE(p.retail_price, 0.0) as retail_price
+        FROM products p
+        JOIN store_inventory i ON p.id = i.product_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.deleted_at IS NULL
+          AND p.is_active = 1
+          AND i.store_id = ?1
+          AND i.stock <= COALESCE(i.minimum_stock, 5)
+        ORDER BY c.name ASC, p.name ASC
+    "#;
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![store_id], |row| {
+            Ok(LowStockProduct {
+                product_name: row.get(0)?,
+                product_code: row.get(1)?,
+                category_name: row.get(2)?,
+                category_color: row.get(3)?,
+                current_stock: row.get(4)?,
+                minimum_stock: row.get(5)?,
+                suggested_order: row.get(6)?,
+                purchase_price: row.get(7)?,
+                retail_price: row.get(8)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }

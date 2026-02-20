@@ -27,3 +27,43 @@ export interface DateRange {
   from: Date;
   to: Date;
 }
+
+export interface TopSellingProduct {
+  ranking: number;
+  product_name: string;
+  product_code: string;
+  category_name: string;
+  category_color: string | null;
+  quantity_sold: number;
+  total_revenue: number;
+  percentage_of_total: number;
+}
+
+export interface DeadStockProduct {
+  product_name: string;
+  product_code: string;
+  category_name: string;
+  category_color: string | null;
+  current_stock: number;
+  purchase_price: number;
+  stagnant_value: number;
+  last_sale_date: string | null;
+}
+
+export interface InventoryValuation {
+  total_cost: number;
+  total_retail: number;
+  projected_profit: number;
+}
+
+export interface LowStockProduct {
+  product_name: string;
+  product_code: string;
+  category_name: string;
+  category_color: string | null;
+  current_stock: number;
+  minimum_stock: number;
+  suggested_order: number;
+  purchase_price: number;
+  retail_price: number;
+}
