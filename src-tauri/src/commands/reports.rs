@@ -57,6 +57,26 @@ pub struct DeadStockProduct {
     pub last_sale_date: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InventoryValuation {
+    pub total_cost: f64,
+    pub total_retail: f64,
+    pub projected_profit: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LowStockProduct {
+    pub product_name: String,
+    pub product_code: String,
+    pub category_name: String,
+    pub category_color: Option<String>,
+    pub current_stock: i64,
+    pub minimum_stock: i64,
+    pub suggested_order: i64,
+    pub purchase_price: f64,
+    pub retail_price: f64,
+}
+
 fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
     let sql = r#"
         SELECT 
@@ -390,6 +410,83 @@ pub fn get_dead_stock_report(
                 purchase_price: row.get(5)?,
                 stagnant_value: row.get(6)?,
                 last_sale_date: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_inventory_valuation(db: State<Mutex<Connection>>) -> Result<InventoryValuation, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
+    let sql = r#"
+        SELECT 
+            COALESCE(SUM(MAX(i.stock, 0) * COALESCE(p.purchase_price, 0)), 0.0) as total_cost,
+            COALESCE(SUM(MAX(i.stock, 0) * COALESCE(p.retail_price, 0)), 0.0) as total_retail
+        FROM products p
+        JOIN store_inventory i ON p.id = i.product_id
+        WHERE p.deleted_at IS NULL 
+          AND i.stock > 0
+          AND i.store_id = ?1
+    "#;
+
+    conn.query_row(sql, params![store_id], |row| {
+        let total_cost: f64 = row.get(0)?;
+        let total_retail: f64 = row.get(1)?;
+        Ok(InventoryValuation {
+            total_cost,
+            total_retail,
+            projected_profit: total_retail - total_cost,
+        })
+    })
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_low_stock_products(
+    db: State<Mutex<Connection>>,
+) -> Result<Vec<LowStockProduct>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let store_id = get_current_store_id(&conn)?;
+
+    let sql = r#"
+        SELECT 
+            p.name as product_name,
+            p.code as product_code,
+            COALESCE(c.name, 'Sin Categoría') as category_name,
+            c.color as category_color,
+            i.stock as current_stock,
+            COALESCE(i.minimum_stock, 5) as minimum_stock,
+            MAX(COALESCE(i.minimum_stock, 5) * 2 - i.stock, 0) as suggested_order,
+            COALESCE(p.purchase_price, 0.0) as purchase_price,
+            COALESCE(p.retail_price, 0.0) as retail_price
+        FROM products p
+        JOIN store_inventory i ON p.id = i.product_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.deleted_at IS NULL
+          AND p.is_active = 1
+          AND i.store_id = ?1
+          AND i.stock <= COALESCE(i.minimum_stock, 5)
+        ORDER BY c.name ASC, p.name ASC
+    "#;
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![store_id], |row| {
+            Ok(LowStockProduct {
+                product_name: row.get(0)?,
+                product_code: row.get(1)?,
+                category_name: row.get(2)?,
+                category_color: row.get(3)?,
+                current_stock: row.get(4)?,
+                minimum_stock: row.get(5)?,
+                suggested_order: row.get(6)?,
+                purchase_price: row.get(7)?,
+                retail_price: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
