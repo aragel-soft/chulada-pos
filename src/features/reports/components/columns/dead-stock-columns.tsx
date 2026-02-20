@@ -46,7 +46,7 @@ export const deadStockColumns: ColumnDef<DeadStockProduct>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Costo Unitario" />,
     cell: ({ row }) => {
       const price = row.getValue("purchase_price") as number;
-      return <span className="tabular-nums text-muted-foreground">{formatCurrency(price)}</span>;
+      return <span className="tabular-nums">{formatCurrency(price)}</span>;
     },
   },
   {

@@ -217,11 +217,25 @@ pub fn get_top_selling_products(
     from_date: String,
     to_date: String,
     limit: Option<i64>,
+    category_ids: Option<Vec<String>>,
 ) -> Result<Vec<TopSellingProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let seller_limit = limit.unwrap_or(50);
 
-    let sql = r#"
+    let category_filter = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 4))
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let sql = format!(
+        r#"
         WITH product_sales AS (
             SELECT 
                 si.product_id,
@@ -236,6 +250,7 @@ pub fn get_top_selling_products(
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE s.created_at BETWEEN ?1 AND ?2
               AND s.status != 'cancelled'
+              {}
             GROUP BY si.product_id, p.name, p.code, c.name
         ),
         grand_total AS (
@@ -255,11 +270,27 @@ pub fn get_top_selling_products(
         FROM product_sales ps, grand_total gt
         ORDER BY ps.total_revenue DESC
         LIMIT ?3
-    "#;
+    "#,
+        category_filter
+    );
 
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(from_date),
+        Box::new(to_date),
+        Box::new(seller_limit),
+    ];
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            bind_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        bind_params.iter().map(|p| p.as_ref()).collect();
     let rows = stmt
-        .query_map(params![from_date, to_date, seller_limit], |row| {
+        .query_map(params_refs.as_slice(), |row| {
             Ok(TopSellingProduct {
                 ranking: row.get(0)?,
                 product_name: row.get(1)?,
@@ -281,11 +312,25 @@ pub fn get_dead_stock_report(
     db: State<Mutex<Connection>>,
     from_date: String,
     to_date: String,
+    category_ids: Option<Vec<String>>,
 ) -> Result<Vec<DeadStockProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let store_id = get_current_store_id(&conn)?;
 
-    let sql = r#"
+    let category_filter = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 4))
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let sql = format!(
+        r#"
         SELECT 
             p.name as product_name,
             p.code as product_code,
@@ -314,12 +359,26 @@ pub fn get_dead_stock_report(
               WHERE s.created_at BETWEEN ?1 AND ?2
                 AND s.status != 'cancelled'
           )
+          {}
         ORDER BY stagnant_value DESC
-    "#;
+    "#,
+        category_filter
+    );
 
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> =
+        vec![Box::new(from_date), Box::new(to_date), Box::new(store_id)];
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            bind_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        bind_params.iter().map(|p| p.as_ref()).collect();
     let rows = stmt
-        .query_map(params![from_date, to_date, store_id], |row| {
+        .query_map(params_refs.as_slice(), |row| {
             Ok(DeadStockProduct {
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
