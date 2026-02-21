@@ -24,6 +24,7 @@ import { PermissionsMatrixPage } from '@/features/settings/pages/PermissionsMatr
 import CashRegisterPage from '@/pages/CashRegisterPage';
 import CurrentShiftPage from '@/features/cash-register/pages/CurrentShiftPage';
 import ShiftHistoryPage from '@/features/cash-register/pages/ShiftHistoryPage';
+import ShiftDetailPage from '@/features/cash-register/pages/ShiftDetailPage';
 import HardwarePage from '@/features/settings/pages/HardwarePage';
 import BusinessSettingsPage from '@/features/settings/pages/BusinessSettingsPage';
 import TicketDesignPage from '@/features/settings/pages/TicketDesignPage';
@@ -107,6 +108,13 @@ const router = createBrowserRouter([
             element: 
               <ProtectedRoute module="cash_register:view">
                 <ShiftHistoryPage />
+              </ProtectedRoute>,
+          },
+          {
+            path: "history/:id",
+            element: 
+              <ProtectedRoute module="cash_register:view">
+                <ShiftDetailPage />
               </ProtectedRoute>,
           },
         ],

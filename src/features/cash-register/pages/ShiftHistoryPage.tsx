@@ -1,14 +1,18 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   PaginationState,
   SortingState,
   ColumnFiltersState,
   OnChangeFn,
 } from "@tanstack/react-table";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { ShiftDto } from "@/types/cast-cut";
 import { getShiftsHistory } from "@/lib/api/cash-register/details";
 import { columns as shiftColumns } from "../components/history/columns";
+import { ShiftHistoryToolbar } from "../components/history/ShiftHistoryToolbar";
 
 export default function ShiftHistoryPage() {
   const [data, setData] = useState<ShiftDto[]>([]);
@@ -23,10 +27,16 @@ export default function ShiftHistoryPage() {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "closing_date", desc: true }
   ]);
+  
+  // Custom Filters State
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [minDifference, setMinDifference] = useState("");
 
   const fetchShifts = async () => {
     setIsLoading(true);
     try {
+      const statusFilter = columnFilters.find((f) => f.id === "status")?.value as string[];
       const sortField = sorting.length > 0 ? sorting[0].id : "closing_date";
       const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
 
@@ -37,13 +47,17 @@ export default function ShiftHistoryPage() {
         sortOrder,
         {
           user_search: globalFilter || undefined,
+          status: statusFilter && statusFilter.length === 1 ? statusFilter[0] : undefined,
+          date_from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+          date_to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+          only_with_differences: onlyDifferences ? true : undefined,
+          min_difference: minDifference ? parseFloat(minDifference) : undefined,
         }
       );
 
       setData(response.data);
       setTotalRows(response.total);
     } catch (error) {
-      console.error("Error fetching shift history:", error);
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +71,9 @@ export default function ShiftHistoryPage() {
     globalFilter,
     sorting,
     columnFilters,
+    dateRange,
+    onlyDifferences,
+    minDifference,
   ]);
 
   const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
@@ -74,15 +91,33 @@ export default function ShiftHistoryPage() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
+  const handleOnlyDifferencesChange = (val: boolean) => {
+    setOnlyDifferences(val);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
+  const handleMinDifferenceChange = (val: string) => {
+    setMinDifference(val);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
   const columns = useMemo(() => shiftColumns, []);
 
-  // Row click logic for Commit 4 (Detail Modal) will go here
+  // Navigate to full details page
+  const navigate = useNavigate();
+
   const handleRowClick = (row: any) => {
-    console.log("Selected shift:", row.original.id);
+    navigate(`/cash-register/history/${row.original.id}`);
   };
 
   return (
-
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto">
         <DataTable
           columns={columns}
           data={data}
@@ -113,6 +148,19 @@ export default function ShiftHistoryPage() {
           columnFilters={columnFilters}
           onColumnFiltersChange={handleColumnFiltersChange}
           onRowClick={handleRowClick}
+          toolbar={(table) => (
+            <ShiftHistoryToolbar
+              table={table}
+              dateRange={dateRange}
+              setDateRange={handleDateRangeChange}
+              onlyDifferences={onlyDifferences}
+              setOnlyDifferences={handleOnlyDifferencesChange}
+              minDifference={minDifference}
+              setMinDifference={handleMinDifferenceChange}
+            />
+          )}
         />
+      </div>
+    </div>
   );
 }
