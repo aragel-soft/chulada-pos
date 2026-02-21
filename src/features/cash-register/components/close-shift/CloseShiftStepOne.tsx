@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +17,8 @@ import {
 import type { ShiftDetailsDto } from "@/types/cast-cut";
 import { getCloseShiftSchema, type CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
 import { TheoreticalSummaryColumn } from "./TheoreticalSummaryColumn";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -66,63 +67,60 @@ export function CloseShiftStepOne({
 }: CloseShiftStepOneProps) {
   const d = details;
 
-  // Form state
-  const [finalCash, setFinalCash] = useState(initialValues?.final_cash?.toString() ?? "0");
-  const [cardTerminalTotal, setCardTerminalTotal] = useState(initialValues?.card_terminal_total?.toString() ?? "0");
-  const [terminalConfirmed, setTerminalConfirmed] = useState(initialValues?.terminal_cut_confirmed ?? false);
-  const [notes, setNotes] = useState(initialValues?.notes ?? "");
-  const [submitted, setSubmitted] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
   // Theoretical values
   const expectedCash = d.theoretical_cash;
   const cardExpectedTotal = d.total_card_sales + d.debt_payments_card;
 
-  // Real-time differences
-  const finalCashNum = parseFloat(finalCash) || 0;
-  const cardTerminalNum = parseFloat(cardTerminalTotal) || 0;
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<CloseShiftFormValues>({
+    defaultValues: {
+      final_cash: initialValues?.final_cash ?? 0,
+      card_terminal_total: initialValues?.card_terminal_total ?? 0,
+      terminal_cut_confirmed: initialValues?.terminal_cut_confirmed ?? false as any,
+      notes: initialValues?.notes ?? "",
+    },
+    resolver: async (values, context, options) => {
+      const finalCashNum = values.final_cash || 0;
+      const cardTerminalNum = values.card_terminal_total || 0;
+      
+      const currentCashDiff = finalCashNum - expectedCash;
+      const currentCardDiff = cardTerminalNum - cardExpectedTotal;
+      const currentHasDifference =
+        Math.abs(currentCashDiff) >= 0.01 || Math.abs(currentCardDiff) >= 0.01;
 
-  const cashDiff = finalCashNum - expectedCash;
-  const cardDiff = cardTerminalNum - cardExpectedTotal;
+      const schema = getCloseShiftSchema(currentHasDifference);
+      return zodResolver(schema as any)(values, context, options);
+    },
+  });
+
+  const formFinalCash = watch("final_cash") || 0;
+  const formCardTerminal = watch("card_terminal_total") || 0;
+
+  const cashDiff = formFinalCash - expectedCash;
+  const cardDiff = formCardTerminal - cardExpectedTotal;
   const hasDifference = Math.abs(cashDiff) >= 0.01 || Math.abs(cardDiff) >= 0.01;
 
-  const handleNext = () => {
-    setSubmitted(true);
-
-    const schema = getCloseShiftSchema(hasDifference);
-    const result = schema.safeParse({
-      final_cash: finalCash,
-      card_terminal_total: cardTerminalTotal,
-      terminal_cut_confirmed: terminalConfirmed || undefined,
-      notes,
-    });
-
-    if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const key = issue.path[0]?.toString();
-        if (key && !fieldErrors[key]) {
-          fieldErrors[key] = issue.message;
-        }
-      }
-      setErrors(fieldErrors);
-      return;
-    }
-
-    setErrors({});
+  const onSubmitForm = handleSubmit((values: CloseShiftFormValues) => {
     onNext(
       {
-        final_cash: finalCashNum,
-        card_terminal_total: cardTerminalNum,
+        ...values,
         terminal_cut_confirmed: true,
-        notes: notes.trim(),
+        notes: values.notes?.trim(),
       },
       details
     );
-  };
+  });
 
   return (
-    <div className="flex flex-col h-full">
+    <form
+      onSubmit={onSubmitForm}
+      className="flex flex-col h-full overflow-hidden"
+    >
       <ScrollArea className="flex-1">
         <div className="p-6">
           <div className="grid grid-cols-2 gap-5">
@@ -144,23 +142,27 @@ export function CloseShiftStepOne({
                     </Label>
                     <div className="relative flex items-center">
                       <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
-                      <MoneyInput
-                        id="close-final-cash"
-                        className="pl-8 text-lg font-medium"
-                        value={finalCash}
-                        onChange={(e) => setFinalCash(e.target.value)}
-                        placeholder="0.00"
-                        autoFocus
+                      <Controller
+                        name="final_cash"
+                        control={control}
+                        render={({ field }) => (
+                          <MoneyInput
+                            id="close-final-cash"
+                            className="pl-8 text-lg font-medium w-full"
+                            value={field.value !== undefined ? field.value.toString() : ""}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            autoFocus
+                          />
+                        )}
                       />
                     </div>
-                    {submitted && errors.final_cash && (
-                      <p className="text-xs text-red-600">{errors.final_cash}</p>
+                    {errors.final_cash && (
+                      <p className="text-xs text-red-600">{errors.final_cash.message}</p>
                     )}
-                    {finalCash !== "" && (
-                      <div className="mt-2">
-                        <DifferenceBadge difference={cashDiff} />
-                      </div>
-                    )}
+                    <div className="mt-2">
+                      <DifferenceBadge difference={cashDiff} />
+                    </div>
                   </div>
 
                   {/* Card input */}
@@ -170,37 +172,48 @@ export function CloseShiftStepOne({
                     </Label>
                     <div className="relative flex items-center">
                       <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
-                      <MoneyInput
-                        id="close-card-total"
-                        className="pl-8 text-lg font-medium"
-                        value={cardTerminalTotal}
-                        onChange={(e) => setCardTerminalTotal(e.target.value)}
-                        placeholder="0.00"
+                      <Controller
+                        name="card_terminal_total"
+                        control={control}
+                        render={({ field }) => (
+                          <MoneyInput
+                            id="close-card-total"
+                            className="pl-8 text-lg font-medium w-full"
+                            value={field.value !== undefined ? field.value.toString() : ""}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                          />
+                        )}
                       />
                     </div>
-                    {submitted && errors.card_terminal_total && (
-                      <p className="text-xs text-red-600">{errors.card_terminal_total}</p>
+                    {errors.card_terminal_total && (
+                      <p className="text-xs text-red-600">{errors.card_terminal_total.message}</p>
                     )}
-                    {cardTerminalTotal !== "" && (
-                      <div className="mt-2">
-                        <DifferenceBadge difference={cardDiff} />
-                      </div>
-                    )}
+                    <div className="mt-2">
+                       <DifferenceBadge difference={cardDiff} />
+                    </div>
                   </div>
 
                   {/* Terminal confirmation checkbox */}
                   <div className="flex items-start gap-2 pt-1">
-                    <Checkbox
-                      id="terminal-confirmed"
-                      checked={terminalConfirmed}
-                      onCheckedChange={(v) => setTerminalConfirmed(v === true)}
+                    <Controller
+                      name="terminal_cut_confirmed"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox
+                          id="terminal-confirmed"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                      )}
                     />
                     <div className="space-y-0.5">
                       <Label htmlFor="terminal-confirmed" className="text-sm cursor-pointer">
                         Confirmo que realicé el corte de la terminal bancaria <span className="text-red-500">*</span>
                       </Label>
-                      {submitted && errors.terminal_cut_confirmed && (
-                        <p className="text-xs text-red-600">{errors.terminal_cut_confirmed}</p>
+                      {errors.terminal_cut_confirmed && (
+                        <p className="text-xs text-red-600">{errors.terminal_cut_confirmed.message}</p>
                       )}
                     </div>
                   </div>
@@ -218,14 +231,13 @@ export function CloseShiftStepOne({
                   </div>
                   <div className="p-4">
                     <Textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      {...register("notes")}
                       rows={3}
                       placeholder="Explique la diferencia encontrada..."
                       className="resize-none"
                     />
-                    {submitted && errors.notes && (
-                      <p className="text-xs text-red-600 mt-1">{errors.notes}</p>
+                    {errors.notes && (
+                      <p className="text-xs text-red-600 mt-1">{errors.notes.message}</p>
                     )}
                   </div>
                 </div>
@@ -237,16 +249,22 @@ export function CloseShiftStepOne({
 
       {/* ── Footer ── */}
       <div className="border-t p-4 flex justify-between items-center bg-zinc-50/50">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button
+          type="button" 
+          variant="ghost" 
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
           <X className="h-4 w-4 mr-1.5" /> Cancelar
         </Button>
         <Button
-          onClick={handleNext}
+          type="submit"
+          disabled={isSubmitting}
           className="bg-[#480489] hover:bg-[#360368] text-white"
         >
           Siguiente <ArrowRight className="h-4 w-4 ml-1.5" />
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
