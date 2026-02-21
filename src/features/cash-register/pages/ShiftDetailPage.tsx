@@ -15,6 +15,8 @@ import {
   HandCoins,
   Ticket,
   Receipt,
+  ArrowDownCircle,
+  ArrowUpCircle,
   Calculator,
   type LucideIcon,
 } from "lucide-react";
