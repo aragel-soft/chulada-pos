@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   Banknote,
   CreditCard,
-  Wallet,
   FileText,
   CheckCircle2,
   AlertTriangle,
@@ -28,6 +27,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
 import type { ShiftDetailsDto, CloseShiftRequest, ShiftDto } from "@/types/cast-cut";
 import type { CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
+import { Calculator, HandCoins, ArrowDownCircle, ArrowUpCircle, Receipt, Ticket } from "lucide-react";
+import { InfoRow } from "./CloseShiftStepOne";
+
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -117,7 +119,6 @@ export function CloseShiftStepTwo({
   // Computed values
   const expectedCash = d.theoretical_cash;
   const cardExpectedTotal = d.total_card_sales + d.debt_payments_card;
-  const cashWithdrawal = d.total_cash_sales + d.debt_payments_cash;
 
   const cashDiff = formValues.final_cash - expectedCash;
   const cardDiff = formValues.card_terminal_total - cardExpectedTotal;
@@ -157,67 +158,61 @@ export function CloseShiftStepTwo({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
+
         <div className="p-6">
           <div className="grid grid-cols-2 gap-5">
             {/* ── LEFT COLUMN: Financial summary ── */}
             <div className="space-y-4">
-              {/* Cash comparison */}
-              <div className="rounded-lg border border-zinc-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-50 border-b flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-semibold text-zinc-700">Efectivo</span>
+              {/* Cash theoretical breakdown */}
+              <div className="rounded-lg border border-green-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-green-50 border-b border-green-200 flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-semibold text-green-800">Desglose Teórico del Efectivo</span>
                 </div>
-                <div className="p-4 space-y-1">
-                  <SummaryRow label="Fondo Inicial" value={formatCurrency(d.shift.initial_cash)} />
-                  <SummaryRow label="Efectivo Esperado" value={formatCurrency(expectedCash)} bold />
-                  <SummaryRow label="Efectivo Contado" value={formatCurrency(formValues.final_cash)} bold />
-                  <div className="h-px bg-zinc-200 my-2" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-zinc-600">Diferencia</span>
-                    <DiffBadge diff={cashDiff} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Card comparison */}
-              <div className="rounded-lg border border-zinc-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-50 border-b flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-semibold text-zinc-700">Tarjeta</span>
-                </div>
-                <div className="p-4 space-y-1">
-                  <SummaryRow label="Total Tarjeta Esperado" value={formatCurrency(cardExpectedTotal)} bold />
-                  <SummaryRow label="Reportado por Terminal" value={formatCurrency(formValues.card_terminal_total)} bold />
-                  <div className="h-px bg-zinc-200 my-2" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-zinc-600">Diferencia</span>
-                    <DiffBadge diff={cardDiff} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cash withdrawal */}
-<div className="rounded-lg border-2 border-emerald-200 overflow-hidden bg-emerald-50">
-                <div className="p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-emerald-700" />
-                    <div>
-                      <span className="text-sm font-semibold text-emerald-800 block">
-                        Monto a Retirar de Caja
+                <div className="p-4 space-y-2">
+                  <InfoRow icon={Banknote} label="Fondo Inicial" value={d.shift.initial_cash} prefix="+" />
+                  <InfoRow icon={Banknote} label="Ventas Efectivo" value={d.total_cash_sales} prefix="+" />
+                  <InfoRow icon={HandCoins} label="Abonos Efectivo" value={d.debt_payments_cash} prefix="+" />
+                  <InfoRow icon={ArrowDownCircle} label="Entradas Manuales" value={d.total_movements_in} prefix="+" />
+                  <InfoRow icon={ArrowUpCircle} label="Salidas Manuales" value={d.total_movements_out} prefix="-" />
+                  <div className="h-px bg-zinc-200 my-1" />
+                    <div className="flex justify-between items-center font-semibold text-zinc-900 text-sm font-medium">
+                      <span className="flex items-center gap-1">
+                        <Calculator className="h-3 w-3" /> Efectivo Esperado
                       </span>
-                      <span className="text-xs text-emerald-600">
-                        Ventas efectivo + Abonos efectivo
-                      </span>
+                      <span>{formatCurrency(expectedCash)}</span>
                     </div>
-                  </div>
-                  <span className="text-2xl font-bold text-emerald-800">
-                    {formatCurrency(cashWithdrawal)}
-                  </span>
                 </div>
-                <div className="px-4 pb-3">
-                  <p className="text-xs text-emerald-700 bg-emerald-100 rounded px-2 py-1">
-                    Debe retirarse TODO el efectivo generado por ventas y abonos
-                  </p>
+              </div>
+
+              {/* Card theoretical breakdown */}
+              <div className="rounded-lg border border-blue-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-200 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-800">Tarjeta Teórica</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  <InfoRow icon={CreditCard} label="Ventas con Tarjeta" value={d.total_card_sales} prefix="+" />
+                  <InfoRow icon={HandCoins} label="Abonos con Tarjeta" value={d.debt_payments_card} prefix="+" />
+                  <div className="h-px bg-zinc-200 my-1" />
+                    <div className="flex justify-between items-center font-semibold text-zinc-900 text-sm font-medium">
+                      <span className="flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" /> Total Tarjeta Esperado
+                      </span>
+                      <span>{formatCurrency(cardExpectedTotal)}</span>
+                    </div>
+                </div>
+              </div>
+
+              {/* Other sales info */}
+              <div className="rounded-lg border border-amber-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-800">Otros Métodos (Solo Informativo)</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  <InfoRow icon={Receipt} label="Ventas a Crédito" value={d.total_credit_sales} />
+                  <InfoRow icon={Ticket} label="Uso de Vales" value={d.total_voucher_sales} />
                 </div>
               </div>
             </div>
@@ -282,23 +277,40 @@ export function CloseShiftStepTwo({
                   </div>
                 )}
               </div>
-
-              {/* Sales summary */}
-              <div className="rounded-lg border border-zinc-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-50 border-b">
-                  <span className="text-sm font-semibold text-zinc-700">Resumen de Ventas</span>
+              {/* Cash withdrawal */}
+              <div className="rounded-lg border border-green-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-green-50 border-b flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-semibold text-green-800">Efectivo</span>
                 </div>
                 <div className="p-4 space-y-1">
-                  <SummaryRow label="Total Ventas" value={formatCurrency(d.total_sales)} bold />
-                  <SummaryRow label="Número de Ventas" value={String(d.sales_count)} />
-                  <div className="h-px bg-zinc-200 my-1.5" />
-                  <SummaryRow label="Efectivo" value={formatCurrency(d.total_cash_sales)} />
-                  <SummaryRow label="Tarjeta" value={formatCurrency(d.total_card_sales)} />
-                  <SummaryRow label="Crédito" value={formatCurrency(d.total_credit_sales)} />
-                  <SummaryRow label="Vales" value={formatCurrency(d.total_voucher_sales)} />
+                  <SummaryRow label="Fondo Inicial" value={formatCurrency(d.shift.initial_cash)} />
+                  <SummaryRow label="Efectivo Esperado" value={formatCurrency(expectedCash)} bold />
+                  <SummaryRow label="Efectivo Contado" value={formatCurrency(formValues.final_cash)} bold />
+                  <div className="h-px bg-zinc-200 my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-zinc-600">Diferencia</span>
+                    <DiffBadge diff={cashDiff} />
+                  </div>
                 </div>
               </div>
 
+              {/* Card comparison */}
+              <div className="rounded-lg border border-blue-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-blue-50 border-b flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-800">Tarjeta</span>
+                </div>
+                <div className="p-4 space-y-1">
+                  <SummaryRow label="Total Tarjeta Esperado" value={formatCurrency(cardExpectedTotal)} bold />
+                  <SummaryRow label="Reportado por Terminal" value={formatCurrency(formValues.card_terminal_total)} bold />
+                  <div className="h-px bg-zinc-200 my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-zinc-600">Diferencia</span>
+                    <DiffBadge diff={cardDiff} />
+                  </div>
+                </div>
+              </div>
               {/* Notes */}
               {formValues.notes && formValues.notes.trim().length > 0 && (
                 <div className="rounded-lg border border-amber-200 overflow-hidden bg-amber-50/30">

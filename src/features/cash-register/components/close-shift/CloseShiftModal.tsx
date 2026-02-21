@@ -5,8 +5,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Scissors } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { CheckCircle2, Scissors, Wallet } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { CloseShiftStepOne } from "./CloseShiftStepOne";
@@ -30,12 +30,13 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
   const [currentStep, setCurrentStep] = useState(1);
   const [formValues, setFormValues] = useState<CloseShiftFormValues | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
-
   const { data: details, isLoading } = useQuery({
     queryKey: ["shiftDetails", shiftId, "close-modal"],
     queryFn: () => getShiftDetails(shiftId),
     enabled: isOpen && !!shiftId,
   });
+
+  const cashWithdrawal = (details?.total_cash_sales ?? 0) + (details?.debt_payments_cash ?? 0)  + (details?.total_movements_in ?? 0) - (details?.total_movements_out ?? 0);
 
   // Reset when opening
   useEffect(() => {
@@ -70,23 +71,43 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
         key={sessionKey}
       >
         {/* Header */}
-        <div className="p-6 pb-4 border-b bg-background">
-          <DialogHeader className="mb-6 flex flex-row items-center gap-3 space-y-0">
-            <div className="p-2 rounded-full bg-purple-50">
-              <Scissors className="h-6 w-6 text-purple-800" />
+        <div className="p-4 border-b bg-background">
+          <DialogHeader className="mb-4 flex flex-row items-center gap-4 space-y-0 justify-between">
+            <div className="flex flex-row items-center gap-3">
+              <div className="p-2 rounded-full bg-purple-50 shrink-0">
+                <Scissors className="h-5 w-5 text-purple-800" />
+              </div>
+              <div className="flex flex-col">
+                <DialogTitle className="text-lg font-bold text-foreground leading-tight">
+                  Realizar Corte de Caja
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground">
+                  Proceso guiado de cierre de turno
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <DialogTitle className="text-xl font-bold text-foreground">
-                Realizar Corte de Caja
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                Proceso guiado de cierre de turno
-              </p>
+
+            {/* Cash withdrawal - Slim version */}
+            <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2 mr-6">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-emerald-600" />
+                <div className="flex flex-col min-w-[120px]">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-800 leading-none">
+                    Monto a Retirar
+                  </span>
+                  <span className="text-[9px] text-emerald-600 leading-none mt-0.5">
+                    Totas las operaciones en efectivo
+                  </span>
+                </div>
+              </div>
+              <div className="text-lg font-bold text-emerald-700 tabular-nums">
+                {formatCurrency(cashWithdrawal)}
+              </div>
             </div>
           </DialogHeader>
 
           {/* Stepper */}
-          <nav aria-label="Progreso del Corte" className="w-full">
+          <nav aria-label="Progreso del Corte" className="w-full px-2">
             <ol className="flex items-center w-full">
               {WIZARD_STEPS.map((step, index) => {
                 const isActive = step.id === currentStep;
