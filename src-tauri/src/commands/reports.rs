@@ -80,19 +80,25 @@ pub struct LowStockProduct {
 fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
     let sql = r#"
         SELECT 
-            COALESCE(SUM(s.total), 0.0) as gross_sales,
-            COUNT(s.id) as transaction_count,
-            COALESCE((
-                SELECT SUM(si.total - (si.quantity * COALESCE(p.purchase_price, 0)))
-                FROM sale_items si
-                JOIN sales s2 ON si.sale_id = s2.id
-                JOIN products p ON si.product_id = p.id
-                WHERE s2.created_at BETWEEN ?1 AND ?2 
-                  AND s2.status = 'completed'
+            COALESCE(SUM(
+                si.total - COALESCE(ri.returned_subtotal, 0.0)
+            ), 0.0) as gross_sales,
+            COUNT(DISTINCT s.id) as transaction_count,
+            COALESCE(SUM(
+                (si.total - COALESCE(ri.returned_subtotal, 0.0))
+                - ((si.quantity - COALESCE(ri.returned_qty, 0.0)) * COALESCE(p.purchase_price, 0))
             ), 0.0) as net_profit
-        FROM sales s
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        JOIN products p ON si.product_id = p.id
+        LEFT JOIN (
+            SELECT sale_item_id, SUM(quantity) as returned_qty, SUM(subtotal) as returned_subtotal
+            FROM return_items
+            GROUP BY sale_item_id
+        ) ri ON ri.sale_item_id = si.id
         WHERE s.created_at BETWEEN ?1 AND ?2 
-          AND s.status = 'completed'
+          AND s.status IN ('completed', 'partial_return')
+          AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
     "#;
 
     conn.query_row(sql, params![from_date, to_date], |row| {
@@ -130,11 +136,20 @@ fn fetch_sales_chart(
         ),
         daily_sales AS (
             SELECT 
-                strftime('%Y-%m-%d', created_at, 'localtime') as sale_day, 
-                COALESCE(SUM(total), 0.0) as total_sales
-            FROM sales 
-            WHERE created_at BETWEEN ?1 AND ?2 
-              AND status = 'completed'
+                strftime('%Y-%m-%d', s.created_at, 'localtime') as sale_day, 
+                COALESCE(SUM(
+                    si.total - COALESCE(ri.returned_subtotal, 0.0)
+                ), 0.0) as total_sales
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            LEFT JOIN (
+                SELECT sale_item_id, SUM(quantity) as returned_qty, SUM(subtotal) as returned_subtotal
+                FROM return_items
+                GROUP BY sale_item_id
+            ) ri ON ri.sale_item_id = si.id
+            WHERE s.created_at BETWEEN ?1 AND ?2 
+              AND s.status IN ('completed', 'partial_return')
+              AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
             GROUP BY sale_day
         )
         SELECT 
@@ -179,14 +194,22 @@ fn fetch_categories(
         FROM (
             SELECT 
                 c.name as category_name,
-                COALESCE(SUM(si.total), 0.0) as category_total,
+                COALESCE(SUM(
+                    si.total - COALESCE(ri.returned_subtotal, 0.0)
+                ), 0.0) as category_total,
                 c.color
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
             JOIN categories c ON p.category_id = c.id
+            LEFT JOIN (
+                SELECT sale_item_id, SUM(quantity) as returned_qty, SUM(subtotal) as returned_subtotal
+                FROM return_items
+                GROUP BY sale_item_id
+            ) ri ON ri.sale_item_id = si.id
             WHERE s.created_at BETWEEN ?1 AND ?2 
-              AND s.status = 'completed'
+              AND s.status IN ('completed', 'partial_return')
+              AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
             GROUP BY c.id, c.name, c.color
         )
         ORDER BY category_total DESC
@@ -260,14 +283,20 @@ pub fn get_top_selling_products(
                 p.code as product_code,
                 COALESCE(c.name, 'Sin Categoría') as category_name,
                 c.color as category_color,
-                SUM(si.quantity) as quantity_sold,
-                SUM(si.total) as total_revenue
+                SUM(si.quantity - COALESCE(ri.returned_qty, 0.0)) as quantity_sold,
+                SUM(si.total - COALESCE(ri.returned_subtotal, 0.0)) as total_revenue
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
             LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN (
+                SELECT sale_item_id, SUM(quantity) as returned_qty, SUM(subtotal) as returned_subtotal
+                FROM return_items
+                GROUP BY sale_item_id
+            ) ri ON ri.sale_item_id = si.id
             WHERE s.created_at BETWEEN ?1 AND ?2
-              AND s.status != 'cancelled'
+              AND s.status IN ('completed', 'partial_return')
+              AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
             GROUP BY si.product_id, p.category_id, p.name, p.code, c.name, c.color
         ),
         grand_total AS (
@@ -365,7 +394,7 @@ pub fn get_dead_stock_report(
                 FROM sale_items si2
                 JOIN sales s2 ON si2.sale_id = s2.id
                 WHERE si2.product_id = p.id
-                  AND s2.status != 'cancelled'
+                  AND s2.status IN ('completed', 'partial_return')
             ) as last_sale_date
         FROM products p
         JOIN store_inventory inv ON p.id = inv.product_id
@@ -378,8 +407,14 @@ pub fn get_dead_stock_report(
               SELECT DISTINCT si.product_id
               FROM sale_items si
               JOIN sales s ON si.sale_id = s.id
+              LEFT JOIN (
+                  SELECT sale_item_id, SUM(quantity) as returned_qty
+                  FROM return_items
+                  GROUP BY sale_item_id
+              ) ri ON ri.sale_item_id = si.id
               WHERE s.created_at BETWEEN ?1 AND ?2
-                AND s.status != 'cancelled'
+                AND s.status IN ('completed', 'partial_return')
+                AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
           )
           {}
         ORDER BY stagnant_value DESC
