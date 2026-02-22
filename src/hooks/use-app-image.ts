@@ -26,7 +26,6 @@ export function useAppImage(path?: string | null) {
         
         setSrc(convertFileSrc(finalPath));
       } catch (error) {
-        console.error('Error resolving image path:', error);
         setSrc(undefined);
       }
     };

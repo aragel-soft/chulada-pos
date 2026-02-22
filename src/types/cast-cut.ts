@@ -7,9 +7,19 @@ export interface ShiftDto {
   opening_user_avatar?: string;
   status: string;
   code?: string;
-  final_cash?: number;
+  // Closing fields
   closing_date?: string;
   closing_user_id?: string;
+  closing_user_name?: string;
+  closing_user_avatar?: string;
+  final_cash?: number;
+  expected_cash?: number;
+  cash_difference?: number;
+  card_terminal_total?: number;
+  card_expected_total?: number;
+  card_difference?: number;
+  cash_withdrawal?: number;
+  notes?: string;
 }
 
 export interface CashMovementDto {
@@ -38,10 +48,34 @@ export interface ShiftDetailsDto {
   debt_payments_card: number;
   theoretical_cash: number;
 }
+
 export interface CreateCashMovementRequest {
   shift_id: number;
   type_: 'IN' | 'OUT';
   amount: number;
   concept: string;
   description?: string;
+}
+
+export interface CloseShiftRequest {
+  finalCash: number;
+  cardTerminalTotal: number;
+  notes?: string;
+}
+
+export interface ShiftHistoryFilters {
+  date_from?: string;
+  date_to?: string;
+  user_search?: string;
+  user_id?: string;
+  only_with_differences?: boolean;
+  min_difference?: number;
+}
+
+export interface PaginatedShifts {
+  data: ShiftDto[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }

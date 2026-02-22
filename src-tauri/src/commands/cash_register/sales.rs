@@ -743,13 +743,7 @@ pub fn process_sale(
              }
         }
 
-        // Calculate amount to use: Min(SaleTotal, VoucherBalance)
-        // Note: If mixed payment, we assume voucher is applied first to reduce pending total.
-        // But logic should be: TotalPaid = Cash + Card + Voucher.
-        // If Cash + Card is already covering everything, voucher might not be needed? 
-        // Requirement: "El monto aplicado del vale debe ser el menor entre: saldo y total pendiente".
-        // Here we assume "Total Pendiente" is the FinalTotal because calculations happen before payment check.
-        
+        // Calculate amount to use
         let max_applicable = if v_balance > final_total { final_total } else { v_balance };
         voucher_amount_used = max_applicable;
         voucher_id_used = Some(v_id);
