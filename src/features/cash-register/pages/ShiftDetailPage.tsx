@@ -74,7 +74,7 @@ function SummaryRow({
   return (
     <div
       className={cn(
-        "flex justify-between items-center py-1.5",
+        "flex justify-between items-center",
         bold && "font-semibold"
       )}
     >
@@ -147,7 +147,7 @@ export default function ShiftDetailPage() {
           <Badge
             variant="outline"
             className={cn(
-              "font-medium tracking-wide",
+              "font-medium tracking-wide w-20 justify-center",
               isEntry
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                 : "border-rose-200 bg-rose-50 text-rose-700"
@@ -191,6 +191,11 @@ export default function ShiftDetailPage() {
         );
       },
     },
+    {
+      accessorKey: "description",
+      header: "Descripción",
+      cell: ({ row }) => row.getValue("description"),
+    },
   ], []);
 
   if (isLoading) {
@@ -226,7 +231,7 @@ export default function ShiftDetailPage() {
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-300">
       
       {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b px-6 py-5 bg-white shadow-sm shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b px-6 py-2 bg-white shadow-sm shrink-0 mt-4" >
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -237,13 +242,13 @@ export default function ShiftDetailPage() {
             <ArrowLeft className="h-6 w-6" />
           </Button>
 
-          <div className="h-14 w-14 rounded-full bg-[#480489]/10 flex items-center justify-center text-[#480489] shrink-0">
-            <CalendarDays className="h-7 w-7" />
+          <div className="h-10 w-10 rounded-full bg-[#480489]/10 flex items-center justify-center text-[#480489] shrink-0">
+            <CalendarDays className="h-5 w-5" />
           </div>
           
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
+              <h1 className="text-xl md:text-xl font-bold tracking-tight text-gray-900">
                 Detalle de Turno
               </h1>
               <Badge 
@@ -262,6 +267,42 @@ export default function ShiftDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Users Info */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 px-6 bg-white shrink-0">
+          <div>
+              <SummaryRow label="Apertura" value={formatDateLabel(shift.opening_date)} large />
+              <SummaryRow 
+                label="Apertura por" 
+                value={
+                  <div className="ml-2 flex items-center gap-2 justify-end">
+                          <AppAvatar path={shift.opening_user_avatar || ''} name={shift.opening_user_name || "U"} className="h-7 w-7" />
+                          <span>{shift.opening_user_name || shift.opening_user_id}</span>
+                        </div>
+                      } 
+                      large 
+                      bold 
+                    />
+          </div>
+          <div>
+              <SummaryRow label="Cierre" value={formatDateLabel(shift.closing_date)} large />
+              <SummaryRow 
+                label="Cierre por" 
+                value={
+                  shift.status === 'closed' ? (
+                    <div className="ml-2 flex items-center gap-2 justify-end">
+                      <AppAvatar path={shift.closing_user_avatar || ''} name={shift.closing_user_name || "U"} className="h-7 w-7" />
+                      <span>{shift.closing_user_name || shift.closing_user_id}</span>
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400">Sin Cerrar</span>
+                  )
+                } 
+                large 
+                bold
+              />
+          </div>
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -272,7 +313,7 @@ export default function ShiftDetailPage() {
           {isClosed && (
             <div
               className={cn(
-                "rounded-xl border-2 overflow-hidden p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm",
+                "rounded-xl border-2 overflow-hidden p-4 flex flex-col md:flex-row items-center justify-between shadow-sm",
                 hasDifferences
                   ? "border-amber-200 bg-amber-50/50"
                   : "border-emerald-200 bg-emerald-50/50"
@@ -280,14 +321,14 @@ export default function ShiftDetailPage() {
             >
               <div className="flex items-center gap-4">
                 {hasDifferences ? (
-                  <AlertTriangle className="h-10 w-10 text-amber-600 shrink-0" />
+                  <AlertTriangle className="h-8 w-8 text-amber-600 shrink-0" />
                 ) : (
-                  <ShieldCheck className="h-10 w-10 text-emerald-600 shrink-0" />
+                  <ShieldCheck className="h-8 w-8 text-emerald-600 shrink-0" />
                 )}
                 <div>
                   <h3
                     className={cn(
-                      "font-bold text-2xl mb-1",
+                      "font-bold text-xl mb-1",
                       hasDifferences ? "text-amber-900" : "text-emerald-900"
                     )}
                   >
@@ -311,46 +352,34 @@ export default function ShiftDetailPage() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* ── LEFT COLUMN ── */}
             <div className="space-y-6">
-              
-              {/* General Info */}
-              <div className="rounded-xl border border-indigo-100 overflow-hidden bg-white shadow-sm">
-                <div className="px-5 py-3.5 bg-indigo-50/50 border-b border-indigo-100 flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-indigo-600" />
-                  <span className="text-base font-semibold text-indigo-900">Línea de Tiempo y Personal</span>
+              {/* Sales Details */}
+              <div className="rounded-xl border border-teal-100 overflow-hidden bg-white shadow-sm">
+                <div className="px-5 py-3.5 bg-teal-50/50 border-b border-teal-100 flex items-center justify-between">
+                  <span className="text-base font-semibold text-teal-900">Resumen Operativo (Ingresos)</span>
+                  <Badge variant="outline" className="text-sm bg-white border-teal-200 text-teal-800">{details.sales_count} Tickets emitidos</Badge>
                 </div>
-                <div className="p-5 space-y-2">
-                  <SummaryRow label="Apertura" value={formatDateLabel(shift.opening_date)} large />
-                  <SummaryRow 
-                    label="Usuario de Apertura" 
-                    value={
-                      <div className="flex items-center gap-2 justify-end">
-                        <AppAvatar path={shift.opening_user_avatar || ''} name={shift.opening_user_name || "U"} className="h-7 w-7" />
-                        <span>{shift.opening_user_name || shift.opening_user_id}</span>
-                      </div>
-                    } 
-                    large 
-                    bold 
-                  />
+                <div className="p-5 space-y-1">
+                  <SummaryRow icon={Receipt} label="Ventas Totales" value={formatCurrency(details.total_sales)} large bold highlight="emerald" />
+                  
                   <div className="h-px bg-zinc-200 my-4" />
-                  <SummaryRow label="Cierre" value={formatDateLabel(shift.closing_date)} large />
-                  <SummaryRow 
-                    label="Usuario de Cierre" 
-                    value={
-                      shift.status === 'closed' ? (
-                        <div className="flex items-center gap-2 justify-end">
-                          <AppAvatar path={shift.closing_user_avatar || ''} name={shift.closing_user_name || "U"} className="h-7 w-7" />
-                          <span>{shift.closing_user_name || shift.closing_user_id}</span>
-                        </div>
-                      ) : (
-                        <span className="text-zinc-400">Sin Cerrar</span>
-                      )
-                    } 
-                    large 
-                    bold
-                  />
+                  
+                  <SummaryRow icon={Banknote} label="Ventas Efectivo" value={formatCurrency(details.total_cash_sales)} large />
+                  <SummaryRow icon={CreditCard} label="Ventas Tarjeta" value={formatCurrency(details.total_card_sales)} large />
+                  <SummaryRow icon={HandCoins} iconColor="text-amber-500" label="Ventas Crédito" value={formatCurrency(details.total_credit_sales)} large highlight="amber" />
+                  <SummaryRow icon={Ticket} iconColor="text-purple-500" label="Ventas Vales" value={formatCurrency(details.total_voucher_sales)} large highlight="purple" />
+                  
+                  <div className="h-px bg-zinc-200 my-4" />
+                  
+                  <SummaryRow icon={HandCoins} iconColor="text-teal-600" label="Total Abonos" value={formatCurrency(details.total_debt_payments)} large bold highlight="teal" />
+                  <SummaryRow icon={Banknote} label="Abonos Efectivo" value={formatCurrency(details.debt_payments_cash)} large />
+                  <SummaryRow icon={CreditCard} label="Abonos Tarjeta" value={formatCurrency(details.debt_payments_card)} large />
                 </div>
               </div>
 
+            </div>
+
+            {/* ── RIGHT COLUMN ── */}
+            <div className="space-y-6">
               {/* Cash comparison */}
               <div className="rounded-xl border border-emerald-100 overflow-hidden bg-white shadow-sm">
                 <div className="px-5 py-3.5 bg-emerald-50/50 border-b border-emerald-100 flex items-center gap-2">
@@ -382,36 +411,7 @@ export default function ShiftDetailPage() {
                   </div>
                 </div>
               </div>
-
-            </div>
-
-            {/* ── RIGHT COLUMN ── */}
-            <div className="space-y-6">
-
-              {/* Sales Details */}
-              <div className="rounded-xl border border-teal-100 overflow-hidden bg-white shadow-sm">
-                <div className="px-5 py-3.5 bg-teal-50/50 border-b border-teal-100 flex items-center justify-between">
-                  <span className="text-base font-semibold text-teal-900">Resumen Operativo (Ingresos)</span>
-                  <Badge variant="outline" className="text-sm bg-white border-teal-200 text-teal-800">{details.sales_count} Tickets emitidos</Badge>
-                </div>
-                <div className="p-5 space-y-1">
-                  <SummaryRow icon={Receipt} label="Ventas Totales" value={formatCurrency(details.total_sales)} large bold highlight="emerald" />
-                  
-                  <div className="h-px bg-zinc-200 my-4" />
-                  
-                  <SummaryRow icon={Banknote} label="Ventas Efectivo" value={formatCurrency(details.total_cash_sales)} large />
-                  <SummaryRow icon={CreditCard} label="Ventas Tarjeta" value={formatCurrency(details.total_card_sales)} large />
-                  <SummaryRow icon={HandCoins} iconColor="text-amber-500" label="Ventas Crédito" value={formatCurrency(details.total_credit_sales)} large highlight="amber" />
-                  <SummaryRow icon={Ticket} iconColor="text-purple-500" label="Ventas Vales" value={formatCurrency(details.total_voucher_sales)} large highlight="purple" />
-                  
-                  <div className="h-px bg-zinc-200 my-4" />
-                  
-                  <SummaryRow icon={HandCoins} iconColor="text-teal-600" label="Total Abonos" value={formatCurrency(details.total_debt_payments)} large bold highlight="teal" />
-                  <SummaryRow icon={Banknote} label="Abonos Efectivo" value={formatCurrency(details.debt_payments_cash)} large />
-                  <SummaryRow icon={CreditCard} label="Abonos Tarjeta" value={formatCurrency(details.debt_payments_card)} large />
-                </div>
-              </div>
-
+              
               {/* Card comparison */}
               <div className="rounded-xl border border-blue-100 overflow-hidden bg-white shadow-sm">
                 <div className="px-5 py-3.5 bg-blue-50/50 border-b border-blue-100 flex items-center gap-2">
@@ -448,29 +448,44 @@ export default function ShiftDetailPage() {
             </div>
           </div>
 
-          {/* ── BOT ROW: Retiro / Notas / Movimientos ── */}
-
-          {/* Cash Withdrawals */}
-          {isClosed && (
-            <div className="rounded-xl border border-emerald-300 overflow-hidden bg-emerald-50 shadow-sm flex flex-col md:flex-row items-center justify-between p-6 gap-6">
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                  <Wallet className="h-7 w-7 text-emerald-700" />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Cash Withdrawals */}
+            {isClosed && (
+              <div className="rounded-xl border border-emerald-300 overflow-hidden bg-emerald-50 shadow-sm flex flex-col xl:flex-row items-center justify-between p-6 gap-6 h-full">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                    <Wallet className="h-7 w-7 text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-emerald-900">
+                      Monto Retirado de Caja
+                    </h4>
+                    <p className="text-sm text-emerald-700">
+                      Dinero retirado e ingresado a administración.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-lg font-bold text-emerald-900">
-                    Monto Retirado de Caja
-                  </h4>
-                  <p className="text-sm text-emerald-700">
-                    Dinero retirado físicamente y entregado a administración.
+                <span className="text-3xl font-black text-emerald-800 tabular-nums">
+                  {formatCurrency(shift.cash_withdrawal || 0)}
+                </span>
+              </div>
+            )}
+            
+            {/* Notes */}
+            {shift.notes && shift.notes.trim().length > 0 && (
+              <div className="rounded-xl border border-amber-200 overflow-hidden bg-[#fffdf5] shadow-sm h-full">
+                <div className="px-4 py-2 border-b border-amber-100 flex items-center gap-3">
+                  <FileText className="h-6 w-6 text-amber-600" />
+                  <h3 className="text-lg font-bold text-amber-900">Comentarios del Cajero</h3>
+                </div>
+                <div className="p-3">
+                  <p className="text-base text-zinc-800 whitespace-pre-wrap leading-relaxed">
+                    {shift.notes}
                   </p>
                 </div>
               </div>
-              <span className="text-4xl font-black text-emerald-800 tabular-nums">
-                {formatCurrency(shift.cash_withdrawal || 0)}
-              </span>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Movimientos de Efectivo Table (NEW!) */}
           <div className="rounded-xl border border-violet-100 overflow-hidden bg-white shadow-sm">
@@ -485,28 +500,15 @@ export default function ShiftDetailPage() {
               <DataTable
                 columns={movementsColumns}
                 data={details.movements || []}
+                initialColumnVisibility={ {description: false} }
                 manualPagination={false}
                 manualSorting={false}
                 searchPlaceholder="Buscar por concepto o descripción..."
                 initialPageSize={16}
+                showColumnFilters = {false}
               />
             </div>
           </div>
-
-          {/* Notes */}
-          {shift.notes && shift.notes.trim().length > 0 && (
-            <div className="rounded-xl border border-amber-200 overflow-hidden bg-[#fffdf5] shadow-sm">
-              <div className="px-5 py-4 border-b border-amber-100 flex items-center gap-3">
-                <FileText className="h-6 w-6 text-amber-600" />
-                <h3 className="text-lg font-bold text-amber-900">Comentarios del Cajero</h3>
-              </div>
-              <div className="p-6">
-                <p className="text-base text-zinc-800 whitespace-pre-wrap leading-relaxed">
-                  {shift.notes}
-                </p>
-              </div>
-            </div>
-          )}
 
         </div>
       </ScrollArea>
