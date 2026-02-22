@@ -189,10 +189,9 @@ pub fn get_shifts_history(
         if let Some(user_search) = f.user_search {
             let u = user_search.trim().to_string();
             if !u.is_empty() {
-                dq.add_condition("(u.full_name LIKE ? OR uc.full_name LIKE ?)");
-                let pattern = format!("%{}%", u);
-                dq.add_param(pattern.clone());
-                dq.add_param(pattern);
+                dq.add_condition("(s.opening_user_id = ? OR s.closing_user_id = ?)");
+                dq.add_param(u.clone());
+                dq.add_param(u);
             }
         }
 

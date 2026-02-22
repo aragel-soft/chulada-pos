@@ -67,6 +67,7 @@ export interface ShiftHistoryFilters {
   date_from?: string;
   date_to?: string;
   user_search?: string;
+  user_id?: string;
   status?: string;
   only_with_differences?: boolean;
   min_difference?: number;

@@ -3,12 +3,12 @@ import { X } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
-import { DebouncedInput } from "@/components/ui/debounced-input";
 import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
 import { DateSelector } from "@/components/ui/date-selector";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { UserCombobox } from "@/components/ui/user-combobox";
 
 const statusOptions = [
   { value: "open", label: "Abierto" },
@@ -82,11 +82,11 @@ export function ShiftHistoryToolbar<TData>({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-col lg:flex-row gap-2 w-full lg:w-auto items-start lg:items-center flex-wrap">
-          <DebouncedInput
-            placeholder="Buscar usuario..."
-            value={(table.getState().globalFilter as string) ?? ""}
-            onChange={(value) => table.setGlobalFilter(String(value))}
+          <UserCombobox 
+            value={(table.getState().globalFilter as string) ?? null}
+            onChange={(val) => table.setGlobalFilter(val ?? "")}
             className="h-9 w-full lg:w-[250px]"
+            placeholder="Todos los cajeros"
           />
 
           <div className="flex gap-2 w-full lg:w-auto">

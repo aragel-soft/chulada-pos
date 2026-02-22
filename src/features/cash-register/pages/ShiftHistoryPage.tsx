@@ -25,7 +25,7 @@ export default function ShiftHistoryPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "closing_date", desc: true }
+    { id: "opening_date", desc: true }
   ]);
   
   // Custom Filters State
