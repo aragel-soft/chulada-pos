@@ -45,7 +45,6 @@ pub struct ShiftHistoryFilters {
     pub date_from: Option<String>,
     pub date_to: Option<String>,
     pub user_search: Option<String>,
-    pub status: Option<String>,
     pub only_with_differences: Option<bool>,
     pub min_difference: Option<f64>,
 }
@@ -157,15 +156,9 @@ pub fn get_shifts_history(
     let conn = db.lock().map_err(|e| e.to_string())?;
     let mut dq = DynamicQuery::new();
 
-    if let Some(f) = filters {
-        if let Some(status) = f.status {
-            let s = status.trim().to_string();
-            if !s.is_empty() {
-                dq.add_condition("s.status = ?");
-                dq.add_param(s);
-            }
-        }
 
+
+    if let Some(f) = filters {
         if let Some(date_from) = f.date_from {
             let d = date_from.trim().to_string();
             if !d.is_empty() {

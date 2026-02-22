@@ -3,17 +3,11 @@ import { X } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
-import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
 import { DateSelector } from "@/components/ui/date-selector";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { UserCombobox } from "@/components/ui/user-combobox";
-
-const statusOptions = [
-  { value: "open", label: "Abierto" },
-  { value: "closed", label: "Cerrado" },
-];
 
 export interface ShiftHistoryToolbarProps<TData> {
   table: Table<TData>;
@@ -34,19 +28,6 @@ export function ShiftHistoryToolbar<TData>({
   minDifference,
   setMinDifference,
 }: ShiftHistoryToolbarProps<TData>) {
-  const handleFilterChange = (columnId: string, values: Set<string>) => {
-    if (values.size > 0) {
-      table.getColumn(columnId)?.setFilterValue(Array.from(values));
-    } else {
-      table.getColumn(columnId)?.setFilterValue(undefined);
-    }
-  };
-
-  const getFilterValue = (columnId: string): Set<string> => {
-    const value = table.getColumn(columnId)?.getFilterValue() as string[];
-    return new Set(value || []);
-  };
-
   const isFiltered =
     table.getState().columnFilters.length > 0 ||
     table.getState().globalFilter ||
@@ -106,13 +87,6 @@ export function ShiftHistoryToolbar<TData>({
               formatStr="dd MMM y"
             />
           </div>
-
-          <DataTableFacetedFilter
-            title="Estado"
-            options={statusOptions}
-            selectedValues={getFilterValue("status")}
-            onSelect={(values) => handleFilterChange("status", values)}
-          />
 
           <div className="flex items-center space-x-2 border rounded-md px-3 h-9">
             <Switch 

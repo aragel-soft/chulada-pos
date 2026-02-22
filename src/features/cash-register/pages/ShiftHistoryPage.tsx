@@ -36,7 +36,6 @@ export default function ShiftHistoryPage() {
   const fetchShifts = async () => {
     setIsLoading(true);
     try {
-      const statusFilter = columnFilters.find((f) => f.id === "status")?.value as string[];
       const sortField = sorting.length > 0 ? sorting[0].id : "closing_date";
       const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
 
@@ -47,7 +46,6 @@ export default function ShiftHistoryPage() {
         sortOrder,
         {
           user_search: globalFilter || undefined,
-          status: statusFilter && statusFilter.length === 1 ? statusFilter[0] : undefined,
           date_from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
           date_to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
           only_with_differences: onlyDifferences ? true : undefined,
