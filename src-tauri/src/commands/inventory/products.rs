@@ -746,10 +746,12 @@ pub async fn update_product(
   })
 }
 
-// TODO: Tarea Backlog - Implementar consulta real a tabla 'sale_items' cuando exista el módulo de ventas.
-fn check_product_has_sales(_conn: &Connection, _product_id: &str) -> Result<bool, rusqlite::Error> {
-  // Por ahora, asumimos que no hay ventas para permitir la edición
-  Ok(false)
+fn check_product_has_sales(conn: &Connection, product_id: &str) -> Result<bool, rusqlite::Error> {
+  conn.query_row(
+    "SELECT EXISTS(SELECT 1 FROM sale_items WHERE product_id = ?)",
+    [product_id],
+    |row| row.get(0),
+  )
 }
 
 #[tauri::command]
