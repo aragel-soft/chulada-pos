@@ -10,8 +10,6 @@ export interface ShiftDto {
   // Closing fields
   closing_date?: string;
   closing_user_id?: string;
-  closing_user_name?: string;
-  closing_user_avatar?: string;
   final_cash?: number;
   expected_cash?: number;
   cash_difference?: number;
@@ -61,21 +59,4 @@ export interface CloseShiftRequest {
   finalCash: number;
   cardTerminalTotal: number;
   notes?: string;
-}
-
-export interface ShiftHistoryFilters {
-  date_from?: string;
-  date_to?: string;
-  user_search?: string;
-  status?: string;
-  only_with_differences?: boolean;
-  min_difference?: number;
-}
-
-export interface PaginatedShifts {
-  data: ShiftDto[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
 }
