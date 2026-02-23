@@ -256,7 +256,6 @@ function DetailRow({
   );
 }
 
-// ─── Exported Props type for parent usage ────────────
 export interface PaymentDetailSheetProps {
   isOpen: boolean;
   onClose: () => void;

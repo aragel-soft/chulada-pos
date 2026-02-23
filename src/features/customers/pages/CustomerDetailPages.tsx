@@ -23,6 +23,7 @@ import SalesHistoryModule from "@/features/sales/components/SalesHistoryModule";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { useAuthStore } from "@/stores/authStore";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
+import { PaymentDetailPanel } from "@/features/customers/components/PaymentDetailSheet";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +34,7 @@ export default function CustomerDetailPage() {
   const shift = useCashRegisterStore((state) => state.shift);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
 
   const initialCustomer = location.state?.customer;
 
@@ -277,28 +279,55 @@ export default function CustomerDetailPage() {
         </TabsList>
 
         <TabsContent value="ledger" className="flex-1 mt-4">
-          <div className="h-full border rounded-md overflow-auto bg-white">
-            <DataTable
-              columns={columns}
-              data={statement?.movements || []}
-              isLoading={isLoadingStatement}
-              searchPlaceholder="Buscar folio..."
-              manualPagination={false}
-              manualSorting={false}
-              initialPageSize={16}
-              showColumnFilters={false}
-              actions={
-                isDebt && (
-                  <Button
-                    onClick={() => setIsPaymentModalOpen(true)}
-                    className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
-                  >
-                    <Wallet className="w-4 h-4 mr-2" />
-                    Abonar a Deuda
-                  </Button>
-                )
-              }
-            />
+          <div className="flex h-full w-full overflow-hidden border rounded-md bg-white">
+            {/* Table */}
+            <div
+              className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+                selectedPaymentId ? "w-[65%] border-r" : "w-full"
+              }`}
+            >
+              <div className="flex-1 overflow-auto">
+                <DataTable
+                  columns={columns}
+                  data={statement?.movements || []}
+                  isLoading={isLoadingStatement}
+                  searchPlaceholder="Buscar folio..."
+                  manualPagination={false}
+                  manualSorting={false}
+                  initialPageSize={16}
+                  showColumnFilters={false}
+                  onRowClick={(row) => {
+                    const movement = row.original;
+                    if (movement.movement_type === "payment") {
+                      setSelectedPaymentId(
+                        selectedPaymentId === movement.id ? null : movement.id
+                      );
+                    }
+                  }}
+                  actions={
+                    isDebt && (
+                      <Button
+                        onClick={() => setIsPaymentModalOpen(true)}
+                        className="bg-[#480489] hover:bg-[#360368] text-white font-bold shadow-sm"
+                      >
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Abonar a Deuda
+                      </Button>
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Payment Detail Panel */}
+            {selectedPaymentId && (
+              <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+                <PaymentDetailPanel
+                  paymentId={selectedPaymentId}
+                  onClose={() => setSelectedPaymentId(null)}
+                />
+              </div>
+            )}
           </div>
         </TabsContent>
 
