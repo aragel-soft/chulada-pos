@@ -83,7 +83,7 @@ export function PromotionDetailPanel({
           <span className="sr-only">Cerrar</span>
         </Button>
 
-        <div className="mb-4 pr-10">
+        <div className="pr-10">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="bg-[#480489]/10 p-1.5 rounded-full">
@@ -101,9 +101,11 @@ export function PromotionDetailPanel({
             )}
           </div>
 
-          <p className="text-sm text-muted-foreground mt-1">
-            {promotion?.description || "Sin descripción"}
-          </p>
+          {promotion?.description && (
+            <p className="text-sm text-muted-foreground mt-2 ml-9">
+              {promotion.description}
+            </p>
+          )}
         </div>
       </div>
 
@@ -114,41 +116,37 @@ export function PromotionDetailPanel({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : promotion ? (
-          <div className="p-6 space-y-6">
-            <div className="bg-muted/30 p-5 rounded-lg border flex flex-col md:flex-row justify-between gap-4">
-              <div className="space-y-1 flex-1">
-                <h3 className="font-bold text-xl text-[#480489]">
-                  {promotion.name}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {promotion.description || "Sin descripción"}
-                </p>
-                <div className="flex items-center gap-2 mt-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {format(
-                      new Date(promotion.start_date + "T00:00:00"),
-                      "dd MMM yyyy",
-                      { locale: es }
-                    )}{" "}
-                    -{" "}
-                    {format(
-                      new Date(promotion.end_date + "T00:00:00"),
-                      "dd MMM yyyy",
-                      { locale: es }
-                    )}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end justify-center border-l pl-6 min-w-[150px]">
-                <span className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">
-                  Precio Final
+          <div className="p-6 space-y-5">
+            <div className="flex flex-col items-center py-4 bg-gray-50 rounded-lg border border-green-200">
+              <span className="text-sm font-medium text-gray-600 uppercase tracking-wider mb-1">
+                Precio del Combo
+              </span>
+              <span className="text-3xl font-bold text-gray-700 tabular-nums flex items-center">
+                <DollarSign className="h-6 w-6" />
+                {promotion.combo_price.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span>
+                Vigencia:{" "}
+                <span className="font-medium text-foreground">
+                  {format(
+                    new Date(promotion.start_date + "T00:00:00"),
+                    "dd MMM yyyy",
+                    { locale: es }
+                  )}
                 </span>
-                <div className="text-3xl font-bold text-green-600 flex items-center">
-                  <DollarSign className="h-6 w-6" />
-                  {promotion.combo_price.toFixed(2)}
-                </div>
-              </div>
+                {" — "}
+                <span className="font-medium text-foreground">
+                  {format(
+                    new Date(promotion.end_date + "T00:00:00"),
+                    "dd MMM yyyy",
+                    { locale: es }
+                  )}
+                </span>
+              </span>
             </div>
 
             <div className="border rounded-xl overflow-hidden shadow-sm">
@@ -174,14 +172,12 @@ export function PromotionDetailPanel({
                         {item.product.code}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Badge
-                        variant="secondary"
-                        className="h-7 px-3 text-sm font-mono bg-[#480489]/10 text-[#480489]"
-                      >
-                        x{item.quantity}
-                      </Badge>
-                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="h-7 px-3 text-sm font-mono bg-[#480489]/10 text-[#480489]"
+                    >
+                      x{item.quantity}
+                    </Badge>
                   </li>
                 ))}
               </ul>
