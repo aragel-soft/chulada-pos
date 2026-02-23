@@ -16,6 +16,7 @@ import {
   Ticket,
   Receipt,
   Calculator,
+  Printer,
   type LucideIcon,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -28,6 +29,7 @@ import { DataTable } from "@/components/ui/data-table/data-table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, formatCurrency } from "@/lib/utils";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
+import { printShiftTicket } from "@/lib/api/printers";
 import type { ShiftDetailsDto, CashMovementDto } from "@/types/cast-cut";
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -109,6 +111,7 @@ export default function ShiftDetailPage() {
 
   const [details, setDetails] = useState<ShiftDetailsDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -266,6 +269,32 @@ export default function ShiftDetailPage() {
               </span>
             </div>
           </div>
+          
+          {isClosed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  setIsPrinting(true);
+                  await printShiftTicket(shift.id);
+                } catch (err) {
+                  console.error("Error al imprimir ticket:", err);
+                } finally {
+                  setIsPrinting(false);
+                }
+              }}
+              disabled={isPrinting}
+              className="ml-4 gap-2 h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              {isPrinting ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {isPrinting ? "Imprimiendo..." : "Imprimir Corte"}
+            </Button>
+          )}
         </div>
 
         {/* Users Info */}

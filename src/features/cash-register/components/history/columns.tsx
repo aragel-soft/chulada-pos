@@ -4,9 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Printer, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from "@/lib/utils";
 import { AppAvatar } from '@/components/ui/app-avatar';
+import { printShiftTicket } from '@/lib/api/printers';
+import { useState } from 'react';
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return '-';
@@ -141,4 +144,42 @@ export const columns: ColumnDef<ShiftDto>[] = [
       return <div className={colorClass}>{formatCurrency(diff)}</div>;
     },
   },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const [isPrinting, setIsPrinting] = useState(false);
+      const isClosed = row.original.status === 'closed';
+      
+      if (!isClosed) return null;
+
+      return (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={isPrinting}
+            className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                setIsPrinting(true);
+                await printShiftTicket(row.original.id);
+              } catch (error) {
+                console.error("Error al imprimir ticket:", error);
+              } finally {
+                setIsPrinting(false);
+              }
+            }}
+          >
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4" />
+            )}
+            <span className="sr-only">Imprimir Corte</span>
+          </Button>
+        </div>
+      );
+    }
+  }
 ];
