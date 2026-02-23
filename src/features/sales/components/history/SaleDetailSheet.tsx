@@ -28,7 +28,7 @@ import { ProductImagePreview } from "@/features/inventory/components/products/Pr
 import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
-import { printSaleTicket, printReturnVoucher } from "@/lib/api/cash-register/sales";
+import { printSaleTicket, printReturnVoucher } from "@/lib/api/printers";
 
 const RETURN_REASON_LABELS: Record<string, string> = {
   quality: "Producto dañado / Mala calidad",

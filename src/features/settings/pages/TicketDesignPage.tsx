@@ -26,10 +26,8 @@ import {
   saveLogoImage,
   BusinessSettings,
 } from "@/lib/api/business-settings";
-import {
-  testPrintTicket,
-  HardwareConfig
-} from "@/lib/api/hardware";
+import { HardwareConfig } from "@/lib/api/hardware";
+import { testPrintTicket } from "@/lib/api/printers";
 import { useHardwareStore } from "@/stores/hardwareStore";
 import { useBusinessStore } from "@/stores/businessStore";
 import { z } from "zod";
