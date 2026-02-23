@@ -90,3 +90,84 @@ body {
   overscroll-behavior: none;
   overflow: hidden;
 }
+
+/* ── Print Styles ─────────────────────────────────────────────────── */
+@media print {
+
+  html,
+  body {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Remove ALL layout constraints — every div must flow freely in print */
+  * {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Prevent table rows from being split across pages */
+  table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Hide DataTableLayout toolbar (filters/actions bar) and pagination */
+  /* The toolbar container: first child of DataTableLayout with p-4 border-b */
+  .flex-none.p-4.border-b {
+    display: none !important;
+  }
+
+  /* Hide pagination footer */
+  .flex-none.border-t.bg-background {
+    display: none !important;
+  }
+
+  /* Table styling for clean print */
+  table {
+    width: 100% !important;
+    font-size: 11px !important;
+    border-collapse: collapse !important;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #999 !important;
+    padding: 4px 8px !important;
+  }
+
+  /* Reset column header button styles for print — remove negative margin and ghost styling */
+  table th button {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    font-weight: 600 !important;
+  }
+
+  /* Force B&W for ink savings */
+  * {
+    color: #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Reset Tailwind border-b on thead/tr to avoid doubled borders in collapse mode */
+  table thead,
+  table tr {
+    border: none !important;
+  }
+
+  /* Table header row styling - th gets gray bg, children stay transparent */
+  table th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+
+  table th * {
+    background: transparent !important;
+  }
+}
