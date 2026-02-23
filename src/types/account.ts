@@ -24,3 +24,17 @@ export interface DebtPaymentRequest {
   payment_method: 'cash' | 'card' | 'mixed' | 'transfer';
   notes: string | null;
 }
+
+export interface PaymentDetail {
+  id: string;
+  folio: string;
+  customer_id: string;
+  customer_name: string;
+  amount: number;
+  cash_amount: number;
+  card_amount: number;
+  payment_method: string;
+  payment_date: string;
+  user_name: string;
+  notes: string | null;
+}
