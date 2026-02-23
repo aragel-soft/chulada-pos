@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/inventory/promotions";
 import { PromotionWizard } from "../components/promotions/PromotionWizard";
 import { DeletePromotionsDialog } from "../components/promotions/DeletePromotionsDialog";
+import { PromotionDetailPanel } from "../components/promotions/PromotionDetailSheet";
 
 export default function PromotionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -34,6 +35,7 @@ export default function PromotionsPage() {
   const [editingPromotion, setEditingPromotion] = useState<PromotionWithDetails | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [promotionsToDelete, setPromotionsToDelete] = useState<Promotion[]>([]);
+  const [selectedPromotionId, setSelectedPromotionId] = useState<string | null>(null);
 
   const queryParams: PaginationParams = useMemo(
     () => ({
@@ -118,74 +120,100 @@ export default function PromotionsPage() {
 
   return (
     <div className="h-full flex flex-col space-y-4">
-      <DataTable
-        columns={columns}
-        data={data?.data || []}
-        isLoading={isLoading}
-        searchPlaceholder="Buscar por nombre o productos..."
-        initialColumnVisibility={{ created_at: false }}
-        columnTitles={{
-          name: "Nombre",
-          items_summary: "Contenido",
-          combo_price: "Precio",
-          start_date: "Vigencia",
-          created_at: "Fecha de Creación",
-          status: "Estado",
-        }}
-        manualPagination={true}
-        manualFiltering={true}
-        manualSorting={true}
-        rowCount={data?.total || 0}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        globalFilter={globalFilter}
-        onGlobalFilterChange={(val) => setGlobalFilter(String(val))}
-        rowSelection={rowSelection}
-        onRowSelectionChange={setRowSelection}
-        actions={(table) => {
-          const selectedRows = table
-            .getFilteredSelectedRowModel()
-            .rows.map((row) => row.original);
+      <div className="flex h-full w-full overflow-hidden rounded-md bg-white">
+        {/* Table */}
+        <div
+          className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+            selectedPromotionId ? "w-[65%] border-r" : "w-full"
+          }`}
+        >
+          <div className="flex-1 overflow-auto">
+            <DataTable
+              columns={columns}
+              data={data?.data || []}
+              isLoading={isLoading}
+              searchPlaceholder="Buscar por nombre o productos..."
+              initialColumnVisibility={{ created_at: false }}
+              columnTitles={{
+                name: "Nombre",
+                items_summary: "Contenido",
+                combo_price: "Precio",
+                start_date: "Vigencia",
+                created_at: "Fecha de Creación",
+                status: "Estado",
+              }}
+              manualPagination={true}
+              manualFiltering={true}
+              manualSorting={true}
+              rowCount={data?.total || 0}
+              pagination={pagination}
+              onPaginationChange={setPagination}
+              sorting={sorting}
+              onSortingChange={setSorting}
+              globalFilter={globalFilter}
+              onGlobalFilterChange={(val) => setGlobalFilter(String(val))}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
+              onRowClick={(row) =>
+                setSelectedPromotionId(
+                  selectedPromotionId === row.original.id ? null : row.original.id
+                )
+              }
+              actions={(table) => {
+                const selectedRows = table
+                  .getFilteredSelectedRowModel()
+                  .rows.map((row) => row.original);
 
-          return (
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              {can("promotions:create") && (
-                <Button
-                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                  onClick={handleCreate}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Agregar</span>
-                </Button>
-              )}
+                return (
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    {can("promotions:create") && (
+                      <Button
+                        className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                        onClick={handleCreate}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        <span className="hidden sm:inline">Agregar</span>
+                      </Button>
+                    )}
 
-              {can("promotions:edit") && (
-                <Button
-                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-                  disabled={selectedRows.length !== 1}
-                  onClick={() => handleEdit(selectedRows)}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Modificar</span>
-                </Button>
-              )}
+                    {can("promotions:edit") && (
+                      <Button
+                        className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
+                        disabled={selectedRows.length !== 1}
+                        onClick={() => handleEdit(selectedRows)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        <span className="hidden sm:inline">Modificar</span>
+                      </Button>
+                    )}
 
-              {can("promotions:delete") && (
-                <Button
-                  variant="destructive"
-                  disabled={selectedRows.length === 0}
-                  onClick={() => handleDelete(selectedRows)}
-                >
-                  <Trash className="mr-2 h-4 w-4" />
-                  Eliminar ({selectedRows.length})
-                </Button>
-              )}
-            </div>
-          );
-        }}
-      />
+                    {can("promotions:delete") && (
+                      <Button
+                        variant="destructive"
+                        disabled={selectedRows.length === 0}
+                        onClick={() => handleDelete(selectedRows)}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Eliminar ({selectedRows.length})
+                      </Button>
+                    )}
+                  </div>
+                );
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Promotion Detail Panel */}
+        {selectedPromotionId && (
+          <div className="w-[35%] bg-white h-full overflow-auto animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+            <PromotionDetailPanel
+              promotionId={selectedPromotionId}
+              onClose={() => setSelectedPromotionId(null)}
+            />
+          </div>
+        )}
+      </div>
 
       <PromotionWizard
         open={isWizardOpen}
@@ -203,3 +231,4 @@ export default function PromotionsPage() {
     </div>
   );
 }
+
