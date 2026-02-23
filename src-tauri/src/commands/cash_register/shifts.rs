@@ -17,6 +17,8 @@ pub struct ShiftDto {
     // Closing fields
     pub closing_date: Option<String>,
     pub closing_user_id: Option<String>,
+    pub closing_user_name: Option<String>,
+    pub closing_user_avatar: Option<String>,
     pub final_cash: Option<f64>,
     pub expected_cash: Option<f64>,
     pub cash_difference: Option<f64>,
@@ -34,9 +36,11 @@ pub const SHIFT_SELECT_SQL: &str =
     "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code,
             s.closing_date, s.closing_user_id, s.final_cash, s.expected_cash, s.cash_difference,
             s.card_terminal_total, s.card_expected_total, s.card_difference, s.cash_withdrawal, s.notes,
-            u.full_name, u.avatar_url
+            u.full_name, u.avatar_url,
+            uc.full_name, uc.avatar_url
      FROM cash_register_shifts s
-     LEFT JOIN users u ON s.opening_user_id = u.id";
+     LEFT JOIN users u ON s.opening_user_id = u.id
+     LEFT JOIN users uc ON s.closing_user_id = uc.id";
 
 /// Maps a row (from SHIFT_SELECT_SQL) into a ShiftDto.
 pub fn shift_from_row(row: &rusqlite::Row) -> rusqlite::Result<ShiftDto> {
@@ -59,6 +63,8 @@ pub fn shift_from_row(row: &rusqlite::Row) -> rusqlite::Result<ShiftDto> {
         notes: row.get(15).unwrap_or(None),
         opening_user_name: row.get(16)?,
         opening_user_avatar: row.get(17).unwrap_or(None),
+        closing_user_name: row.get(18).unwrap_or(None),
+        closing_user_avatar: row.get(19).unwrap_or(None),
     })
 }
 
@@ -273,6 +279,8 @@ pub fn open_shift(
         code: Some(code),
         closing_date: None,
         closing_user_id: None,
+        closing_user_name: None,
+        closing_user_avatar: None,
         final_cash: None,
         expected_cash: None,
         cash_difference: None,

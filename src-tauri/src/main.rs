@@ -87,6 +87,7 @@ fn main() {
             commands::cash_register::movements::register_cash_movement,
             commands::cash_register::details::get_shift_details,
             commands::cash_register::details::get_closed_shifts,
+            commands::cash_register::details::get_shifts_history,
             commands::cash_register::sales::process_sale,
             commands::cash_register::sales::validate_voucher,
             // Settings - Business
