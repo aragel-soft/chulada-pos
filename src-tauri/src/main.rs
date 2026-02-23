@@ -100,6 +100,8 @@ fn main() {
             commands::customers::customers::delete_customers,
             commands::customers::account::get_customer_account_statement,
             commands::customers::account::register_debt_payment,
+            commands::customers::account::get_payment_details,
+            commands::customers::account::print_payment_receipt,
             // Sales - History
             commands::sales::history::get_sales_history,
             commands::sales::history::get_sale_details,
