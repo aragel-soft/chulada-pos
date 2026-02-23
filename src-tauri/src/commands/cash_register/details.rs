@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 
+use super::shifts::{calculate_shift_totals, shift_from_row, SHIFT_SELECT_SQL};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CashMovementDto {
     pub id: i64,
@@ -40,28 +42,9 @@ pub fn get_shift_details(
     let conn = db.lock().map_err(|e| e.to_string())?;
 
     // Get Shift
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
-         FROM cash_register_shifts s
-         LEFT JOIN users u ON s.opening_user_id = u.id
-         WHERE s.id = ?1",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let shift = stmt
-        .query_row([shift_id], |row| {
-            Ok(super::shifts::ShiftDto {
-                id: row.get(0)?,
-                initial_cash: row.get(1)?,
-                opening_date: row.get(2)?,
-                opening_user_id: row.get(3)?,
-                opening_user_name: row.get(6)?,
-                opening_user_avatar: row.get(7).unwrap_or(None),
-                status: row.get(4)?,
-                code: row.get(5).unwrap_or(None),
-            })
-        })
+    let sql = format!("{} WHERE s.id = ?1", SHIFT_SELECT_SQL);
+    let shift = conn
+        .query_row(&sql, [shift_id], shift_from_row)
         .map_err(|_| "Turno no encontrado".to_string())?;
 
     // Get Movements
@@ -74,7 +57,7 @@ pub fn get_shift_details(
         )
         .map_err(|e| e.to_string())?;
 
-    let movements_iter = stmt_mov
+    let movements: Vec<CashMovementDto> = stmt_mov
         .query_map([shift_id], |row| {
             Ok(CashMovementDto {
                 id: row.get(0)?,
@@ -86,90 +69,27 @@ pub fn get_shift_details(
                 created_at: row.get(6)?,
             })
         })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    let mut movements = Vec::new();
-    let mut total_movements_in = 0.0;
-    let mut total_movements_out = 0.0;
-
-    for movement in movements_iter {
-        let m = movement.map_err(|e| e.to_string())?;
-        if m.type_ == "IN" {
-            total_movements_in += m.amount;
-        } else if m.type_ == "OUT" {
-            total_movements_out += m.amount;
-        }
-        movements.push(m);
-    }
-
-    // Sales Totals
-    let (sales_count, total_sales, total_card_sales): (i64, f64, f64) = conn.query_row(
-        "SELECT 
-            COUNT(*),
-            COALESCE(SUM(total), 0.0), 
-            COALESCE(SUM(card_transfer_amount), 0.0)
-         FROM sales 
-         WHERE cash_register_shift_id = ?1 AND status = 'completed'",
-        [shift_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    ).unwrap_or((0, 0.0, 0.0));
-
-    // Credit Sales
-    let total_credit_sales: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total), 0.0)
-         FROM sales 
-         WHERE cash_register_shift_id = ?1 AND payment_method = 'credit'",
-        [shift_id],
-        |row| row.get(0)
-    ).unwrap_or(0.0);
-
-    // Voucher amounts used in sales
-    let total_voucher_sales: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(sv.amount), 0.0)
-         FROM sale_vouchers sv
-         INNER JOIN sales s ON sv.sale_id = s.id
-         WHERE s.cash_register_shift_id = ?1 AND s.status = 'completed'",
-        [shift_id],
-        |row| row.get(0)
-    ).unwrap_or(0.0);
-
-    // Debt Payments
-    let (total_debt_payments, debt_payments_cash, debt_payments_card): (f64, f64, f64) = conn.query_row(
-        "SELECT 
-            COALESCE(SUM(amount), 0.0),
-            COALESCE(SUM(cash_amount), 0.0),
-            COALESCE(SUM(card_transfer_amount), 0.0)
-         FROM debt_payments 
-         WHERE cash_register_shift_id = ?1",
-        [shift_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    ).unwrap_or((0.0, 0.0, 0.0));
-
-    // Total cash sales
-    let total_cash_sales = total_sales - total_card_sales - total_credit_sales - total_voucher_sales;
-
-    // Theoretical Cash
-    let theoretical_cash = shift.initial_cash 
-        + total_cash_sales 
-        + debt_payments_cash 
-        + total_movements_in 
-        - total_movements_out;
+    let totals = calculate_shift_totals(&conn, shift_id, shift.initial_cash);
 
     Ok(ShiftDetailsDto {
         shift,
         movements,
-        total_movements_in,
-        total_movements_out,
-        sales_count,
-        total_sales,
-        total_cash_sales,
-        total_card_sales,
-        total_credit_sales,
-        total_voucher_sales,
-        total_debt_payments,
-        debt_payments_cash,
-        debt_payments_card,
-        theoretical_cash,
+        total_movements_in: totals.total_movements_in,
+        total_movements_out: totals.total_movements_out,
+        sales_count: totals.sales_count,
+        total_sales: totals.total_sales,
+        total_cash_sales: totals.total_cash_sales,
+        total_card_sales: totals.total_card_sales,
+        total_credit_sales: totals.total_credit_sales,
+        total_voucher_sales: totals.total_voucher_sales,
+        total_debt_payments: totals.total_debt_payments,
+        debt_payments_cash: totals.debt_payments_cash,
+        debt_payments_card: totals.debt_payments_card,
+        theoretical_cash: totals.theoretical_cash,
     })
 }
 
@@ -181,30 +101,15 @@ pub fn get_closed_shifts(
 ) -> Result<Vec<super::shifts::ShiftDto>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
-         FROM cash_register_shifts s
-         LEFT JOIN users u ON s.opening_user_id = u.id
-         WHERE s.status = 'closed'
-         ORDER BY s.closing_date DESC
-         LIMIT ?1 OFFSET ?2",
-        )
-        .map_err(|e| e.to_string())?;
+    let sql = format!(
+        "{} WHERE s.status = 'closed' ORDER BY s.closing_date DESC LIMIT ?1 OFFSET ?2",
+        SHIFT_SELECT_SQL
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
     let shifts_iter = stmt
-        .query_map([limit, offset], |row| {
-            Ok(super::shifts::ShiftDto {
-                id: row.get(0)?,
-                initial_cash: row.get(1)?,
-                opening_date: row.get(2)?,
-                opening_user_id: row.get(3)?,
-                opening_user_name: row.get(6)?,
-                opening_user_avatar: row.get(7).unwrap_or(None),
-                status: row.get(4)?,
-                code: row.get(5).unwrap_or(None),
-            })
-        })
+        .query_map([limit, offset], shift_from_row)
         .map_err(|e| e.to_string())?;
 
     let mut shifts = Vec::new();

@@ -53,12 +53,10 @@ pub fn resolve_logo_bytes(app_handle: &tauri::AppHandle, logo_path: &str, max_wi
              match image_to_escpos(&logo_path_str, max_width) {
                  Ok(cmds) => {
                      // Try to save for cache
-                     if let Err(e) = std::fs::write(&bin_path, &cmds) {
-                         println!("Warning: Failed to save cached logo: {}", e);
-                     }
+                     let _ = std::fs::write(&bin_path, &cmds);
                      return Some(cmds);
                  },
-                 Err(e) => println!("Warning: Failed to process logo: {}", e),
+                 Err(_) => {}
              }
          }
     }
