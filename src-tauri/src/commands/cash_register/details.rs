@@ -1,7 +1,13 @@
+use rusqlite::types::ToSql;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
+
+use crate::database::DynamicQuery;
+use super::shifts::{
+    calculate_shift_totals, shift_from_row, SHIFT_SELECT_SQL,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CashMovementDto {
@@ -32,6 +38,26 @@ pub struct ShiftDetailsDto {
     pub theoretical_cash: f64,
 }
 
+// ── History filters ─────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ShiftHistoryFilters {
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub user_search: Option<String>,
+    pub only_with_differences: Option<bool>,
+    pub min_difference: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedShifts {
+    pub data: Vec<super::shifts::ShiftDto>,
+    pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+    pub total_pages: i64,
+}
+
 #[tauri::command]
 pub fn get_shift_details(
     db: State<Mutex<Connection>>,
@@ -40,28 +66,9 @@ pub fn get_shift_details(
     let conn = db.lock().map_err(|e| e.to_string())?;
 
     // Get Shift
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
-         FROM cash_register_shifts s
-         LEFT JOIN users u ON s.opening_user_id = u.id
-         WHERE s.id = ?1",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let shift = stmt
-        .query_row([shift_id], |row| {
-            Ok(super::shifts::ShiftDto {
-                id: row.get(0)?,
-                initial_cash: row.get(1)?,
-                opening_date: row.get(2)?,
-                opening_user_id: row.get(3)?,
-                opening_user_name: row.get(6)?,
-                opening_user_avatar: row.get(7).unwrap_or(None),
-                status: row.get(4)?,
-                code: row.get(5).unwrap_or(None),
-            })
-        })
+    let sql = format!("{} WHERE s.id = ?1", SHIFT_SELECT_SQL);
+    let shift = conn
+        .query_row(&sql, [shift_id], shift_from_row)
         .map_err(|_| "Turno no encontrado".to_string())?;
 
     // Get Movements
@@ -74,7 +81,7 @@ pub fn get_shift_details(
         )
         .map_err(|e| e.to_string())?;
 
-    let movements_iter = stmt_mov
+    let movements: Vec<CashMovementDto> = stmt_mov
         .query_map([shift_id], |row| {
             Ok(CashMovementDto {
                 id: row.get(0)?,
@@ -86,90 +93,27 @@ pub fn get_shift_details(
                 created_at: row.get(6)?,
             })
         })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    let mut movements = Vec::new();
-    let mut total_movements_in = 0.0;
-    let mut total_movements_out = 0.0;
-
-    for movement in movements_iter {
-        let m = movement.map_err(|e| e.to_string())?;
-        if m.type_ == "IN" {
-            total_movements_in += m.amount;
-        } else if m.type_ == "OUT" {
-            total_movements_out += m.amount;
-        }
-        movements.push(m);
-    }
-
-    // Sales Totals
-    let (sales_count, total_sales, total_card_sales): (i64, f64, f64) = conn.query_row(
-        "SELECT 
-            COUNT(*),
-            COALESCE(SUM(total), 0.0), 
-            COALESCE(SUM(card_transfer_amount), 0.0)
-         FROM sales 
-         WHERE cash_register_shift_id = ?1 AND status = 'completed'",
-        [shift_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    ).unwrap_or((0, 0.0, 0.0));
-
-    // Credit Sales
-    let total_credit_sales: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total), 0.0)
-         FROM sales 
-         WHERE cash_register_shift_id = ?1 AND payment_method = 'credit'",
-        [shift_id],
-        |row| row.get(0)
-    ).unwrap_or(0.0);
-
-    // Voucher amounts used in sales
-    let total_voucher_sales: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(sv.amount), 0.0)
-         FROM sale_vouchers sv
-         INNER JOIN sales s ON sv.sale_id = s.id
-         WHERE s.cash_register_shift_id = ?1 AND s.status = 'completed'",
-        [shift_id],
-        |row| row.get(0)
-    ).unwrap_or(0.0);
-
-    // Debt Payments
-    let (total_debt_payments, debt_payments_cash, debt_payments_card): (f64, f64, f64) = conn.query_row(
-        "SELECT 
-            COALESCE(SUM(amount), 0.0),
-            COALESCE(SUM(cash_amount), 0.0),
-            COALESCE(SUM(card_transfer_amount), 0.0)
-         FROM debt_payments 
-         WHERE cash_register_shift_id = ?1",
-        [shift_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    ).unwrap_or((0.0, 0.0, 0.0));
-
-    // Total cash sales
-    let total_cash_sales = total_sales - total_card_sales - total_credit_sales - total_voucher_sales;
-
-    // Theoretical Cash
-    let theoretical_cash = shift.initial_cash 
-        + total_cash_sales 
-        + debt_payments_cash 
-        + total_movements_in 
-        - total_movements_out;
+    let totals = calculate_shift_totals(&conn, shift_id, shift.initial_cash);
 
     Ok(ShiftDetailsDto {
         shift,
         movements,
-        total_movements_in,
-        total_movements_out,
-        sales_count,
-        total_sales,
-        total_cash_sales,
-        total_card_sales,
-        total_credit_sales,
-        total_voucher_sales,
-        total_debt_payments,
-        debt_payments_cash,
-        debt_payments_card,
-        theoretical_cash,
+        total_movements_in: totals.total_movements_in,
+        total_movements_out: totals.total_movements_out,
+        sales_count: totals.sales_count,
+        total_sales: totals.total_sales,
+        total_cash_sales: totals.total_cash_sales,
+        total_card_sales: totals.total_card_sales,
+        total_credit_sales: totals.total_credit_sales,
+        total_voucher_sales: totals.total_voucher_sales,
+        total_debt_payments: totals.total_debt_payments,
+        debt_payments_cash: totals.debt_payments_cash,
+        debt_payments_card: totals.debt_payments_card,
+        theoretical_cash: totals.theoretical_cash,
     })
 }
 
@@ -181,30 +125,15 @@ pub fn get_closed_shifts(
 ) -> Result<Vec<super::shifts::ShiftDto>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code, u.full_name, u.avatar_url
-         FROM cash_register_shifts s
-         LEFT JOIN users u ON s.opening_user_id = u.id
-         WHERE s.status = 'closed'
-         ORDER BY s.closing_date DESC
-         LIMIT ?1 OFFSET ?2",
-        )
-        .map_err(|e| e.to_string())?;
+    let sql = format!(
+        "{} WHERE s.status = 'closed' ORDER BY s.closing_date DESC LIMIT ?1 OFFSET ?2",
+        SHIFT_SELECT_SQL
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
     let shifts_iter = stmt
-        .query_map([limit, offset], |row| {
-            Ok(super::shifts::ShiftDto {
-                id: row.get(0)?,
-                initial_cash: row.get(1)?,
-                opening_date: row.get(2)?,
-                opening_user_id: row.get(3)?,
-                opening_user_name: row.get(6)?,
-                opening_user_avatar: row.get(7).unwrap_or(None),
-                status: row.get(4)?,
-                code: row.get(5).unwrap_or(None),
-            })
-        })
+        .query_map([limit, offset], shift_from_row)
         .map_err(|e| e.to_string())?;
 
     let mut shifts = Vec::new();
@@ -213,4 +142,152 @@ pub fn get_closed_shifts(
     }
 
     Ok(shifts)
+}
+
+#[tauri::command]
+pub fn get_shifts_history(
+    db: State<Mutex<Connection>>,
+    page: i64,
+    page_size: i64,
+    sort_by: Option<String>,
+    sort_order: Option<String>,
+    filters: Option<ShiftHistoryFilters>,
+) -> Result<PaginatedShifts, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut dq = DynamicQuery::new();
+
+
+
+    if let Some(f) = filters {
+        if let Some(date_from) = f.date_from {
+            let d = date_from.trim().to_string();
+            if !d.is_empty() {
+                dq.add_condition("(s.opening_date >= ? OR s.closing_date >= ?)");
+                let val = format!("{} 00:00:00", d);
+                dq.add_param(val.clone());
+                dq.add_param(val);
+            }
+        }
+
+        if let Some(date_to) = f.date_to {
+            let d = date_to.trim().to_string();
+            if !d.is_empty() {
+                dq.add_condition("(s.opening_date <= ? OR s.closing_date <= ?)");
+                let val = format!("{} 23:59:59", d);
+                dq.add_param(val.clone());
+                dq.add_param(val);
+            }
+        }
+
+        if let Some(user_search) = f.user_search {
+            let u = user_search.trim().to_string();
+            if !u.is_empty() {
+                dq.add_condition("(s.opening_user_id = ? OR s.closing_user_id = ?)");
+                dq.add_param(u.clone());
+                dq.add_param(u);
+            }
+        }
+
+        if f.only_with_differences.unwrap_or(false) {
+            dq.add_condition(
+                "((s.cash_difference IS NOT NULL AND s.cash_difference != 0) \
+                 OR (s.card_difference IS NOT NULL AND s.card_difference != 0))",
+            );
+        }
+
+        if let Some(min_diff) = f.min_difference {
+            if min_diff > 0.0 {
+                dq.add_condition(
+                    "(ABS(COALESCE(s.cash_difference, 0)) >= ? \
+                     OR ABS(COALESCE(s.card_difference, 0)) >= ?)",
+                );
+                dq.add_param(min_diff);
+                dq.add_param(min_diff);
+            }
+        }
+    }
+
+    let where_clause = if dq.sql_parts.is_empty() {
+        "1=1".to_string()
+    } else {
+        dq.sql_parts.join(" AND ")
+    };
+
+    // Count
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM cash_register_shifts s \
+         LEFT JOIN users u ON s.opening_user_id = u.id \
+         LEFT JOIN users uc ON s.closing_user_id = uc.id \
+         WHERE {}",
+        where_clause
+    );
+
+    let mut count_params: Vec<&dyn ToSql> = Vec::new();
+    for p in &dq.params {
+        count_params.push(p.as_ref());
+    }
+
+    let total: i64 = conn
+        .query_row(
+            &count_sql,
+            rusqlite::params_from_iter(count_params.iter()),
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    // Sort
+    let order_column = match sort_by.as_deref() {
+        Some("opening_date") => "s.opening_date",
+        Some("closing_date") => "s.closing_date",
+        Some("initial_cash") => "s.initial_cash",
+        Some("final_cash") => "s.final_cash",
+        Some("cash_difference") => "s.cash_difference",
+        Some("card_difference") => "s.card_difference",
+        Some("code") => "s.code",
+        _ => "s.closing_date",
+    };
+
+    let default_direction = if sort_by.is_none() { "DESC" } else { "ASC" };
+    let order_direction = match sort_order.as_deref() {
+        Some("desc") => "DESC",
+        Some("asc") => "ASC",
+        _ => default_direction,
+    };
+
+    // Data
+    let data_sql = format!(
+        "{} WHERE {} ORDER BY {} {} LIMIT ? OFFSET ?",
+        SHIFT_SELECT_SQL, where_clause, order_column, order_direction
+    );
+
+    let limit = page_size;
+    let offset = (page - 1) * page_size;
+
+    let mut data_params: Vec<&dyn ToSql> = Vec::new();
+    for p in &dq.params {
+        data_params.push(p.as_ref());
+    }
+    data_params.push(&limit);
+    data_params.push(&offset);
+
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
+
+    let data = stmt
+        .query_map(
+            rusqlite::params_from_iter(data_params.iter()),
+            shift_from_row,
+        )
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+
+    Ok(PaginatedShifts {
+        data,
+        total,
+        page,
+        page_size,
+        total_pages,
+    })
 }
