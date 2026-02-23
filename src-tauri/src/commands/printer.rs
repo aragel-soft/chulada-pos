@@ -113,3 +113,15 @@ pub async fn print_return_voucher(
     .map_err(|e| format!("Error en hilo de impresión: {}", e))?
     .map(|_| "Vale enviado a imprimir".to_string())
 }
+
+#[command]
+pub async fn print_shift_ticket(
+    app_handle: AppHandle,
+    shift_id: i64,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::printer_utils::print_shift_summary(app_handle, shift_id)
+    }).await
+    .map_err(|e| format!("Error en hilo de impresión: {}", e))?
+    .map(|_| "Corte de caja enviado a imprimir".to_string())
+}

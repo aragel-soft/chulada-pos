@@ -44,6 +44,7 @@ fn main() {
             commands::printer::test_print_ticket,
             commands::printer::print_sale_ticket,
             commands::printer::print_return_voucher,
+            commands::printer::print_shift_ticket,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,

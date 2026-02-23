@@ -266,6 +266,7 @@ fn encode_code128b(data: &str) -> Result<Vec<u8>, String> {
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use printers::common::base::job::PrinterJobOptions;
+use crate::commands::cash_register::shifts::{ShiftDto, calculate_shift_totals, shift_from_row, SHIFT_SELECT_SQL};
 
 use tauri::Manager;
 
@@ -904,4 +905,229 @@ fn remove_accents(s: &str) -> String {
             _ => if c.is_ascii() { c } else { '?' },
         })
         .collect()
+}
+
+pub fn print_shift_summary(
+    app_handle: tauri::AppHandle,
+    shift_id: i64,
+) -> Result<(), String> {
+    use crate::commands::settings::business::fetch_business_settings;
+    use crate::commands::settings::hardware::load_settings;
+    use rusqlite::Connection;
+    
+    let db_state: State<Mutex<Connection>> = app_handle.state();
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    let sql = format!("{} WHERE s.id = ?1", SHIFT_SELECT_SQL);
+    let shift: ShiftDto = conn
+        .query_row(&sql, [shift_id], shift_from_row)
+        .map_err(|_| "Turno no encontrado".to_string())?;
+
+    if shift.status != "closed" {
+        return Err("Solo se pueden imprimir turnos que ya estén cerrados".to_string());
+    }
+
+    let totals = calculate_shift_totals(&conn, shift_id, shift.initial_cash);
+
+    let settings = fetch_business_settings(&conn)
+        .unwrap_or_else(|_| BusinessSettings {
+            store_name: "Error loading settings".to_string(),
+            logical_store_name: "store-main".to_string(),
+            store_address: "".to_string(),
+            ticket_header: "".to_string(),
+            ticket_footer: "".to_string(),
+            ticket_footer_lines: "".to_string(),
+            default_cash_fund: 0.0,
+            max_cash_limit: 0.0,
+            currency_symbol: "$".to_string(),
+            tax_rate: 0.0,
+            apply_tax: false,
+            logo_path: "".to_string(),
+        });
+
+    drop(conn);
+
+    let hardware_config = load_settings(app_handle.clone())
+        .unwrap_or_else(|_| Default::default());
+
+    let printers_list = printers::get_printers();
+    let printer = printers_list
+        .iter()
+        .find(|p| p.name == hardware_config.printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+
+    let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
+    let mut builder = ReceiptBuilder::new(width_val);
+    
+    // BUILD TICKET
+    builder.init();
+    print_store_header(&mut builder, &settings, &app_handle);
+    
+    builder.align_center();
+    builder.set_bold(true);
+    builder.set_size_double_h();
+    builder.add_text_ln("CORTE DE CAJA");
+    builder.set_size_normal();
+    builder.set_bold(false);
+    let now = chrono::Local::now().format("%d/%m/%Y %H:%M").to_string();
+    builder.add_text_ln(&format!("Impreso: {}", now));
+    builder.add_text("\n");
+    
+    builder.align_left();
+    builder.add_text_ln(&format!("Folio: {}", shift.code.as_deref().unwrap_or("-")));
+    builder.add_text_ln(&format!("Apertura: {}", shift.opening_date));
+    if let Some(c_date) = &shift.closing_date {
+        builder.add_text_ln(&format!("Cierre: {}", c_date));
+    }
+    builder.add_text_ln(&format!("Abre: {}", shift.opening_user_name.as_deref().unwrap_or("Desc.")));
+    builder.add_text_ln(&format!("Cierra: {}", shift.closing_user_name.as_deref().unwrap_or("Desc.")));
+    
+    builder.add_separator('-');
+    
+    // SALES SUMMARY
+    builder.align_center();
+    builder.set_bold(true);
+    builder.add_text_ln("RESUMEN DE VENTAS");
+    builder.set_bold(false);
+    builder.align_left();
+    
+    if totals.total_cash_sales > 0.0 {
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Ventas Efectivo:", totals.total_cash_sales));
+    }
+    if totals.total_card_sales > 0.0 {
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Ventas Tarjeta:", totals.total_card_sales));
+    }
+    if totals.total_credit_sales > 0.0 {
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Ventas Credito:", totals.total_credit_sales));
+    }
+
+    // CASH MOVEMENTS
+    let has_movements = totals.total_movements_in > 0.0 || totals.total_movements_out > 0.0 || totals.debt_payments_cash > 0.0 || totals.total_voucher_sales > 0.0;
+    if has_movements {
+        builder.add_separator('-');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("MOVIMIENTOS DE CAJA");
+        builder.set_bold(false);
+        builder.align_left();
+        
+        if totals.total_movements_in > 0.0 {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Entradas Manuales:", totals.total_movements_in));
+        }
+        if totals.total_movements_out > 0.0 {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Salidas Manuales:", totals.total_movements_out));
+        }
+        if totals.debt_payments_cash > 0.0 {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Abonos Efectivo:", totals.debt_payments_cash));
+        }
+        if totals.total_voucher_sales > 0.0 {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Uso Cupones (Info):", totals.total_voucher_sales));
+        }
+    }
+
+    builder.add_separator('=');
+
+    // CASH RECONCILIATION
+    builder.align_center();
+    builder.set_bold(true);
+    builder.add_text_ln("CONCILIACION EFECTIVO");
+    builder.set_bold(false);
+    builder.align_left();
+    
+    builder.add_text_ln(&format!("{:<20} {:>10.2}", "Fondo Inicial:", shift.initial_cash));
+    builder.add_text_ln(&format!("{:<20} {:>10.2}", "Efectivo Teorico:", totals.theoretical_cash));
+    if let Some(fc) = shift.final_cash {
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Efectivo Contado:", fc));
+    }
+    
+    if let Some(diff) = shift.cash_difference {
+        if diff != 0.0 {
+            builder.add_text("\n");
+            builder.set_bold(true);
+            let state = if diff > 0.0 { "SOBRANTE" } else { "FALTANTE" };
+            builder.add_text_ln(&format!("{}: ${:.2}", state, diff.abs()));
+            builder.set_bold(false);
+        }
+    }
+
+    // CARD RECONCILIATION
+    if totals.total_card_sales > 0.0 || totals.debt_payments_card > 0.0 {
+        builder.add_separator('=');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("CONCILIACION TARJETA");
+        builder.set_bold(false);
+        builder.align_left();
+
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Tarjeta Teorico:", shift.card_expected_total.unwrap_or(0.0)));
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Tarjeta Terminal:", shift.card_terminal_total.unwrap_or(0.0)));
+        
+        if let Some(cdiff) = shift.card_difference {
+            if cdiff != 0.0 {
+                builder.set_bold(true);
+                let c_state = if cdiff > 0.0 { "SOBRANTE" } else { "FALTANTE" };
+                builder.add_text_ln(&format!("{}: ${:.2}", c_state, cdiff.abs()));
+                builder.set_bold(false);
+            }
+        }
+    }
+
+    builder.add_separator('-');
+    
+    // CASH WITHDRAWAL
+    builder.align_center();
+    builder.set_bold(true);
+    builder.add_text_ln("RETIROS");
+    builder.set_bold(false);
+    builder.align_left();
+
+    if let Some(cw) = shift.cash_withdrawal {
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Monto Generado:", totals.theoretical_cash - shift.initial_cash));
+        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Efectivo a Retirar:", cw));
+        builder.set_bold(true);
+        if let Some(fc) = shift.final_cash {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Fondo Para Dejar:", fc - cw));
+        }
+        builder.set_bold(false);
+    }
+    
+    builder.add_separator('-');
+    
+    if let Some(n) = &shift.notes {
+        if !n.trim().is_empty() {
+            builder.align_left();
+            builder.set_bold(true);
+            builder.add_text_ln("NOTAS DEL CIERRE:");
+            builder.set_bold(false);
+            
+            // Limit characters per line for notes
+            let clean_note = remove_accents(n.trim());
+            let mut line = String::new();
+            for word in clean_note.split_whitespace() {
+                if line.len() + word.len() + 1 > builder.max_chars {
+                    builder.add_text_ln(&line);
+                    line.clear();
+                }
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(word);
+            }
+            if !line.is_empty() {
+                builder.add_text_ln(&line);
+            }
+            builder.add_separator('-');
+        }
+    }
+
+    builder.align_center();
+    builder.add_text_ln("Documento informativo de cierre de turno");
+    
+    builder.cut();
+
+    printer
+        .print(&builder.build(), PrinterJobOptions::none())
+        .map_err(|e| format!("Error imprimiendo corte de caja: {:?}", e))?;
+
+    Ok(())
 }
