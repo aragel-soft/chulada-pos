@@ -30,11 +30,3 @@ export const testCashDrawer = async (printerName: string, commandHex: string): P
   return await invoke("test_cash_drawer", { printerName, commandHex });
 };
 
-export const testPrintTicket = async (
-  printerName: string,
-  settings: any,
-  hardwareConfig: any,
-  logoBytes: number[] | Uint8Array | null
-): Promise<string> => {
-  return await invoke("test_print_ticket", { printerName, settings, hardwareConfig, logoBytes });
-};
