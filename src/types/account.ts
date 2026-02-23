@@ -36,5 +36,6 @@ export interface PaymentDetail {
   payment_method: string;
   payment_date: string;
   user_name: string;
+  user_avatar: string;
   notes: string | null;
 }

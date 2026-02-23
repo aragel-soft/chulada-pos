@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCurrency } from "@/lib/utils";
 import { getPaymentDetails, printPaymentReceipt } from "@/lib/api/account";
 import { AccountMovement } from "@/types/account";
@@ -58,7 +58,7 @@ export function PaymentDetailPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
+    <div className="flex flex-col h-full bg-white w-full border-l shadow-sm overflow-y-auto">
       {/* ── HEADER ── */}
       <div className="p-6 border-b bg-muted/5 relative shrink-0">
         <Button
@@ -95,9 +95,12 @@ export function PaymentDetailPanel({
         {/* Cashier Card */}
         {payment && (
           <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
-              <User className="h-5 w-5" />
-            </div>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={payment.user_avatar} />
+              <AvatarFallback>
+                <User />
+              </AvatarFallback>
+            </Avatar>
             <div>
               <p className="text-sm font-medium">Cajero</p>
               <p className="text-xs text-muted-foreground">
@@ -108,19 +111,19 @@ export function PaymentDetailPanel({
         )}
       </div>
 
-      {/* ── BODY ── */}
-      <ScrollArea className="flex-1 p-6">
+      {/* BODY */}
+      <div className="flex-1 min-h-0">
         {isLoading ? (
           <div className="flex h-full items-center justify-center min-h-[200px]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : payment ? (
-          <div className="space-y-6">
-            <div className="flex flex-col items-center py-6 bg-emerald-50 rounded-lg border border-emerald-200">
+          <div className="p-6 space-y-4">
+            <div className="flex flex-col items-center py-4 bg-emerald-50 rounded-lg border border-emerald-200">
               <span className="text-sm font-medium text-emerald-600 uppercase tracking-wider mb-1">
                 Monto Abonado
               </span>
-              <span className="text-4xl font-bold text-emerald-700 tabular-nums">
+              <span className="text-3xl font-bold text-emerald-700 tabular-nums">
                 {formatCurrency(payment.amount)}
               </span>
             </div>
@@ -154,9 +157,6 @@ export function PaymentDetailPanel({
                   payment.payment_method
                 }
               />
-
-              {/* Cashier */}
-              <DetailRow icon={User} label="Cajero" value={payment.user_name} />
 
               {/* Notes */}
               {payment.notes && (
@@ -203,35 +203,32 @@ export function PaymentDetailPanel({
                 </div>
               </>
             )}
+
+            {/* FOOTER */}
+            <div className="pt-4 border-t bg-muted/5 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Total abonado</span>
+                <span className="text-xl font-bold">
+                  {formatCurrency(payment.amount)}
+                </span>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleReprint}
+              >
+                <Printer className="h-4 w-4" />
+                Reimprimir Comprobante
+              </Button>
+            </div>
           </div>
         ) : null}
-      </ScrollArea>
-
-      {/* ── FOOTER ── */}
-      {payment && (
-        <div className="p-6 border-t bg-muted/5 shrink-0">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-sm text-muted-foreground">Total abonado</span>
-            <span className="text-xl font-bold">
-              {formatCurrency(payment.amount)}
-            </span>
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={handleReprint}
-          >
-            <Printer className="h-4 w-4" />
-            Reimprimir Comprobante
-          </Button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ─── Reusable detail row ─────────────────────────────
 function DetailRow({
   icon: Icon,
   label,

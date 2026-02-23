@@ -2,7 +2,7 @@ use chrono::Local;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -233,15 +233,18 @@ pub struct PaymentDetail {
     pub payment_method: String,
     pub payment_date: String,
     pub user_name: String,
+    pub user_avatar: Option<String>,
     pub notes: Option<String>,
 }
 
 #[tauri::command]
 pub fn get_payment_details(
+    app_handle: AppHandle,
     db_state: State<'_, Mutex<Connection>>,
     payment_id: String,
 ) -> Result<PaymentDetail, String> {
     let conn = db_state.lock().unwrap();
+    let app_dir = app_handle.path().app_data_dir().unwrap();
 
     let detail = conn
         .query_row(
@@ -257,7 +260,8 @@ pub fn get_payment_details(
         dp.payment_method,
         dp.payment_date,
         u.full_name as user_name,
-        dp.notes
+        dp.notes,
+        u.avatar_url
       FROM debt_payments dp
       JOIN users u ON dp.user_id = u.id
       JOIN customers c ON dp.customer_id = c.id
@@ -265,6 +269,15 @@ pub fn get_payment_details(
     "#,
             [&payment_id],
             |row| {
+                let raw_avatar: Option<String> = row.get(11)?;
+                let resolved_avatar = raw_avatar.map(|path| {
+                    if path.starts_with("http") {
+                        path
+                    } else {
+                        app_dir.join(path).to_string_lossy().to_string()
+                    }
+                });
+
                 Ok(PaymentDetail {
                     id: row.get(0)?,
                     folio: row.get(1)?,
@@ -276,6 +289,7 @@ pub fn get_payment_details(
                     payment_method: row.get(7)?,
                     payment_date: row.get(8)?,
                     user_name: row.get(9)?,
+                    user_avatar: resolved_avatar,
                     notes: row.get(10)?,
                 })
             },

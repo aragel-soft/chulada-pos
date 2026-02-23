@@ -253,7 +253,7 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="ledger" className="flex-1 flex flex-col">
+      <Tabs defaultValue="ledger" className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="w-full justify-start rounded-none bg-transparent p-0 border-b h-auto">
           <TabsTrigger
             value="ledger"
@@ -278,7 +278,7 @@ export default function CustomerDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ledger" className="flex-1 mt-4">
+        <TabsContent value="ledger" className="flex-1 mt-4 min-h-0 overflow-hidden">
           <div className="flex h-full w-full overflow-hidden border rounded-md bg-white">
             {/* Table */}
             <div
@@ -321,7 +321,7 @@ export default function CustomerDetailPage() {
 
             {/* Payment Detail Panel */}
             {selectedPaymentId && (
-              <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+              <div className="w-[35%] bg-white h-full overflow-auto animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
                 <PaymentDetailPanel
                   paymentId={selectedPaymentId}
                   onClose={() => setSelectedPaymentId(null)}
@@ -331,7 +331,7 @@ export default function CustomerDetailPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="history" className="flex-1 mt-4">
+        <TabsContent value="history" className="flex-1 mt-4 min-h-0 overflow-hidden">
           <SalesHistoryModule
             initialFilters={{ ...customerHistoryFilters }}
             defaultCollapsed={true}
