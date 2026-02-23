@@ -23,7 +23,6 @@ export default function TopSellersPage() {
       const cats = await getAllCategories();
       setCategoryOptions(cats.map((c: any) => ({ label: c.name, value: c.id })));
     } catch (error) {
-      console.error("Error cargando categorías", error);
     }
   }, []);
 
