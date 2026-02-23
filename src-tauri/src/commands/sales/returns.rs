@@ -596,9 +596,7 @@ pub fn process_return(
         let app_handle_clone = app_handle.clone();
         let sale_id_clone = payload.sale_id.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = crate::printer_utils::print_voucher_from_db(app_handle_clone, sale_id_clone) {
-                eprintln!("Error auto-printing voucher: {}", e);
-            }
+            let _ = crate::printer_utils::print_voucher_from_db(app_handle_clone, sale_id_clone);
         });
     }
     

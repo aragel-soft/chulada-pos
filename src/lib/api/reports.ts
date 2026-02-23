@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { SalesReport, TopSellingProduct, DeadStockProduct, InventoryValuation, LowStockProduct } from "@/types/reports";
 
-const formatDate = (date: Date): string => {
+export const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
