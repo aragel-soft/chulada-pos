@@ -102,6 +102,8 @@ fn main() {
             commands::customers::customers::delete_customers,
             commands::customers::account::get_customer_account_statement,
             commands::customers::account::register_debt_payment,
+            commands::customers::account::get_payment_details,
+            commands::customers::account::print_payment_receipt,
             // Sales - History
             commands::sales::history::get_sales_history,
             commands::sales::history::get_sale_details,
@@ -109,6 +111,10 @@ fn main() {
             commands::sales::returns::process_return,
             // Reports
             commands::reports::get_sales_report,
+            commands::reports::get_top_selling_products,
+            commands::reports::get_dead_stock_report,
+            commands::reports::get_inventory_valuation,
+            commands::reports::get_low_stock_products,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

@@ -24,16 +24,16 @@ export function DataTableColumnHeader<TData, TValue>({
       <Button
         variant="ghost"
         size="sm"
-        className="-ml-3 h-8 data-[state=open]:bg-accent"
+        className="-ml-3 h-8 data-[state=open]:bg-accent print:ml-0 print:h-auto print:p-0 print:bg-transparent"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         <span>{title}</span>
         {column.getIsSorted() === "desc" ? (
-          <ArrowDown className="ml-2 h-4 w-4" />
+          <ArrowDown className="ml-2 h-4 w-4 print:hidden" />
         ) : column.getIsSorted() === "asc" ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
+          <ArrowUp className="ml-2 h-4 w-4 print:hidden" />
         ) : (
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          <ArrowUpDown className="ml-2 h-4 w-4 print:hidden" />
         )}
       </Button>
     </div>
