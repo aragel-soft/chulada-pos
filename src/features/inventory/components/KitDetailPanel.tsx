@@ -39,42 +39,38 @@ export function KitDetailPanel({
         </Button>
 
         <div className="pr-10">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <div className="bg-[#480489]/10 p-1.5 rounded-full">
-                <Gift className="h-4 w-4 text-[#480489]" />
-              </div>
-              <h2 className="text-xl font-bold text-[#480489]">
-                {kit?.name || "Cargando..."}
-              </h2>
+          <div className="flex items-center gap-2">
+            <div className="bg-[#480489]/10 p-1.5 rounded-full">
+              <Gift className="h-4 w-4 text-[#480489]" />
             </div>
+            <h2 className="text-xl font-bold text-[#480489]">
+              {kit?.name || "Cargando..."}
+            </h2>
+          </div>
 
-            {kit && (
+          {kit && (
+            <div className="flex items-start justify-between gap-3 mt-3 ml-9">
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {kit.description && (
+                  <p className="text-sm text-muted-foreground">
+                    {kit.description}
+                  </p>
+                )}
+                <Badge
+                  variant="outline"
+                  className="border-[#480489] text-[#480489] w-fit"
+                >
+                  {kit.is_required ? "Selección Obligatoria" : "Opcional"}
+                </Badge>
+              </div>
               <Badge
-                className={`capitalize min-w-[80px] justify-center ${
+                className={`capitalize shrink-0 ${
                   kit.is_active
                     ? "bg-green-600 text-white hover:bg-green-600/80"
                     : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
                 }`}
               >
                 {kit.is_active ? "Activo" : "Inactivo"}
-              </Badge>
-            )}
-          </div>
-
-          {kit?.description && (
-            <p className="text-sm text-muted-foreground mt-2 ml-9">
-              {kit.description}
-            </p>
-          )}
-
-          {kit && (
-            <div className="mt-3 ml-9">
-              <Badge
-                variant="outline"
-                className="border-[#480489] text-[#480489]"
-              >
-                {kit.is_required ? "Selección Obligatoria" : "Opcional"}
               </Badge>
             </div>
           )}
