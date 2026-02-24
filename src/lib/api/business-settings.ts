@@ -1,4 +1,3 @@
-// Update types in business settings API first
 import { invoke } from "@tauri-apps/api/core";
 
 export interface BusinessSettings {

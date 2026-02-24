@@ -29,7 +29,6 @@ export const getAllActivePromotions = async (): Promise<PromotionWithCombos[]> =
   try {
     return await invoke('get_all_active_promotions');
   } catch (error) {
-    console.error('Error fetching active promotions:', error);
     return [];
   }
 };
@@ -83,7 +82,6 @@ export const deletePromotions = async (ids: string[]): Promise<void> => {
   try {
     await invoke('delete_promotions', { ids });
   } catch (error) {
-    console.error('Error deleting promotions:', error);
     throw error;
   }
 };
