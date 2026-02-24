@@ -1323,10 +1323,7 @@ pub fn print_shift_summary(
         builder.add_text_ln("TOTAL DE VENTAS");
         builder.set_bold(false);
         builder.align_left();
-        builder.add_text_ln(&format!(
-            "Cantidad de ventas: {:.0}",
-            details.sales_count
-        ));
+        builder.add_text_ln(&format!("Cantidad de ventas: {:.0}", details.sales_count));
         builder.add_separator('-');
 
         builder.align_center();
@@ -1337,32 +1334,37 @@ pub fn print_shift_summary(
 
         if details.total_cash_sales > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Ventas Efectivo:", details.total_cash_sales
+                "{:<18} {:>13}",
+                "Ventas Efectivo:",
+                format!("${:.2}", details.total_cash_sales)
             ));
         }
         if details.total_card_sales > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Ventas Tarjeta:", details.total_card_sales
+                "{:<18} {:>13}",
+                "Ventas Tarjeta:",
+                format!("${:.2}", details.total_card_sales)
             ));
         }
         if details.total_credit_sales > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Ventas Credito:", details.total_credit_sales
+                "{:<18} {:>13}",
+                "Ventas Credito:",
+                format!("${:.2}", details.total_credit_sales)
             ));
         }
         if details.total_voucher_sales > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Ventas Cupones:", details.total_voucher_sales
+                "{:<18} {:>13}",
+                "Ventas Cupones:",
+                format!("${:.2}", details.total_voucher_sales)
             ));
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Total Ventas:", details.total_sales
+            "{:<18} {:>13}",
+            "Total Ventas:",
+            format!("${:.2}", details.total_sales)
         ));
         builder.set_bold(false);
         builder.add_separator('-');
@@ -1379,20 +1381,23 @@ pub fn print_shift_summary(
 
         if details.debt_payments_cash > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Abonos Efectivo:", details.debt_payments_cash
+                "{:<18} {:>13}",
+                "Abonos Efectivo:",
+                format!("${:.2}", details.debt_payments_cash)
             ));
         }
         if details.debt_payments_card > 0.0 {
             builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Abonos Tarjeta:", details.debt_payments_card
+                "{:<18} {:>13}",
+                "Abonos Tarjeta:",
+                format!("${:.2}", details.debt_payments_card)
             ));
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Total Abonos:", details.total_debt_payments
+            "{:<18} {:>13}",
+            "Total Abonos:",
+            format!("${:.2}", details.total_debt_payments)
         ));
         builder.set_bold(false);
     }
@@ -1431,8 +1436,8 @@ pub fn print_shift_summary(
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Total Entradas:", details.total_movements_in
+            "{:<18} {:>13}",
+            "Total Entradas:", format!("${:.2}", details.total_movements_in)
         ));
         builder.set_bold(false);
     }
@@ -1470,8 +1475,8 @@ pub fn print_shift_summary(
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Total Salidas:", details.total_movements_out
+            "{:<18} {:>13}",
+            "Total Salidas:", format!("${:.2}", details.total_movements_out)
         ));
         builder.set_bold(false);
         builder.add_separator('-');
@@ -1523,7 +1528,11 @@ pub fn print_shift_summary(
         builder.set_bold(false);
         builder.set_bold(true);
         if let Some(cw) = shift.cash_withdrawal {
-            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Monto a Retirar:", cw));
+            builder.add_text_ln(&format!(
+                "{:<18} {:>13}",
+                "Monto a Retirar:",
+                format!("${:.2}", cw)
+            ));
         }
         builder.set_bold(false);
     }
@@ -1549,7 +1558,10 @@ pub fn print_shift_summary(
         builder.add_text_ln(&format!(
             "{:<18} {:>13}",
             "Total Tarjeta:",
-            format!("${:.2}", details.total_card_sales + details.debt_payments_card)
+            format!(
+                "${:.2}",
+                details.total_card_sales + details.debt_payments_card
+            )
         ));
         builder.set_bold(false);
     }
