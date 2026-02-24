@@ -361,9 +361,7 @@ fn encode_code128b(data: &str) -> Result<Vec<u8>, String> {
     Ok(bars)
 }
 
-use crate::commands::cash_register::shifts::{
-    calculate_shift_totals, shift_from_row, ShiftDto, SHIFT_SELECT_SQL,
-};
+use crate::commands::cash_register::details::ShiftDetailsDto;
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use printers::common::base::job::PrinterJobOptions;
@@ -1233,7 +1231,10 @@ fn remove_accents(s: &str) -> String {
         .collect()
 }
 
-pub fn print_shift_summary(app_handle: tauri::AppHandle, shift_id: i64) -> Result<(), String> {
+pub fn print_shift_summary(
+    app_handle: tauri::AppHandle,
+    details: ShiftDetailsDto,
+) -> Result<(), String> {
     use crate::commands::settings::business::fetch_business_settings;
     use crate::commands::settings::hardware::load_settings;
     use rusqlite::Connection;
@@ -1241,16 +1242,21 @@ pub fn print_shift_summary(app_handle: tauri::AppHandle, shift_id: i64) -> Resul
     let db_state: State<Mutex<Connection>> = app_handle.state();
     let conn = db_state.lock().map_err(|e| e.to_string())?;
 
-    let sql = format!("{} WHERE s.id = ?1", SHIFT_SELECT_SQL);
-    let shift: ShiftDto = conn
-        .query_row(&sql, [shift_id], shift_from_row)
-        .map_err(|_| "Turno no encontrado".to_string())?;
+    let shift = &details.shift;
 
     if shift.status != "closed" {
         return Err("Solo se pueden imprimir turnos que ya estén cerrados".to_string());
     }
 
-    let totals = calculate_shift_totals(&conn, shift_id, shift.initial_cash);
+    let mut movements_in = Vec::new();
+    let mut movements_out = Vec::new();
+    for m in &details.movements {
+        if m.type_ == "IN" {
+            movements_in.push((m.amount, m.concept.clone(), m.description.clone()));
+        } else {
+            movements_out.push((m.amount, m.concept.clone(), m.description.clone()));
+        }
+    }
 
     let settings = fetch_business_settings(&conn).unwrap_or_else(|_| BusinessSettings {
         store_name: "Error loading settings".to_string(),
@@ -1309,52 +1315,61 @@ pub fn print_shift_summary(app_handle: tauri::AppHandle, shift_id: i64) -> Resul
         shift.closing_user_name.as_deref().unwrap_or("Desc.")
     ));
 
-    builder.add_separator('-');
-
     // SALES SUMMARY
-    let has_sales = totals.total_sales > 0.0;
+    let has_sales = details.total_sales > 0.0;
     if has_sales {
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("TOTAL DE VENTAS");
+        builder.set_bold(false);
+        builder.align_left();
+        builder.add_text_ln(&format!(
+            "Cantidad de ventas: {:.0}",
+            details.sales_count
+        ));
+        builder.add_separator('-');
+
         builder.align_center();
         builder.set_bold(true);
         builder.add_text_ln("RESUMEN DE VENTAS");
         builder.set_bold(false);
         builder.align_left();
 
-        if totals.total_cash_sales > 0.0 {
+        if details.total_cash_sales > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Ventas Efectivo:", totals.total_cash_sales
+                "Ventas Efectivo:", details.total_cash_sales
             ));
         }
-        if totals.total_card_sales > 0.0 {
+        if details.total_card_sales > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Ventas Tarjeta:", totals.total_card_sales
+                "Ventas Tarjeta:", details.total_card_sales
             ));
         }
-        if totals.total_credit_sales > 0.0 {
+        if details.total_credit_sales > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Ventas Credito:", totals.total_credit_sales
+                "Ventas Credito:", details.total_credit_sales
             ));
         }
-        if totals.total_voucher_sales > 0.0 {
+        if details.total_voucher_sales > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Ventas Cupones:", totals.total_voucher_sales
+                "Ventas Cupones:", details.total_voucher_sales
             ));
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
             "{:<20} {:>10.2}",
-            "Total Ventas:", totals.total_sales
+            "Total Ventas:", details.total_sales
         ));
         builder.set_bold(false);
         builder.add_separator('-');
     }
 
     // DEBT PAYMENTS
-    let has_debt_payments = totals.total_debt_payments > 0.0;
+    let has_debt_payments = details.total_debt_payments > 0.0;
     if has_debt_payments {
         builder.align_center();
         builder.set_bold(true);
@@ -1362,64 +1377,111 @@ pub fn print_shift_summary(app_handle: tauri::AppHandle, shift_id: i64) -> Resul
         builder.set_bold(false);
         builder.align_left();
 
-        if totals.debt_payments_cash > 0.0 {
+        if details.debt_payments_cash > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Abonos Efectivo:", totals.debt_payments_cash
+                "Abonos Efectivo:", details.debt_payments_cash
             ));
         }
-        if totals.debt_payments_card > 0.0 {
+        if details.debt_payments_card > 0.0 {
             builder.add_text_ln(&format!(
                 "{:<20} {:>10.2}",
-                "Abonos Tarjeta:", totals.debt_payments_card
+                "Abonos Tarjeta:", details.debt_payments_card
             ));
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
             "{:<20} {:>10.2}",
-            "Total Abonos:", totals.total_debt_payments
+            "Total Abonos:", details.total_debt_payments
         ));
         builder.set_bold(false);
-        builder.add_separator('-');
     }
 
-    // CASH MOVEMENTS
-    let has_movements = totals.total_movements_in > 0.0 || totals.total_movements_out > 0.0;
-    if has_movements {
+    // CASH MOVEMENTS (DETAILED)
+    if !movements_in.is_empty() {
         builder.add_separator('-');
         builder.align_center();
         builder.set_bold(true);
-        builder.add_text_ln("MOVIMIENTOS DE CAJA");
+        builder.add_text_ln("ENTRADAS DE EFECTIVO");
         builder.set_bold(false);
         builder.align_left();
 
-        if totals.total_movements_in > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Entradas Manuales:", totals.total_movements_in
-            ));
-        }
-        if totals.total_movements_out > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<20} {:>10.2}",
-                "Salidas Manuales:", totals.total_movements_out
-            ));
+        for (amt, concept, desc) in &movements_in {
+            let clean_concept = remove_accents(concept.trim());
+            let amt_str = format!("{:.2}", amt);
+
+            let dots_len = (builder.max_chars as i32)
+                .saturating_sub(clean_concept.len() as i32)
+                .saturating_sub(amt_str.len() as i32)
+                .saturating_sub(3);
+
+            let line = if dots_len > 1 {
+                let dots = ".".repeat(dots_len as usize);
+                format!("{} {} ${}", clean_concept, dots, amt_str)
+            } else {
+                format!("{:<20} {:>10.2}", clean_concept, amt)
+            };
+            builder.add_text_ln(&line);
+
+            if let Some(d) = desc {
+                if !d.trim().is_empty() {
+                    builder.add_text_ln(&format!("  Nota: {}", remove_accents(d.trim())));
+                }
+            }
         }
         builder.set_bold(true);
         builder.add_text_ln(&format!(
             "{:<20} {:>10.2}",
-            "Total Movimientos:",
-            totals.total_movements_in - totals.total_movements_out
+            "Total Entradas:", details.total_movements_in
+        ));
+        builder.set_bold(false);
+    }
+
+    if !movements_out.is_empty() {
+        builder.add_separator('-');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("SALIDAS DE EFECTIVO");
+        builder.set_bold(false);
+        builder.align_left();
+
+        for (amt, concept, desc) in &movements_out {
+            let clean_concept = remove_accents(concept.trim());
+            let amt_str = format!("{:.2}", amt);
+
+            let dots_len = (builder.max_chars as i32)
+                .saturating_sub(clean_concept.len() as i32)
+                .saturating_sub(amt_str.len() as i32)
+                .saturating_sub(3);
+
+            let line = if dots_len > 1 {
+                let dots = ".".repeat(dots_len as usize);
+                format!("{} {} ${}", clean_concept, dots, amt_str)
+            } else {
+                format!("{:<20} {:>10.2}", clean_concept, amt)
+            };
+            builder.add_text_ln(&line);
+
+            if let Some(d) = desc {
+                if !d.trim().is_empty() {
+                    builder.add_text_ln(&format!("  Nota: {}", remove_accents(d.trim())));
+                }
+            }
+        }
+        builder.set_bold(true);
+        builder.add_text_ln(&format!(
+            "{:<20} {:>10.2}",
+            "Total Salidas:", details.total_movements_out
         ));
         builder.set_bold(false);
         builder.add_separator('-');
     }
 
     // CASH RECONCILIATION
-    if totals.total_cash_sales > 0.0
-        || totals.debt_payments_cash > 0.0
-        || totals.total_movements_in > 0.0
-        || totals.total_movements_out > 0.0
+    if details.total_cash_sales > 0.0
+        || details.debt_payments_cash > 0.0
+        || details.total_movements_in > 0.0
+        || details.total_movements_out > 0.0
     {
         builder.align_center();
         builder.set_bold(true);
@@ -1428,80 +1490,69 @@ pub fn print_shift_summary(app_handle: tauri::AppHandle, shift_id: i64) -> Resul
         builder.align_left();
 
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Fondo Inicial:", shift.initial_cash
+            "{:<18} {:>13}",
+            "Fondo Inicial:",
+            format!("+${:.2}", shift.initial_cash)
         ));
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Efectivo Teorico:", totals.theoretical_cash
+            "{:<18} {:>13}",
+            "Ventas Efectivo:",
+            format!("+${:.2}", details.total_cash_sales)
         ));
-        if let Some(fc) = shift.final_cash {
-            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Efectivo Contado:", fc));
+        builder.add_text_ln(&format!(
+            "{:<18} {:>13}",
+            "Abonos Efectivo:",
+            format!("+${:.2}", details.debt_payments_cash)
+        ));
+        builder.add_text_ln(&format!(
+            "{:<18} {:>13}",
+            "Entradas Efectivo:",
+            format!("+${:.2}", details.total_movements_in)
+        ));
+        builder.add_text_ln(&format!(
+            "{:<18} {:>13}",
+            "Salidas Efectivo:",
+            format!("-${:.2}", details.total_movements_out)
+        ));
+        builder.set_bold(true);
+        builder.add_text_ln(&format!(
+            "{:<18} {:>13}",
+            "Total Efectivo:",
+            format!("${:.2}", details.theoretical_cash)
+        ));
+        builder.set_bold(false);
+        builder.set_bold(true);
+        if let Some(cw) = shift.cash_withdrawal {
+            builder.add_text_ln(&format!("{:<20} {:>10.2}", "Monto a Retirar:", cw));
         }
-
-        if let Some(diff) = shift.cash_difference {
-            if diff != 0.0 {
-                builder.add_text("\n");
-                builder.set_bold(true);
-                let state = if diff > 0.0 { "SOBRANTE" } else { "FALTANTE" };
-                builder.add_text_ln(&format!("{}: ${:.2}", state, diff.abs()));
-                builder.set_bold(false);
-            }
-        }
+        builder.set_bold(false);
     }
-    // CARD RECONCILIATION
-    if totals.total_card_sales > 0.0 || totals.debt_payments_card > 0.0 {
+    // CARD INFORMATION
+    if details.total_card_sales > 0.0 || details.debt_payments_card > 0.0 {
         builder.add_separator('-');
         builder.align_center();
         builder.set_bold(true);
         builder.add_text_ln("TOTAL TARJETA");
         builder.set_bold(false);
         builder.align_left();
-
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Tarjeta Teorico:",
-            shift.card_expected_total.unwrap_or(0.0)
+            "{:<18} {:>13}",
+            "Ventas Tarjeta:",
+            format!("+${:.2}", details.total_card_sales)
         ));
         builder.add_text_ln(&format!(
-            "{:<20} {:>10.2}",
-            "Tarjeta Terminal:",
-            shift.card_terminal_total.unwrap_or(0.0)
+            "{:<18} {:>13}",
+            "Abonos Tarjeta:",
+            format!("+${:.2}", details.debt_payments_card)
         ));
-
-        if let Some(cdiff) = shift.card_difference {
-            if cdiff != 0.0 {
-                builder.set_bold(true);
-                let c_state = if cdiff > 0.0 { "SOBRANTE" } else { "FALTANTE" };
-                builder.add_text_ln(&format!("{}: ${:.2}", c_state, cdiff.abs()));
-                builder.set_bold(false);
-            }
-        }
+        builder.set_bold(true);
+        builder.add_text_ln(&format!(
+            "{:<18} {:>13}",
+            "Total Tarjeta:",
+            format!("${:.2}", details.total_card_sales + details.debt_payments_card)
+        ));
+        builder.set_bold(false);
     }
-
-    builder.add_separator('-');
-
-    // CASH WITHDRAWAL
-    builder.align_center();
-    builder.set_bold(true);
-    builder.add_text_ln("RETIRO DE EFECTIVO");
-    builder.set_bold(false);
-    builder.align_left();
-
-    builder.add_text_ln(&format!(
-        "{:<20} {:>10.2}",
-        "Monto Total:", totals.theoretical_cash
-    ));
-    builder.set_bold(true);
-    if let Some(cw) = shift.cash_withdrawal {
-        builder.add_text_ln(&format!("{:<20} {:>10.2}", "Retirar:", cw));
-    }
-    builder.add_text_ln(&format!(
-        "{:<20} {:>10.2}",
-        "Dejar en Fondo:",
-        shift.initial_cash + shift.cash_difference.unwrap_or(0.0)
-    ));
-    builder.set_bold(false);
 
     if let Some(n) = &shift.notes {
         if !n.trim().is_empty() {

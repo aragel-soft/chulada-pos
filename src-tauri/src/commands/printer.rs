@@ -120,7 +120,12 @@ pub async fn print_shift_ticket(
     shift_id: i64,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        crate::printer_utils::print_shift_summary(app_handle, shift_id)
+        use tauri::Manager;
+        let details = crate::commands::cash_register::details::get_shift_details(
+            app_handle.state(),
+            shift_id
+        )?;
+        crate::printer_utils::print_shift_summary(app_handle, details)
     }).await
     .map_err(|e| format!("Error en hilo de impresión: {}", e))?
     .map(|_| "Corte de caja enviado a imprimir".to_string())
