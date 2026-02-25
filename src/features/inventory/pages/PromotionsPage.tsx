@@ -13,7 +13,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Promotion, PromotionWithDetails } from "@/types/promotions";
 import { PaginationParams } from "@/types/pagination";
 import { columns as baseColumns } from "../components/promotions/columns";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   getPromotions,
   getPromotionDetails,
@@ -23,6 +23,7 @@ import { DeletePromotionsDialog } from "../components/promotions/DeletePromotion
 import { PromotionDetailPanel } from "../components/promotions/PromotionDetailSheet";
 
 export default function PromotionsPage() {
+  const queryClient = useQueryClient();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -219,7 +220,14 @@ export default function PromotionsPage() {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         promotionToEdit={editingPromotion}
-        onSuccess={() => setRowSelection({})}
+        onSuccess={() => {
+          setRowSelection({});
+          if (editingPromotion) {
+            queryClient.invalidateQueries({
+              queryKey: ["promotion-detail", editingPromotion.id],
+            });
+          }
+        }}
       />
 
       <DeletePromotionsDialog
