@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ColumnDef,
   PaginationState,
@@ -21,6 +21,7 @@ import { DeleteKitsDialog } from "../components/DeleteKitsDialog";
 import { KitDetailPanel } from "../components/KitDetailPanel";
 
 export default function KitsPage() {
+  const queryClient = useQueryClient();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -283,6 +284,11 @@ export default function KitsPage() {
         kitIdToEdit={editingKitId}
         onSuccess={() => {
           setRowSelection({});
+          if (editingKitId) {
+            queryClient.invalidateQueries({
+              queryKey: ["kit-detail", editingKitId],
+            });
+          }
         }}
       />
 
