@@ -465,6 +465,23 @@ impl ReceiptBuilder {
         self.add_text_ln(&sep);
     }
 
+    pub fn add_row_with_dots(&mut self, label: &str, value: &str) {
+        let clean_label = remove_accents(label.trim());
+        let val_trim = value.trim();
+
+        let dots_len = (self.max_chars as i32)
+            .saturating_sub(clean_label.len() as i32)
+            .saturating_sub(val_trim.len() as i32)
+            .saturating_sub(2);
+
+        if dots_len > 1 {
+            let dots = ".".repeat(dots_len as usize);
+            self.add_text_ln(&format!("{} {} {}", clean_label, dots, val_trim));
+        } else {
+            self.add_text_ln(&format!("{:<18} {:>13}", clean_label, val_trim));
+        }
+    }
+
     pub fn cut(&mut self) {
         self.content.extend_from_slice(CMD_CUT);
     }
@@ -1333,39 +1350,31 @@ pub fn print_shift_summary(
         builder.align_left();
 
         if details.total_cash_sales > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Ventas Efectivo:",
-                format!("${:.2}", details.total_cash_sales)
-            ));
+                &format!("${:.2}", details.total_cash_sales),
+            );
         }
         if details.total_card_sales > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Ventas Tarjeta:",
-                format!("${:.2}", details.total_card_sales)
-            ));
+                &format!("${:.2}", details.total_card_sales),
+            );
         }
         if details.total_credit_sales > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Ventas Credito:",
-                format!("${:.2}", details.total_credit_sales)
-            ));
+                &format!("${:.2}", details.total_credit_sales),
+            );
         }
         if details.total_voucher_sales > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Ventas Cupones:",
-                format!("${:.2}", details.total_voucher_sales)
-            ));
+                &format!("${:.2}", details.total_voucher_sales),
+            );
         }
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
-            "Total Ventas:",
-            format!("${:.2}", details.total_sales)
-        ));
+        builder.add_row_with_dots("Total Ventas:", &format!("${:.2}", details.total_sales));
         builder.set_bold(false);
         builder.add_separator('-');
     }
@@ -1380,25 +1389,22 @@ pub fn print_shift_summary(
         builder.align_left();
 
         if details.debt_payments_cash > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Abonos Efectivo:",
-                format!("${:.2}", details.debt_payments_cash)
-            ));
+                &format!("${:.2}", details.debt_payments_cash),
+            );
         }
         if details.debt_payments_card > 0.0 {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
+            builder.add_row_with_dots(
                 "Abonos Tarjeta:",
-                format!("${:.2}", details.debt_payments_card)
-            ));
+                &format!("${:.2}", details.debt_payments_card),
+            );
         }
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+        builder.add_row_with_dots(
             "Total Abonos:",
-            format!("${:.2}", details.total_debt_payments)
-        ));
+            &format!("${:.2}", details.total_debt_payments),
+        );
         builder.set_bold(false);
     }
 
@@ -1412,21 +1418,7 @@ pub fn print_shift_summary(
         builder.align_left();
 
         for (amt, concept, desc) in &movements_in {
-            let clean_concept = remove_accents(concept.trim());
-            let amt_str = format!("{:.2}", amt);
-
-            let dots_len = (builder.max_chars as i32)
-                .saturating_sub(clean_concept.len() as i32)
-                .saturating_sub(amt_str.len() as i32)
-                .saturating_sub(3);
-
-            let line = if dots_len > 1 {
-                let dots = ".".repeat(dots_len as usize);
-                format!("{} {} ${}", clean_concept, dots, amt_str)
-            } else {
-                format!("{:<20} {:>10.2}", clean_concept, amt)
-            };
-            builder.add_text_ln(&line);
+            builder.add_row_with_dots(concept, &format!("${:.2}", amt));
 
             if let Some(d) = desc {
                 if !d.trim().is_empty() {
@@ -1435,10 +1427,10 @@ pub fn print_shift_summary(
             }
         }
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
-            "Total Entradas:", format!("${:.2}", details.total_movements_in)
-        ));
+        builder.add_row_with_dots(
+            "Total Entradas:",
+            &format!("${:.2}", details.total_movements_in),
+        );
         builder.set_bold(false);
     }
 
@@ -1451,21 +1443,7 @@ pub fn print_shift_summary(
         builder.align_left();
 
         for (amt, concept, desc) in &movements_out {
-            let clean_concept = remove_accents(concept.trim());
-            let amt_str = format!("{:.2}", amt);
-
-            let dots_len = (builder.max_chars as i32)
-                .saturating_sub(clean_concept.len() as i32)
-                .saturating_sub(amt_str.len() as i32)
-                .saturating_sub(3);
-
-            let line = if dots_len > 1 {
-                let dots = ".".repeat(dots_len as usize);
-                format!("{} {} ${}", clean_concept, dots, amt_str)
-            } else {
-                format!("{:<20} {:>10.2}", clean_concept, amt)
-            };
-            builder.add_text_ln(&line);
+            builder.add_row_with_dots(concept, &format!("${:.2}", amt));
 
             if let Some(d) = desc {
                 if !d.trim().is_empty() {
@@ -1474,10 +1452,10 @@ pub fn print_shift_summary(
             }
         }
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
-            "Total Salidas:", format!("${:.2}", details.total_movements_out)
-        ));
+        builder.add_row_with_dots(
+            "Total Salidas:",
+            &format!("${:.2}", details.total_movements_out),
+        );
         builder.set_bold(false);
         builder.add_separator('-');
     }
@@ -1494,45 +1472,33 @@ pub fn print_shift_summary(
         builder.set_bold(false);
         builder.align_left();
 
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
-            "Fondo Inicial:",
-            format!("+${:.2}", shift.initial_cash)
-        ));
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+        builder.add_row_with_dots("Fondo Inicial:", &format!("+${:.2}", shift.initial_cash));
+        builder.add_row_with_dots(
             "Ventas Efectivo:",
-            format!("+${:.2}", details.total_cash_sales)
-        ));
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+            &format!("+${:.2}", details.total_cash_sales),
+        );
+        builder.add_row_with_dots(
             "Abonos Efectivo:",
-            format!("+${:.2}", details.debt_payments_cash)
-        ));
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+            &format!("+${:.2}", details.debt_payments_cash),
+        );
+        builder.add_row_with_dots(
             "Entradas Efectivo:",
-            format!("+${:.2}", details.total_movements_in)
-        ));
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+            &format!("+${:.2}", details.total_movements_in),
+        );
+        builder.add_row_with_dots(
             "Salidas Efectivo:",
-            format!("-${:.2}", details.total_movements_out)
-        ));
+            &format!("-${:.2}", details.total_movements_out),
+        );
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+        builder.add_row_with_dots(
             "Total Efectivo:",
-            format!("${:.2}", details.theoretical_cash)
-        ));
+            &format!("${:.2}", details.theoretical_cash),
+        );
         builder.set_bold(false);
         builder.set_bold(true);
+        builder.add_separator('-');
         if let Some(cw) = shift.cash_withdrawal {
-            builder.add_text_ln(&format!(
-                "{:<18} {:>13}",
-                "Monto a Retirar:",
-                format!("${:.2}", cw)
-            ));
+            builder.add_row_with_dots("Monto a Retirar:", &format!("${:.2}", cw));
         }
         builder.set_bold(false);
     }
@@ -1544,25 +1510,22 @@ pub fn print_shift_summary(
         builder.add_text_ln("TOTAL TARJETA");
         builder.set_bold(false);
         builder.align_left();
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+        builder.add_row_with_dots(
             "Ventas Tarjeta:",
-            format!("+${:.2}", details.total_card_sales)
-        ));
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+            &format!("+${:.2}", details.total_card_sales),
+        );
+        builder.add_row_with_dots(
             "Abonos Tarjeta:",
-            format!("+${:.2}", details.debt_payments_card)
-        ));
+            &format!("+${:.2}", details.debt_payments_card),
+        );
         builder.set_bold(true);
-        builder.add_text_ln(&format!(
-            "{:<18} {:>13}",
+        builder.add_row_with_dots(
             "Total Tarjeta:",
-            format!(
+            &format!(
                 "${:.2}",
                 details.total_card_sales + details.debt_payments_card
-            )
-        ));
+            ),
+        );
         builder.set_bold(false);
     }
 
