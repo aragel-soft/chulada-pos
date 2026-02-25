@@ -31,6 +31,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { printShiftTicket } from "@/lib/api/printers";
 import type { ShiftDetailsDto, CashMovementDto } from "@/types/cast-cut";
+import { useAuthStore } from "@/stores/authStore";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ function SummaryRow({
 // ── Component ───────────────────────────────────────────────────
 
 export default function ShiftDetailPage() {
+  const { can } = useAuthStore();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -270,7 +272,8 @@ export default function ShiftDetailPage() {
             </div>
           </div>
           
-          {isClosed && (
+          {isClosed && 
+            can('cash_register:close') && (
             <Button
               variant="outline"
               size="sm"
@@ -293,7 +296,7 @@ export default function ShiftDetailPage() {
               )}
               {isPrinting ? "Imprimiendo..." : "Imprimir Corte"}
             </Button>
-          )}
+            )}
         </div>
 
         {/* Users Info */}
