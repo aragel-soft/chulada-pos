@@ -34,7 +34,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
     filters.start_date !== null;
 
   return (
-    <div className="flex flex-col gap-4 mb-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-wrap gap-2 items-center">
           <DebouncedInput
