@@ -52,8 +52,11 @@ export default function CustomersTable() {
       ? updaterOrValue(paginationState)
       : updaterOrValue;
 
-    setPage(newPagination.pageIndex + 1);
-    setPageSize(newPagination.pageSize);
+    if (newPagination.pageSize !== pageSize) {
+      setPageSize(newPagination.pageSize);
+    } else {
+      setPage(newPagination.pageIndex + 1);
+    }
   };
 
   const queryParams: PaginationParams = useMemo(() => ({
