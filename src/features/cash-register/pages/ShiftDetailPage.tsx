@@ -279,7 +279,6 @@ export default function ShiftDetailPage() {
                   setIsPrinting(true);
                   await printShiftTicket(shift.id);
                 } catch (err) {
-                  console.error("Error al imprimir ticket:", err);
                 } finally {
                   setIsPrinting(false);
                 }
