@@ -17,10 +17,12 @@ interface SalesHistoryModuleProps {
   initialFilters?: Partial<SalesHistoryFilter>;
 }
 
-export default function SalesHistoryModule({ 
-  initialFilters = {}
+export default function SalesHistoryModule({
+  initialFilters = {},
 }: SalesHistoryModuleProps) {
-  const { data, isLoading, filters, actions } = useSalesHistory({ initialFilters });
+  const { data, isLoading, filters, actions } = useSalesHistory({
+    initialFilters,
+  });
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState({});
 
@@ -55,13 +57,16 @@ export default function SalesHistoryModule({
       },
       ...historyColumns,
     ],
-    [historyColumns]
+    [historyColumns],
   );
 
-  const paginationState: PaginationState = useMemo(() => ({
-    pageIndex: filters.page - 1,
-    pageSize: filters.page_size,
-  }), [filters.page, filters.page_size]);
+  const paginationState: PaginationState = useMemo(
+    () => ({
+      pageIndex: filters.page - 1,
+      pageSize: filters.page_size,
+    }),
+    [filters.page, filters.page_size],
+  );
 
   const sortingState: SortingState = useMemo(
     () => [
@@ -70,7 +75,7 @@ export default function SalesHistoryModule({
         desc: filters.sort_order === "desc",
       },
     ],
-    [filters.sort_by, filters.sort_order]
+    [filters.sort_by, filters.sort_order],
   );
 
   const handlePaginationChange = (updaterOrValue: Updater<PaginationState>) => {
@@ -103,53 +108,47 @@ export default function SalesHistoryModule({
     <div className="flex h-full w-full overflow-hidden">
       <div className="flex-1 flex min-w-0 transition-all duration-300">
         <div
-          className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-            selectedSaleId ? "w-[65%] border-r" : "w-full"
+          className={`flex flex-col min-w-0 h-full transition-all duration-300 ease-in-out ${
+            selectedSaleId ? "w-[65%] border-r pr-4" : "w-full"
           }`}
         >
-          <main className="flex-1 px-4 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-auto p-1">
-              <DataTable
-                columns={columns}
-                data={data?.data || []}
-                isLoading={isLoading}
-                rowCount={data?.total || 0}
-                manualPagination={true}
-                manualFiltering={true}
-                manualSorting={true}
-                pagination={paginationState}
-                onPaginationChange={handlePaginationChange}
-                sorting={sortingState}
-                onSortingChange={handleSortingChange}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                globalFilter={filters.search || ""}
-                onGlobalFilterChange={(val) =>
-                  actions.setSearch(String(val))
-                }
-                columnTitles={{
-                  folio: "Folio",
-                  sale_date: "Fecha",
-                  status: "Estado",
-                  payment_method: "Método Pago",
-                  total: "Total",
-                }}
-                onRowClick={(row) =>
-                  setSelectedSaleId(
-                    selectedSaleId === row.original.id ? null : row.original.id,
-                  )
-                }
-                showColumnFilters={false}
-                toolbar={() => (
-                  <SalesHistoryToolbar filters={filters} actions={actions} />
-                )}
-              />
-            </div>
-          </main>
+          <DataTable
+            columns={columns}
+            data={data?.data || []}
+            isLoading={isLoading}
+            rowCount={data?.total || 0}
+            manualPagination={true}
+            manualFiltering={true}
+            manualSorting={true}
+            pagination={paginationState}
+            onPaginationChange={handlePaginationChange}
+            sorting={sortingState}
+            onSortingChange={handleSortingChange}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            globalFilter={filters.search || ""}
+            onGlobalFilterChange={(val) => actions.setSearch(String(val))}
+            columnTitles={{
+              folio: "Folio",
+              sale_date: "Fecha",
+              status: "Estado",
+              payment_method: "Método Pago",
+              total: "Total",
+            }}
+            onRowClick={(row) =>
+              setSelectedSaleId(
+                selectedSaleId === row.original.id ? null : row.original.id,
+              )
+            }
+            showColumnFilters={false}
+            toolbar={() => (
+              <SalesHistoryToolbar filters={filters} actions={actions} />
+            )}
+          />
         </div>
 
         {selectedSaleId && (
-          <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+          <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20 pl-4">
             <SaleDetailPanel
               saleId={selectedSaleId}
               onClose={() => setSelectedSaleId(null)}
