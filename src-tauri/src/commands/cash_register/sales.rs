@@ -624,7 +624,7 @@ fn calculate_sale_items<'a>(
         .join(",");
 
     let sql = format!(
-        "SELECT id, code, name, retail_price, wholesale_price FROM products WHERE id IN ({})",
+        "SELECT id, code, name, retail_price, wholesale_price, is_active FROM products WHERE id IN ({})",
         ids_placeholder
     );
 
@@ -632,18 +632,24 @@ fn calculate_sale_items<'a>(
     let products_iter = stmt
         .query_map(rusqlite::params_from_iter(product_ids.iter()), |row| {
             Ok((
-                row.get::<_, String>(0)?, // id
-                row.get::<_, String>(1)?, // code
-                row.get::<_, String>(2)?, // name
-                row.get::<_, f64>(3)?,    // retail
-                row.get::<_, f64>(4)?,    // wholesale
+                row.get::<_, String>(0)?, 
+                row.get::<_, String>(1)?, 
+                row.get::<_, String>(2)?, 
+                row.get::<_, f64>(3)?,    
+                row.get::<_, f64>(4)?,    
+                row.get::<_, bool>(5)?,   
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut products_map: HashMap<String, (String, String, f64, f64)> = HashMap::new();
     for result in products_iter {
-        let (id, code, name, retail, wholesale) = result.map_err(|e| e.to_string())?;
+        let (id, code, name, retail, wholesale, is_active) = result.map_err(|e| e.to_string())?;
+        
+        if !is_active {
+            return Err(format!("El producto '{}' ({}) se encuentra inactivo y no puede ser vendido.", name, code));
+        }
+
         products_map.insert(id, (code, name, retail, wholesale));
     }
 
