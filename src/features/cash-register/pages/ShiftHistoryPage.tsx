@@ -98,7 +98,7 @@ export default function ShiftHistoryPage() {
             closing_user_name: "Cerró",
             status: "Estado",
             initial_cash: "Fondo Inicial",
-            cash_withdrawn: "Retiro de Efectivo",
+            cash_withdrawal: "Retiro de Efectivo",
             card_terminal_total: "Total Tarjeta",
           }}
           manualPagination={true}
