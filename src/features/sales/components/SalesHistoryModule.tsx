@@ -62,10 +62,10 @@ export default function SalesHistoryModule({
     [historyColumns],
   );
 
-  const paginationState: PaginationState = {
+  const paginationState: PaginationState = useMemo(() => ({
     pageIndex: filters.page - 1,
     pageSize: filters.page_size,
-  };
+  }), [filters.page, filters.page_size]);
 
   const sortingState: SortingState = useMemo(
     () => [
@@ -83,8 +83,11 @@ export default function SalesHistoryModule({
         ? updaterOrValue(paginationState)
         : updaterOrValue;
 
-    actions.setPage(newPagination.pageIndex + 1);
-    actions.setPageSize(newPagination.pageSize);
+    if (newPagination.pageSize !== filters.page_size) {
+      actions.setPageSize(newPagination.pageSize);
+    } else {
+      actions.setPage(newPagination.pageIndex + 1);
+    }
   };
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
