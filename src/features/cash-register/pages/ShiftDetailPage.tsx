@@ -24,7 +24,6 @@ import { useAuthStore } from "@/stores/authStore";
 import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
 
 // ── Helpers ─────────────────────────────────────────────────────
-
 function SummaryRow({
   icon: Icon,
   iconColor,
@@ -46,12 +45,21 @@ function SummaryRow({
     <div
       className={cn(
         "flex justify-between items-center",
-        bold && "font-semibold"
+        bold && "font-semibold",
       )}
     >
       <div className="flex items-center gap-2">
-        {Icon && <Icon className={cn("h-4 w-4", iconColor || "text-zinc-500")} />}
-        <span className={cn("text-zinc-600", large ? "text-sm text-zinc-700" : "text-sm")}>{label}</span>
+        {Icon && (
+          <Icon className={cn("h-4 w-4", iconColor || "text-zinc-500")} />
+        )}
+        <span
+          className={cn(
+            "text-zinc-600",
+            large ? "text-sm text-zinc-700" : "text-sm",
+          )}
+        >
+          {label}
+        </span>
       </div>
       <span
         className={cn(
@@ -63,7 +71,7 @@ function SummaryRow({
           highlight === "amber" && "text-amber-700 font-bold",
           highlight === "teal" && "text-teal-700 font-bold",
           highlight === "purple" && "text-purple-700 font-bold",
-          !highlight && bold && "text-zinc-900"
+          !highlight && bold && "text-zinc-900",
         )}
       >
         {value}
@@ -73,14 +81,17 @@ function SummaryRow({
 }
 
 // ── Component ───────────────────────────────────────────────────
-
 export default function ShiftDetailPage() {
   const { can } = useAuthStore();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const shiftId = Number(id);
-  const { data: details, isLoading, error } = useQuery({
+  const {
+    data: details,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["shiftDetails", shiftId],
     queryFn: () => getShiftDetails(shiftId),
     enabled: !!id,
@@ -91,7 +102,6 @@ export default function ShiftDetailPage() {
     if (!dateStr) return "-";
     return format(new Date(dateStr), "dd/MM/yyyy HH:mm", { locale: es });
   };
-
 
   if (isLoading) {
     return (
@@ -106,8 +116,12 @@ export default function ShiftDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
         <AlertTriangle className="h-12 w-12 opacity-50 text-red-500" />
-        <p className="text-lg text-zinc-800">No se pudo cargar la información del turno.</p>
-        <p className="text-sm">{error ? String(error) : "Turno no encontrado."}</p>
+        <p className="text-lg text-zinc-800">
+          No se pudo cargar la información del turno.
+        </p>
+        <p className="text-sm">
+          {error ? String(error) : "Turno no encontrado."}
+        </p>
         <Button onClick={() => navigate(-1)} variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
         </Button>
@@ -116,15 +130,12 @@ export default function ShiftDetailPage() {
   }
 
   const { shift } = details;
-  const isClosed = shift.status === 'closed';
-  
-
+  const isClosed = shift.status === "closed";
 
   return (
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-300">
-      
       {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b px-6 py-2 bg-white shadow-sm shrink-0 mt-4" >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b px-6 py-2 bg-white shadow-sm shrink-0 mt-4">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -138,19 +149,21 @@ export default function ShiftDetailPage() {
           <div className="h-10 w-10 rounded-full bg-[#480489]/10 flex items-center justify-center text-[#480489] shrink-0">
             <CalendarDays className="h-5 w-5" />
           </div>
-          
+
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl md:text-xl font-bold tracking-tight text-gray-900">
                 Detalle de Turno
               </h1>
-              <Badge 
+              <Badge
                 className={cn(
                   "px-3 py-1 text-sm font-medium",
-                  isClosed ? "bg-slate-500 hover:bg-slate-600" : "bg-emerald-500 hover:bg-emerald-600"
+                  isClosed
+                    ? "bg-slate-500 hover:bg-slate-600"
+                    : "bg-emerald-500 hover:bg-emerald-600",
                 )}
               >
-                {isClosed ? 'Cerrado' : 'Abierto'}
+                {isClosed ? "Cerrado" : "Abierto"}
               </Badge>
             </div>
             <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
@@ -159,9 +172,8 @@ export default function ShiftDetailPage() {
               </span>
             </div>
           </div>
-          
-          {isClosed && 
-            can('cash_register:close') && (
+
+          {isClosed && can("cash_register:close") && (
             <Button
               variant="outline"
               size="sm"
@@ -184,42 +196,62 @@ export default function ShiftDetailPage() {
               )}
               {isPrinting ? "Imprimiendo..." : "Imprimir Corte"}
             </Button>
-            )}
+          )}
         </div>
 
         {/* Users Info */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 px-6 bg-white shrink-0">
           <div>
-              <SummaryRow label="Apertura" value={formatDateLabel(shift.opening_date)} large />
-              <SummaryRow 
-                label="Apertura por" 
-                value={
-                  <div className="ml-2 flex items-center gap-2 justify-end">
-                          <AppAvatar path={shift.opening_user_avatar || ''} name={shift.opening_user_name || "U"} className="h-7 w-7" />
-                          <span>{shift.opening_user_name || shift.opening_user_id}</span>
-                        </div>
-                      } 
-                      large 
-                      bold 
-                    />
+            <SummaryRow
+              label="Apertura"
+              value={formatDateLabel(shift.opening_date)}
+              large
+            />
+            <SummaryRow
+              label="Apertura por"
+              value={
+                <div className="ml-2 flex items-center gap-2 justify-end">
+                  <AppAvatar
+                    path={shift.opening_user_avatar || ""}
+                    name={shift.opening_user_name || "U"}
+                    className="h-7 w-7"
+                  />
+                  <span>
+                    {shift.opening_user_name || shift.opening_user_id}
+                  </span>
+                </div>
+              }
+              large
+              bold
+            />
           </div>
           <div>
-              <SummaryRow label="Cierre" value={formatDateLabel(shift.closing_date)} large />
-              <SummaryRow 
-                label="Cierre por" 
-                value={
-                  shift.status === 'closed' ? (
-                    <div className="ml-2 flex items-center gap-2 justify-end">
-                      <AppAvatar path={shift.closing_user_avatar || ''} name={shift.closing_user_name || "U"} className="h-7 w-7" />
-                      <span>{shift.closing_user_name || shift.closing_user_id}</span>
-                    </div>
-                  ) : (
-                    <span className="text-zinc-400">Sin Cerrar</span>
-                  )
-                } 
-                large 
-                bold
-              />
+            <SummaryRow
+              label="Cierre"
+              value={formatDateLabel(shift.closing_date)}
+              large
+            />
+            <SummaryRow
+              label="Cierre por"
+              value={
+                shift.status === "closed" ? (
+                  <div className="ml-2 flex items-center gap-2 justify-end">
+                    <AppAvatar
+                      path={shift.closing_user_avatar || ""}
+                      name={shift.closing_user_name || "U"}
+                      className="h-7 w-7"
+                    />
+                    <span>
+                      {shift.closing_user_name || shift.closing_user_id}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-zinc-400">Sin Cerrar</span>
+                )
+              }
+              large
+              bold
+            />
           </div>
         </div>
       </div>
@@ -227,13 +259,11 @@ export default function ShiftDetailPage() {
       {/* ── Content ── */}
       <ScrollArea className="flex-1">
         <div className="p-6 max-w-7xl mx-auto space-y-6">
-
           <ShiftSummary shiftId={shift.id} />
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* Cash Withdrawals */}
           </div>
-
         </div>
       </ScrollArea>
     </div>
