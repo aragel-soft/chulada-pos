@@ -34,65 +34,63 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
     filters.start_date !== null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
-        <div className="flex flex-1 flex-wrap gap-2 items-center">
-          <DebouncedInput
-            placeholder="Buscar por folio o producto..."
-            value={filters.search ?? ""}
-            onChange={(value) => actions.setSearch(String(value))}
-            className="h-9 w-full lg:w-[300px]"
+    <div className="flex items-center justify-between">
+      <div className="flex flex-1 items-center flex-wrap gap-2">
+        <DebouncedInput
+          placeholder="Buscar folio o producto..."
+          value={filters.search ?? ""}
+          onChange={(value) => actions.setSearch(String(value))}
+          className="h-9 w-full sm:w-[250px] lg:w-[300px]"
+        />
+
+        <DateRangeSelector
+          dateRange={
+            filters.start_date || filters.end_date
+              ? {
+                  from: filters.start_date ? new Date(filters.start_date + "T00:00:00") : undefined,
+                  to: filters.end_date ? new Date(filters.end_date + "T00:00:00") : undefined,
+                }
+              : undefined
+          }
+          onSelect={(range) => actions.setDateRange(range)}
+        />
+
+        <DataTableFacetedFilter
+          title="Estado"
+          options={statusOptions}
+          selectedValues={new Set(filters.status || [])}
+          onSelect={(values) => actions.setStatus(Array.from(values))}
+        />
+
+        <DataTableFacetedFilter
+          title="Método de Pago"
+          options={paymentOptions}
+          selectedValues={new Set(filters.payment_method && filters.payment_method !== "all" ? [filters.payment_method] : [])}
+          onSelect={(values) => {
+            const arr = Array.from(values);
+            actions.setPaymentMethod(arr.length > 0 ? arr[0] : "all");
+          }}
+        />
+
+        <div className="min-w-[150px] ">
+          <UserCombobox
+            value={filters.user_id || null}
+            onChange={actions.setUserId}
+            placeholder="Vendedor"
+            className="h-9 w-full [&_span]:truncate"
           />
-
-          <DateRangeSelector
-            dateRange={
-              filters.start_date || filters.end_date
-                ? {
-                    from: filters.start_date ? new Date(filters.start_date + "T00:00:00") : undefined,
-                    to: filters.end_date ? new Date(filters.end_date + "T00:00:00") : undefined,
-                  }
-                : undefined
-            }
-            onSelect={(range) => actions.setDateRange(range)}
-          />
-
-          <DataTableFacetedFilter
-            title="Estado"
-            options={statusOptions}
-            selectedValues={new Set(filters.status || [])}
-            onSelect={(values) => actions.setStatus(Array.from(values))}
-          />
-
-          <DataTableFacetedFilter
-            title="Método de Pago"
-            options={paymentOptions}
-            selectedValues={new Set(filters.payment_method && filters.payment_method !== "all" ? [filters.payment_method] : [])}
-            onSelect={(values) => {
-              const arr = Array.from(values);
-              actions.setPaymentMethod(arr.length > 0 ? arr[0] : "all");
-            }}
-          />
-
-          <div className="w-[200px]">
-            <UserCombobox
-              value={filters.user_id || null}
-              onChange={actions.setUserId}
-              placeholder="Vendedor"
-              className="h-9"
-            />
-          </div>
-
-          {isFiltered && (
-            <Button
-              variant="ghost"
-              onClick={actions.resetFilters}
-              className="h-8 px-2 lg:px-3"
-            >
-              Limpiar
-              <X className="ml-2 h-4 w-4" />
-            </Button>
-          )}
         </div>
+
+        {isFiltered && (
+          <Button
+            variant="ghost"
+            onClick={actions.resetFilters}
+            className="h-9 px-2 lg:px-3 text-muted-foreground hover:text-foreground"
+          >
+            Limpiar
+            <X className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
