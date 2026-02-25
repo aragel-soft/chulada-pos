@@ -13,13 +13,18 @@ export const usePosProducts = ({ search = "", enabled = true }: UsePosProductsPr
   const query = useInfiniteQuery({
     queryKey: ["pos-products", search],
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await getProducts({
-        page: pageParam,
-        pageSize: PAGE_SIZE,
-        search: search.trim() || undefined, 
-        sortBy: "name", 
-        sortOrder: "asc",
-      });
+      const response = await getProducts(
+        {
+          page: pageParam,
+          pageSize: PAGE_SIZE,
+          search: search.trim() || undefined, 
+          sortBy: "name", 
+          sortOrder: "asc",
+        },
+        {
+          active_status: ["active"]
+        }
+      );
       return response;
     },
     initialPageParam: 1,
