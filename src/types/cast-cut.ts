@@ -68,8 +68,6 @@ export interface ShiftHistoryFilters {
   date_to?: string;
   user_search?: string;
   user_id?: string;
-  only_with_differences?: boolean;
-  min_difference?: number;
 }
 
 export interface PaginatedShifts {

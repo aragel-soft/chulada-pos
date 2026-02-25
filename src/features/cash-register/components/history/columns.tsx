@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { AppAvatar } from "@/components/ui/app-avatar";
 
@@ -15,31 +14,6 @@ const formatDate = (dateString?: string) => {
 };
 
 export const columns: ColumnDef<ShiftDto>[] = [
-  {
-    id: "status_indicator",
-    header: "",
-    cell: ({ row }) => {
-      const cashDiff = row.original.cash_difference || 0;
-      const cardDiff = row.original.card_difference || 0;
-      const status = row.original.status;
-
-      if (status === "open") return null;
-
-      const hasDifferences = Math.abs(cashDiff) > 0 || Math.abs(cardDiff) > 0;
-      const hasMissing = cashDiff < 0 || cardDiff < 0;
-
-      if (!hasDifferences) {
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      }
-      return (
-        <AlertCircle
-          className={`w-4 h-4 ${hasMissing ? "text-red-500" : "text-amber-500"}`}
-        />
-      );
-    },
-    enableSorting: false,
-    enableHiding: false,
-  },
   {
     accessorKey: "code",
     header: ({ column }) => (
@@ -145,42 +119,21 @@ export const columns: ColumnDef<ShiftDto>[] = [
     ),
   },
   {
-    accessorKey: "expected_cash",
+    accessorKey: "cash_withdrawal",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Efectivo Teórico" />
+      <DataTableColumnHeader column={column} title="Retiro de Efectivo" />
     ),
     cell: ({ row }) => (
-      <div>{formatCurrency(row.getValue("expected_cash"))}</div>
+      <div>{formatCurrency(row.getValue("cash_withdrawal"))}</div>
     ),
-  },
+  }, 
   {
-    accessorKey: "final_cash",
+    accessorKey: "card_terminal_total",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Cierre Real" />
+      <DataTableColumnHeader column={column} title="Tarjeta Teórica" />
     ),
     cell: ({ row }) => (
-      <div className="font-medium">
-        {formatCurrency(row.getValue("final_cash"))}
-      </div>
+      <div>{formatCurrency(row.getValue("card_terminal_total"))}</div>
     ),
-  },
-  {
-    accessorKey: "cash_difference",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Dif. Efectivo" />
-    ),
-    cell: ({ row }) => {
-      const diff = row.getValue("cash_difference") as number | undefined;
-      if (diff == null || row.original.status === "open") return <span>-</span>;
-
-      const isMissing = diff < 0;
-      const isSurplus = diff > 0;
-
-      let colorClass = "text-muted-foreground";
-      if (isMissing) colorClass = "text-red-600 font-medium";
-      if (isSurplus) colorClass = "text-amber-600 font-medium";
-
-      return <div className={colorClass}>{formatCurrency(diff)}</div>;
-    },
   },
 ];
