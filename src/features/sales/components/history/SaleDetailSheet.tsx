@@ -501,29 +501,65 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
             </HoverCard>
           </div>
 
-          <div className="flex flex-col items-start gap-0.5">
-            <span className="font-medium text-gray-900 line-clamp-1 break-all text-xs">
-              {item.product_name}
-            </span>
+          <div className="flex flex-col items-start gap-0.5 min-w-0">
+            <TooltipProvider>
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <span className="font-medium text-gray-900 line-clamp-1 break-all text-xs cursor-help w-full">
+                    {item.product_name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-[200px] break-words text-xs bg-slate-800 text-slate-100 border-slate-700">
+                  <p>{item.product_name}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-1 flex-wrap items-center">
               {getBadgeTypes(item).map((type, index) => {
-                const config = BADGE_CONFIGS[type]; 
+                const config = BADGE_CONFIGS[type];
                 const Icon = config.icon;
-                const label = config.getLabel ? config.getLabel(item) : config.label;
-                
-                return (
+                const fullLabel = config.getLabel ? config.getLabel(item) : config.label;
+                const isLongLabelType = type === 'promo';
+
+                const badgeContent = (
+                  <>
+                    {Icon && <Icon className="w-2.5 h-2.5 mr-0.5 shrink-0" />}
+                    <span className={`leading-none ${isLongLabelType ? 'truncate max-w-[180px]' : ''}`}>
+                      {fullLabel}
+                    </span>
+                  </>
+                );
+
+                const badgeElement = (
                   <Badge
                     key={`badge-${type}-${index}`}
                     variant={config.variant || "outline"}
-                    className={`${config.className} text-[9px] px-1 py-0 h-4`}
+                    className={`${config.className} text-[9px] px-1 py-0 h-4 flex items-center min-w-0`}
                   >
-                    {Icon && <Icon className="w-2.5 h-2.5 mr-0.5" />}
-                    {label}
+                    {badgeContent}
                   </Badge>
                 );
+
+                if (isLongLabelType) {
+                  return (
+                    <TooltipProvider key={`tooltip-${type}-${index}`}>
+                      <Tooltip delayDuration={200}>
+                        <TooltipTrigger asChild className="cursor-help">
+                          {badgeElement}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="start" className="max-w-[200px] break-words text-xs bg-slate-800 text-slate-100 border-slate-700">
+                          <p>{fullLabel}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                }
+
+                return badgeElement;
               })}
             </div>
+
           </div>
         </div>
       </td>
