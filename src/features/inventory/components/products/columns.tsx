@@ -219,24 +219,4 @@ export const getColumns = (
       );
     },
   },
-  {
-    accessorKey: "category_ids",
-    header: "Filtro Categoría",
-    enableHiding: true,
-  },
-  {
-    accessorKey: "tag_ids",
-    header: "Filtro Etiquetas",
-    enableHiding: true,
-  },
-  {
-    accessorKey: "stock_status",
-    header: "Filtro Stock",
-    enableHiding: true,
-  },
-  {
-    accessorKey: "status_facet",
-    header: "Filtro Estado",
-    enableHiding: true,
-  },
 ];

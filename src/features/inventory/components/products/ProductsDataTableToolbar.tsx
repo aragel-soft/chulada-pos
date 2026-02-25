@@ -60,16 +60,17 @@ export function ProductsDataTableToolbar<TData>({
   const isFiltered = table.getState().columnFilters.length > 0
 
   const handleFilterChange = (columnId: string, values: Set<string>) => {
+    const current = table.getState().columnFilters
+    const next = current.filter((f) => f.id !== columnId)
     if (values.size > 0) {
-      table.getColumn(columnId)?.setFilterValue(Array.from(values))
-    } else {
-      table.getColumn(columnId)?.setFilterValue(undefined)
+      next.push({ id: columnId, value: Array.from(values) })
     }
+    table.setColumnFilters(next)
   }
 
   const getFilterValue = (columnId: string): Set<string> => {
-    const value = table.getColumn(columnId)?.getFilterValue() as string[]
-    return new Set(value || [])
+    const filter = table.getState().columnFilters.find((f) => f.id === columnId)
+    return new Set((filter?.value as string[]) || [])
   }
 
   return (

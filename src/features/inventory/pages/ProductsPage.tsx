@@ -141,10 +141,6 @@ export default function ProductsPage() {
         initialSorting={[]}
         initialColumnVisibility={{
           created_at: false,
-          category_ids: false,
-          tag_ids: false,
-          stock_status: false,
-          status_facet: false,
         }}
         columnTitles={{
           image_url: "Imagen",
