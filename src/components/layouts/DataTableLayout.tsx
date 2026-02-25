@@ -18,7 +18,7 @@ export function DataTableLayout({
       {/* Encabezado Fijo Responsivo */}
       <div className="flex-none p-4 border-b space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          {filters && <div className="w-full md:w-auto flex items-center space-x-6">{filters}</div>}
+          {filters && <div className="flex-1 min-w-0 flex items-center">{filters}</div>}
           <div className="w-full md:w-auto flex items-center justify-start md:justify-end space-x-2 overflow-x-auto pb-1 md:pb-0">
             {actions}
           </div>

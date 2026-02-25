@@ -142,7 +142,10 @@ export default function SalesHistoryModule({
             }
             showColumnFilters={false}
             toolbar={() => (
-              <SalesHistoryToolbar filters={filters} actions={actions} />
+              <SalesHistoryToolbar
+                filters={filters}
+                actions={actions}
+              />
             )}
           />
         </div>
