@@ -32,7 +32,6 @@ export const getProductById = async (id: string): Promise<ProductDetail> => {
   try {
     return await invoke("get_product_by_id", { id });
   } catch (error) {
-    console.error("Error fetching product details:", error);
     throw error;
   }
 };
@@ -41,7 +40,6 @@ export const createProduct = async (data: CreateProductPayload): Promise<Product
   try {
     return await invoke("create_product", { payload: data });
   } catch (error) {
-    console.error("Error creating product:", error);
     throw error;
   }
 };
@@ -57,7 +55,6 @@ export const updateProduct = async (payload: UpdateProductPayload): Promise<Prod
   try {
     return await invoke("update_product", { payload });
   } catch (error) {
-    console.error("Error updating product:", error);
     throw error;
   }
 };
@@ -66,7 +63,6 @@ export const getAllTags = async (): Promise<string[]> => {
   try {
     return await invoke("get_all_tags");
   } catch (error) {
-    console.error("Error fetching tags:", error);
     return [];
   }
 };
@@ -75,7 +71,6 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
   try {
     await invoke("delete_products", { ids: productIds });
   } catch (error) {
-    console.error("Error deleting products:", error);
     throw error;
   }
 };
@@ -85,7 +80,6 @@ export const bulkUpdateProducts = async (payload: BulkUpdateProductsPayload): Pr
     const result = await invoke<string>("bulk_update_products", { payload });
     return result;
   } catch (error) {
-    console.error("Error updating products:", error);
     throw new Error(String(error));
   }
 };
