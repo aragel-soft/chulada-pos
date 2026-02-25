@@ -1,4 +1,3 @@
-// component for input money
 import { forwardRef, InputHTMLAttributes } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -20,6 +19,10 @@ const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
           className={cn("pl-7", className)}
           ref={ref}
           {...props}
+          onWheel={(e) => {
+            e.currentTarget.blur();
+            props.onWheel?.(e);
+          }}
           onKeyDown={(e) => {
             // Prevent invalid characters for money
             if (["e", "E", "+", "-"].includes(e.key)) {
