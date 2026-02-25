@@ -78,7 +78,7 @@ export default function CurrentShiftPage() {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden p-6 bg-white">
+      <div className="flex-1 overflow-hidden p-4 bg-white">
         <ShiftSummary shiftId={shift.id} />
       </div>
 

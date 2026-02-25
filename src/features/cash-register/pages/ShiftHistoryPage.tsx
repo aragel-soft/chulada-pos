@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   PaginationState,
@@ -9,15 +9,12 @@ import {
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { ShiftDto } from "@/types/cast-cut";
 import { getShiftsHistory } from "@/lib/api/cash-register/details";
 import { columns as shiftColumns } from "../components/history/columns";
 import { ShiftHistoryToolbar } from "../components/history/ShiftHistoryToolbar";
+import { useQuery } from "@tanstack/react-query";
 
 export default function ShiftHistoryPage() {
-  const [data, setData] = useState<ShiftDto[]>([]);
-  const [totalRows, setTotalRows] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 16,
@@ -30,49 +27,32 @@ export default function ShiftHistoryPage() {
   
   // Custom Filters State
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [minDifference, setMinDifference] = useState("");
 
-  const fetchShifts = async () => {
-    setIsLoading(true);
-    try {
-      const sortField = sorting.length > 0 ? sorting[0].id : "closing_date";
-      const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : "asc";
-
-      const response = await getShiftsHistory(
+  const { data: response, isLoading } = useQuery({
+    queryKey: [
+      "shifts-history",
+      pagination.pageIndex,
+      pagination.pageSize,
+      globalFilter,
+      sorting,
+      dateRange,
+    ],
+    queryFn: () =>
+      getShiftsHistory(
         pagination.pageIndex + 1,
         pagination.pageSize,
-        sortField,
-        sortOrder,
+        sorting.length > 0 ? sorting[0].id : "closing_date",
+        sorting.length > 0 && sorting[0].desc ? "desc" : "asc",
         {
           user_search: globalFilter || undefined,
           date_from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
           date_to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-          only_with_differences: onlyDifferences ? true : undefined,
-          min_difference: minDifference ? parseFloat(minDifference) : undefined,
         }
-      );
+      ),
+  });
 
-      setData(response.data);
-      setTotalRows(response.total);
-    } catch (error) {
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchShifts();
-  }, [
-    pagination.pageIndex,
-    pagination.pageSize,
-    globalFilter,
-    sorting,
-    columnFilters,
-    dateRange,
-    onlyDifferences,
-    minDifference,
-  ]);
+  const data = response?.data ?? [];
+  const totalRows = response?.total ?? 0;
 
   const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
     setGlobalFilter((prev) => 
@@ -91,16 +71,6 @@ export default function ShiftHistoryPage() {
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setDateRange(range);
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-  };
-
-  const handleOnlyDifferencesChange = (val: boolean) => {
-    setOnlyDifferences(val);
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-  };
-
-  const handleMinDifferenceChange = (val: string) => {
-    setMinDifference(val);
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
@@ -128,10 +98,8 @@ export default function ShiftHistoryPage() {
             closing_user_name: "Cerró",
             status: "Estado",
             initial_cash: "Fondo Inicial",
-            expected_cash: "Efectivo Teórico",
-            final_cash: "Cierre Real",
-            cash_difference: "Dif. Efectivo",
-            card_difference: "Dif. Tarjeta",
+            cash_withdrawal: "Retiro de Efectivo",
+            card_terminal_total: "Total Tarjeta",
           }}
           manualPagination={true}
           manualSorting={true}
@@ -151,10 +119,6 @@ export default function ShiftHistoryPage() {
               table={table}
               dateRange={dateRange}
               setDateRange={handleDateRangeChange}
-              onlyDifferences={onlyDifferences}
-              setOnlyDifferences={handleOnlyDifferencesChange}
-              minDifference={minDifference}
-              setMinDifference={handleMinDifferenceChange}
             />
           )}
         />

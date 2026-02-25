@@ -45,8 +45,6 @@ pub struct ShiftHistoryFilters {
     pub date_from: Option<String>,
     pub date_to: Option<String>,
     pub user_search: Option<String>,
-    pub only_with_differences: Option<bool>,
-    pub min_difference: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -187,24 +185,6 @@ pub fn get_shifts_history(
                 dq.add_param(u);
             }
         }
-
-        if f.only_with_differences.unwrap_or(false) {
-            dq.add_condition(
-                "((s.cash_difference IS NOT NULL AND s.cash_difference != 0) \
-                 OR (s.card_difference IS NOT NULL AND s.card_difference != 0))",
-            );
-        }
-
-        if let Some(min_diff) = f.min_difference {
-            if min_diff > 0.0 {
-                dq.add_condition(
-                    "(ABS(COALESCE(s.cash_difference, 0)) >= ? \
-                     OR ABS(COALESCE(s.card_difference, 0)) >= ?)",
-                );
-                dq.add_param(min_diff);
-                dq.add_param(min_diff);
-            }
-        }
     }
 
     let where_clause = if dq.sql_parts.is_empty() {
@@ -240,9 +220,8 @@ pub fn get_shifts_history(
         Some("opening_date") => "s.opening_date",
         Some("closing_date") => "s.closing_date",
         Some("initial_cash") => "s.initial_cash",
-        Some("final_cash") => "s.final_cash",
-        Some("cash_difference") => "s.cash_difference",
-        Some("card_difference") => "s.card_difference",
+        Some("cash_withdrawal") => "s.cash_withdrawal",
+        Some("card_terminal_total") => "s.card_terminal_total",
         Some("code") => "s.code",
         _ => "s.closing_date",
     };
