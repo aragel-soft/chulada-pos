@@ -52,6 +52,7 @@ export const columns: ColumnDef<ShiftDto>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Abrió" />
     ),
+    enableSorting: false,
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <AppAvatar
@@ -69,6 +70,7 @@ export const columns: ColumnDef<ShiftDto>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Cerró" />
     ),
+    enableSorting: false,
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <AppAvatar
@@ -86,6 +88,7 @@ export const columns: ColumnDef<ShiftDto>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Estado" />
     ),
+    enableSorting: false,
     cell: ({ row }) => {
       const status = row.getValue("status") as string;
       const map: Record<string, { label: string; class: string }> = {
