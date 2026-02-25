@@ -3,18 +3,18 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { getSalesHistory, getSaleDetails } from '@/lib/api/sales-history';
 import { SalesHistoryFilter } from '@/types/sales-history';
 import { format } from 'date-fns';
+import { DateRange } from "react-day-picker";
 
 const INITIAL_FILTER: SalesHistoryFilter = {
   page: 1,
   page_size: 16,
-  start_date: format(new Date(), 'yyyy-MM-dd'), // Today as default
+  start_date: format(new Date(), 'yyyy-MM-dd'),
   end_date: format(new Date(), 'yyyy-MM-dd'),
   status: [],
   payment_method: 'all',
   user_id: null,
   customer_id: null,
-  folio: '',
-  product_search: '',
+  search: '',
   sort_by: 'folio',
   sort_order: 'desc'
 };
@@ -33,20 +33,19 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
     setPage: (page: number) => setFilters((prev) => ({ ...prev, page })),
     setPageSize: (size: number) => setFilters((prev) => ({ ...prev, page_size: size, page: 1 })),
     
-    setDateRange: (start: Date | null, end: Date | null) => {
+    setDateRange: (range: DateRange | undefined) => {
       setFilters((prev) => ({
         ...prev,
-        start_date: start ? format(start, 'yyyy-MM-dd') : null,
-        end_date: end ? format(end, 'yyyy-MM-dd') : null,
+        start_date: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
+        end_date: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
         page: 1
       }));
     },
 
-    setSearch: (type: 'folio' | 'product', value: string) => {
+    setSearch: (value: string) => {
       setFilters((prev) => ({
         ...prev,
-        folio: type === 'folio' ? value : '',
-        product_search: type === 'product' ? value : '',
+        search: value,
         page: 1,
       }));
     },

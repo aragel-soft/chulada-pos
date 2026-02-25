@@ -13,8 +13,7 @@ pub struct SalesFilter {
   pub payment_method: Option<String>, 
   pub user_id: Option<String>,
   pub customer_id: Option<String>,
-  pub folio: Option<String>,         
-  pub product_search: Option<String>, 
+  pub search: Option<String>, 
   pub sort_by: Option<String>, 
   pub sort_order: Option<String>,
 }
@@ -157,24 +156,17 @@ pub fn get_sales_history(
     }
   }
 
-  if let Some(folio) = &filter.folio {
-    if !folio.is_empty() {
-      where_clauses.push("s.folio LIKE ?".to_string());
-      params.push(Box::new(format!("%{}%", folio)));
-    }
-  }
-
-  if let Some(prod_query) = &filter.product_search {
-    if !prod_query.is_empty() {
+  if let Some(search_term) = &filter.search {
+    if !search_term.is_empty() {
       where_clauses.push(
-        "EXISTS (
+        "(s.folio LIKE ? OR EXISTS (
         SELECT 1 FROM sale_items si 
         WHERE si.sale_id = s.id 
         AND si.product_name LIKE ?
-      )"
-        .to_string(),
+      ))".to_string(),
       );
-      params.push(Box::new(format!("%{}%", prod_query)));
+      params.push(Box::new(format!("%{}%", search_term)));
+      params.push(Box::new(format!("%{}%", search_term)));
     }
   }
 
