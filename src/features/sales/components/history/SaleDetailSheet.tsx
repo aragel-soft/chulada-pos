@@ -3,7 +3,6 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SaleHistoryItem } from "@/types/sales-history";
 import { useSaleDetail } from "@/hooks/use-sales-history";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, User, X, Ban, Printer } from "lucide-react";
@@ -56,10 +55,8 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
     : 999;
   const canReturn = daysSinceSale <= 30;
   
-  // TODO: La validación de tiempo será ajustada cuando se corrija el problema de zona horaria en la base de datos.
   const canCancel = daysSinceSale < 2 && sale?.status !== "cancelled" && sale?.status !== "fully_returned" && sale?.status !== "partial_return";
   
-  // Hide buttons completely if sale is cancelled or fully returned
   const showActionButtons = sale?.status !== "cancelled" && sale?.status !== "fully_returned";
   
   const hasItemsToReturn = sale?.items.some(item => item.quantity_available > 0) ?? false;
@@ -67,23 +64,27 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
   return (
     <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
-      {/* HEADER */}
-      <div className="p-6 border-b bg-muted/5 relative shrink-0">
+      <div className="p-4 border-b bg-muted/5 relative shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-4 top-4 h-8 w-8 text-muted-foreground hover:text-foreground z-10"
+          className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground z-10"
           onClick={onClose}
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Cerrar</span>
         </Button>
 
-        <div className="mb-4 pr-10">
+        <div className="mb-3 pr-8">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-2xl font-mono font-semibold tracking-tight">
-              {sale?.folio || "Cargando..."}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-mono font-semibold tracking-tight">
+                {sale?.folio || "Cargando..."}
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                {sale ? format(new Date(sale.sale_date), "dd/MM/yy HH:mm", { locale: es }) : "..."}
+              </span>
+            </div>
 
             <div className="flex gap-2">
               {sale?.status === "cancelled" && (
@@ -117,101 +118,101 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               )}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            {sale
-              ? format(new Date(sale.sale_date), "PPP 'a las' p", {
-                  locale: es,
-                })
-              : "..."}
-          </p>
         </div>
 
         {sale && (
           <>
-            <div className="flex items-center gap-3 bg-white p-3 rounded-md border shadow-sm">
-              <Avatar className="h-10 w-10">
+            <div className="flex items-center gap-3 bg-white p-2.5 rounded-md border shadow-sm">
+              <Avatar className="h-8 w-8">
                 <AvatarImage src={sale.user_avatar} />
                 <AvatarFallback>
-                  <User />
+                  <User className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <p className="text-sm font-medium">Vendedor</p>
-                <p className="text-xs text-muted-foreground">{sale.user_name}</p>
-              </div>
-              <div className="ml-auto flex gap-2">
-                {sale.payment_method === "credit" && (
-                  <Badge className="bg-purple-600">A CRÉDITO</Badge>
-                )}
-                {sale.has_discount && (
-                  <Badge
-                    variant="secondary"
-                    className="text-orange-600 border-orange-200 bg-orange-50"
-                  >
-                    DESCUENTO
-                  </Badge>
-                )}
+              <div className="flex-1 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground leading-tight">Vendedor</p>
+                  <p className="text-sm font-medium leading-tight">{sale.user_name}</p>
+                </div>
+                <div className="flex gap-1.5">
+                  {sale.payment_method === "credit" && (
+                    <Badge className="bg-purple-600 text-[10px] px-1.5 py-0 h-5">A CRÉDITO</Badge>
+                  )}
+                  {sale.has_discount && (
+                    <Badge
+                      variant="secondary"
+                      className="text-orange-600 border-orange-200 bg-orange-50 text-[10px] px-1.5 py-0 h-5"
+                    >
+                      DESCUENTO
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
             {showActionButtons && (
-            <TooltipProvider>
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <div className="w-full mt-3 cursor-not-allowed"> 
-                     {can("history:devolution") && <Button
-                      variant="outline"
-                      className="w-full pointer-events-auto" 
-                      onClick={() => setReturnModalOpen(true)}
-                      disabled={!canProcessReturn}
-                    >
-                      Procesar Devolución
-                    </Button>}
-                  </div>
-                </TooltipTrigger>
-                {!canProcessReturn && (
-                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
-                    <p>
-                      {!canReturn
-                        ? "Esta venta excede el periodo permitido de devoluciones (30 días)"
-                        : "Todos los items ya han sido devueltos"
-                      }
-                    </p>
-                  </TooltipContent>
+              <div className="flex gap-2 mt-3 w-full">
+                {can("history:devolution") && (
+                  <TooltipProvider>
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1 cursor-not-allowed"> 
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full pointer-events-auto text-xs h-8" 
+                            onClick={() => setReturnModalOpen(true)}
+                            disabled={!canProcessReturn}
+                          >
+                            Devolución
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {!canProcessReturn && (
+                        <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                          <p>
+                            {!canReturn
+                              ? "Excede el periodo permitido de devoluciones (30 días)"
+                              : "Todos los items ya han sido devueltos"
+                            }
+                          </p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-              </Tooltip>
-            </TooltipProvider>
-            )}
 
-            {/* Cancel Sale Button - TODO: ajustar validación de tiempo cuando se corrija zona horaria en BD */}
-            {showActionButtons && (
-            <TooltipProvider>
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <div className="w-full mt-2 cursor-not-allowed">
-                    {can("history:devolution") && <Button
-                      variant="destructive"
-                      className="w-full pointer-events-auto gap-2"
-                      onClick={() => setCancellationModalOpen(true)}
-                      disabled={!canCancel}
-                    >
-                      <Ban className="h-4 w-4" />
-                      Cancelar Venta
-                    </Button>}
-                  </div>
-                </TooltipTrigger>
-                {(!canCancel && can("history:devolution")) && (
-                  <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
-                    <p>
-                      {sale.status === "partial_return"
-                        ? "No se puede cancelar una venta con devoluciones"
-                        : "Esta venta excede el tiempo permitido para cancelación"
-                      }
-                    </p>
-                  </TooltipContent>
+                {can("history:devolution") && (
+                  <TooltipProvider>
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1 cursor-not-allowed">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full pointer-events-auto gap-1.5 text-xs h-8"
+                            onClick={() => setCancellationModalOpen(true)}
+                            disabled={!canCancel}
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {(!canCancel && can("history:devolution")) && (
+                        <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
+                          <p>
+                            {sale.status === "partial_return"
+                              ? "No se puede cancelar una venta con devoluciones"
+                              : "Excede el tiempo permitido para cancelación"
+                            }
+                          </p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-              </Tooltip>
-            </TooltipProvider>
+              </div>
             )}
           </>
         )}
@@ -235,15 +236,13 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
         />
       )}
 
-      {/* BODY */}
-      <ScrollArea className="flex-1 p-6">
+      <ScrollArea className="flex-1 p-4">
         {isLoading ? (
           <div className="flex h-full items-center justify-center min-h-[200px]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : sale ? (
-          <div className="space-y-6">
-            {/* ITEMS TABLE */}
+          <div className="space-y-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-muted-foreground border-b">
@@ -260,52 +259,49 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </tbody>
             </table>
 
-            {/* NOTAS */}
             {(sale.notes || sale.returns?.length > 0) && (
-              <div className="space-y-3 mt-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">Notas</h3>
+              <div className="space-y-2.5 mt-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas y Movimientos</h3>
                 
-                {/* Nota de la venta */}
                 {sale.notes && (
-                  <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-yellow-800">Venta</span>
+                  <div className="bg-yellow-50 p-2.5 rounded-md border border-yellow-200 text-sm">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-semibold text-yellow-800 text-xs">Venta</span>
                     </div>
-                    <p className="text-yellow-700">{sale.notes}</p>
+                    <p className="text-yellow-700 text-xs">{sale.notes}</p>
                   </div>
                 )}
 
-                {/* Notas de devoluciones/cancelaciones */}
                 {sale.returns?.map((ret) => {
                   const reasonLabel = RETURN_REASON_LABELS[ret.reason] || ret.reason;
                   
                   return (
                     <div 
                       key={ret.id} 
-                      className={`p-3 rounded-md border text-sm ${
+                      className={`p-2.5 rounded-md border text-sm ${
                         ret.reason === "cancellation" 
                           ? "bg-red-50 border-red-200" 
                           : "bg-purple-50 border-purple-200"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${
+                      <div className="flex items-center justify-between mb-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-semibold text-xs ${
                             ret.reason === "cancellation" ? "text-red-800" : "text-purple-800"
                           }`}>
                             {ret.reason === "cancellation" ? "Cancelación" : "Devolución"}
                           </span>
-                          <span className="text-muted-foreground">•</span>
-                          <span className={ret.reason === "cancellation" ? "text-red-700" : "text-purple-700"}>
+                          <span className="text-muted-foreground text-xs">•</span>
+                          <span className={`text-xs ${ret.reason === "cancellation" ? "text-red-700" : "text-purple-700"}`}>
                             {reasonLabel}
                           </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(ret.return_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(ret.return_date), "dd/MM/yy HH:mm", { locale: es })}
                         </span>
                       </div>
                       {ret.notes && (
-                        <p className={`mt-1 ${ret.reason === "cancellation" ? "text-red-600" : "text-purple-600"}`}>
+                        <p className={`mt-0.5 text-xs ${ret.reason === "cancellation" ? "text-red-600" : "text-purple-600"}`}>
                           {ret.notes}
                         </p>
                       )}
@@ -318,39 +314,34 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
         ) : null}
       </ScrollArea>
 
-      {/* FOOTER */}
       {sale && (
-        <div className="p-6 border-t bg-muted/5 space-y-3 shrink-0">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatCurrency(sale.subtotal)}</span>
-          </div>
-
-          {sale.discount_global_amount > 0 && (
-            <div className="flex justify-between text-sm text-red-600 font-medium">
-              <span>Descuento Global ({sale.discount_global_percent}%)</span>
-              <span>- {formatCurrency(sale.discount_global_amount)}</span>
+        <div className="p-4 border-t bg-muted/5 shrink-0">
+          <div className="flex items-end justify-between mb-3">
+            <div className="flex flex-col gap-0.5 text-sm">
+              <span className="text-muted-foreground leading-none">Subtotal: <span className="text-foreground">{formatCurrency(sale.subtotal)}</span></span>
+              {sale.discount_global_amount > 0 && (
+                <span className="text-red-600 font-medium text-xs leading-none">
+                  Desc ({sale.discount_global_percent}%): -{formatCurrency(sale.discount_global_amount)}
+                </span>
+              )}
             </div>
-          )}
-
-          <Separator />
-
-          <div className="flex justify-between text-xl font-bold">
-            <span>Total</span>
-            <span>{formatCurrency(sale.total)}</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Total</span>
+              <span className="text-2xl font-bold leading-none">{formatCurrency(sale.total)}</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground">
+          <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-dashed text-[11px] text-muted-foreground">
             <div className="flex flex-col">
               <span>Efectivo</span>
-              <span className="font-mono text-black">
+              <span className="font-mono text-black text-xs">
                 {formatCurrency(sale.cash_amount)}
               </span>
             </div>
             {sale.card_amount > 0 ? (
               <div className="flex flex-col text-center">
-                <span>Tarjeta / Transf</span>
-                <span className="font-mono text-black">
+                <span>Tarjeta</span>
+                <span className="font-mono text-black text-xs">
                   {formatCurrency(sale.card_amount)}
                 </span>
               </div>
@@ -358,22 +349,21 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
             {sale.voucher_amount > 0 ? (
               <div className="flex flex-col text-center">
                 <span>Vale</span>
-                <span className="font-mono text-black">
+                <span className="font-mono text-black text-xs">
                   {formatCurrency(sale.voucher_amount)}
                 </span>
               </div>
             ) : <div></div>}
             <div className="flex flex-col text-right">
               <span>Cambio</span>
-              <span className="font-mono text-black">
+              <span className="font-mono text-black text-xs">
                 {formatCurrency(sale.change_returned)}
               </span>
             </div>
           </div>
 
-          {/* Reprint Buttons */}
           {can('history:devolution') && (
-            <div className="flex gap-2 mt-3 pt-3 border-t border-dashed">
+            <div className="flex gap-2 mt-3">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -381,7 +371,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full text-xs"
+                        className="w-full text-xs h-8"
                         disabled={sale.status === 'cancelled' || sale.status === 'fully_returned'}
                         onClick={() => printSaleTicket(sale.id)
                           .then(() => toast.success('Ticket enviado a imprimir'))
@@ -412,7 +402,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full text-xs"
+                          className="w-full text-xs h-8"
                           disabled={
                             sale.voucher.is_used ||
                             sale.voucher.is_expired ||
@@ -423,7 +413,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                             .catch((e) => toast.error('Error al reimprimir vale', { description: String(e) }))}
                         >
                           <Printer className="h-3.5 w-3.5 mr-1.5" />
-                          Reimprimir Vale
+                          Vale
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -481,9 +471,8 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
 
   return (
     <tr className={`group ${isFullyReturned ? 'opacity-50 bg-slate-50' : ''}`}>
-      <td className="py-3 pr-2 pl-1">
-        <div className="flex items-center gap-3">
-          {/* IMAGE */}
+      <td className="py-2.5 pr-2 pl-1">
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center shrink-0">
             <HoverCard>
               <HoverCardTrigger asChild>
@@ -491,7 +480,7 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
                   <AppAvatar
                     name={item.product_name}
                     path={item.product_image}
-                    className="h-9 w-9 border border-zinc-200"
+                    className="h-8 w-8 border border-zinc-200"
                     variant="muted"
                   />
                 </div>
@@ -513,12 +502,10 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
           </div>
 
           <div className="flex flex-col items-start gap-0.5">
-            {/* NAME */}
-            <span className="font-medium text-gray-900 line-clamp-1 break-all">
+            <span className="font-medium text-gray-900 line-clamp-1 break-all text-xs">
               {item.product_name}
             </span>
 
-            {/* BADGES */}
             <div className="flex gap-1 flex-wrap">
               {getBadgeTypes(item).map((type, index) => {
                 const config = BADGE_CONFIGS[type]; 
@@ -529,9 +516,9 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
                   <Badge
                     key={`badge-${type}-${index}`}
                     variant={config.variant || "outline"}
-                    className={config.className}
+                    className={`${config.className} text-[9px] px-1 py-0 h-4`}
                   >
-                    {Icon && <Icon className="w-3 h-3 mr-1" />}
+                    {Icon && <Icon className="w-2.5 h-2.5 mr-0.5" />}
                     {label}
                   </Badge>
                 );
@@ -540,29 +527,28 @@ function ItemRowWithReturns({ item }: { item: SaleHistoryItem }) {
           </div>
         </div>
       </td>
-      <td className={`py-3 text-center align-top ${isFullyReturned ? 'text-slate-400 line-through' : 'text-gray-600'}`}>
-        {/* Show return breakdown in quantity column */}
+      <td className={`py-2.5 text-center align-top ${isFullyReturned ? 'text-slate-400 line-through' : 'text-gray-600'}`}>
         {isPartiallyReturned || isFullyReturned ? (
-          <div className="flex flex-col items-center gap-0.5">
-            <span className={isFullyReturned ? 'line-through text-slate-400' : ''}>x{item.quantity}</span>
-            <span className={`text-[10px] ${isFullyReturned ? 'text-slate-500' : 'text-orange-600 font-semibold'}`}>
+          <div className="flex flex-col items-center gap-0">
+            <span className={isFullyReturned ? 'line-through text-slate-400 text-xs' : 'text-xs'}>x{item.quantity}</span>
+            <span className={`text-[9px] leading-tight ${isFullyReturned ? 'text-slate-500' : 'text-orange-600 font-semibold'}`}>
               {isFullyReturned ? `(${item.quantity_returned} devueltos)` : `-${item.quantity_returned} dev.`}
             </span>
           </div>
         ) : (
-          <span>x{item.quantity}</span>
+          <span className="text-xs">x{item.quantity}</span>
         )}
       </td>
-      <td className={`py-3 text-right align-top ${isFullyReturned ? 'text-slate-400' : 'text-gray-600'}`}>
+      <td className={`py-2.5 text-right align-top text-xs ${isFullyReturned ? 'text-slate-400' : 'text-gray-600'}`}>
         {item.is_gift ? (
-          <span className="line-through text-xs text-muted-foreground">
+          <span className="line-through text-[10px] text-muted-foreground">
             {formatCurrency(item.unit_price)}
           </span>
         ) : (
           formatCurrency(item.unit_price)
         )}
       </td>
-      <td className="py-3 text-right align-top font-medium pr-1">
+      <td className="py-2.5 text-right align-top font-medium pr-1 text-xs">
         {item.is_gift ? (
           <span className="text-green-600 font-bold">GRATIS</span>
         ) : (
