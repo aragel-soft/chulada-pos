@@ -18,7 +18,7 @@ import { MAX_OPEN_TICKETS } from "@/config/constants";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { printSaleTicket } from "@/lib/api/cash-register/sales";
+import { printSaleTicket } from "@/lib/api/printers";
 import { useSalesStore } from "@/features/sales/stores/salesStore";
 import { KitSelectionModal } from "@/features/sales/components/KitSelectionModal";
 import { useKitLogic } from "@/features/sales/hooks/useKitLogic";

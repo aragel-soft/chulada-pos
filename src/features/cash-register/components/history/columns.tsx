@@ -4,9 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Printer, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from "@/lib/utils";
 import { AppAvatar } from '@/components/ui/app-avatar';
+import { printShiftTicket } from '@/lib/api/printers';
+import { useState } from 'react';
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return '-';
@@ -123,22 +126,5 @@ export const columns: ColumnDef<ShiftDto>[] = [
       
       return <div className={colorClass}>{formatCurrency(diff)}</div>;
     },
-  },
-  {
-    accessorKey: 'card_difference',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Dif. Tarjeta" />,
-    cell: ({ row }) => {
-      const diff = row.getValue('card_difference') as number | undefined;
-      if (diff == null || row.original.status === 'open') return <span>-</span>;
-      
-      const isMissing = diff < 0;
-      const isSurplus = diff > 0;
-      
-      let colorClass = 'text-muted-foreground';
-      if (isMissing) colorClass = 'text-red-600 font-medium';
-      if (isSurplus) colorClass = 'text-amber-600 font-medium';
-      
-      return <div className={colorClass}>{formatCurrency(diff)}</div>;
-    },
-  },
+  }
 ];

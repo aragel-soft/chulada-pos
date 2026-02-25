@@ -27,6 +27,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
 import type { ShiftDetailsDto, CloseShiftRequest, ShiftDto } from "@/types/cast-cut";
 import type { CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
+import { printShiftTicket } from "@/lib/api/printers";
 import { TheoreticalSummaryColumn } from "./TheoreticalSummaryColumn";
 
 
@@ -144,6 +145,13 @@ export function CloseShiftStepTwo({
       };
 
       const closedShift = await closeShift(request, user.id);
+      
+      try {
+        await printShiftTicket(closedShift.id);
+      } catch (printErr) {
+        toast.error("El corte se guardó, pero hubo un error al imprimir el recibo.");
+      }
+
       toast.success("Corte de caja realizado exitosamente");
       onConfirmed(closedShift);
     } catch (err) {

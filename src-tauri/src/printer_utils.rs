@@ -361,6 +361,7 @@ fn encode_code128b(data: &str) -> Result<Vec<u8>, String> {
     Ok(bars)
 }
 
+use crate::commands::cash_register::details::ShiftDetailsDto;
 use crate::commands::settings::business::BusinessSettings;
 use crate::commands::settings::hardware::HardwareConfig;
 use printers::common::base::job::PrinterJobOptions;
@@ -462,6 +463,23 @@ impl ReceiptBuilder {
     pub fn add_separator(&mut self, char: char) {
         let sep = char.to_string().repeat(self.max_chars);
         self.add_text_ln(&sep);
+    }
+
+    pub fn add_row_with_dots(&mut self, label: &str, value: &str) {
+        let clean_label = remove_accents(label.trim());
+        let val_trim = value.trim();
+
+        let dots_len = (self.max_chars as i32)
+            .saturating_sub(clean_label.len() as i32)
+            .saturating_sub(val_trim.len() as i32)
+            .saturating_sub(2);
+
+        if dots_len > 1 {
+            let dots = ".".repeat(dots_len as usize);
+            self.add_text_ln(&format!("{} {} {}", clean_label, dots, val_trim));
+        } else {
+            self.add_text_ln(&format!("{:<18} {:>13}", clean_label, val_trim));
+        }
     }
 
     pub fn cut(&mut self) {
@@ -1228,4 +1246,317 @@ fn remove_accents(s: &str) -> String {
             }
         })
         .collect()
+}
+
+pub fn print_shift_summary(
+    app_handle: tauri::AppHandle,
+    details: ShiftDetailsDto,
+) -> Result<(), String> {
+    use crate::commands::settings::business::fetch_business_settings;
+    use crate::commands::settings::hardware::load_settings;
+    use rusqlite::Connection;
+
+    let db_state: State<Mutex<Connection>> = app_handle.state();
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    let shift = &details.shift;
+
+    if shift.status != "closed" {
+        return Err("Solo se pueden imprimir turnos que ya estén cerrados".to_string());
+    }
+
+    let mut movements_in = Vec::new();
+    let mut movements_out = Vec::new();
+    for m in &details.movements {
+        if m.type_ == "IN" {
+            movements_in.push((m.amount, m.concept.clone(), m.description.clone()));
+        } else {
+            movements_out.push((m.amount, m.concept.clone(), m.description.clone()));
+        }
+    }
+
+    let settings = fetch_business_settings(&conn).unwrap_or_else(|_| BusinessSettings {
+        store_name: "Error loading settings".to_string(),
+        logical_store_name: "store-main".to_string(),
+        store_address: "".to_string(),
+        ticket_header: "".to_string(),
+        ticket_footer: "".to_string(),
+        ticket_footer_lines: "".to_string(),
+        default_cash_fund: 0.0,
+        max_cash_limit: 0.0,
+        currency_symbol: "$".to_string(),
+        tax_rate: 0.0,
+        apply_tax: false,
+        logo_path: "".to_string(),
+    });
+
+    drop(conn);
+
+    let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
+
+    let printers_list = printers::get_printers();
+    let printer = printers_list
+        .iter()
+        .find(|p| p.name == hardware_config.printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+
+    let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
+    let mut builder = ReceiptBuilder::new(width_val);
+
+    // BUILD TICKET
+    builder.init();
+    print_store_header(&mut builder, &settings, &app_handle);
+
+    builder.align_center();
+    builder.set_bold(true);
+    builder.set_size_double_h();
+    builder.add_text_ln("CORTE DE CAJA");
+    builder.set_size_normal();
+    builder.set_bold(false);
+    let now = chrono::Local::now().format("%d/%m/%Y %H:%M").to_string();
+    builder.add_text_ln(&format!("Impreso: {}", now));
+    builder.add_text("\n");
+
+    builder.align_left();
+    builder.add_text_ln(&format!("Folio: {}", shift.code.as_deref().unwrap_or("-")));
+    builder.add_text_ln(&format!("Apertura: {}", shift.opening_date));
+    if let Some(c_date) = &shift.closing_date {
+        builder.add_text_ln(&format!("Cierre: {}", c_date));
+    }
+    builder.add_text_ln(&format!(
+        "Abre: {}",
+        shift.opening_user_name.as_deref().unwrap_or("Desc.")
+    ));
+    builder.add_text_ln(&format!(
+        "Cierra: {}",
+        shift.closing_user_name.as_deref().unwrap_or("Desc.")
+    ));
+
+    // SALES SUMMARY
+    let has_sales = details.total_sales > 0.0;
+    if has_sales {
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("TOTAL DE VENTAS");
+        builder.set_bold(false);
+        builder.align_left();
+        builder.add_text_ln(&format!("Cantidad de ventas: {:.0}", details.sales_count));
+        builder.add_separator('-');
+
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("RESUMEN DE VENTAS");
+        builder.set_bold(false);
+        builder.align_left();
+
+        if details.total_cash_sales > 0.0 {
+            builder.add_row_with_dots(
+                "Ventas Efectivo:",
+                &format!("${:.2}", details.total_cash_sales),
+            );
+        }
+        if details.total_card_sales > 0.0 {
+            builder.add_row_with_dots(
+                "Ventas Tarjeta:",
+                &format!("${:.2}", details.total_card_sales),
+            );
+        }
+        if details.total_credit_sales > 0.0 {
+            builder.add_row_with_dots(
+                "Ventas Credito:",
+                &format!("${:.2}", details.total_credit_sales),
+            );
+        }
+        if details.total_voucher_sales > 0.0 {
+            builder.add_row_with_dots(
+                "Ventas Cupones:",
+                &format!("${:.2}", details.total_voucher_sales),
+            );
+        }
+        builder.set_bold(true);
+        builder.add_row_with_dots("Total Ventas:", &format!("${:.2}", details.total_sales));
+        builder.set_bold(false);
+        builder.add_separator('-');
+    }
+
+    // DEBT PAYMENTS
+    let has_debt_payments = details.total_debt_payments > 0.0;
+    if has_debt_payments {
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("ABONOS A DEUDAS");
+        builder.set_bold(false);
+        builder.align_left();
+
+        if details.debt_payments_cash > 0.0 {
+            builder.add_row_with_dots(
+                "Abonos Efectivo:",
+                &format!("${:.2}", details.debt_payments_cash),
+            );
+        }
+        if details.debt_payments_card > 0.0 {
+            builder.add_row_with_dots(
+                "Abonos Tarjeta:",
+                &format!("${:.2}", details.debt_payments_card),
+            );
+        }
+        builder.set_bold(true);
+        builder.add_row_with_dots(
+            "Total Abonos:",
+            &format!("${:.2}", details.total_debt_payments),
+        );
+        builder.set_bold(false);
+    }
+
+    // CASH MOVEMENTS (DETAILED)
+    if !movements_in.is_empty() {
+        builder.add_separator('-');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("ENTRADAS DE EFECTIVO");
+        builder.set_bold(false);
+        builder.align_left();
+
+        for (amt, concept, desc) in &movements_in {
+            builder.add_row_with_dots(concept, &format!("${:.2}", amt));
+
+            if let Some(d) = desc {
+                if !d.trim().is_empty() {
+                    builder.add_text_ln(&format!("  Nota: {}", remove_accents(d.trim())));
+                }
+            }
+        }
+        builder.set_bold(true);
+        builder.add_row_with_dots(
+            "Total Entradas:",
+            &format!("${:.2}", details.total_movements_in),
+        );
+        builder.set_bold(false);
+    }
+
+    if !movements_out.is_empty() {
+        builder.add_separator('-');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("SALIDAS DE EFECTIVO");
+        builder.set_bold(false);
+        builder.align_left();
+
+        for (amt, concept, desc) in &movements_out {
+            builder.add_row_with_dots(concept, &format!("${:.2}", amt));
+
+            if let Some(d) = desc {
+                if !d.trim().is_empty() {
+                    builder.add_text_ln(&format!("  Nota: {}", remove_accents(d.trim())));
+                }
+            }
+        }
+        builder.set_bold(true);
+        builder.add_row_with_dots(
+            "Total Salidas:",
+            &format!("${:.2}", details.total_movements_out),
+        );
+        builder.set_bold(false);
+        builder.add_separator('-');
+    }
+
+    // CASH RECONCILIATION
+    if details.total_cash_sales > 0.0
+        || details.debt_payments_cash > 0.0
+        || details.total_movements_in > 0.0
+        || details.total_movements_out > 0.0
+    {
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("TOTAL EFECTIVO");
+        builder.set_bold(false);
+        builder.align_left();
+
+        builder.add_row_with_dots("Fondo Inicial:", &format!("+${:.2}", shift.initial_cash));
+        builder.add_row_with_dots(
+            "Ventas Efectivo:",
+            &format!("+${:.2}", details.total_cash_sales),
+        );
+        builder.add_row_with_dots(
+            "Abonos Efectivo:",
+            &format!("+${:.2}", details.debt_payments_cash),
+        );
+        builder.add_row_with_dots(
+            "Entradas Efectivo:",
+            &format!("+${:.2}", details.total_movements_in),
+        );
+        builder.add_row_with_dots(
+            "Salidas Efectivo:",
+            &format!("-${:.2}", details.total_movements_out),
+        );
+        builder.set_bold(true);
+        builder.add_row_with_dots(
+            "Total Efectivo:",
+            &format!("${:.2}", details.theoretical_cash),
+        );
+        builder.set_bold(false);
+        builder.set_bold(true);
+        builder.add_separator('-');
+        if let Some(cw) = shift.cash_withdrawal {
+            builder.add_row_with_dots("Monto a Retirar:", &format!("${:.2}", cw));
+        }
+        builder.set_bold(false);
+    }
+    // CARD INFORMATION
+    if details.total_card_sales > 0.0 || details.debt_payments_card > 0.0 {
+        builder.add_separator('-');
+        builder.align_center();
+        builder.set_bold(true);
+        builder.add_text_ln("TOTAL TARJETA");
+        builder.set_bold(false);
+        builder.align_left();
+        builder.add_row_with_dots(
+            "Ventas Tarjeta:",
+            &format!("+${:.2}", details.total_card_sales),
+        );
+        builder.add_row_with_dots(
+            "Abonos Tarjeta:",
+            &format!("+${:.2}", details.debt_payments_card),
+        );
+        builder.set_bold(true);
+        builder.add_row_with_dots(
+            "Total Tarjeta:",
+            &format!(
+                "${:.2}",
+                details.total_card_sales + details.debt_payments_card
+            ),
+        );
+        builder.set_bold(false);
+    }
+
+    if let Some(n) = &shift.notes {
+        if !n.trim().is_empty() {
+            builder.add_separator('-');
+            builder.align_left();
+            builder.set_bold(true);
+            builder.add_text_ln("NOTAS DEL CIERRE:");
+            builder.set_bold(false);
+            let mut line = String::new();
+            for word in n.split_whitespace() {
+                if line.len() + word.len() + 1 > builder.max_chars {
+                    builder.add_text_ln(&line);
+                    line.clear();
+                }
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(word);
+            }
+            if !line.is_empty() {
+                builder.add_text_ln(&line);
+            }
+        }
+    }
+    builder.cut();
+
+    printer
+        .print(&builder.build(), PrinterJobOptions::none())
+        .map_err(|e| format!("Error imprimiendo corte de caja: {:?}", e))?;
+
+    Ok(())
 }
