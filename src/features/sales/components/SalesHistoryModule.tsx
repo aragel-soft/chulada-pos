@@ -108,7 +108,7 @@ export default function SalesHistoryModule({
     <div className="flex h-full w-full overflow-hidden">
       <div className="flex-1 flex min-w-0 transition-all duration-300">
         <div
-          className={`flex flex-col min-w-0 h-full transition-all duration-300 ease-in-out ${
+          className={`flex flex-col min-w-0 h-full transition-[width] duration-100 ease-in-out ${
             selectedSaleId ? "w-[65%] border-r pr-4" : "w-full"
           }`}
         >

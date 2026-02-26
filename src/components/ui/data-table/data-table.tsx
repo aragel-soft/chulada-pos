@@ -184,6 +184,7 @@ export function DataTable<TData, TValue>({
     <DataTableLayout
       actions={combinedActions}
       filters={renderToolbar()}
+      filtersClassName={toolbar ? "flex-1 min-w-0 flex items-center" : undefined}
       pagination={<DataTablePagination table={table} />}
     >
       <table className="w-full caption-bottom text-sm">

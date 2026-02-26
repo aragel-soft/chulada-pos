@@ -1,5 +1,5 @@
 import { X, SlidersHorizontal } from "lucide-react";
-import { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { DebouncedInput } from "@/components/ui/debounced-input";
 import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
@@ -152,10 +152,17 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
     recalculate();
     return () => ro.disconnect();
   }, [recalculate]);
-
-  useLayoutEffect(() => {
+  
+  useEffect(() => {
     recalculate();
-  });
+  }, [
+    recalculate,
+    filters.start_date,
+    filters.end_date,
+    filters.status,
+    filters.payment_method,
+    filters.user_id,
+  ]);
 
   const visibleIds = FILTER_IDS.slice(0, visibleCount);
   const overflowIds = FILTER_IDS.slice(visibleCount);
