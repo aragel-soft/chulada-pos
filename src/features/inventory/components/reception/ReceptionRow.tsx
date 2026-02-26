@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Pencil } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { EditProductDialog } from "@/features/inventory/components/products/EditProductDialog";
+import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
 import { MoneyInput } from "@/components/ui/money-input";
 
 interface ReceptionRowProps {
@@ -209,11 +209,10 @@ export const ReceptionRow = memo(
           </TableCell>
         </TableRow>
 
-        <EditProductDialog
+        <ProductDialog
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           productId={item.product_id}
-          variant="minimal"
           onSuccess={(updatedProduct) => {
             if (updatedProduct) {
               updateProductDetails(updatedProduct);
