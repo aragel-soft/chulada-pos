@@ -96,7 +96,6 @@ export function CloseShiftModal({
       toast.success("Turno cerrado correctamente", {
         description: `Folio: ${closed.code ?? "—"}`,
       });
-      // Print the closing ticket (best-effort, don't block on failure)
       printShiftTicket(closed.id).catch(() => {});
       onClose();
     } catch (err) {
