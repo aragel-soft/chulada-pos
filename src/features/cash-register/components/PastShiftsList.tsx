@@ -42,7 +42,7 @@ export function PastShiftsList() {
             <TableHead>Fecha Cierre</TableHead>
             <TableHead>Código</TableHead>
             <TableHead className="text-right">Fondo Inicial</TableHead>
-            <TableHead className="text-right">Cierre Real</TableHead>
+            <TableHead className="text-right">Retiro de Caja</TableHead>
             <TableHead className="text-center">Estado</TableHead>
           </TableRow>
         </TableHeader>
@@ -75,7 +75,7 @@ export function PastShiftsList() {
                 <TableCell>{shift.code || shift.id}</TableCell>
                 <TableCell className="text-right">{formatCurrency(shift.initial_cash)}</TableCell>
                 <TableCell className="text-right font-bold text-purple-700">
-                  {shift.final_cash ? formatCurrency(shift.final_cash) : "-"}
+                  {shift.cash_withdrawal ? formatCurrency(shift.cash_withdrawal) : "-"}
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge variant={shift.status === 'open' ? 'default' : 'secondary'}>
