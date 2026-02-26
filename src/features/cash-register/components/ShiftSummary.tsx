@@ -28,7 +28,6 @@ interface StatRowProps {
   prefix?: "+" | "-";
 }
 
-/** A single row: icon + label ···· formatted value */
 function StatRow({
   icon: Icon,
   label,
@@ -60,7 +59,6 @@ interface SummaryCardProps {
   iconColor: string;
 }
 
-/** A highlighted single-value card (Fondo Inicial, Entradas, Salidas) */
 function SummaryCard({
   icon: Icon,
   label,
@@ -253,7 +251,7 @@ export function ShiftSummary({
     >
       {/* Left: Stats */}
       <div className="flex-1 space-y-3 overflow-y-auto">
-        {/* Fondo Inicial — oculto en modo compact */}
+        {/* Initial Cash */}
         {!compact && (
           <SummaryCard
             icon={Banknote}
@@ -266,9 +264,9 @@ export function ShiftSummary({
           />
         )}
 
-        {/* Ventas + Abonos side by side */}
+        {/* Sells and Debt Payments */}
         <div className="grid grid-cols-2 gap-2">
-          {/* Ventas */}
+          {/* Sells */}
           <div className="rounded-lg border border-zinc-100 overflow-hidden">
             <div className="px-3 py-2 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -307,7 +305,7 @@ export function ShiftSummary({
             </div>
           </div>
 
-          {/* Abonos */}
+          {/* Debt Payments */}
           <div className="rounded-lg border border-teal-100 overflow-hidden">
             <div className="px-3 py-2 bg-teal-50 border-b border-teal-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -333,7 +331,7 @@ export function ShiftSummary({
           </div>
         </div>
 
-        {/* Movimientos Manuales — ocultos en modo compact */}
+        {/* Manual Movements */}
         {!compact && (
           <div className="grid grid-cols-2 gap-3">
             <SummaryCard
@@ -357,7 +355,7 @@ export function ShiftSummary({
           </div>
         )}
 
-        {/* Efectivo Teórico / Tarjeta */}
+        {/* Totales cash / card */}
         <div className="grid grid-cols-2 gap-3">
           <TotalBreakdownCard
             icon={Calculator}
@@ -409,7 +407,7 @@ export function ShiftSummary({
             ) : null}
           </div>
         )}
-        {/* ── Retirar Efectivo (full width, siempre visible) ── */}
+        {/* ── cash withdrawal  */}
         {d.shift.status == "open" && compact &&
           (() => {
             const withdrawal = d.total_cash - d.shift.initial_cash;
@@ -433,7 +431,7 @@ export function ShiftSummary({
           })()}
       </div>
 
-      {/* Right: Movements List — hidden in compact mode */}
+      {/* Movements List */}
       {!compact && (
         <div className="w-full md:w-[350px] flex flex-col bg-zinc-50/30 border rounded-lg overflow-hidden md:h-auto md:max-h-[calc(100vh-200px)]">
           <div className="p-3 border-b text-base font-medium text-zinc-500 bg-white">
