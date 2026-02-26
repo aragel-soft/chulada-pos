@@ -12,14 +12,19 @@ export interface ShiftDto {
   closing_user_id?: string;
   closing_user_name?: string;
   closing_user_avatar?: string;
-  final_cash?: number;
   expected_cash?: number;
-  cash_difference?: number;
-  card_terminal_total?: number;
-  card_expected_total?: number;
-  card_difference?: number;
   cash_withdrawal?: number;
   notes?: string;
+  total_sales?: number;
+  total_cash_sales?: number;
+  total_card_sales?: number;
+  total_credit_sales?: number;
+  total_voucher_sales?: number;
+  total_debt_payments?: number;
+  debt_payments_cash?: number;
+  debt_payments_card?: number;
+  total_movements_in?: number;
+  total_movements_out?: number;
 }
 
 export interface CashMovementDto {
