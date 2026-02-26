@@ -137,7 +137,7 @@ export const columns: ColumnDef<ShiftDto>[] = [
     ),
     cell: ({ row }) => (
       <div className="font-medium tabular-nums">
-        {formatCurrency(row.getValue("total_card_sales"))}
+        {formatCurrency(row.getValue("total_sales"))}
       </div>
     ),
   },

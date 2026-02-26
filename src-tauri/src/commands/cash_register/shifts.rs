@@ -23,15 +23,6 @@ pub struct ShiftDto {
     pub cash_withdrawal: Option<f64>,
     pub notes: Option<String>,
     pub total_sales: Option<f64>,
-    pub total_cash_sales: Option<f64>,
-    pub total_card_sales: Option<f64>,
-    pub total_credit_sales: Option<f64>,
-    pub total_voucher_sales: Option<f64>,
-    pub total_debt_payments: Option<f64>,
-    pub debt_payments_cash: Option<f64>,
-    pub debt_payments_card: Option<f64>,
-    pub total_movements_in: Option<f64>,
-    pub total_movements_out: Option<f64>,
 }
 
 /// Standard SELECT for ShiftDto.
@@ -40,10 +31,7 @@ pub const SHIFT_SELECT_SQL: &str =
             s.closing_date, s.closing_user_id, s.expected_cash, s.cash_withdrawal, s.notes,
             u.full_name, u.avatar_url,
             uc.full_name, uc.avatar_url,
-            s.total_sales, s.total_cash_sales, s.total_card_sales,
-            s.total_credit_sales, s.total_voucher_sales,
-            s.total_debt_payments, s.debt_payments_cash, s.debt_payments_card,
-            s.total_movements_in, s.total_movements_out
+            s.total_sales
      FROM cash_register_shifts s
      LEFT JOIN users u ON s.opening_user_id = u.id
      LEFT JOIN users uc ON s.closing_user_id = uc.id";
@@ -67,15 +55,6 @@ pub fn shift_from_row(row: &rusqlite::Row) -> rusqlite::Result<ShiftDto> {
         closing_user_name: row.get(13).unwrap_or(None),
         closing_user_avatar: row.get(14).unwrap_or(None),
         total_sales: row.get(15).unwrap_or(None),
-        total_cash_sales: row.get(16).unwrap_or(None),
-        total_card_sales: row.get(17).unwrap_or(None),
-        total_credit_sales: row.get(18).unwrap_or(None),
-        total_voucher_sales: row.get(19).unwrap_or(None),
-        total_debt_payments: row.get(20).unwrap_or(None),
-        debt_payments_cash: row.get(21).unwrap_or(None),
-        debt_payments_card: row.get(22).unwrap_or(None),
-        total_movements_in: row.get(23).unwrap_or(None),
-        total_movements_out: row.get(24).unwrap_or(None),
     })
 }
 
@@ -295,15 +274,6 @@ pub fn open_shift(
         cash_withdrawal: None,
         notes: None,
         total_sales: None,
-        total_cash_sales: None,
-        total_card_sales: None,
-        total_credit_sales: None,
-        total_voucher_sales: None,
-        total_debt_payments: None,
-        debt_payments_cash: None,
-        debt_payments_card: None,
-        total_movements_in: None,
-        total_movements_out: None,
     })
 }
 
@@ -349,12 +319,9 @@ pub fn close_shift(
             "UPDATE cash_register_shifts
          SET closing_date = ?1, closing_user_id = ?2, status = 'closed',
              expected_cash = ?3, cash_withdrawal = ?4, notes = ?5,
-             total_sales = ?6, total_cash_sales = ?7, total_card_sales = ?8,
-             total_credit_sales = ?9, total_voucher_sales = ?10,
-             total_debt_payments = ?11, debt_payments_cash = ?12, debt_payments_card = ?13,
-             total_movements_in = ?14, total_movements_out = ?15,
+             total_sales = ?6,
              updated_at = ?1
-         WHERE id = ?16 AND status = 'open'",
+         WHERE id = ?7 AND status = 'open'",
             params![
                 now,
                 user_id,
@@ -362,15 +329,6 @@ pub fn close_shift(
                 cash_withdrawal,
                 notes_trimmed,
                 totals.total_sales,
-                totals.total_cash_sales,
-                totals.total_card_sales,
-                totals.total_credit_sales,
-                totals.total_voucher_sales,
-                totals.total_debt_payments,
-                totals.debt_payments_cash,
-                totals.debt_payments_card,
-                totals.total_movements_in,
-                totals.total_movements_out,
                 shift_id,
             ],
         )

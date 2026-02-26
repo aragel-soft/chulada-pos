@@ -16,15 +16,6 @@ export interface ShiftDto {
   cash_withdrawal?: number;
   notes?: string;
   total_sales?: number;
-  total_cash_sales?: number;
-  total_card_sales?: number;
-  total_credit_sales?: number;
-  total_voucher_sales?: number;
-  total_debt_payments?: number;
-  debt_payments_cash?: number;
-  debt_payments_card?: number;
-  total_movements_in?: number;
-  total_movements_out?: number;
 }
 
 export interface CashMovementDto {
