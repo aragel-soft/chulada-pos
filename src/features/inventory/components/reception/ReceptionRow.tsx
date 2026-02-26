@@ -159,7 +159,7 @@ export const ReceptionRow = memo(
           {purchasePriceVisible && (
             <TableCell className="w-[140px]">
               <MoneyInput
-                step="0.01"
+                step="0.50"
                 value={costValue}
                 onChange={handleCostChange}
                 onBlur={handleCostBlur}
@@ -171,7 +171,7 @@ export const ReceptionRow = memo(
 
           <TableCell className="w-[130px]">
             <MoneyInput
-              step="0.01"
+              step="0.50"
               value={retailValue}
               onChange={handleRetailChange}
               onBlur={handleRetailBlur}
@@ -182,7 +182,7 @@ export const ReceptionRow = memo(
 
           <TableCell className="w-[130px]">
             <MoneyInput
-              step="0.01"
+              step="0.50"
               value={wholesaleValue}
               onChange={handleWholesaleChange}
               onBlur={handleWholesaleBlur}
