@@ -261,7 +261,7 @@ export function KitWizard({
                     >
                       <div
                         className={cn(
-                          "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300",
+                          "flex items-center justify-center w-8 h-8 shrink-0 rounded-full border-2 transition-all duration-300", 
                           isActive
                             ? "border-[#480489] bg-[#480489] text-white shadow-md scale-110"
                             : isCompleted
