@@ -10,7 +10,7 @@ pub struct SalesFilter {
   pub start_date: Option<String>,     
   pub end_date: Option<String>,      
   pub status: Option<Vec<String>>,   
-  pub payment_method: Option<String>, 
+  pub payment_method: Option<Vec<String>>,
   pub user_id: Option<String>,
   pub customer_id: Option<String>,
   pub search: Option<String>, 
@@ -135,10 +135,14 @@ pub fn get_sales_history(
     }
   }
 
-  if let Some(method) = &filter.payment_method {
-    if method != "all" && !method.is_empty() {
-      where_clauses.push("s.payment_method = ?".to_string());
-      params.push(Box::new(method.clone()));
+  if let Some(methods) = &filter.payment_method {
+    let valid: Vec<&String> = methods.iter().filter(|m| !m.is_empty()).collect();
+    if !valid.is_empty() {
+      let placeholders = valid.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+      where_clauses.push(format!("s.payment_method IN ({})", placeholders));
+      for m in valid {
+        params.push(Box::new(m.clone()));
+      }
     }
   }
 

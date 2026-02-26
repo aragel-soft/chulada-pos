@@ -45,7 +45,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
   const isFiltered =
     (filters.search ?? "") !== "" ||
     (filters.status?.length ?? 0) > 0 ||
-    (filters.payment_method && filters.payment_method !== "all") ||
+    (filters.payment_method?.length ?? 0) > 0 ||
     filters.user_id !== null ||
     filters.start_date !== null;
 
@@ -56,7 +56,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
     switch (id) {
       case "date":    return filters.start_date !== null;
       case "status":  return (filters.status?.length ?? 0) > 0;
-      case "payment": return !!(filters.payment_method && filters.payment_method !== "all");
+      case "payment": return (filters.payment_method?.length ?? 0) > 0;
       case "user":    return filters.user_id !== null;
     }
   }, [filters.start_date, filters.status, filters.payment_method, filters.user_id]);
@@ -91,15 +91,8 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
           <DataTableFacetedFilter
             title="Método de Pago"
             options={paymentOptions}
-            selectedValues={new Set(
-              filters.payment_method && filters.payment_method !== "all"
-                ? [filters.payment_method]
-                : []
-            )}
-            onSelect={(values) => {
-              const arr = Array.from(values);
-              actions.setPaymentMethod(arr.length > 0 ? arr[0] : "all");
-            }}
+            selectedValues={new Set(filters.payment_method || [])}
+            onSelect={(values) => actions.setPaymentMethod(Array.from(values))}
           />
         );
       case "user":

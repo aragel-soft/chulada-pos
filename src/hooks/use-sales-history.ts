@@ -11,7 +11,7 @@ const INITIAL_FILTER: SalesHistoryFilter = {
   start_date: format(new Date(), 'yyyy-MM-dd'),
   end_date: format(new Date(), 'yyyy-MM-dd'),
   status: [],
-  payment_method: 'all',
+  payment_method: [],
   user_id: null,
   customer_id: null,
   search: '',
@@ -51,7 +51,7 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
     },
 
     setStatus: (status: string[]) => setFilters((prev) => ({ ...prev, status, page: 1 })),
-    setPaymentMethod: (method: string) => setFilters((prev) => ({ ...prev, payment_method: method, page: 1 })),
+    setPaymentMethod: (methods: string[]) => setFilters((prev) => ({ ...prev, payment_method: methods, page: 1 })),
     
     resetFilters: () => setFilters(INITIAL_FILTER),
 

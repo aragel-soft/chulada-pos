@@ -4,7 +4,7 @@ export interface SalesHistoryFilter {
   start_date?: string | null;
   end_date?: string | null;
   status?: string[] | null;
-  payment_method?: string | null;
+  payment_method?: string[] | null;
   user_id?: string | null;
   customer_id?: string | null;
   search?: string | null;
