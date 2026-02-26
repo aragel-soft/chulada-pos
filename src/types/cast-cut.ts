@@ -51,7 +51,7 @@ export interface ShiftDetailsDto {
   total_debt_payments: number;
   debt_payments_cash: number;
   debt_payments_card: number;
-  theoretical_cash: number;
+  total_cash: number;
 }
 
 export interface CreateCashMovementRequest {
@@ -63,8 +63,6 @@ export interface CreateCashMovementRequest {
 }
 
 export interface CloseShiftRequest {
-  finalCash: number;
-  cardTerminalTotal: number;
   notes?: string;
 }
 

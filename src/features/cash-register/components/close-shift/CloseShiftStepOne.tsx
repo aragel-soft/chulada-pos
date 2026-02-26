@@ -68,7 +68,7 @@ export function CloseShiftStepOne({
   const d = details;
 
   // Theoretical values
-  const expectedCash = d.theoretical_cash;
+  const expectedCash = d.total_cash;
   const cardExpectedTotal = d.total_card_sales + d.debt_payments_card;
 
   const {

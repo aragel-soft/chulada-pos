@@ -94,7 +94,7 @@ pub struct ShiftTotals {
     pub total_debt_payments: f64,
     pub debt_payments_cash: f64,
     pub debt_payments_card: f64,
-    pub theoretical_cash: f64,
+    pub total_cash: f64,
 }
 
 /// Calculates all shift totals from the database.
@@ -164,7 +164,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
 
     // Derived
     let total_cash_sales = total_sales - total_card_sales - total_credit_sales - total_voucher_sales;
-    let theoretical_cash = initial_cash + total_cash_sales + debt_payments_cash + total_movements_in - total_movements_out;
+    let total_cash = initial_cash + total_cash_sales + debt_payments_cash + total_movements_in - total_movements_out;
 
     ShiftTotals {
         total_movements_in,
@@ -178,7 +178,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
         total_debt_payments,
         debt_payments_cash,
         debt_payments_card,
-        theoretical_cash,
+        total_cash,
     }
 }
 
@@ -339,7 +339,7 @@ pub fn close_shift(
     // Recalculate all totals atomically inside the transaction
     let totals = calculate_shift_totals(&tx, shift_id, initial_cash);
 
-    let expected_cash = totals.theoretical_cash;
+    let expected_cash = totals.total_cash;
     let cash_withdrawal = expected_cash - initial_cash;
 
     let notes_trimmed = notes

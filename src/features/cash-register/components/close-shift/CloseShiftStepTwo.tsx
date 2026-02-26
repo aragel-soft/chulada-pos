@@ -117,7 +117,7 @@ export function CloseShiftStepTwo({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Computed values
-  const expectedCash = d.theoretical_cash;
+  const expectedCash = d.total_cash;
   const cardExpectedTotal = d.total_card_sales + d.debt_payments_card;
 
   const cashDiff = formValues.final_cash - expectedCash;

@@ -35,7 +35,7 @@ pub struct ShiftDetailsDto {
     pub total_debt_payments: f64,
     pub debt_payments_cash: f64,
     pub debt_payments_card: f64,
-    pub theoretical_cash: f64,
+    pub total_cash: f64,
 }
 
 // ── History filters ─────────────────────────────────────────────
@@ -111,7 +111,7 @@ pub fn get_shift_details(
         total_debt_payments: totals.total_debt_payments,
         debt_payments_cash: totals.debt_payments_cash,
         debt_payments_card: totals.debt_payments_card,
-        theoretical_cash: totals.theoretical_cash,
+        total_cash: totals.total_cash,
     })
 }
 

@@ -51,8 +51,6 @@ export const useCashRegisterStore = create<CashRegisterState>()(
         try {
           const updatedShift = await invoke<ShiftDto>('close_shift', {
             shiftId: shift.id,
-            finalCash: request.finalCash,
-            cardTerminalTotal: request.cardTerminalTotal,
             notes: request.notes || null,
             userId,
           });
