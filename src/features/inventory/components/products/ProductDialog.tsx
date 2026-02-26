@@ -158,14 +158,14 @@ export function ProductDialog({
         imageUrl = await saveProductImage(uint8Array, values.code || "product");
       }
 
-      // TODO: Actualizar este payload después de actualizar el backend para soportar tags e is_active al crear producto
       const payload: CreateProductPayload = {
         ...values,
         image_url: imageUrl,
         description: values.description || undefined,
         barcode: values.barcode || undefined,
         purchase_price: values.purchase_price || 0,
-        // tags e is_active dependerán de si la interfaz backend ya los soporta al crear
+        is_active: values.is_active, 
+        tags: values.tags || [],
       };
 
       return await createProduct(payload);
