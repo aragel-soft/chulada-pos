@@ -220,8 +220,8 @@ pub fn get_shifts_history(
         Some("opening_date") => "s.opening_date",
         Some("closing_date") => "s.closing_date",
         Some("initial_cash") => "s.initial_cash",
-        Some("expected_cash") => "s.expected_cash",
         Some("cash_withdrawal") => "s.cash_withdrawal",
+        Some("total_sales") => "s.total_sales",
         Some("code") => "s.code",
         _ => "s.closing_date",
     };

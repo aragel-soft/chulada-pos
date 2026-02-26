@@ -131,12 +131,14 @@ export const columns: ColumnDef<ShiftDto>[] = [
     ),
   }, 
   {
-    accessorKey: "card_terminal_total",
+    accessorKey: "total_sales",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Tarjeta Teórica" />
+      <DataTableColumnHeader column={column} title="Total Ventas" />
     ),
     cell: ({ row }) => (
-      <div>{formatCurrency(row.getValue("card_terminal_total"))}</div>
+      <div className="font-medium tabular-nums">
+        {formatCurrency(row.getValue("total_card_sales"))}
+      </div>
     ),
   },
 ];
