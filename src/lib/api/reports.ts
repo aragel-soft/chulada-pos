@@ -40,12 +40,16 @@ export const getTopSellingProducts = async (
 export const getDeadStockReport = async (
   from: Date,
   to: Date,
+  page: number = 1,
+  pageSize: number = 16,
   categoryIds?: string[],
-): Promise<DeadStockProduct[]> => {
+): Promise<PaginatedResponse<DeadStockProduct>> => {
   try {
-    return await invoke<DeadStockProduct[]>("get_dead_stock_report", {
+    return await invoke<PaginatedResponse<DeadStockProduct>>("get_dead_stock_report", {
       fromDate: formatDate(from),
       toDate: formatDate(to),
+      page,
+      pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
     });
   } catch (error) {

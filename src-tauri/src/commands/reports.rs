@@ -276,7 +276,7 @@ pub fn get_top_selling_products(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 3))
+                .map(|(i, _)| format!("?{}", i + 3)) // TODO: Analizar esto
                 .collect();
             format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
@@ -288,7 +288,7 @@ pub fn get_top_selling_products(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 5))
+                .map(|(i, _)| format!("?{}", i + 5)) // TODO: Analizar esto
                 .collect();
             format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
@@ -438,24 +438,86 @@ pub fn get_dead_stock_report(
     db: State<Mutex<Connection>>,
     from_date: String,
     to_date: String,
+    page: i64,
+    page_size: i64,
     category_ids: Option<Vec<String>>,
-) -> Result<Vec<DeadStockProduct>, String> {
+) -> Result<PaginatedResult<DeadStockProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let store_id = get_current_store_id(&conn)?;
 
-    let category_filter = match &category_ids {
+    let offset = (page - 1) * page_size;
+
+    let category_filter_count = match &category_ids {
         Some(ids) if !ids.is_empty() => {
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 4))
+                .map(|(i, _)| format!("?{}", i + 4)) // TODO: Analizar esto
                 .collect();
             format!("AND p.category_id IN ({})", placeholders.join(", "))
         }
         _ => String::new(),
     };
 
-    let sql = format!(
+    let category_filter_data = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 6)) // TODO: Analizar esto
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let count_sql = format!(
+        r#"
+        SELECT COUNT(p.id)
+        FROM products p
+        JOIN store_inventory inv ON p.id = inv.product_id
+        WHERE inv.store_id = ?3
+          AND inv.stock > 0
+          AND p.is_active = 1
+          AND p.deleted_at IS NULL
+          AND p.id NOT IN (
+              SELECT DISTINCT si.product_id
+              FROM sale_items si
+              JOIN sales s ON si.sale_id = s.id
+              LEFT JOIN (
+                  SELECT sale_item_id, SUM(quantity) as returned_qty
+                  FROM return_items
+                  GROUP BY sale_item_id
+              ) ri ON ri.sale_item_id = si.id
+              WHERE s.created_at BETWEEN ?1 AND ?2
+                AND s.status IN ('completed', 'partial_return')
+                AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
+          )
+          {}
+        "#,
+        category_filter_count
+    );
+
+    let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(from_date.clone()),
+        Box::new(to_date.clone()),
+        Box::new(store_id.clone()),
+    ];
+    
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            count_params.push(Box::new(id.clone()));
+        }
+    }
+    
+    let count_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        count_params.iter().map(|p| p.as_ref()).collect();
+
+    let total_count: i64 = conn
+        .query_row(&count_sql, count_params_refs.as_slice(), |row| row.get(0))
+        .unwrap_or(0);
+
+    let data_sql = format!(
         r#"
         SELECT 
             p.name as product_name,
@@ -494,24 +556,32 @@ pub fn get_dead_stock_report(
           )
           {}
         ORDER BY stagnant_value DESC
+        LIMIT ?4 OFFSET ?5
     "#,
-        category_filter
+        category_filter_data
     );
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
 
-    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> =
-        vec![Box::new(from_date), Box::new(to_date), Box::new(store_id)];
+    let mut data_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(from_date),
+        Box::new(to_date),
+        Box::new(store_id),
+        Box::new(page_size),
+        Box::new(offset),
+    ];
+    
     if let Some(ids) = &category_ids {
         for id in ids {
-            bind_params.push(Box::new(id.clone()));
+            data_params.push(Box::new(id.clone()));
         }
     }
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        bind_params.iter().map(|p| p.as_ref()).collect();
+    let data_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        data_params.iter().map(|p| p.as_ref()).collect();
+
     let rows = stmt
-        .query_map(params_refs.as_slice(), |row| {
+        .query_map(data_params_refs.as_slice(), |row| {
             Ok(DeadStockProduct {
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
@@ -525,8 +595,16 @@ pub fn get_dead_stock_report(
         })
         .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
+    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
+
+    Ok(PaginatedResult {
+        data,
+        total: total_count,
+        page,
+        page_size,
+        total_pages,
+    })
 }
 
 #[tauri::command]
