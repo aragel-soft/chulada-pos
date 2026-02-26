@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getInventoryValuation, getLowStockProducts } from "@/lib/api/reports";
 import { InventoryValuation, LowStockProduct } from "@/types/reports";
+import { PaginatedResponse } from "@/types/pagination";
 import { toast } from "sonner";
 
 const INITIAL_VALUATION: InventoryValuation = {
@@ -9,9 +10,12 @@ const INITIAL_VALUATION: InventoryValuation = {
   projected_profit: 0,
 };
 
-export const useInventoryReport = () => {
+export const useInventoryReport = (
+  page: number = 1,
+  pageSize: number = 16
+) => {
   const [valuation, setValuation] = useState<InventoryValuation>(INITIAL_VALUATION);
-  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
+  const [lowStockProducts, setLowStockProducts] = useState<PaginatedResponse<LowStockProduct> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +26,7 @@ export const useInventoryReport = () => {
     try {
       const [valuationData, lowStockData] = await Promise.all([
         getInventoryValuation(),
-        getLowStockProducts(),
+        getLowStockProducts(page, pageSize),
       ]);
       setValuation(valuationData);
       setLowStockProducts(lowStockData);
@@ -33,7 +37,7 @@ export const useInventoryReport = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
 
   useEffect(() => {
     fetchData();

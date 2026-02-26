@@ -65,9 +65,15 @@ export const getInventoryValuation = async (): Promise<InventoryValuation> => {
   }
 };
 
-export const getLowStockProducts = async (): Promise<LowStockProduct[]> => {
+export const getLowStockProducts = async (
+  page: number = 1,
+  pageSize: number = 16,
+): Promise<PaginatedResponse<LowStockProduct>> => {
   try {
-    return await invoke<LowStockProduct[]>("get_low_stock_products");
+    return await invoke<PaginatedResponse<LowStockProduct>>("get_low_stock_products", {
+      page,
+      pageSize,
+    });
   } catch (error) {
     throw new Error(`Error fetching low stock products: ${error}`);
   }

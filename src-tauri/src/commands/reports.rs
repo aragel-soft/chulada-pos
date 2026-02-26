@@ -634,13 +634,29 @@ pub fn get_inventory_valuation(db: State<Mutex<Connection>>) -> Result<Inventory
     })
     .map_err(|e| e.to_string())
 }
-
 #[tauri::command]
 pub fn get_low_stock_products(
     db: State<Mutex<Connection>>,
-) -> Result<Vec<LowStockProduct>, String> {
+    page: i64,
+    page_size: i64,
+) -> Result<PaginatedResult<LowStockProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let store_id = get_current_store_id(&conn)?;
+
+    let offset = (page - 1) * page_size;
+    let count_sql = r#"
+        SELECT COUNT(p.id)
+        FROM products p
+        JOIN store_inventory i ON p.id = i.product_id
+        WHERE p.deleted_at IS NULL
+          AND p.is_active = 1
+          AND i.store_id = ?1
+          AND i.stock <= COALESCE(i.minimum_stock, 5)
+    "#;
+
+    let total_count: i64 = conn
+        .query_row(count_sql, params![store_id], |row| row.get(0))
+        .unwrap_or(0);
 
     let sql = r#"
         SELECT 
@@ -661,11 +677,12 @@ pub fn get_low_stock_products(
           AND i.store_id = ?1
           AND i.stock <= COALESCE(i.minimum_stock, 5)
         ORDER BY c.name ASC, p.name ASC
+        LIMIT ?2 OFFSET ?3
     "#;
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![store_id], |row| {
+        .query_map(params![store_id, page_size, offset], |row| {
             Ok(LowStockProduct {
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
@@ -680,6 +697,14 @@ pub fn get_low_stock_products(
         })
         .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
+    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
+
+    Ok(PaginatedResult {
+        data,
+        total: total_count,
+        page,
+        page_size,
+        total_pages,
+    })
 }
