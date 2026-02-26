@@ -251,13 +251,23 @@ export function CloseShiftModal({
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={isLoading || isClosing}
-                  className="bg-[#480489] hover:bg-[#5a0aa0] text-white shrink-0 px-6"
-                >
-                  Confirmar Cierre de Turno
-                </Button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={isLoading || isClosing}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isLoading || isClosing}
+                    className="bg-[#480489] hover:bg-[#5a0aa0] text-white px-6"
+                  >
+                    Confirmar Cierre de Turno
+                  </Button>
+                </div>
               </div>
             </div>
           </form>
