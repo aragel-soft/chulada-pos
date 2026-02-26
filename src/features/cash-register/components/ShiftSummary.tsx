@@ -423,9 +423,6 @@ export function ShiftSummary({
                     <p className="text-md font-bold text-emerald-700 uppercase tracking-wider leading-none">
                       Retirar Efectivo
                     </p>
-                    <p className="text-xs text-emerald-500 mt-0.5">
-                      Proyectado al cierre
-                    </p>
                   </div>
                 </div>
                 <span className="text-3xl font-black text-emerald-800 tabular-nums">

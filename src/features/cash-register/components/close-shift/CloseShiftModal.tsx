@@ -18,11 +18,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Scissors, Wallet, Loader2 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { Scissors, Loader2, ChevronDown, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { closeShiftSchema } from "@/features/cash-register/schemas/closeShiftSchema";
 import { z } from "zod";
@@ -41,10 +40,15 @@ interface CloseShiftModalProps {
   onClose: () => void;
 }
 
-export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalProps) {
+export function CloseShiftModal({
+  shiftId,
+  isOpen,
+  onClose,
+}: CloseShiftModalProps) {
   const [sessionKey, setSessionKey] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   const { closeShift } = useCashRegisterStore();
   const { user } = useAuthStore();
@@ -54,13 +58,6 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
     queryFn: () => getShiftDetails(shiftId),
     enabled: isOpen && !!shiftId,
   });
-
-  const cashWithdrawal =
-    (details?.total_cash_sales ?? 0) +
-    (details?.debt_payments_cash ?? 0) +
-    (details?.total_movements_in ?? 0) -
-    (details?.total_movements_out ?? 0);
-
 
   const {
     control,
@@ -77,12 +74,12 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
     },
   });
 
-  // Reset when opening
   useEffect(() => {
     if (isOpen) {
       reset({ terminal_cut_confirmed: undefined, notes: "" });
       setSessionKey((prev) => prev + 1);
       setShowConfirm(false);
+      setShowNotes(false);
     }
   }, [isOpen, reset]);
 
@@ -109,6 +106,41 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
       setShowConfirm(false);
     }
   };
+
+  const onInvalid = (errors: FieldErrors<CloseShiftFormValues>) => {
+    if (errors.terminal_cut_confirmed) {
+      toast.error("Acción requerida", {
+        description: errors.terminal_cut_confirmed.message,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen || showConfirm) return;
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.key === "Enter" &&
+        (e.target as HTMLElement).tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        handleSubmit(onSubmit, onInvalid)();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, showConfirm, handleSubmit, onInvalid]);
+
+  useEffect(() => {
+    if (!showConfirm || isClosing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleConfirm();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showConfirm, isClosing, handleConfirm]);
 
   return (
     <>
@@ -137,7 +169,10 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
           </div>
 
           {/* ── Content ── */}
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <form
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
             <ScrollArea className="flex-1">
               <div className="p-4">
                 {isLoading && (
@@ -155,19 +190,34 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
 
             {/* ── Footer form ── */}
             <div className="border-t p-4 bg-background shrink-0 space-y-4">
-              {/* Notes */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="notes" className="text-sm font-medium">
-                    Notas del cierre <span className="text-muted-foreground font-normal">(opcional)</span>
-                  </Label>
+              {/* Notes — collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotes((v) => !v)}
+                  aria-expanded={showNotes}
+                  aria-controls="notes"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Agregar nota al cierre
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      showNotes ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showNotes && (
                   <textarea
                     id="notes"
+                    autoFocus
                     placeholder="Ej: Se detectó inconsistencia en el efectivo al retirar..."
                     rows={2}
-                    className="w-full resize-none text-sm border border-input rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="mt-2 w-full resize-none text-sm border border-input rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     {...register("notes")}
                   />
-                </div>
+                )}
+              </div>
 
               {/* Checkbox + Submit row */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -191,7 +241,8 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
                       htmlFor="terminal_cut_confirmed"
                       className="text-sm font-medium cursor-pointer leading-snug"
                     >
-                      Confirmo que realicé el corte físico de la terminal bancaria
+                      Confirmo que realicé el corte físico de la terminal
+                      bancaria
                     </Label>
                     {errors.terminal_cut_confirmed && (
                       <p className="text-xs text-destructive">
@@ -218,10 +269,12 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cerrar el turno definitivamente?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Cerrar el turno definitivamente?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción cerrará el turno actual. No podrás revertirlo ni registrar
-              nuevas ventas en este turno.
+              Esta acción cerrará el turno actual. No podrás revertirlo ni
+              registrar nuevas ventas en este turno.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -230,9 +283,12 @@ export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalPro
               onClick={handleConfirm}
               disabled={isClosing}
               className="bg-[#480489] hover:bg-[#5a0aa0]"
+              autoFocus
             >
               {isClosing ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cerrando...</>
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cerrando...
+                </>
               ) : (
                 "Sí, Cerrar Turno"
               )}
