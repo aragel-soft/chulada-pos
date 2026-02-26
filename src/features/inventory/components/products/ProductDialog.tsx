@@ -34,6 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
+import { MoneyInput } from "@/components/ui/money-input"; 
 import {
   productSchema,
   ProductFormValues,
@@ -285,6 +286,12 @@ export function ProductDialog({
 
   const isPending = isEditing ? updateMutation.isPending : createMutation.isPending;
 
+  const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["e", "E", "+", "-", "."].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
@@ -528,10 +535,11 @@ export function ProductDialog({
                         Precio Menudeo <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
-                          <Input type="number" step="0.50" className="pl-7 font-semibold" {...field} />
-                        </div>
+                        <MoneyInput 
+                          step="0.50"
+                          className="font-semibold h-10" 
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -545,10 +553,11 @@ export function ProductDialog({
                     <FormItem>
                       <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
-                          <Input type="number" step="0.50" className="pl-7" {...field} />
-                        </div>
+                        <MoneyInput 
+                          step="0.50"
+                          className="h-10" 
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -563,10 +572,11 @@ export function ProductDialog({
                       <FormItem>
                         <FormLabel>Costo de Compra</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1.5 text-muted-foreground">$</span>
-                            <Input type="number" step="0.50" className="pl-7 bg-muted/20" {...field} />
-                          </div>
+                          <MoneyInput 
+                            step="0.50"
+                            className="bg-muted/20 h-10" 
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -595,6 +605,8 @@ export function ProductDialog({
                           className={isEditing ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"} 
                           disabled={isEditing}
                           {...field} 
+                          onWheel={(e) => e.currentTarget.blur()}
+                          onKeyDown={handleQuantityKeyDown}
                         />
                       </FormControl>
                       <FormMessage />
@@ -609,7 +621,13 @@ export function ProductDialog({
                     <FormItem>
                       <FormLabel className="!text-foreground">Stock Mínimo</FormLabel>
                       <FormControl>
-                        <Input type="number" className="bg-background" {...field} />
+                        <Input 
+                          type="number" 
+                          className="bg-background" 
+                          {...field} 
+                          onWheel={(e) => e.currentTarget.blur()}
+                          onKeyDown={handleQuantityKeyDown}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
