@@ -19,12 +19,7 @@ pub struct ShiftDto {
     pub closing_user_id: Option<String>,
     pub closing_user_name: Option<String>,
     pub closing_user_avatar: Option<String>,
-    pub final_cash: Option<f64>,
     pub expected_cash: Option<f64>,
-    pub cash_difference: Option<f64>,
-    pub card_terminal_total: Option<f64>,
-    pub card_expected_total: Option<f64>,
-    pub card_difference: Option<f64>,
     pub cash_withdrawal: Option<f64>,
     pub notes: Option<String>,
 }
@@ -34,8 +29,7 @@ pub struct ShiftDto {
 /// Standard SELECT for ShiftDto. All queries that build a ShiftDto must use this
 pub const SHIFT_SELECT_SQL: &str =
     "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code,
-            s.closing_date, s.closing_user_id, s.final_cash, s.expected_cash, s.cash_difference,
-            s.card_terminal_total, s.card_expected_total, s.card_difference, s.cash_withdrawal, s.notes,
+            s.closing_date, s.closing_user_id, s.expected_cash, s.cash_withdrawal, s.notes,
             u.full_name, u.avatar_url,
             uc.full_name, uc.avatar_url
      FROM cash_register_shifts s
@@ -53,18 +47,13 @@ pub fn shift_from_row(row: &rusqlite::Row) -> rusqlite::Result<ShiftDto> {
         code: row.get(5).unwrap_or(None),
         closing_date: row.get(6).unwrap_or(None),
         closing_user_id: row.get(7).unwrap_or(None),
-        final_cash: row.get(8).unwrap_or(None),
-        expected_cash: row.get(9).unwrap_or(None),
-        cash_difference: row.get(10).unwrap_or(None),
-        card_terminal_total: row.get(11).unwrap_or(None),
-        card_expected_total: row.get(12).unwrap_or(None),
-        card_difference: row.get(13).unwrap_or(None),
-        cash_withdrawal: row.get(14).unwrap_or(None),
-        notes: row.get(15).unwrap_or(None),
-        opening_user_name: row.get(16)?,
-        opening_user_avatar: row.get(17).unwrap_or(None),
-        closing_user_name: row.get(18).unwrap_or(None),
-        closing_user_avatar: row.get(19).unwrap_or(None),
+        expected_cash: row.get(8).unwrap_or(None),
+        cash_withdrawal: row.get(9).unwrap_or(None),
+        notes: row.get(10).unwrap_or(None),
+        opening_user_name: row.get(11)?,
+        opening_user_avatar: row.get(12).unwrap_or(None),
+        closing_user_name: row.get(13).unwrap_or(None),
+        closing_user_avatar: row.get(14).unwrap_or(None),
     })
 }
 
@@ -280,12 +269,7 @@ pub fn open_shift(
         closing_user_id: None,
         closing_user_name: None,
         closing_user_avatar: None,
-        final_cash: None,
         expected_cash: None,
-        cash_difference: None,
-        card_terminal_total: None,
-        card_expected_total: None,
-        card_difference: None,
         cash_withdrawal: None,
         notes: None,
     })
@@ -295,18 +279,9 @@ pub fn open_shift(
 pub fn close_shift(
     db: State<Mutex<Connection>>,
     shift_id: i64,
-    final_cash: f64,
-    card_terminal_total: f64,
     notes: Option<String>,
     user_id: String,
 ) -> Result<ShiftDto, String> {
-    if final_cash < 0.0 {
-        return Err("El monto final no puede ser negativo.".to_string());
-    }
-    if card_terminal_total < 0.0 {
-        return Err("El monto de tarjeta no puede ser negativo.".to_string());
-    }
-
     let mut conn = db.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
@@ -330,38 +305,27 @@ pub fn close_shift(
     // Recalculate all totals atomically inside the transaction
     let totals = calculate_shift_totals(&tx, shift_id, initial_cash);
 
-    // Compute closing differences
     let expected_cash = totals.theoretical_cash;
-    let cash_difference = final_cash - expected_cash;
-    let card_expected_total = totals.total_card_sales + totals.debt_payments_card;
-    let card_difference = card_terminal_total - card_expected_total;
     let cash_withdrawal = expected_cash - initial_cash;
 
     let notes_trimmed = notes
         .map(|n| n.trim().to_string())
         .filter(|n| !n.is_empty());
 
-    // Persist all closing data
+    // Persist closing data
     let rows = tx
         .execute(
             "UPDATE cash_register_shifts
-         SET final_cash = ?1, closing_date = ?2, closing_user_id = ?3, status = 'closed',
-             expected_cash = ?5, cash_difference = ?6,
-             card_terminal_total = ?7, card_expected_total = ?8, card_difference = ?9,
-             cash_withdrawal = ?10, notes = ?11, updated_at = ?2
-         WHERE id = ?4 AND status = 'open'",
+         SET closing_date = ?1, closing_user_id = ?2, status = 'closed',
+             expected_cash = ?3, cash_withdrawal = ?4, notes = ?5, updated_at = ?1
+         WHERE id = ?6 AND status = 'open'",
             params![
-                final_cash,
                 now,
                 user_id,
-                shift_id,
                 expected_cash,
-                cash_difference,
-                card_terminal_total,
-                card_expected_total,
-                card_difference,
                 cash_withdrawal,
                 notes_trimmed,
+                shift_id,
             ],
         )
         .map_err(|e| e.to_string())?;
