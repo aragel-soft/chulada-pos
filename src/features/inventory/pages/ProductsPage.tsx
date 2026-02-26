@@ -12,8 +12,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { getProducts, getAllTags } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
-import { CreateProductDialog } from "../components/products/CreateProductDialog";
-import { EditProductDialog } from "../components/products/EditProductDialog";
+import { ProductDialog } from "../components/products/ProductDialog";
 import { BulkEditProductDialog } from "../components/products/BulkEditProductDialog";
 import { DeleteProductsDialog } from "../components/products/DeleteProductsDialog";
 import { getColumns } from "../components/products/columns";
@@ -24,9 +23,8 @@ export default function ProductsPage() {
   const [data, setData] = useState<Product[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [selectedProductsForBulk, setSelectedProductsForBulk] = useState<Product[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -179,7 +177,10 @@ export default function ProductsPage() {
             {can("products:create") && (
               <Button
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                onClick={() => setIsCreateDialogOpen(true)}
+                onClick={() => {
+                  setActiveProductId(null);
+                  setIsProductDialogOpen(true);
+                }}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Agregar</span>
@@ -194,8 +195,8 @@ export default function ProductsPage() {
                   const selectedRows = table.getFilteredSelectedRowModel().rows;
                   if (selectedRows.length === 1) {
                     const selectedRow = selectedRows[0];
-                    setEditingId(selectedRow.original.id);
-                    setIsEditDialogOpen(true);
+                    setActiveProductId(selectedRow.original.id);
+                    setIsProductDialogOpen(true);
                   } else {
                     const products = selectedRows.map((row) => row.original);
                     setSelectedProductsForBulk(products);
@@ -232,32 +233,26 @@ export default function ProductsPage() {
         )}
       />
 
-      <CreateProductDialog
-        open={isCreateDialogOpen}
+      <ProductDialog
+        open={isProductDialogOpen}
+        productId={activeProductId}
         onOpenChange={(open) => {
-          setIsCreateDialogOpen(open);
+          setIsProductDialogOpen(open);
           if (!open) {
+            setActiveProductId(null);
             fetchProducts();
             setRowSelection({});
-          }
-        }}
-      />
-      <EditProductDialog
-        open={isEditDialogOpen}
-        productId={editingId}
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) {
-            setEditingId(null);
           }
         }}
         onSuccess={() => {
           fetchProducts();
           fetchOptions();
           setRowSelection({});
-          setIsEditDialogOpen(false);
+          setIsProductDialogOpen(false);
+          setActiveProductId(null);
         }}
       />
+
       <BulkEditProductDialog
         open={isBulkEditOpen}
         onOpenChange={setIsBulkEditOpen}
