@@ -34,9 +34,7 @@ pub struct ShiftDto {
     pub total_movements_out: Option<f64>,
 }
 
-// ──────────────────────────────────────────────────────────────
-
-/// Standard SELECT for ShiftDto. All queries that build a ShiftDto must use this
+/// Standard SELECT for ShiftDto.
 pub const SHIFT_SELECT_SQL: &str =
     "SELECT s.id, s.initial_cash, s.opening_date, s.opening_user_id, s.status, s.code,
             s.closing_date, s.closing_user_id, s.expected_cash, s.cash_withdrawal, s.notes,
@@ -119,7 +117,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
                 COALESCE(SUM(total), 0.0),
                 COALESCE(SUM(card_transfer_amount), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND status = 'completed'",
+             WHERE cash_register_shift_id = ?1 AND (status = 'completed' OR status = 'partial_return')",
             params![shift_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
@@ -130,7 +128,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
         .query_row(
             "SELECT COALESCE(SUM(total), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit'",
+             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND (status = 'completed' OR status = 'partial_return')",
             params![shift_id],
             |row| row.get(0),
         )
@@ -142,7 +140,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
             "SELECT COALESCE(SUM(sv.amount), 0.0)
              FROM sale_vouchers sv
              INNER JOIN sales s ON sv.sale_id = s.id
-             WHERE s.cash_register_shift_id = ?1 AND s.status = 'completed'",
+             WHERE s.cash_register_shift_id = ?1 AND (s.status = 'completed' OR s.status = 'partial_return')",
             params![shift_id],
             |row| row.get(0),
         )
