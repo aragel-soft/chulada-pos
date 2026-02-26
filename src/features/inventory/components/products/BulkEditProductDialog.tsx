@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,12 +21,18 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +59,7 @@ import {
 import {
   getCommonValue
 } from "@/features/inventory/utils/bulk-actions";
+import { cn } from "@/lib/utils";
 
 interface BulkEditProductDialogProps {
   open: boolean;
@@ -68,9 +75,8 @@ export function BulkEditProductDialog({
   onSuccess,
 }: BulkEditProductDialogProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingValues, setPendingValues] = useState<BulkEditFormValues | null>(
-    null
-  );
+  const [pendingValues, setPendingValues] = useState<BulkEditFormValues | null>(null);
+  const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
@@ -198,39 +204,92 @@ export function BulkEditProductDialog({
                   <FormField
                     control={form.control}
                     name="category_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Categoría</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          disabled={loadingCategories}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={isMixed("category_id") ? "(Varios valores actuales)" : "Seleccionar categoría"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <Badge 
-                                  variant="outline" 
-                                  className="font-normal border-0 px-2"
-                                  style={{ 
-                                    backgroundColor: (cat.color || '#64748b') + '20',
-                                    color: cat.color || '#64748b', 
-                                  }}
+                    render={({ field }) => {
+                      const selectedCategory = categories.find((cat) => cat.id === field.value);
+                      
+                      return (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Categoría</FormLabel>
+                          <Popover open={openCategoryPopover} onOpenChange={setOpenCategoryPopover}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openCategoryPopover}
+                                  disabled={loadingCategories}
+                                  className={cn(
+                                    "w-full justify-between font-normal bg-background hover:bg-background h-10",
+                                    !field.value && "text-muted-foreground"
+                                  )}
                                 >
-                                  {cat.name}
-                                </Badge>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                                  {selectedCategory ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="font-normal border-0 px-2"
+                                      style={{
+                                        backgroundColor: (selectedCategory.color || '#64748b') + '20',
+                                        color: selectedCategory.color || '#64748b',
+                                      }}
+                                    >
+                                      {selectedCategory.name}
+                                    </Badge>
+                                  ) : loadingCategories ? (
+                                    "Cargando..."
+                                  ) : isMixed("category_id") ? (
+                                    "(Varios valores actuales)"
+                                  ) : (
+                                    "Seleccionar categoría"
+                                  )}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar categoría..." />
+                                <CommandList>
+                                  <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+                                  <CommandGroup>
+                                    {categories.map((cat) => (
+                                      <CommandItem
+                                        key={cat.id}
+                                        value={`${cat.name} ${cat.id}`}
+                                        onSelect={() => {
+                                          form.setValue("category_id", cat.id, {
+                                            shouldValidate: true,
+                                            shouldDirty: true,
+                                          });
+                                          setOpenCategoryPopover(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            cat.id === field.value ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <Badge
+                                          variant="outline"
+                                          className="font-normal border-0 px-2"
+                                          style={{
+                                            backgroundColor: (cat.color || '#64748b') + '20',
+                                            color: cat.color || '#64748b',
+                                          }}
+                                        >
+                                          {cat.name}
+                                        </Badge>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
