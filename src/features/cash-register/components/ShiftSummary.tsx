@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
 import { format } from "date-fns";
-import type { CashMovementDto, ShiftDetailsDto } from "@/types/cast-cut";
+import type { CashMovementDto, ShiftDetailsDto } from "@/types/cash-register";
 // ── Reusable helpers ─────────────────────────────────────────────
 
 interface StatRowProps {

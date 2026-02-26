@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { ShiftDto } from "@/types/cast-cut";
+import { ShiftDto } from "@/types/cash-register";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
