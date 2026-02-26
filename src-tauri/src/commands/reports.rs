@@ -276,7 +276,7 @@ pub fn get_top_selling_products(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 3)) // TODO: Analizar esto
+                .map(|(i, _)| format!("?{}", i + 3))
                 .collect();
             format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
@@ -288,7 +288,7 @@ pub fn get_top_selling_products(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 5)) // TODO: Analizar esto
+                .map(|(i, _)| format!("?{}", i + 5))
                 .collect();
             format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
@@ -452,7 +452,7 @@ pub fn get_dead_stock_report(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 4)) // TODO: Analizar esto
+                .map(|(i, _)| format!("?{}", i + 4))
                 .collect();
             format!("AND p.category_id IN ({})", placeholders.join(", "))
         }
@@ -464,7 +464,7 @@ pub fn get_dead_stock_report(
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 6)) // TODO: Analizar esto
+                .map(|(i, _)| format!("?{}", i + 6))
                 .collect();
             format!("AND p.category_id IN ({})", placeholders.join(", "))
         }
