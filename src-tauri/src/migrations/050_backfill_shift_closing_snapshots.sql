@@ -13,27 +13,27 @@ SET
         SELECT COALESCE(SUM(s.total), 0.0)
         FROM sales s
         WHERE s.cash_register_shift_id = cash_register_shifts.id
-          AND (s.status = 'completed' OR s.status = 'partial_return')
+          AND NOT s.status = 'canceled'
     ),
     total_card_sales = (
         SELECT COALESCE(SUM(s.card_transfer_amount), 0.0)
         FROM sales s
         WHERE s.cash_register_shift_id = cash_register_shifts.id
-          AND (s.status = 'completed' OR s.status = 'partial_return')
+          AND NOT s.status = 'canceled'
     ),
     total_credit_sales = (
         SELECT COALESCE(SUM(s.total), 0.0)
         FROM sales s
         WHERE s.cash_register_shift_id = cash_register_shifts.id
           AND s.payment_method = 'credit'
-          AND (s.status = 'completed' OR s.status = 'partial_return')
+          AND NOT s.status = 'canceled'
     ),
     total_voucher_sales = (
         SELECT COALESCE(SUM(sv.amount), 0.0)
         FROM sale_vouchers sv
         INNER JOIN sales s ON sv.sale_id = s.id
         WHERE s.cash_register_shift_id = cash_register_shifts.id
-          AND (s.status = 'completed' OR s.status = 'partial_return')
+          AND NOT s.status = 'canceled'
     ),
     -- Cash sales = total - card - credit - voucher (derived)
     total_cash_sales = (
@@ -45,18 +45,18 @@ SET
                 FROM sales s2
                 WHERE s2.cash_register_shift_id = cash_register_shifts.id
                   AND s2.payment_method = 'credit'
-                  AND (s2.status = 'completed' OR s2.status = 'partial_return')
+                  AND NOT s2.status = 'canceled'
             )
             - (
                 SELECT COALESCE(SUM(sv2.amount), 0.0)
                 FROM sale_vouchers sv2
                 INNER JOIN sales s3 ON sv2.sale_id = s3.id
                 WHERE s3.cash_register_shift_id = cash_register_shifts.id
-                  AND (s3.status = 'completed' OR s3.status = 'partial_return')
+                  AND NOT s3.status = 'canceled'
             )
         FROM sales s
         WHERE s.cash_register_shift_id = cash_register_shifts.id
-          AND (s.status = 'completed' OR s.status = 'partial_return')
+          AND NOT s.status = 'canceled'
     ),
     -- Debt payments
     total_debt_payments = (

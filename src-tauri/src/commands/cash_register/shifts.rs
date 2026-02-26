@@ -117,7 +117,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
                 COALESCE(SUM(total), 0.0),
                 COALESCE(SUM(card_transfer_amount), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND (status = 'completed' OR status = 'partial_return')",
+             WHERE cash_register_shift_id = ?1 AND NOT status = 'canceled'",
             params![shift_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
@@ -128,7 +128,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
         .query_row(
             "SELECT COALESCE(SUM(total), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND (status = 'completed' OR status = 'partial_return')",
+             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND NOT status = 'canceled'",
             params![shift_id],
             |row| row.get(0),
         )
@@ -140,7 +140,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
             "SELECT COALESCE(SUM(sv.amount), 0.0)
              FROM sale_vouchers sv
              INNER JOIN sales s ON sv.sale_id = s.id
-             WHERE s.cash_register_shift_id = ?1 AND (s.status = 'completed' OR s.status = 'partial_return')",
+             WHERE s.cash_register_shift_id = ?1 AND NOT s.status = 'canceled'",
             params![shift_id],
             |row| row.get(0),
         )
