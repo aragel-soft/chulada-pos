@@ -199,7 +199,7 @@ export function CloseShiftModal({
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  Agregar nota al cierre
+                  Agregar nota
                   <ChevronDown
                     className={`h-3.5 w-3.5 transition-transform duration-200 ${
                       showNotes ? "rotate-180" : ""
