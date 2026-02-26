@@ -24,7 +24,7 @@ const statusOptions = [
 
 const paymentOptions = [
   { label: "Efectivo", value: "cash" },
-  { label: "Tarjeta/Transf.", value: "card_transfer" },
+  { label: "Tarjeta", value: "card" },
   { label: "Mixto", value: "mixed" },
   { label: "Crédito", value: "credit" },
 ];
