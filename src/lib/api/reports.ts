@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { PaginatedResponse } from "@/types/pagination";
 import { SalesReport, TopSellingProduct, DeadStockProduct, InventoryValuation, LowStockProduct } from "@/types/reports";
 
 export const formatDate = (date: Date): string => {
@@ -19,14 +20,16 @@ export const getSalesReport = async (from: Date, to: Date): Promise<SalesReport>
 export const getTopSellingProducts = async (
   from: Date,
   to: Date,
-  limit?: number,
+  page: number = 1,
+  pageSize: number = 16,
   categoryIds?: string[],
-): Promise<TopSellingProduct[]> => {
+): Promise<PaginatedResponse<TopSellingProduct>> => {
   try {
-    return await invoke<TopSellingProduct[]>("get_top_selling_products", {
+    return await invoke<PaginatedResponse<TopSellingProduct>>("get_top_selling_products", {
       fromDate: formatDate(from),
       toDate: formatDate(to),
-      limit: limit ?? null,
+      page,
+      pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
     });
   } catch (error) {

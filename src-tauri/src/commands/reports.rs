@@ -4,6 +4,15 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 
+#[derive(Debug, Serialize)]
+pub struct PaginatedResult<T> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+    pub total_pages: i64,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReportKpis {
     pub gross_sales: f64,
@@ -249,31 +258,87 @@ pub fn get_sales_report(
         category_chart,
     })
 }
-
 #[tauri::command]
 pub fn get_top_selling_products(
     db: State<Mutex<Connection>>,
     from_date: String,
     to_date: String,
-    limit: Option<i64>,
+    page: i64,
+    page_size: i64,
     category_ids: Option<Vec<String>>,
-) -> Result<Vec<TopSellingProduct>, String> {
+) -> Result<PaginatedResult<TopSellingProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let seller_limit = limit.unwrap_or(50);
 
-    let category_filter = match &category_ids {
+    let offset = (page - 1) * page_size;
+
+    let category_filter_count = match &category_ids {
         Some(ids) if !ids.is_empty() => {
             let placeholders: Vec<String> = ids
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("?{}", i + 4))
+                .map(|(i, _)| format!("?{}", i + 3))
                 .collect();
             format!("AND ps.category_id IN ({})", placeholders.join(", "))
         }
         _ => String::new(),
     };
 
-    let sql = format!(
+    let category_filter_data = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 5))
+                .collect();
+            format!("AND ps.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let count_sql = format!(
+        r#"
+        WITH product_sales AS (
+            SELECT 
+                si.product_id,
+                p.category_id
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
+            LEFT JOIN (
+                SELECT sale_item_id, SUM(quantity) as returned_qty
+                FROM return_items
+                GROUP BY sale_item_id
+            ) ri ON ri.sale_item_id = si.id
+            WHERE s.created_at BETWEEN ?1 AND ?2
+              AND s.status IN ('completed', 'partial_return')
+              AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
+            GROUP BY si.product_id, p.category_id
+        )
+        SELECT COUNT(*) FROM product_sales ps
+        WHERE 1=1 {}
+        "#,
+        category_filter_count
+    );
+
+    let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(from_date.clone()),
+        Box::new(to_date.clone()),
+    ];
+    
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            count_params.push(Box::new(id.clone()));
+        }
+    }
+    
+    let count_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        count_params.iter().map(|p| p.as_ref()).collect();
+
+    let total_count: i64 = conn
+        .query_row(&count_sql, count_params_refs.as_slice(), |row| row.get(0))
+        .unwrap_or(0);
+
+    let data_sql = format!(
         r#"
         WITH product_sales AS (
             SELECT 
@@ -318,28 +383,31 @@ pub fn get_top_selling_products(
         WHERE 1=1
           {}
         ORDER BY ps.total_revenue DESC
-        LIMIT ?3
+        LIMIT ?3 OFFSET ?4
     "#,
-        category_filter
+        category_filter_data
     );
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
 
-    let mut bind_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+    let mut data_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
         Box::new(from_date),
         Box::new(to_date),
-        Box::new(seller_limit),
+        Box::new(page_size),
+        Box::new(offset),
     ];
+    
     if let Some(ids) = &category_ids {
         for id in ids {
-            bind_params.push(Box::new(id.clone()));
+            data_params.push(Box::new(id.clone()));
         }
     }
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        bind_params.iter().map(|p| p.as_ref()).collect();
+    let data_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        data_params.iter().map(|p| p.as_ref()).collect();
+
     let rows = stmt
-        .query_map(params_refs.as_slice(), |row| {
+        .query_map(data_params_refs.as_slice(), |row| {
             Ok(TopSellingProduct {
                 ranking: row.get(0)?,
                 product_name: row.get(1)?,
@@ -353,8 +421,16 @@ pub fn get_top_selling_products(
         })
         .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
+    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
+
+    Ok(PaginatedResult {
+        data,
+        total: total_count,
+        page,
+        page_size,
+        total_pages,
+    })
 }
 
 #[tauri::command]
