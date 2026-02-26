@@ -31,7 +31,7 @@ const PRICE_TYPE_STYLES: Record<string, PriceTypeStyle> = {
     kit_item: {
         container: 'ml-0 bg-pink-50/50 border-pink-100',
         badge: 'bg-pink-100 text-pink-700 border border-pink-200 font-medium hover:bg-pink-100',
-        label: 'Regalo',
+        label: 'Complemento',
         labelClass: 'font-bold tracking-wider',
         icon: Gift,
         canTogglePrice: false

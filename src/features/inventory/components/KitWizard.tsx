@@ -41,10 +41,10 @@ const { useStepper, steps } = defineStepper(
   { id: "info", title: "Información", description: "Datos básicos" },
   {
     id: "triggers",
-    title: "Disparadores",
+    title: "Productos Principales",
     description: "Productos que activan",
   },
-  { id: "rewards", title: "Regalos", description: "Contenido del kit" },
+  { id: "rewards", title: "Complementos", description: "Contenido del kit" },
   { id: "review", title: "Confirmar", description: "Resumen final" },
 );
 
@@ -150,14 +150,14 @@ export function KitWizard({
       if (isValid) {
         stepper.next();
       } else {
-        toast.error("Debes seleccionar al menos un producto disparador");
+        toast.error("Debes seleccionar al menos un producto principal");
       }
     } else if (stepper.current.id === "rewards") {
       const isValid = await trigger("includedItems");
       if (isValid) {
         stepper.next();
       } else {
-        toast.error("Debes seleccionar al menos un producto de regalo");
+        toast.error("Debes seleccionar al menos un complemento");
       }
     }
   };
@@ -332,7 +332,7 @@ export function KitWizard({
                       </Label>
                       <Input
                         id="name"
-                        placeholder="Ej. Tinte + Shampoo de Regalo"
+                        placeholder="Ej. Tinte + Shampoo de Complemento"
                         {...register("name")}
                         className={cn(
                           "focus-visible:ring-[#480489]",
@@ -363,7 +363,7 @@ export function KitWizard({
                         <span className="text-muted-foreground leading-tight pr-4">
                           {" "}
                           {/* pr-4 evita que el texto se pegue al switch */}
-                          El sistema exigirá elegir el regalo antes de cobrar.
+                          El sistema exigirá elegir el complemento antes de cobrar.
                         </span>
                         <Switch
                           checked={formData.isRequired}
@@ -431,7 +431,7 @@ export function KitWizard({
                 <div className="min-h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
                   <div className="mb-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
-                      ¿Qué se llevan de regalo?
+                      ¿Qué complemento se llevan?
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       Define los productos incluidos y sus cantidades.
@@ -491,11 +491,11 @@ export function KitWizard({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Resumen Triggers */}
+                    {/* Resumen Productos Principales */}
                     <div className="border rounded-xl overflow-hidden shadow-sm">
                       <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
                         <h4 className="font-semibold flex items-center gap-2">
-                          Disparadores
+                          Productos Principales
                         </h4>
                         <span className="pr-1 font-mono text-sm">
                           {formData.triggers.length}
@@ -515,11 +515,11 @@ export function KitWizard({
                       </ul>
                     </div>
 
-                    {/* Resumen Rewards */}
+                    {/* Resumen Complementos */}
                     <div className="border rounded-xl overflow-hidden shadow-sm">
                       <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
                         <h4 className="font-semibold flex items-center gap-2">
-                          Regalos
+                          Complementos
                         </h4>
                         <span className="pr-1 font-mono text-sm">
                           {formData.includedItems.length}

@@ -38,7 +38,7 @@ export const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
     className:
       "h-5 px-1 text-[10px] bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-100",
     icon: Gift,
-    label: "REGALO",
+    label: "COMPLEMENTO",
   },
   kit: {
     variant: "secondary",

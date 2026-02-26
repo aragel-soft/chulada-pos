@@ -70,10 +70,10 @@ export function KitSelectionModal({ isOpen, kit, triggerQuantity, alreadySelecte
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gift className="w-5 h-5 text-purple-600" />
-            <span>Selecciona tus Regalos</span>
+            <span>Selecciona tus Complementos</span>
           </DialogTitle>
           <DialogDescription>
-            Te faltan seleccionar <strong>{remaining}</strong> regalo(s) del kit: <strong>{kit.name}</strong> de un total de {totalNeeded} ({alreadySelectedCount} ya seleccionados).
+            Te faltan seleccionar <strong>{remaining}</strong> complemento(s) del kit: <strong>{kit.name}</strong> de un total de {totalNeeded} ({alreadySelectedCount} ya seleccionados).
           </DialogDescription>
         </DialogHeader>
 

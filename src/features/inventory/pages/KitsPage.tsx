@@ -128,7 +128,7 @@ export default function KitsPage() {
       {
         accessorKey: "items_summary",
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Contenido (Regalo)" />
+          <DataTableColumnHeader column={column} title="Contenido (Complemento)" />
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

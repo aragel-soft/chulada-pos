@@ -134,9 +134,9 @@ export function ProductSearchSelector({
   const title = customTitle
     ? customTitle
     : mode === "triggers"
-      ? "Productos Activadores"
+      ? "Productos Principales"
       : mode === "rewards"
-        ? "Productos de Regalo"
+        ? "Complementos"
         : "Productos Seleccionados";
 
   return (

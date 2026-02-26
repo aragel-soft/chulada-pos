@@ -98,7 +98,7 @@ export function DeleteKitsDialog({
               <div className="space-y-1">
                 <p className="font-semibold">Liberación de Productos</p>
                 <p className="opacity-90 leading-snug">
-                  Los productos "disparadores" de estos kits quedarán
+                  Los productos principales de estos kits quedarán
                   <strong> libres inmediatamente</strong> y podrán ser asignados
                   a nuevos kits.
                 </p>

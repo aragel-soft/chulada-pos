@@ -19,10 +19,10 @@ export const kitFormSchema = z.object({
   isActive: z.boolean().default(true),
   triggers: z
     .array(selectorItemSchema)
-    .min(1, "Debes seleccionar al menos un producto disparador"),
+    .min(1, "Debes seleccionar al menos un producto principal"),
   includedItems: z
     .array(selectorItemSchema)
-    .min(1, "Debes agregar al menos un producto de regalo"),
+    .min(1, "Debes agregar al menos un complemento"),
 });
 
 export type KitFormData = z.infer<typeof kitFormSchema>;
