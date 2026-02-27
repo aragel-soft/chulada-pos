@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Pencil } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { EditProductDialog } from "@/features/inventory/components/products/EditProductDialog";
+import { MoneyInput } from "@/components/ui/money-input";
 
 interface ReceptionRowProps {
   item: ReceptionItem;
@@ -55,10 +56,7 @@ export const ReceptionRow = memo(
     const subtotal = item.quantity * item.cost;
 
     const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      if (val === "" || /^\d+$/.test(val)) {
-        setQtyValue(val);
-      }
+      setQtyValue(e.target.value);
     };
 
     const handleQtyBlur = () => {
@@ -71,10 +69,7 @@ export const ReceptionRow = memo(
     };
 
     const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      if (val === "" || /^\d*\.?\d*$/.test(val)) {
-        setCostValue(val);
-      }
+      setCostValue(e.target.value);
     };
 
     const handleCostBlur = () => {
@@ -87,10 +82,7 @@ export const ReceptionRow = memo(
     };
 
     const handleRetailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      if (val === "" || /^\d*\.?\d*$/.test(val)) {
-        setRetailValue(val);
-      }
+      setRetailValue(e.target.value);
     };
 
     const handleRetailBlur = () => {
@@ -103,10 +95,7 @@ export const ReceptionRow = memo(
     };
 
     const handleWholesaleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      if (val === "" || /^\d*\.?\d*$/.test(val)) {
-        setWholesaleValue(val);
-      }
+      setWholesaleValue(e.target.value);
     };
 
     const handleWholesaleBlur = () => {
@@ -151,63 +140,55 @@ export const ReceptionRow = memo(
 
           <TableCell className="w-[120px]">
             <Input
-              type="text"
-              inputMode="numeric"
+              type="number"
+              min="1"
+              step="1"
               value={qtyValue}
               onChange={handleQtyChange}
               onBlur={handleQtyBlur}
+              onWheel={(e) => e.currentTarget.blur()}
+              onKeyDown={(e) => {
+                if (["e", "E", "+", "-", "."].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               className="h-8 text-center font-bold"
             />
           </TableCell>
 
           {purchasePriceVisible && (
             <TableCell className="w-[140px]">
-              <div className="relative">
-                <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
-                  $
-                </span>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={costValue}
-                  onChange={handleCostChange}
-                  onBlur={handleCostBlur}
-                  className="h-8 pl-5 text-right font-medium"
-                />
-              </div>
+              <MoneyInput
+                step="0.01"
+                value={costValue}
+                onChange={handleCostChange}
+                onBlur={handleCostBlur}
+                className="h-8 text-right font-medium"
+                symbolClassName="text-xs font-normal"
+              />
             </TableCell>
           )}
 
           <TableCell className="w-[130px]">
-            <div className="relative">
-              <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
-                $
-              </span>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={retailValue}
-                onChange={handleRetailChange}
-                onBlur={handleRetailBlur}
-                className="h-8 pl-5 text-right font-medium"
-              />
-            </div>
+            <MoneyInput
+              step="0.01"
+              value={retailValue}
+              onChange={handleRetailChange}
+              onBlur={handleRetailBlur}
+              className="h-8 text-right font-medium"
+              symbolClassName="text-xs font-normal"
+            />
           </TableCell>
 
           <TableCell className="w-[130px]">
-            <div className="relative">
-              <span className="absolute left-2 top-1.5 text-muted-foreground text-xs">
-                $
-              </span>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={wholesaleValue}
-                onChange={handleWholesaleChange}
-                onBlur={handleWholesaleBlur}
-                className="h-8 pl-5 text-right font-medium"
-              />
-            </div>
+            <MoneyInput
+              step="0.01"
+              value={wholesaleValue}
+              onChange={handleWholesaleChange}
+              onBlur={handleWholesaleBlur}
+              className="h-8 text-right font-medium"
+              symbolClassName="text-xs font-normal"
+            />
           </TableCell>
 
           {purchasePriceVisible && (
