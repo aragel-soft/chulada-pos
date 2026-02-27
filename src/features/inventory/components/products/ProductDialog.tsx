@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Upload, X, Loader2, PackagePlus, Pencil } from "lucide-react";
+import { Upload, X, Loader2, PackagePlus, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
@@ -21,13 +21,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/text-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +28,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { MoneyInput } from "@/components/ui/money-input"; 
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   productSchema,
   ProductFormValues,
@@ -49,6 +55,7 @@ import {
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { CreateProductPayload, UpdateProductPayload, ImageAction, Product } from "@/types/inventory";
 import { useAppImage } from "@/hooks/use-app-image";
+import { cn } from "@/lib/utils";
 
 interface ProductDialogProps {
   open: boolean;
@@ -85,6 +92,7 @@ export function ProductDialog({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>("Keep");
+  const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
@@ -466,41 +474,92 @@ export function ProductDialog({
                   <FormField
                     control={form.control}
                     name="category_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-foreground">
-                          Categoría <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={loadingCategories}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={loadingCategories ? "Cargando..." : "Selecciona una categoría"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <Badge
+                    render={({ field }) => {
+                      const selectedCategory = categories.find((cat) => cat.id === field.value);
+                      
+                      return (
+                        <FormItem className="flex flex-col pt-2">
+                          <FormLabel className="!text-foreground">
+                            Categoría <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <Popover open={openCategoryPopover} onOpenChange={setOpenCategoryPopover}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
                                   variant="outline"
-                                  className="font-normal border-0 px-2"
-                                  style={{
-                                    backgroundColor: (cat.color || '#64748b') + '20',
-                                    color: cat.color || '#64748b',
-                                  }}
+                                  role="combobox"
+                                  aria-expanded={openCategoryPopover}
+                                  disabled={loadingCategories}
+                                  className={cn(
+                                    "w-full justify-between font-normal bg-background hover:bg-background h-10",
+                                    !field.value && "text-muted-foreground"
+                                  )}
                                 >
-                                  {cat.name}
-                                </Badge>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                                  {selectedCategory ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="font-normal border-0 px-2"
+                                      style={{
+                                        backgroundColor: (selectedCategory.color || '#64748b') + '20',
+                                        color: selectedCategory.color || '#64748b',
+                                      }}
+                                    >
+                                      {selectedCategory.name}
+                                    </Badge>
+                                  ) : loadingCategories ? (
+                                    "Cargando..."
+                                  ) : (
+                                    "Selecciona una categoría"
+                                  )}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar categoría..." />
+                                <CommandList>
+                                  <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+                                  <CommandGroup>
+                                    {categories.map((cat) => (
+                                      <CommandItem
+                                        key={cat.id}
+                                        value={`${cat.name} ${cat.id}`}
+                                        onSelect={() => {
+                                          form.setValue("category_id", cat.id, { 
+                                            shouldValidate: true,
+                                            shouldDirty: true 
+                                          });
+                                          setOpenCategoryPopover(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            cat.id === field.value ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <Badge
+                                          variant="outline"
+                                          className="font-normal border-0 px-2"
+                                          style={{
+                                            backgroundColor: (cat.color || '#64748b') + '20',
+                                            color: cat.color || '#64748b',
+                                          }}
+                                        >
+                                          {cat.name}
+                                        </Badge>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
