@@ -63,8 +63,8 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
   const canProcessReturn = canReturn && hasItemsToReturn && sale?.status !== "cancelled";
 
   return (
-    <div className="flex flex-col h-full bg-white w-full border-l shadow-sm">
-      <div className="p-4 border-b bg-muted/5 relative shrink-0">
+    <div className="flex flex-col h-full bg-white w-full">
+      <div className="p-4 bg-muted/5 relative shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -378,7 +378,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                           .catch((e) => toast.error('Error al reimprimir', { description: String(e) }))}
                       >
                         <Printer className="h-3.5 w-3.5 mr-1.5" />
-                        Reimprimir Ticket
+                        Ticket
                       </Button>
                     </span>
                   </TooltipTrigger>

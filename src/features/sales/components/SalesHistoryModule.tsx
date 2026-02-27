@@ -8,24 +8,22 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { useSalesHistory } from "@/hooks/use-sales-history";
-import { FiltersPanel } from "@/features/sales/components/history/FiltersPanel";
 import { historyColumns } from "@/features/sales/components/history/columns";
 import { SaleDetailPanel } from "@/features/sales/components/history/SaleDetailSheet";
+import { SalesHistoryToolbar } from "@/features/sales/components/history/SalesHistoryToolbar";
 import { SaleMaster, SalesHistoryFilter } from "@/types/sales-history";
 
 interface SalesHistoryModuleProps {
   initialFilters?: Partial<SalesHistoryFilter>;
-  defaultCollapsed?: boolean;
 }
 
-export default function SalesHistoryModule({ 
+export default function SalesHistoryModule({
   initialFilters = {},
-  defaultCollapsed = false
 }: SalesHistoryModuleProps) {
   const { data, isLoading, filters, actions } = useSalesHistory({
-    initialFilters});
+    initialFilters,
+  });
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(defaultCollapsed);
   const [rowSelection, setRowSelection] = useState({});
 
   const columns = useMemo<ColumnDef<SaleMaster>[]>(
@@ -62,10 +60,13 @@ export default function SalesHistoryModule({
     [historyColumns],
   );
 
-  const paginationState: PaginationState = useMemo(() => ({
-    pageIndex: filters.page - 1,
-    pageSize: filters.page_size,
-  }), [filters.page, filters.page_size]);
+  const paginationState: PaginationState = useMemo(
+    () => ({
+      pageIndex: filters.page - 1,
+      pageSize: filters.page_size,
+    }),
+    [filters.page, filters.page_size],
+  );
 
   const sortingState: SortingState = useMemo(
     () => [
@@ -77,7 +78,7 @@ export default function SalesHistoryModule({
     [filters.sort_by, filters.sort_order],
   );
 
-  const handlePaginationChange = (updaterOrValue: any) => {
+  const handlePaginationChange = (updaterOrValue: Updater<PaginationState>) => {
     const newPagination =
       typeof updaterOrValue === "function"
         ? updaterOrValue(paginationState)
@@ -105,62 +106,52 @@ export default function SalesHistoryModule({
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      {/* LEFT SIDE PANEL (FILTERS) */}
-      <FiltersPanel
-        filters={filters}
-        actions={actions}
-        isCollapsed={filtersCollapsed}
-        onToggleCollapse={() => setFiltersCollapsed(!filtersCollapsed)}
-      />
-
-      {/* MAIN CONTAINER */}
       <div className="flex-1 flex min-w-0 transition-all duration-300">
         <div
-          className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-            selectedSaleId ? "w-[65%] border-r" : "w-full"
+          className={`flex flex-col min-w-0 h-full transition-[width] duration-150 ease-in-out ${
+            selectedSaleId ? "w-[65%] border-r pr-4" : "w-full"
           }`}
         >
-          <main className="flex-1 pl-4 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-auto p-1">
-              <DataTable
-                columns={columns}
-                data={data?.data || []}
-                isLoading={isLoading}
-                rowCount={data?.total || 0}
-                manualPagination={true}
-                manualFiltering={true}
-                manualSorting={true}
-                pagination={paginationState}
-                onPaginationChange={handlePaginationChange}
-                sorting={sortingState}
-                onSortingChange={handleSortingChange}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                globalFilter={filters.folio || ""}
-                onGlobalFilterChange={(val) =>
-                  actions.setSearch("folio", String(val))
-                }
-                searchPlaceholder="Buscar por Folio..."
-                columnTitles={{
-                  folio: "Folio",
-                  sale_date: "Fecha",
-                  status: "Estado",
-                  payment_method: "Método Pago",
-                  total: "Total",
-                }}
-                onRowClick={(row) =>
-                  setSelectedSaleId(
-                    selectedSaleId === row.original.id ? null : row.original.id,
-                  )
-                }
-                showColumnFilters={false}
+          <DataTable
+            columns={columns}
+            data={data?.data || []}
+            isLoading={isLoading}
+            rowCount={data?.total || 0}
+            manualPagination={true}
+            manualFiltering={true}
+            manualSorting={true}
+            pagination={paginationState}
+            onPaginationChange={handlePaginationChange}
+            sorting={sortingState}
+            onSortingChange={handleSortingChange}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            globalFilter={filters.search || ""}
+            onGlobalFilterChange={(val) => actions.setSearch(String(val))}
+            columnTitles={{
+              folio: "Folio",
+              sale_date: "Fecha",
+              status: "Estado",
+              payment_method: "Método Pago",
+              total: "Total",
+            }}
+            onRowClick={(row) =>
+              setSelectedSaleId(
+                selectedSaleId === row.original.id ? null : row.original.id,
+              )
+            }
+            showColumnFilters={false}
+            toolbar={() => (
+              <SalesHistoryToolbar
+                filters={filters}
+                actions={actions}
               />
-            </div>
-          </main>
+            )}
+          />
         </div>
 
         {selectedSaleId && (
-          <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20">
+          <div className="w-[35%] bg-white h-full overflow-hidden animate-in slide-in-from-right-5 duration-300 flex flex-col z-20 pl-4">
             <SaleDetailPanel
               saleId={selectedSaleId}
               onClose={() => setSelectedSaleId(null)}

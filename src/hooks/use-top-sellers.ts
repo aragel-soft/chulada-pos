@@ -1,47 +1,56 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { DateRange } from "react-day-picker";
+import { useState, useEffect } from "react";
 import { getTopSellingProducts } from "@/lib/api/reports";
-import { TopSellingProduct } from "@/types/reports";
-import { toast } from "sonner";
+import { TopSellingProduct, DateRange } from "@/types/reports";
+import { PaginatedResponse } from "@/types/pagination";
 
 export const useTopSellers = (
-  dateRange: DateRange | undefined,
+  dateRange: DateRange | undefined, 
   categoryIds?: string[],
+  page: number = 1,
+  pageSize: number = 16
 ) => {
-  const [data, setData] = useState<TopSellingProduct[]>([]);
+  const [data, setData] = useState<PaginatedResponse<TopSellingProduct> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const categoryKey = JSON.stringify(categoryIds ?? []);
-  const stableCategoryIds = useRef(categoryIds);
-  stableCategoryIds.current = categoryIds;
-
-  const fetchData = useCallback(async () => {
-    if (!dateRange?.from || !dateRange?.to) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await getTopSellingProducts(
-        dateRange.from,
-        dateRange.to,
-        undefined,
-        stableCategoryIds.current,
-      );
-      setData(result);
-    } catch (err) {
-      const errorMessage = "No se pudieron cargar los productos más vendidos. Intente nuevamente.";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange, categoryKey]);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let isMounted = true;
 
-  return { data, isLoading, error, refetch: fetchData };
+    const fetchData = async () => {
+      if (!dateRange?.from || !dateRange?.to) return; 
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const result = await getTopSellingProducts(
+          dateRange.from, 
+          dateRange.to, 
+          page, 
+          pageSize, 
+          categoryIds
+        );
+        
+        if (isMounted) {
+          setData(result);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Error al cargar el reporte");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dateRange?.from, dateRange?.to, categoryIds, page, pageSize]);
+
+  return { data, isLoading, error };
 };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { PaginationState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { deadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
@@ -10,13 +11,22 @@ export default function DeadStockPage() {
   const { dateRange } = useReportsContext();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 16,
+  });
 
   const categoryIds = useMemo(
     () => (selectedCategories.size > 0 ? Array.from(selectedCategories) : undefined),
     [selectedCategories]
   );
 
-  const { data, isLoading, error } = useDeadStock(dateRange, categoryIds);
+  const { data, isLoading, error } = useDeadStock(
+    dateRange, 
+    categoryIds,
+    pagination.pageIndex + 1,
+    pagination.pageSize
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -34,10 +44,14 @@ export default function DeadStockPage() {
     <div className="flex flex-col gap-4 h-full">
       <DataTable
         columns={deadStockColumns}
-        data={data}
+        data={data?.data || []}
         isLoading={isLoading}
         initialSorting={[{ id: "stagnant_value", desc: true }]}
         showColumnFilters={false}
+        manualPagination={true}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        rowCount={data?.total || 0}
         columnTitles={{
           product_name: "Producto",
           category_name: "Categoría",
