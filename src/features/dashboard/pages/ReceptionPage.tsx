@@ -14,8 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { processBulkReception } from "@/lib/api/inventory/inventory-movements";
-import { CreateProductDialog } from "@/features/inventory/components/products/CreateProductDialog";
-import { EditProductDialog } from "@/features/inventory/components/products/EditProductDialog";
+import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,9 +42,8 @@ export default function ReceptionPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [showZeroCostWarning, setShowZeroCostWarning] = useState(false);
-  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
-  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
 
   const executeReception = async () => {
     if (!user?.id) return;
@@ -100,7 +98,10 @@ export default function ReceptionPage() {
         <div className="flex gap-2 shrink-0">
           {can("products:create") && (
             <Button
-              onClick={() => setIsCreateProductOpen(true)}
+              onClick={() => {
+                setActiveProductId(null);
+                setIsProductDialogOpen(true);
+              }}
               className="rounded-r-md bg-[#480489] hover:bg-[#480489]/90 transition-all"
             >
               <PlusCircle className="w-5 h-5 mr-2" />
@@ -113,8 +114,8 @@ export default function ReceptionPage() {
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
               disabled={selectedIds.length !== 1}
               onClick={() => {
-                setEditingId(selectedIds[0]);
-                setIsEditProductOpen(true);
+                setActiveProductId(selectedIds[0]);
+                setIsProductDialogOpen(true);
               }}
             >
               <Pencil className="mr-2 h-4 w-4" />
@@ -166,19 +167,6 @@ export default function ReceptionPage() {
         </div>
       </div>
 
-      <EditProductDialog
-        open={isEditProductOpen}
-        onOpenChange={setIsEditProductOpen}
-        productId={editingId}
-        variant="minimal"
-        onSuccess={(updatedProduct) => {
-          if (updatedProduct) {
-            updateProductDetails(updatedProduct);
-          }
-          clearSelection();
-        }}
-      />
-
       {can("products:purchase_price") && (
         <AlertDialog
           open={showZeroCostWarning}
@@ -206,9 +194,21 @@ export default function ReceptionPage() {
         </AlertDialog>
       )}
 
-      <CreateProductDialog
-        open={isCreateProductOpen}
-        onOpenChange={setIsCreateProductOpen}
+      <ProductDialog
+        open={isProductDialogOpen}
+        productId={activeProductId}
+        onOpenChange={(open) => {
+          setIsProductDialogOpen(open);
+          if (!open) setActiveProductId(null);
+        }}
+        onSuccess={(updatedProduct) => {
+          if (updatedProduct && activeProductId) {
+            updateProductDetails(updatedProduct);
+            clearSelection();
+          }
+          setIsProductDialogOpen(false);
+          setActiveProductId(null);
+        }}
       />
     </div>
   );
