@@ -12,14 +12,10 @@ export interface ShiftDto {
   closing_user_id?: string;
   closing_user_name?: string;
   closing_user_avatar?: string;
-  final_cash?: number;
   expected_cash?: number;
-  cash_difference?: number;
-  card_terminal_total?: number;
-  card_expected_total?: number;
-  card_difference?: number;
   cash_withdrawal?: number;
   notes?: string;
+  total_sales?: number;
 }
 
 export interface CashMovementDto {
@@ -46,7 +42,7 @@ export interface ShiftDetailsDto {
   total_debt_payments: number;
   debt_payments_cash: number;
   debt_payments_card: number;
-  theoretical_cash: number;
+  total_cash: number;
 }
 
 export interface CreateCashMovementRequest {
@@ -58,8 +54,6 @@ export interface CreateCashMovementRequest {
 }
 
 export interface CloseShiftRequest {
-  finalCash: number;
-  cardTerminalTotal: number;
   notes?: string;
 }
 

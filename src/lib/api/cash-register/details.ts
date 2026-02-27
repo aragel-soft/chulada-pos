@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { ShiftDetailsDto, ShiftDto, PaginatedShifts, ShiftHistoryFilters } from '@/types/cast-cut';
+import { ShiftDetailsDto, ShiftDto, PaginatedShifts, ShiftHistoryFilters } from '@/types/cash-register';
 
 export const getShiftDetails = async (shiftId: number): Promise<ShiftDetailsDto> => {
   return await invoke('get_shift_details', { shiftId });

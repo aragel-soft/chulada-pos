@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
-import type { ShiftDto, CloseShiftRequest } from '@/types/cast-cut';
+import type { ShiftDto, CloseShiftRequest } from '@/types/cash-register';
 
 interface CashRegisterState {
   shift: ShiftDto | null;
@@ -51,8 +51,6 @@ export const useCashRegisterStore = create<CashRegisterState>()(
         try {
           const updatedShift = await invoke<ShiftDto>('close_shift', {
             shiftId: shift.id,
-            finalCash: request.finalCash,
-            cardTerminalTotal: request.cardTerminalTotal,
             notes: request.notes || null,
             userId,
           });

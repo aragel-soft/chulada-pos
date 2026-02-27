@@ -1492,7 +1492,7 @@ pub fn print_shift_summary(
         builder.set_bold(true);
         builder.add_row_with_dots(
             "Total Efectivo:",
-            &format!("${:.2}", details.theoretical_cash),
+            &format!("${:.2}", details.total_cash),
         );
         builder.set_bold(false);
         builder.set_bold(true);
