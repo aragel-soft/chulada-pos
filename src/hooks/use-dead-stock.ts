@@ -2,13 +2,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { DateRange } from "react-day-picker";
 import { getDeadStockReport } from "@/lib/api/reports";
 import { DeadStockProduct } from "@/types/reports";
+import { PaginatedResponse } from "@/types/pagination";
 import { toast } from "sonner";
 
 export const useDeadStock = (
   dateRange: DateRange | undefined,
   categoryIds?: string[],
+  page: number = 1,
+  pageSize: number = 16
 ) => {
-  const [data, setData] = useState<DeadStockProduct[]>([]);
+  const [data, setData] = useState<PaginatedResponse<DeadStockProduct> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +29,8 @@ export const useDeadStock = (
       const result = await getDeadStockReport(
         dateRange.from,
         dateRange.to,
+        page,
+        pageSize,
         stableCategoryIds.current,
       );
       setData(result);
@@ -36,7 +41,7 @@ export const useDeadStock = (
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange, categoryKey]);
+  }, [dateRange, categoryKey, page, pageSize]);
 
   useEffect(() => {
     fetchData();
