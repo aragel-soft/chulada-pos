@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { PaginatedResponse } from "@/types/pagination";
 import { SalesReport, TopSellingProduct, DeadStockProduct, InventoryValuation, LowStockProduct } from "@/types/reports";
 
 export const formatDate = (date: Date): string => {
@@ -19,14 +20,16 @@ export const getSalesReport = async (from: Date, to: Date): Promise<SalesReport>
 export const getTopSellingProducts = async (
   from: Date,
   to: Date,
-  limit?: number,
+  page: number = 1,
+  pageSize: number = 16,
   categoryIds?: string[],
-): Promise<TopSellingProduct[]> => {
+): Promise<PaginatedResponse<TopSellingProduct>> => {
   try {
-    return await invoke<TopSellingProduct[]>("get_top_selling_products", {
+    return await invoke<PaginatedResponse<TopSellingProduct>>("get_top_selling_products", {
       fromDate: formatDate(from),
       toDate: formatDate(to),
-      limit: limit ?? null,
+      page,
+      pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
     });
   } catch (error) {
@@ -37,12 +40,16 @@ export const getTopSellingProducts = async (
 export const getDeadStockReport = async (
   from: Date,
   to: Date,
+  page: number = 1,
+  pageSize: number = 16,
   categoryIds?: string[],
-): Promise<DeadStockProduct[]> => {
+): Promise<PaginatedResponse<DeadStockProduct>> => {
   try {
-    return await invoke<DeadStockProduct[]>("get_dead_stock_report", {
+    return await invoke<PaginatedResponse<DeadStockProduct>>("get_dead_stock_report", {
       fromDate: formatDate(from),
       toDate: formatDate(to),
+      page,
+      pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
     });
   } catch (error) {
@@ -58,9 +65,15 @@ export const getInventoryValuation = async (): Promise<InventoryValuation> => {
   }
 };
 
-export const getLowStockProducts = async (): Promise<LowStockProduct[]> => {
+export const getLowStockProducts = async (
+  page: number = 1,
+  pageSize: number = 16,
+): Promise<PaginatedResponse<LowStockProduct>> => {
   try {
-    return await invoke<LowStockProduct[]>("get_low_stock_products");
+    return await invoke<PaginatedResponse<LowStockProduct>>("get_low_stock_products", {
+      page,
+      pageSize,
+    });
   } catch (error) {
     throw new Error(`Error fetching low stock products: ${error}`);
   }

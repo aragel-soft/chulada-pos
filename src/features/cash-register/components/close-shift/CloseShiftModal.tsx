@@ -5,20 +5,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Scissors, Wallet } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Scissors, Loader2, ChevronDown, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getShiftDetails } from "@/lib/api/cash-register/details";
-import { CloseShiftStepOne } from "./CloseShiftStepOne";
-import { CloseShiftStepTwo } from "./CloseShiftStepTwo";
-import type { CloseShiftFormValues } from "@/features/cash-register/schemas/closeShiftSchema";
-import type { ShiftDetailsDto, ShiftDto } from "@/types/cast-cut";
+import { useForm, Controller, FieldErrors } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { closeShiftSchema } from "@/features/cash-register/schemas/closeShiftSchema";
+import { z } from "zod";
 
-
-const WIZARD_STEPS = [
-  { id: 1, title: "Captura" },
-  { id: 2, title: "Confirmación" },
-];
+type CloseShiftFormValues = z.output<typeof closeShiftSchema>;
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
+import { useAuthStore } from "@/stores/authStore";
+import { printShiftTicket } from "@/lib/api/printers";
+import { toast } from "sonner";
+import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CloseShiftModalProps {
   shiftId: number;
@@ -26,184 +40,271 @@ interface CloseShiftModalProps {
   onClose: () => void;
 }
 
-export function CloseShiftModal({ shiftId, isOpen, onClose }: CloseShiftModalProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formValues, setFormValues] = useState<CloseShiftFormValues | null>(null);
+export function CloseShiftModal({
+  shiftId,
+  isOpen,
+  onClose,
+}: CloseShiftModalProps) {
   const [sessionKey, setSessionKey] = useState(0);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+
+  const { closeShift } = useCashRegisterStore();
+  const { user } = useAuthStore();
+
   const { data: details, isLoading } = useQuery({
     queryKey: ["shiftDetails", shiftId, "close-modal"],
     queryFn: () => getShiftDetails(shiftId),
     enabled: isOpen && !!shiftId,
   });
 
-  const cashWithdrawal = (details?.total_cash_sales ?? 0) + (details?.debt_payments_cash ?? 0)  + (details?.total_movements_in ?? 0) - (details?.total_movements_out ?? 0);
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<CloseShiftFormValues>({
+    resolver: zodResolver(closeShiftSchema) as any,
+    defaultValues: {
+      terminal_cut_confirmed: undefined as any,
+      notes: "",
+    },
+  });
 
-  // Reset when opening
   useEffect(() => {
     if (isOpen) {
-      setCurrentStep(1);
-      setFormValues(null);
+      reset({ terminal_cut_confirmed: undefined, notes: "" });
       setSessionKey((prev) => prev + 1);
+      setShowConfirm(false);
+      setShowNotes(false);
     }
-  }, [isOpen]);
+  }, [isOpen, reset]);
 
-  const handleNext = (values: CloseShiftFormValues, _details: ShiftDetailsDto) => {
-    setFormValues(values);
-    setCurrentStep(2);
+  const onSubmit = (_values: CloseShiftFormValues) => {
+    setShowConfirm(true);
   };
 
-  const handleBack = () => {
-    if (currentStep === 2) {
-      setCurrentStep(1);
-    } else {
+  const handleConfirm = async () => {
+    if (!user?.id) return;
+    const notes = watch("notes");
+    setIsClosing(true);
+    try {
+      const closed = await closeShift({ notes: notes || undefined }, user.id);
+      toast.success("Turno cerrado correctamente", {
+        description: `Folio: ${closed.code ?? "—"}`,
+      });
+      printShiftTicket(closed.id).catch(() => {});
       onClose();
+    } catch (err) {
+      toast.error("Error al cerrar el turno", { description: String(err) });
+    } finally {
+      setIsClosing(false);
+      setShowConfirm(false);
     }
   };
 
-  const handleConfirmed = (_closedShift: ShiftDto) => {
-    onClose();
+  const onInvalid = (errors: FieldErrors<CloseShiftFormValues>) => {
+    if (errors.terminal_cut_confirmed) {
+      toast.error("Acción requerida", {
+        description: errors.terminal_cut_confirmed.message,
+      });
+    }
   };
+
+  useEffect(() => {
+    if (!isOpen || showConfirm) return;
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.key === "Enter" &&
+        (e.target as HTMLElement).tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        handleSubmit(onSubmit, onInvalid)();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, showConfirm, handleSubmit, onInvalid]);
+
+  useEffect(() => {
+    if (!showConfirm || isClosing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleConfirm();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showConfirm, isClosing, handleConfirm]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0"
-        key={sessionKey}
-      >
-        {/* Header */}
-        <div className="p-4 border-b bg-background">
-          <DialogHeader className="mb-4 flex flex-row items-center gap-4 space-y-0 justify-between">
-            <div className="flex flex-row items-center gap-3">
-              <div className="p-2 rounded-full bg-purple-50 shrink-0">
-                <Scissors className="h-5 w-5 text-purple-800" />
-              </div>
-              <div className="flex flex-col">
-                <DialogTitle className="text-lg font-bold text-foreground leading-tight">
-                  Realizar Corte de Caja
-                </DialogTitle>
-                <p className="text-xs text-muted-foreground">
-                  Proceso guiado de cierre de turno
-                </p>
-              </div>
-            </div>
-
-            {/* Cash withdrawal - Slim version */}
-            <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2 mr-6">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-emerald-600" />
-                <div className="flex flex-col min-w-[120px]">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-800 leading-none">
-                    Monto a Retirar
-                  </span>
-                  <span className="text-[9px] text-emerald-600 leading-none mt-0.5">
-                    Totas las operaciones en efectivo
-                  </span>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent
+          className="max-w-5xl h-[92vh] flex flex-col p-0 gap-0"
+          key={sessionKey}
+        >
+          {/* ── Header ── */}
+          <div className="p-4 border-b bg-background shrink-0">
+            <DialogHeader className="flex flex-row items-center gap-4 space-y-0 justify-between">
+              <div className="flex flex-row items-center gap-3">
+                <div className="p-2 rounded-full bg-purple-50 shrink-0">
+                  <Scissors className="h-5 w-5 text-purple-800" />
+                </div>
+                <div className="flex flex-col">
+                  <DialogTitle className="text-lg font-bold text-foreground leading-tight">
+                    Realizar Corte de Caja
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Revisa los montos y confirma el cierre del turno
+                  </p>
                 </div>
               </div>
-              <div className="text-lg font-bold text-emerald-700 tabular-nums">
-                {formatCurrency(cashWithdrawal)}
+            </DialogHeader>
+          </div>
+
+          {/* ── Content ── */}
+          <form
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                {isLoading && (
+                  <div className="h-48 flex items-center justify-center text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Cargando datos del turno...
+                  </div>
+                )}
+
+                {!isLoading && details && (
+                  <ShiftSummary data={details} compact />
+                )}
               </div>
-            </div>
-          </DialogHeader>
+            </ScrollArea>
 
-          {/* Stepper */}
-          <nav aria-label="Progreso del Corte" className="w-full px-2">
-            <ol className="flex items-center w-full">
-              {WIZARD_STEPS.map((step, index) => {
-                const isActive = step.id === currentStep;
-                const isCompleted = step.id < currentStep;
-                const isFuture = step.id > currentStep;
+            {/* ── Footer form ── */}
+            <div className="border-t p-4 bg-background shrink-0 space-y-4">
+              {/* Notes — collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotes((v) => !v)}
+                  aria-expanded={showNotes}
+                  aria-controls="notes"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Agregar nota
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      showNotes ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showNotes && (
+                  <textarea
+                    id="notes"
+                    autoFocus
+                    placeholder="Ej: Se detectó inconsistencia en el efectivo al retirar..."
+                    rows={2}
+                    className="mt-2 w-full resize-none text-sm border border-input rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    {...register("notes")}
+                  />
+                )}
+              </div>
 
-                return (
-                  <li
-                    key={step.id}
-                    className={cn(
-                      "flex items-center relative",
-                      index !== WIZARD_STEPS.length - 1 ? "flex-1" : ""
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex items-center gap-2 group",
-                        isFuture ? "opacity-60" : ""
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300",
-                          isActive
-                            ? "bg-[#480489] border-[#480489] text-white shadow-md scale-110"
-                            : isCompleted
-                            ? "bg-[#480489] border-[#480489] text-white"
-                            : "border-muted-foreground/30 text-muted-foreground bg-background"
-                        )}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : (
-                          <span className="text-sm font-semibold">
-                            {index + 1}
-                          </span>
-                        )}
-                      </div>
-                      <div className="hidden sm:flex flex-col items-start">
-                        <span
-                          className={cn(
-                            "text-sm font-medium transition-colors",
-                            isActive
-                              ? "text-[#480489]"
-                              : isCompleted
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          {step.title}
-                        </span>
-                      </div>
-                    </div>
-
-                    {index !== WIZARD_STEPS.length - 1 && (
-                      <div
-                        className={cn(
-                          "h-[2px] w-full mx-4 transition-colors duration-500",
-                          isCompleted ? "bg-[#480489]" : "bg-muted"
-                        )}
+              {/* Checkbox + Submit row */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <Controller
+                    name="terminal_cut_confirmed"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="terminal_cut_confirmed"
+                        checked={field.value === true}
+                        onCheckedChange={(checked) =>
+                          field.onChange(checked ? true : undefined)
+                        }
+                        className="mt-0.5"
                       />
                     )}
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
-        </div>
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <Label
+                      htmlFor="terminal_cut_confirmed"
+                      className="text-sm font-medium cursor-pointer leading-snug"
+                    >
+                      Confirmo que realicé el corte físico de la terminal
+                      bancaria
+                    </Label>
+                    {errors.terminal_cut_confirmed && (
+                      <p className="text-xs text-destructive">
+                        {errors.terminal_cut_confirmed.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {isLoading && (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Cargando datos del turno...
+                <div className="flex items-center gap-3 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={isLoading || isClosing}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isLoading || isClosing}
+                    className="bg-[#480489] hover:bg-[#5a0aa0] text-white px-6"
+                  >
+                    Confirmar Cierre de Turno
+                  </Button>
+                </div>
+              </div>
             </div>
-          )}
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          {!isLoading && details && currentStep === 1 && (
-            <CloseShiftStepOne
-              details={details}
-              initialValues={formValues}
-              onNext={handleNext}
-              onCancel={onClose}
-            />
-          )}
-
-          {!isLoading && details && currentStep === 2 && formValues && (
-            <CloseShiftStepTwo
-              details={details}
-              formValues={formValues}
-              onBack={handleBack}
-              onConfirmed={handleConfirmed}
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Confirmation AlertDialog */}
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Cerrar el turno definitivamente?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción cerrará el turno actual. No podrás revertirlo ni
+              registrar nuevas ventas en este turno.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClosing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirm}
+              disabled={isClosing}
+              className="bg-[#480489] hover:bg-[#5a0aa0]"
+              autoFocus
+            >
+              {isClosing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cerrando...
+                </>
+              ) : (
+                "Sí, Cerrar Turno"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

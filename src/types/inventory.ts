@@ -29,6 +29,8 @@ export interface CreateProductPayload {
   stock?: number;
   min_stock?: number;
   image_url?: string; 
+  is_active: boolean;
+  tags: string[];
 }
 
 // TODO: Hacer genérica esta interfaz para paginación, algo como QueryResult<T>
