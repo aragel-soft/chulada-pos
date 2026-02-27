@@ -99,7 +99,7 @@ export default function ShiftHistoryPage() {
             status: "Estado",
             initial_cash: "Fondo Inicial",
             cash_withdrawal: "Retiro de Efectivo",
-            card_terminal_total: "Total Tarjeta",
+            total_sales: "Total Ventas",
           }}
           manualPagination={true}
           manualSorting={true}

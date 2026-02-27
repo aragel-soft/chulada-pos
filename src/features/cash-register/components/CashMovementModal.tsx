@@ -33,7 +33,7 @@ import { Textarea } from "@/components/ui/text-area";
 import { registerCashMovement } from "@/lib/api/cash-register/movements";
 import { getCashMovementSchema, type CashMovementFormValues } from "../schemas/cashMovementSchema";
 import { MoneyInput } from "@/components/ui/money-input";
-import { IN_CONCEPTS, OUT_CONCEPTS } from "@/constants/cash-cut";
+import { IN_CONCEPTS, OUT_CONCEPTS } from "@/constants/cash-register";
 
 interface CashMovementModalProps {
   type: "IN" | "OUT";

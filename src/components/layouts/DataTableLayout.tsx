@@ -1,15 +1,17 @@
 import { ReactNode } from "react";
 
 interface DataTableLayoutProps {
-  actions?: ReactNode; 
-  filters?: ReactNode; 
-  children: ReactNode; 
-  pagination?: ReactNode; 
+  actions?: ReactNode;
+  filters?: ReactNode;
+  filtersClassName?: string;
+  children: ReactNode;
+  pagination?: ReactNode;
 }
 
 export function DataTableLayout({
   actions,
   filters,
+  filtersClassName,
   children,
   pagination,
 }: DataTableLayoutProps) {
@@ -18,7 +20,7 @@ export function DataTableLayout({
       {/* Encabezado Fijo Responsivo */}
       <div className="flex-none p-4 border-b space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          {filters && <div className="w-full md:w-auto flex items-center space-x-6">{filters}</div>}
+          {filters && <div className={filtersClassName ?? "w-full md:w-auto flex items-center"}>{filters}</div>}
           <div className="w-full md:w-auto flex items-center justify-start md:justify-end space-x-2 overflow-x-auto pb-1 md:pb-0">
             {actions}
           </div>
