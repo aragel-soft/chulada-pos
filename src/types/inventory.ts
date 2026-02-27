@@ -1,7 +1,7 @@
 export interface Product {
   id: string;
   code: string;
-  barcode?: string; 
+  barcode?: string;
   name: string;
   description?: string;
   category_id: string;
@@ -28,7 +28,8 @@ export interface CreateProductPayload {
   purchase_price?: number;
   stock?: number;
   min_stock?: number;
-  image_url?: string; 
+  image_url?: string;
+  user_id?: string;
   is_active: boolean;
   tags: string[];
 }
@@ -53,9 +54,9 @@ export type ImageAction = 'Keep' | 'Remove' | 'Replace';
 export interface ProductDetail extends Omit<Product, 'current_stock'> {
   description?: string;
   purchase_price: number;
-  stock: number;    
-  min_stock: number;  
-  tags: string[];     
+  stock: number;
+  min_stock: number;
+  tags: string[];
 }
 export interface UpdateProductPayload {
   id: string;
@@ -67,7 +68,7 @@ export interface UpdateProductPayload {
   retail_price: number;
   wholesale_price: number;
   purchase_price?: number;
-  min_stock?: number; 
+  min_stock?: number;
   is_active: boolean;
   tags: string[];
   image_action: ImageAction;
