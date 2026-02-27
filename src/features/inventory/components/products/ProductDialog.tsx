@@ -86,7 +86,7 @@ export function ProductDialog({
   onSuccess,
 }: ProductDialogProps) {
   const queryClient = useQueryClient();
-  const { can } = useAuthStore();
+  const { can, user } = useAuthStore();
   const isEditing = !!productId;
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -175,6 +175,7 @@ export function ProductDialog({
         purchase_price: values.purchase_price || 0,
         is_active: values.is_active, 
         tags: values.tags || [],
+        user_id: user?.id,
       };
 
       return await createProduct(payload);
