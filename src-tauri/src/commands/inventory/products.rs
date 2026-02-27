@@ -51,6 +51,8 @@ pub struct CreateProductPayload {
   pub image_url: Option<String>,
   pub stock: Option<i64>,
   pub min_stock: Option<i64>,
+  pub is_active: bool,
+  pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -463,10 +465,10 @@ pub async fn create_product(
   let inventory_id = Uuid::new_v4().to_string();
   let initial_stock = payload.stock.unwrap_or(0);
   let min_stock = payload.min_stock.unwrap_or(5);
-    let store_id = get_current_store_id(&conn).map_err(|e| InventoryError {
-        code: "STORE_ID_ERROR".to_string(),
-        message: e,
-    })?;
+  let store_id = get_current_store_id(&conn).map_err(|e| InventoryError {
+      code: "STORE_ID_ERROR".to_string(),
+      message: e,
+  })?;
 
   let tx = conn.transaction().map_err(|e| InventoryError {
     code: "DB_TX_ERROR".to_string(),
@@ -479,7 +481,7 @@ pub async fn create_product(
         id, code, barcode, name, description, category_id, 
         retail_price, wholesale_price, purchase_price, unit_of_measure, 
         image_url, is_active
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1)"
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
     ).map_err(|e| InventoryError {
       code: "DB_PREPARE_ERROR".to_string(),
       message: e.to_string(),
@@ -497,6 +499,7 @@ pub async fn create_product(
       &payload.purchase_price.unwrap_or(0.0),
       &payload.unit_of_measure.unwrap_or("piece".to_string()),
       &payload.image_url,
+      &payload.is_active,
     ]).map_err(|e| InventoryError {
       code: "DB_INSERT_PRODUCT_ERROR".to_string(),
       message: format!("Error al insertar producto: {}", e),
@@ -521,17 +524,52 @@ pub async fn create_product(
       code: "DB_INSERT_INVENTORY_ERROR".to_string(),
       message: format!("Error al crear inventario inicial: {}", e),
     })?;
+
+    if !payload.tags.is_empty() {
+      let mut tag_ids = Vec::new();
+      let mut stmt_get_tag = tx.prepare("SELECT id FROM tags WHERE name = ?").unwrap();
+      let mut stmt_ins_tag = tx.prepare("INSERT INTO tags (id, name) VALUES (?, ?)").unwrap();
+
+      for tag_name in &payload.tags {
+        let existing_id: Option<String> = stmt_get_tag.query_row([tag_name], |row| row.get(0)).ok();
+          
+        let final_id = match existing_id {
+          Some(id) => id,
+          None => {
+            let new_id = Uuid::new_v4().to_string();
+            stmt_ins_tag.execute(rusqlite::params![&new_id, tag_name])
+              .map_err(|e| InventoryError {
+                  code: "DB_INSERT_TAG_ERROR".to_string(),
+                  message: format!("Error creando tag '{}': {}", tag_name, e),
+              })?;
+            new_id
+          }
+        };
+        tag_ids.push(final_id);
+      }
+
+      let mut stmt_link = tx.prepare("INSERT INTO product_tags (id, product_id, tag_id) VALUES (?, ?, ?)").unwrap();
+      let unique_tag_ids: HashSet<_> = tag_ids.into_iter().collect();
+          
+      for tag_id in unique_tag_ids {
+        stmt_link.execute(rusqlite::params![Uuid::new_v4().to_string(), &product_id, tag_id])
+          .map_err(|e| InventoryError {
+              code: "DB_LINK_TAG_ERROR".to_string(),
+              message: format!("Error vinculando tag: {}", e),
+          })?;
+      }
     }
+  }
 
-    tx.commit().map_err(|e| InventoryError {
-      code: "DB_COMMIT_ERROR".to_string(),
-      message: format!("Error al confirmar transacción: {}", e),
-    })?;
+  tx.commit().map_err(|e| InventoryError {
+    code: "DB_COMMIT_ERROR".to_string(),
+    message: format!("Error al confirmar transacción: {}", e),
+  })?;
 
-    let full_image_url = if let Some(rel_path) = &payload.image_url {
-      app_handle.path().app_data_dir()
-        .ok()
-        .map(|base| base.join(rel_path).to_string_lossy().to_string())
+  let full_image_url = if let Some(rel_path) = &payload.image_url {
+    app_handle.path().app_data_dir()
+      .ok()
+      .map(|base| base.join(rel_path).to_string_lossy().to_string())
   } else {
     None
   };
@@ -546,7 +584,7 @@ pub async fn create_product(
     wholesale_price: payload.wholesale_price,
     purchase_price: payload.purchase_price.unwrap_or(0.0),
     image_url: full_image_url,
-    is_active: true,
+    is_active: payload.is_active,
     current_stock: initial_stock,
   })
 }
