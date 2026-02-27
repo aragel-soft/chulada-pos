@@ -399,6 +399,7 @@ fn ensure_products_and_update_inventory(
         return Ok(());
     }
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut stmt_update = tx
         .prepare(
             "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3",
@@ -414,7 +415,7 @@ fn ensure_products_and_update_inventory(
             "INSERT INTO inventory_movements (
             id, product_id, store_id, user_id, type, reason,
             quantity, previous_stock, new_stock, reference, created_at
-        ) VALUES (?1, ?2, ?3, ?4, 'IN', 'RETURN', ?5, ?6, ?7, ?8, CURRENT_TIMESTAMP)",
+        ) VALUES (?1, ?2, ?3, ?4, 'IN', 'RETURN', ?5, ?6, ?7, ?8, ?9)",
         )
         .map_err(|e| e.to_string())?;
 
@@ -449,7 +450,8 @@ fn ensure_products_and_update_inventory(
                 qty_i64,
                 current_stock,
                 new_stock,
-                return_id
+                return_id,
+                now_local
             ])
             .map_err(|e| {
                 format!(

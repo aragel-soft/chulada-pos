@@ -470,15 +470,16 @@ pub async fn create_product(
     let inventory_id = Uuid::new_v4().to_string();
     let initial_stock = payload.stock.unwrap_or(0);
     let min_stock = payload.min_stock.unwrap_or(5);
-  let store_id = get_current_store_id(&conn).map_err(|e| InventoryError {
-      code: "STORE_ID_ERROR".to_string(),
-      message: e,
-  })?;
+    let store_id = get_current_store_id(&conn).map_err(|e| InventoryError {
+        code: "STORE_ID_ERROR".to_string(),
+        message: e,
+    })?;
 
     let tx = conn.transaction().map_err(|e| InventoryError {
         code: "DB_TX_ERROR".to_string(),
         message: format!("Error iniciando transacción: {}", e),
     })?;
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     {
         let mut stmt_prod = tx
@@ -546,7 +547,7 @@ pub async fn create_product(
                     "INSERT INTO inventory_movements (
             id, product_id, store_id, user_id, type, reason,
             quantity, previous_stock, new_stock, reference, created_at
-          ) VALUES (?1, ?2, ?3, ?4, 'IN', 'INITIAL_STOCK', ?5, 0, ?6, ?7, CURRENT_TIMESTAMP)",
+          ) VALUES (?1, ?2, ?3, ?4, 'IN', 'INITIAL_STOCK', ?5, 0, ?6, ?7, ?8)",
                     rusqlite::params![
                         movement_id,
                         &product_id,
@@ -554,7 +555,8 @@ pub async fn create_product(
                         user_id_val,
                         initial_stock,
                         initial_stock,
-                        &product_id // reference = product_id
+                        &product_id, // reference = product_id
+                        now_local
                     ],
                 )
                 .map_err(|e| InventoryError {
