@@ -4,11 +4,10 @@ export interface SalesHistoryFilter {
   start_date?: string | null;
   end_date?: string | null;
   status?: string[] | null;
-  payment_method?: string | null;
+  payment_method?: string[] | null;
   user_id?: string | null;
   customer_id?: string | null;
-  folio?: string | null;
-  product_search?: string | null;
+  search?: string | null;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }
@@ -24,7 +23,6 @@ export interface SaleMaster {
   has_discount: boolean;
   is_credit: boolean;
 }
-
 
 export interface PaginatedSalesHistory {
   data: SaleMaster[];

@@ -58,6 +58,7 @@ export function UserCombobox({
           {selectedUser ? (
             <div className="flex items-center gap-2">
               <AppAvatar 
+                key={selectedUser.id}
                 path={selectedUser.avatar_url || ""} 
                 name={selectedUser.full_name || selectedUser.username} 
                 className="h-5 w-5 text-[9px]" 
@@ -108,6 +109,7 @@ export function UserCombobox({
                     )}
                   />
                   <AppAvatar 
+                    key={user.id}
                     path={user.avatar_url || ""} 
                     name={user.full_name || user.username} 
                     className="h-5 w-5 mr-2 text-[9px]" 
