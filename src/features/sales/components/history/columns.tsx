@@ -57,7 +57,7 @@ export const historyColumns: ColumnDef<SaleMaster>[] = [
         const method = row.getValue('payment_method') as string;
         const map: Record<string, string> = {
             cash: 'Efectivo',
-            card_transfer: 'Tarjeta/Transf',
+            card: 'Tarjeta',
             mixed: 'Mixto',
             credit: 'Crédito'
         };

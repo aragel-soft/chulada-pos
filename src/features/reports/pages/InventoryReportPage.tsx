@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Printer } from "lucide-react";
+import { PaginationState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { lowStockColumns } from "@/features/reports/components/columns/low-stock-columns";
 import { InventoryValuationCards } from "@/features/reports/components/InventoryValuationCards";
@@ -6,8 +8,14 @@ import { useInventoryReport } from "@/hooks/use-inventory-report";
 import { Button } from "@/components/ui/button";
 
 export default function InventoryReportPage() {
-  const { valuation, lowStockProducts, isLoading, error } =
-    useInventoryReport();
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 16,
+  });
+  const { valuation, lowStockProducts, isLoading, error } = useInventoryReport(
+    pagination.pageIndex + 1,
+    pagination.pageSize
+  );
 
   const handlePrint = () => {
     window.print();
@@ -45,10 +53,14 @@ export default function InventoryReportPage() {
 
         <DataTable
           columns={lowStockColumns}
-          data={lowStockProducts}
+          data={lowStockProducts?.data || []}
           isLoading={isLoading}
           initialSorting={[{ id: "category_name", desc: false }]}
           showColumnFilters={false}
+          manualPagination={true}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          rowCount={lowStockProducts?.total || 0}
           columnTitles={{
             product_name: "Producto",
             category_name: "Categoría",

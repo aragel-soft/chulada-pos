@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { PaginationState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { topSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
@@ -10,13 +11,22 @@ export default function TopSellersPage() {
   const { dateRange } = useReportsContext();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 16,
+  });
 
   const categoryIds = useMemo(
     () => (selectedCategories.size > 0 ? Array.from(selectedCategories) : undefined),
     [selectedCategories]
   );
 
-  const { data, isLoading, error } = useTopSellers(dateRange, categoryIds);
+  const { data, isLoading, error } = useTopSellers(
+    dateRange && dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined, 
+    categoryIds, 
+    pagination.pageIndex + 1, 
+    pagination.pageSize
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -34,10 +44,14 @@ export default function TopSellersPage() {
     <div className="flex flex-col gap-4 h-full">
       <DataTable
         columns={topSellersColumns}
-        data={data}
+        data={data?.data || []} 
         isLoading={isLoading}
         initialSorting={[{ id: "total_revenue", desc: true }]}
         showColumnFilters={false}
+        manualPagination={true}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        rowCount={data?.total || 0}
         columnTitles={{
           ranking: "#",
           product_name: "Producto",
