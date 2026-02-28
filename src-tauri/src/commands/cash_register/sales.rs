@@ -338,7 +338,7 @@ fn apply_kit_rules(
         if *remaining > 0.0001 {
             let kit_name = &kit_rules[kit_id].name;
             return Err(format!(
-                "Kit incompleto: '{}'. Faltan seleccionar {} opciones de regalo.",
+                "Kit incompleto: '{}'. Faltan seleccionar {} complementos.",
                 kit_name, remaining
             ));
         }

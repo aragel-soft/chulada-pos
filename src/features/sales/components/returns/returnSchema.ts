@@ -23,16 +23,15 @@ const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
   });
 
   itemsByPromo.forEach((promoItems) => {
-    
-     const hasAnySelected = promoItems.some(i => i.isSelected && i.returnQuantity > 0);
-     const hasAllSelectedWithQty = promoItems.every(i => i.isSelected && i.returnQuantity > 0);
+    const hasAnySelected = promoItems.some(i => i.isSelected && i.returnQuantity > 0);
+    const hasAllSelectedWithQty = promoItems.every(i => i.isSelected && i.returnQuantity > 0);
 
-     if (hasAnySelected && !hasAllSelectedWithQty) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `La promoción "${promoItems[0].promotionName}" está incompleta. Debes devolver todos los productos del paquete.`,
-         });
-     }
+    if (hasAnySelected && !hasAllSelectedWithQty) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `La promoción "${promoItems[0].promotionName}" está incompleta. Debes devolver todos los productos del paquete.`,
+      });
+    }
   });
 
   const itemsByKit = new Map<string, ReturnItem[]>();
@@ -55,23 +54,23 @@ const validateReturnItems = (items: ReturnItem[], ctx: z.RefinementCtx) => {
 
     const allMainOriginal = kitItems.filter(i => !i.isGift).reduce((sum, i) => sum + i.originalQuantity, 0);
     const allGiftOriginal = kitItems.filter(i => i.isGift).reduce((sum, i) => sum + i.originalQuantity, 0);
-    
+
     if (allMainOriginal > 0) {
       const ratio = allGiftOriginal / allMainOriginal;
       const expectedGiftQty = totalMainQty * ratio;
 
       if (totalMainQty > 0 && Math.abs(totalGiftQty - expectedGiftQty) > 0.001) {
-           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `Regalos incorrectos en Kit: Por cada ${totalMainQty} pzas compradas, corresponden ${expectedGiftQty} regalos.`,
-          });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Complementos incorrectos en Kit: Por cada ${totalMainQty} pzas compradas, corresponden ${expectedGiftQty} complementos.`,
+        });
       }
-      
+
       if (totalMainQty === 0 && totalGiftQty > 0) {
-           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `No se pueden devolver regalos de un Kit sin el producto principal.`,
-          });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `No se pueden devolver complementos de un Kit sin el producto principal.`,
+        });
       }
     }
   });
@@ -82,7 +81,7 @@ const returnItemSchema = z.object({
   saleItemId: z.string(),
   productId: z.string(),
   productName: z.string(),
-  originalQuantity: z.number(), 
+  originalQuantity: z.number(),
   returnQuantity: z.number().min(0),
   isSelected: z.boolean(),
   unitPrice: z.number(),

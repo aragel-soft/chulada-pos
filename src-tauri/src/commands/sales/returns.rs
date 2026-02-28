@@ -161,7 +161,7 @@ fn validate_kit_instances(
 
         if (trigger_credits - item_consumption).abs() > 0.001 {
             return Err(format!(
-                "Kit '{}' incompleto. Productos principales generan {} selecciones pero se están devolviendo {} items de regalo",
+                "Kit '{}' incompleto. Productos principales generan {} selecciones pero se están devolviendo {} complementos",
                 kit_rule.name, trigger_credits, item_consumption
             ));
         }
@@ -197,12 +197,12 @@ fn validate_kit_instances(
 
         let multiplier = total_trigger_ret / total_trigger_av;
 
-        // Validate Gifts Aggregated
+        // Validate Complements Aggregated
         let expected_total_gift_return = total_gift_av * multiplier;
 
         if total_gift_ret < expected_total_gift_return - 0.001 {
             return Err(format!(
-                "Kit '{}' desbalanceado: Devuelves {:.1}% de los productos base, deberías devolver al menos {:.2} items de regalo, pero recibimos {:.2}.",
+                "Kit '{}' desbalanceado: Devuelves {:.1}% de los productos base, deberías devolver al menos {:.2} complementos, pero recibimos {:.2}.",
                 kit_rule.name, multiplier * 100.0, expected_total_gift_return, total_gift_ret
             ));
         }

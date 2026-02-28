@@ -16,11 +16,11 @@ pub fn load_kit_rules(
     kit_ids: &[String],
 ) -> Result<HashMap<String, KitRule>, String> {
     use rusqlite::params_from_iter;
-    
+
     if kit_ids.is_empty() {
         return Ok(HashMap::new());
     }
-    
+
     let placeholders = kit_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let mut kit_rules: HashMap<String, KitRule> = HashMap::new();
 
@@ -30,29 +30,40 @@ pub fn load_kit_rules(
         placeholders
     );
     let mut stmt_headers = conn.prepare(&sql_headers).map_err(|e| e.to_string())?;
-    let headers_iter = stmt_headers.query_map(params_from_iter(kit_ids.iter()), |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?))
-    }).map_err(|e| e.to_string())?;
+    let headers_iter = stmt_headers
+        .query_map(params_from_iter(kit_ids.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
 
     for r in headers_iter {
         let (id, max_selections, name) = r.map_err(|e| e.to_string())?;
-        kit_rules.insert(id, KitRule {
-            name,
-            max_selections,
-            triggers: HashSet::new(),
-            items: HashSet::new(),
-        });
+        kit_rules.insert(
+            id,
+            KitRule {
+                name,
+                max_selections,
+                triggers: HashSet::new(),
+                items: HashSet::new(),
+            },
+        );
     }
 
-    // Fetch Kit Triggers (main products)
+    // Fetch Kit Main Products (Triggers)
     let sql_kit_triggers = format!(
         "SELECT kit_option_id, main_product_id FROM product_kit_main WHERE kit_option_id IN ({})",
         placeholders
     );
     let mut stmt_kit_trig = conn.prepare(&sql_kit_triggers).map_err(|e| e.to_string())?;
-    let kit_trig_iter = stmt_kit_trig.query_map(params_from_iter(kit_ids.iter()), |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    }).map_err(|e| e.to_string())?;
+    let kit_trig_iter = stmt_kit_trig
+        .query_map(params_from_iter(kit_ids.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
 
     for r in kit_trig_iter {
         let (kit_id, prod_id) = r.map_err(|e| e.to_string())?;
@@ -67,9 +78,11 @@ pub fn load_kit_rules(
         placeholders
     );
     let mut stmt_kit_items = conn.prepare(&sql_kit_items).map_err(|e| e.to_string())?;
-    let kit_items_iter = stmt_kit_items.query_map(params_from_iter(kit_ids.iter()), |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    }).map_err(|e| e.to_string())?;
+    let kit_items_iter = stmt_kit_items
+        .query_map(params_from_iter(kit_ids.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
 
     for r in kit_items_iter {
         let (kit_id, prod_id) = r.map_err(|e| e.to_string())?;

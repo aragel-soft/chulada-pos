@@ -85,12 +85,12 @@ export function KitDetailPanel({
           </div>
         ) : kit ? (
           <div className="p-6 space-y-5">
-            {/* Disparadores */}
+            {/* Productos Principales */}
             <div className="border rounded-xl overflow-hidden shadow-sm">
               <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
                 <h4 className="font-semibold flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                  Disparadores
+                  Productos Principales
                 </h4>
                 <Badge variant="outline" className="bg-background">
                   {kit.triggers.length}{" "}
@@ -116,12 +116,12 @@ export function KitDetailPanel({
               </ul>
             </div>
 
-            {/* Regalos */}
+            {/* Complementos */}
             <div className="border rounded-xl overflow-hidden shadow-sm">
               <div className="bg-muted/40 p-3 border-b flex justify-between items-center">
                 <h4 className="font-semibold flex items-center gap-2">
                   <Gift className="h-4 w-4 text-pink-500" />
-                  Regalos
+                  Complementos
                 </h4>
                 <Badge variant="outline" className="bg-background">
                   {kit.items.length}{" "}
