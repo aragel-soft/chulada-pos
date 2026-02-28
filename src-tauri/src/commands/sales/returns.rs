@@ -391,15 +391,31 @@ fn ensure_products_and_update_inventory(
     tx: &Connection,
     validated_items: &[(ReturnItemRequest, String, String, String)],
     store_id: &str,
+    return_id: &str,
+    user_id: &str,
 ) -> Result<(), String> {
     let product_ids: Vec<&String> = validated_items.iter().map(|(_, _, _, pid)| pid).collect();
     if product_ids.is_empty() {
         return Ok(());
     }
 
-    let mut stmt = tx
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let mut stmt_update = tx
         .prepare(
             "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut stmt_get_stock = tx.prepare(
+        "SELECT COALESCE(stock, 0) FROM store_inventory WHERE product_id = ?1 AND store_id = ?2"
+    ).map_err(|e| e.to_string())?;
+
+    let mut stmt_movement = tx
+        .prepare(
+            "INSERT INTO inventory_movements (
+            id, product_id, store_id, user_id, type, reason,
+            quantity, previous_stock, new_stock, reference, created_at
+        ) VALUES (?1, ?2, ?3, ?4, 'IN', 'RETURN', ?5, ?6, ?7, ?8, ?9)",
         )
         .map_err(|e| e.to_string())?;
 
@@ -408,8 +424,41 @@ fn ensure_products_and_update_inventory(
             continue;
         }
 
-        stmt.execute(params![item.quantity, actual_product_id, store_id])
+        // Obtener stock actual ANTES de reingresar (para el movimiento de inventario)
+        let current_stock: i64 = stmt_get_stock
+            .query_row(rusqlite::params![actual_product_id, store_id], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+
+        let qty_i64 = item.quantity as i64;
+        let new_stock = current_stock + qty_i64;
+
+        // Actualizar inventario
+        stmt_update
+            .execute(params![item.quantity, actual_product_id, store_id])
             .map_err(|e| format!("Error actualizando inventario para {}: {}", product_name, e))?;
+
+        // Registrar movimiento de entrada por devolución en el Kardex
+        let movement_id = Uuid::new_v4().to_string();
+        stmt_movement
+            .execute(rusqlite::params![
+                movement_id,
+                actual_product_id,
+                store_id,
+                user_id,
+                qty_i64,
+                current_stock,
+                new_stock,
+                return_id,
+                now_local
+            ])
+            .map_err(|e| {
+                format!(
+                    "Error registrando movimiento de devolución para {}: {}",
+                    product_name, e
+                )
+            })?;
     }
     Ok(())
 }
@@ -690,12 +739,18 @@ pub fn process_return(
 
     let voucher_code = manage_store_voucher(&tx, &payload.sale_id, return_total)?;
 
-    // Update Inventory
+    // Update Inventory + Registrar movimientos de devolución
     let store_id = get_store_id(&tx)?;
-    ensure_products_and_update_inventory(&tx, &validated_items, &store_id)?;
+    let return_id = Uuid::new_v4().to_string();
+    ensure_products_and_update_inventory(
+        &tx,
+        &validated_items,
+        &store_id,
+        &return_id,
+        &payload.user_id,
+    )?;
 
     // Create Return Records
-    let return_id = Uuid::new_v4().to_string();
     create_return_records(&tx, &payload, return_total, &validated_items, &return_id)?;
 
     // Update Sale Status (passes reason to detect cancellation)

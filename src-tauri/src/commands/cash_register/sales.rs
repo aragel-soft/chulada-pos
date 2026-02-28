@@ -910,6 +910,18 @@ pub fn process_sale(
         let item = data.original_req;
         let item_id = &item_db_ids[i];
 
+        // Get current stock before updating
+        let current_stock: i64 = tx
+            .query_row(
+                "SELECT stock FROM store_inventory WHERE product_id = ?1 AND store_id = ?2",
+                params![item.product_id, store_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Error consultando stock para {}: {}", data.db_name, e))?;
+
+        let qty_i64 = item.quantity as i64;
+        let new_stock = current_stock - qty_i64;
+
         // Decrease stock
         let rows_mod = tx.execute(
             "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
@@ -923,6 +935,32 @@ pub fn process_sale(
             ));
         }
 
+        // Register Inventory Movement for the sale
+        let movement_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO inventory_movements (
+                id, product_id, store_id, user_id, type, reason,
+                quantity, previous_stock, new_stock, reference, created_at
+            ) VALUES (?1, ?2, ?3, ?4, 'OUT', 'SALE', ?5, ?6, ?7, ?8, ?9)",
+            params![
+                movement_id,
+                item.product_id,
+                store_id,
+                payload.user_id,
+                qty_i64,
+                current_stock,
+                new_stock,
+                sale_id,
+                now_local
+            ],
+        )
+        .map_err(|e| {
+            format!(
+                "Error registrando movimiento de venta para {}: {}",
+                data.db_name, e
+            )
+        })?;
+
         tx.execute(
             "INSERT INTO sale_items (
                 id, sale_id, product_id, product_name, product_code, quantity, 
@@ -933,7 +971,7 @@ pub fn process_sale(
                 item_id,
                 sale_id,
                 item.product_id,
-                data.db_name, //
+                data.db_name,
                 data.db_code,
                 item.quantity,
                 data.unit_price,
