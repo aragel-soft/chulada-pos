@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X,  Printer, Wallet, Lock, Trash, Percent } from "lucide-react";
+import { Plus, X, Printer, Wallet, Lock, Trash, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
 import { useAuthStore } from "@/stores/authStore";
 import { formatCurrency } from "@/lib/utils";
 import { usePosProducts } from "@/features/sales/hooks/usePosProducts";
-import { CatalogSearch } from "@/features/sales/components/CatalogSearch";
-import { ProductsGrid } from "@/features/sales/components/ProductsGrid";
-import { Product } from "@/types/inventory";
 import { toast } from "sonner";
 import { useCartStore } from "@/features/sales/stores/cartStore";
-import { useScanDetection } from "@/hooks/use-scan-detection";
 import { playSound } from "@/lib/sounds";
 import { CartItemRow } from "@/features/sales/components/CardItemRow";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
@@ -24,7 +20,7 @@ import { KitSelectionModal } from "@/features/sales/components/KitSelectionModal
 import { useKitLogic } from "@/features/sales/hooks/useKitLogic";
 import { useKitStore } from "@/features/sales/stores/kitStore";
 import { usePromotionsStore } from "@/features/sales/stores/promotionsStore";
-
+import { ScannerInput } from "@/features/sales/components/ScannerInput";
 
 import {
   AlertDialog,
@@ -72,9 +68,12 @@ export default function SalesPage() {
   const ticketTotal = getTicketTotal();
   const ticketSubtotal = getTicketSubtotal();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  // TODO: Commit 4 — ManualSearchModal consumirá este estado
+  const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
+  void isManualSearchOpen; // suppress TS unused-var until modal is added
+  const [selectedItemUuid, setSelectedItemUuid] = useState<string | null>(null);
   const { lastSale, setLastSale } = useSalesStore();
 
   // Kit Logic Hook
@@ -101,23 +100,22 @@ export default function SalesPage() {
   // F12 Trigger
   useHotkeys('f12', handleCheckoutRequest, [ticketTotal, shift, isCheckoutOpen, activeTicket]);
 
+  // F3 Trigger — Manual Search
+  useHotkeys('f3', () => {
+    if (shift?.status === 'open') {
+      setIsManualSearchOpen((prev) => !prev);
+    }
+  }, [shift]);
+
+  // Products for scanner lookup
   const {
     products,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading: isProductsLoading,
   } = usePosProducts({
-    search: searchTerm,
+    search: "",
     enabled: !!shift && shift.status === "open",
   });
 
-  const handleProductSelect = (product: Product) => {
-    addToCart(product);
-    toast.success(`Agregado: ${product.name}`);
-  };
-
-  const handleAddProductByCode = useCallback(
+  const handleScannerInput = useCallback(
     (code: string) => {
       const cleanCode = code.trim();
       const product = products.find(
@@ -136,13 +134,14 @@ export default function SalesPage() {
     [products, addToCart]
   );
 
-  useScanDetection({
-    onScan: handleAddProductByCode,
-  });
-
   useEffect(() => {
     if (tickets.length === 0) createTicket();
   }, [tickets.length, createTicket]);
+
+  // Clear selection when active ticket changes
+  useEffect(() => {
+    setSelectedItemUuid(null);
+  }, [activeTicketId]);
 
   const handleProcessSale = async (method: string, cashAmount: number, cardAmount: number, shouldPrint: boolean, customerId?: string, voucherCode?: string, notes?: string) => {
       if (!user?.id || !shift?.id || !activeTicket) return;
@@ -182,6 +181,7 @@ export default function SalesPage() {
 
           setIsCheckoutOpen(false);
           clearTicket();
+          setSelectedItemUuid(null);
       }
   };
 
@@ -196,8 +196,11 @@ export default function SalesPage() {
       }
   };
 
+  const isShiftOpen = shift?.status === "open";
+  const selectedItem = activeTicket?.items.find((i) => i.uuid === selectedItemUuid) ?? null;
+
   return (
-    <div className="flex-1 flex overflow-hidden gap-4 h-full">
+    <div className="flex-1 flex flex-col overflow-hidden h-full gap-0">
       {/* Checkout Modal */}
       <CheckoutModal 
          isOpen={isCheckoutOpen}
@@ -216,108 +219,12 @@ export default function SalesPage() {
         onCancel={handleKitCancel}
       />
 
-      {/* --- COLUMNA IZQUIERDA: GRID DE PRODUCTOS --- */}
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
-        <div className="shrink-0 bg-white rounded-lg p-1 shadow-sm border border-transparent transition-all">
-          <CatalogSearch
-            onSearch={setSearchTerm}
-            onEnter={(term) => {
-              const clean = term.trim();
-              const exactMatch = products.find(
-                  p => p.code === clean || p.barcode === clean
-              );
-              if (exactMatch) {
-                  addToCart(exactMatch);
-                  playSound("success");
-                  return true; 
-              }
-              return false; 
-            }}
-            isLoading={isProductsLoading || isFetchingNextPage}
-            className="w-full"
-            placeholder="Buscar por nombre, código..."
-          />
-        </div>
-
-        <div className="flex-1 bg-white rounded-lg border border-zinc-200 shadow-sm overflow-hidden relative">
-          <ProductsGrid
-            products={products}
-            isLoading={isProductsLoading}
-            isFetchingNextPage={isFetchingNextPage}
-            hasNextPage={hasNextPage}
-            fetchNextPage={fetchNextPage}
-            onProductSelect={(product) => handleProductSelect(product)}
-          />
-        </div>
-
-        {/* Resumen Izquierdo - Parte Inferior */}
-        <div className="bg-white rounded-lg border p-4 shrink-0 grid grid-cols-4 gap-4">
-          <div>
-            <span className="text-xs text-muted-foreground block">Total (Anterior)</span>
-            <span className="text-xl font-bold text-zinc-500">
-              {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
-            </span>
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">
-              Pagó con
-            </span>
-            <span className="text-xl font-bold">{lastSale ? formatCurrency(lastSale.paid) : "$0.00"}</span>
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">Cambio</span>
-            <span className="text-xl font-bold text-green-600">{lastSale ? formatCurrency(lastSale.change) : "$0.00"}</span>
-          </div>
-          <div className="flex justify-end items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#480489] text-[#480489] hover:bg-purple-50"
-              onClick={handleReprint}
-              disabled={!lastSale}
-            >
-              <Printer className="w-4 h-4 mr-2" /> Re-imprimir ticket
-            </Button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* --- COLUMNA DERECHA: TICKETS VIRTUALES --- */}
-      <div className="w-[400px] bg-white border rounded-lg flex flex-col shrink-0 relative overflow-hidden">
-        {/* Bloqueo de Caja Cerrada */}
-        {(!shift || shift.status !== "open") && (
-          <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-zinc-200 w-full max-w-xs">
-              <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-6 h-6 text-[#480489]" />
-              </div>
-              <h3 className="text-lg font-bold text-zinc-800 mb-2">
-                Caja Cerrada
-              </h3>
-              <p className="text-sm text-zinc-500 mb-6">
-                Para realizar ventas, es necesario abrir turno.
-              </p>
-
-              {can("cash_register:open") && (
-                <OpenShiftModal
-                  trigger={
-                    <Button className="w-full bg-[#480489] hover:bg-[#360368]">
-                      Abrir Caja
-                    </Button>
-                  }
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tabs de Tickets */}
+      {/* ── CABECERA: Tabs + Scanner ── */}
+      <div className="shrink-0 bg-white border-b px-4 py-2 flex flex-col gap-2">
+        {/* Ticket Tabs */}
         <div
-          className={`flex items-end px-2 pt-2 gap-1 overflow-x-auto border-b overflow-y-hidden ${
-            !shift || shift.status !== "open"
-              ? "opacity-50 pointer-events-none"
-              : ""
+          className={`flex items-end gap-1 overflow-x-auto overflow-y-hidden ${
+            !isShiftOpen ? "opacity-50 pointer-events-none" : ""
           }`}
         >
           {tickets.map((ticket) => (
@@ -358,80 +265,213 @@ export default function SalesPage() {
           </Button>
         </div>
 
-        {/* Lista de Items */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-zinc-50/30">
-          {!activeTicket || activeTicket.items.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
-              <div className="text-4xl mb-2">🛒</div>
-              <p className="text-sm">El carrito está vacío</p>
+        {/* Scanner Input */}
+        <ScannerInput
+          onScan={handleScannerInput}
+          onManualSearch={() => setIsManualSearchOpen(true)}
+          disabled={!isShiftOpen}
+        />
+      </div>
+
+      {/* ── CUERPO PRINCIPAL: Split 70/30 ── */}
+      <div className="flex-1 flex overflow-hidden gap-0 relative">
+
+        {/* Bloqueo de Caja Cerrada */}
+        {!isShiftOpen && (
+          <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-zinc-200 w-full max-w-xs">
+              <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-6 h-6 text-[#480489]" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-800 mb-2">
+                Caja Cerrada
+              </h3>
+              <p className="text-sm text-zinc-500 mb-6">
+                Para realizar ventas, es necesario abrir turno.
+              </p>
+
+              {can("cash_register:open") && (
+                <OpenShiftModal
+                  trigger={
+                    <Button className="w-full bg-[#480489] hover:bg-[#360368]">
+                      Abrir Caja
+                    </Button>
+                  }
+                />
+              )}
             </div>
-          ) : (
-            activeTicket.items.map((item) => (
-              <CartItemRow
-                key={item.uuid}
-                item={item}
-                onUpdateQuantity={updateQuantity}
-                onRemove={(uuid) => removeFromCart(uuid)}
-                onTogglePriceType={() => toggleItemPriceType(item.uuid)}
-                hasDiscount={(activeTicket?.discountPercentage || 0) > 0}
-                discountPercentage={activeTicket?.discountPercentage || 0}
-              />
-            ))
-          )}
+          </div>
+        )}
+
+        {/* ── IZQUIERDA (70%): Tabla del Ticket ── */}
+        <div className="w-[70%] flex flex-col overflow-hidden border-r">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-zinc-50/30">
+            {!activeTicket || activeTicket.items.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
+                <div className="text-5xl mb-3">📋</div>
+                <p className="text-base font-medium">Ticket vacío</p>
+                <p className="text-sm mt-1">Escanea un producto o presiona F3 para buscar</p>
+              </div>
+            ) : (
+              activeTicket.items.map((item) => (
+                <div
+                  key={item.uuid}
+                  className={`cursor-pointer rounded-lg transition-all ${
+                    selectedItemUuid === item.uuid
+                      ? "ring-2 ring-[#480489] ring-offset-1"
+                      : ""
+                  }`}
+                  onClick={() => setSelectedItemUuid(
+                    selectedItemUuid === item.uuid ? null : item.uuid
+                  )}
+                >
+                  <CartItemRow
+                    item={item}
+                    onUpdateQuantity={updateQuantity}
+                    onRemove={(uuid) => removeFromCart(uuid)}
+                    onTogglePriceType={() => toggleItemPriceType(item.uuid)}
+                    hasDiscount={(activeTicket?.discountPercentage || 0) > 0}
+                    discountPercentage={activeTicket?.discountPercentage || 0}
+                  />
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Footer: Totales y Cobrar */}
-        <div className="p-4 border-t bg-white space-y-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-          {activeTicket && activeTicket.items.length > 0 && (
-            <div className="flex justify-end">
+        {/* ── DERECHA (30%): Panel de Detalle + Totales ── */}
+        <div className="w-[30%] flex flex-col bg-white min-w-[280px]">
+          
+          {/* Detalle del producto seleccionado */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {selectedItem ? (
+              <div className="space-y-4">
+                <h3 className="font-bold text-lg text-zinc-800 leading-tight">
+                  {selectedItem.name}
+                </h3>
+                <div className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded w-fit">
+                  SKU: {selectedItem.code}
+                </div>
+                {selectedItem.description && (
+                  <p className="text-sm text-zinc-600">{selectedItem.description}</p>
+                )}
+                {selectedItem.category_name && (
+                  <div
+                    className="text-xs px-2 py-1 rounded-full w-fit font-medium"
+                    style={{
+                      backgroundColor: (selectedItem.category_color || "#64748b") + "20",
+                      color: selectedItem.category_color || "#64748b",
+                    }}
+                  >
+                    {selectedItem.category_name}
+                  </div>
+                )}
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-500">Precio Menudeo:</span>
+                    <span className="font-semibold">{formatCurrency(selectedItem.retail_price)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-500">Precio Mayoreo:</span>
+                    <span className="font-semibold">{formatCurrency(selectedItem.wholesale_price)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-500">Stock disponible:</span>
+                    <span className="font-semibold">{selectedItem.stock}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
+                <div className="text-4xl mb-2">🔍</div>
+                <p className="text-sm text-center">Seleccione un producto<br />para ver detalles</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer fijo: Totales y Cobrar */}
+          <div className="p-4 border-t bg-white space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+            {activeTicket && activeTicket.items.length > 0 && (
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 px-2"
+                  onClick={() => {
+                    clearTicket();
+                    setSelectedItemUuid(null);
+                  }}
+                >
+                  <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
+                </Button>
+              </div>
+            )}
+
+            {/* Discount Info */}
+            {activeTicket && activeTicket.discountPercentage > 0 && (
+              <div className="space-y-1 pb-2 border-b">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-zinc-600">Subtotal:</span>
+                  <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm text-red-600 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Percent className="w-3 h-3" />
+                    Descuento ({activeTicket.discountPercentage}%):
+                  </span>
+                  <span>
+                    -{formatCurrency(getTicketDiscountAmount())}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between items-end">
+              <span className="text-lg font-bold text-zinc-700">Total:</span>
+              <span className="text-3xl font-extrabold text-[#480489] tabular-nums">
+                {formatCurrency(ticketTotal)}
+              </span>
+            </div>
+
+            {can("sales:create") && (
               <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 px-2"
-                onClick={clearTicket}
+                className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
+                disabled={!isShiftOpen || ticketTotal === 0}
+                onClick={handleCheckoutRequest}
               >
-                <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
+                <Wallet className="w-5 h-5 mr-2" />
+                Cobrar (F12)
               </Button>
-            </div>
-          )}
+            )}
 
-          {/* Discount Info */}
-          {activeTicket && activeTicket.discountPercentage > 0 && (
-            <div className="space-y-1 pb-2 border-b">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-600">Subtotal:</span>
-                <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm text-red-600 font-medium">
-                <span className="flex items-center gap-1">
-                  <Percent className="w-3 h-3" />
-                  Descuento ({activeTicket.discountPercentage}%):
-                </span>
-                <span>
-                  -{formatCurrency(getTicketDiscountAmount())}
+            {/* Info última venta + reimprimir */}
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t text-xs">
+              <div>
+                <span className="text-muted-foreground block">Anterior</span>
+                <span className="font-bold text-zinc-500">
+                  {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
                 </span>
               </div>
+              <div>
+                <span className="text-muted-foreground block">Cambio</span>
+                <span className="font-bold text-green-600">
+                  {lastSale ? formatCurrency(lastSale.change) : "$0.00"}
+                </span>
+              </div>
+              <div className="flex items-end justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[10px] border-[#480489] text-[#480489] hover:bg-purple-50 px-2"
+                  onClick={handleReprint}
+                  disabled={!lastSale}
+                >
+                  <Printer className="w-3 h-3 mr-1" /> Reimprimir
+                </Button>
+              </div>
             </div>
-          )}
-
-          <div className="flex justify-between items-end">
-            <span className="text-lg font-bold text-zinc-700">Total:</span>
-            <span className="text-4xl font-extrabold text-[#480489] tabular-nums">
-              {formatCurrency(ticketTotal)}
-            </span>
           </div>
-
-          {can("sales:create") && (
-            <Button
-            className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
-            disabled={!shift || shift.status !== "open" || ticketTotal === 0}
-            onClick={handleCheckoutRequest}
-          >
-            <Wallet className="w-5 h-5 mr-2" />
-            Cobrar (F12)
-          </Button>
-          )}
-          </div>
+        </div>
       </div>
 
       {/* Dialog de Confirmación para Cerrar Ticket con Productos */}
