@@ -32,7 +32,7 @@ function getItemBadges(item: CartItem, discountPercentage: number): BadgeInfo[] 
 
   if (item.priceType === "kit_item") {
     badges.push({
-      label: "Kit / Regalo",
+      label: "Complemento",
       className: "bg-pink-100 text-pink-700 border-pink-200",
       icon: Gift,
     });
