@@ -12,6 +12,7 @@ import { playSound } from "@/lib/sounds";
 import { TicketTable } from "@/features/sales/components/TicketTable";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
+import { ManualSearchModal } from "@/features/sales/components/ManualSearchModal";
 import { ProductDetailPanel } from "@/features/sales/components/ProductDetailPanel";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -71,9 +72,7 @@ export default function SalesPage() {
 
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  // TODO: Commit 4 — ManualSearchModal consumirá este estado
   const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
-  void isManualSearchOpen; // suppress TS unused-var until modal is added
   const [selectedItemUuid, setSelectedItemUuid] = useState<string | null>(null);
   const { lastSale, setLastSale } = useSalesStore();
 
@@ -366,6 +365,15 @@ export default function SalesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ManualSearchModal
+        isOpen={isManualSearchOpen}
+        onClose={() => setIsManualSearchOpen(false)}
+        onProductSelect={(product) => {
+          addToCart(product);
+          playSound("success");
+          toast.success(`Agregado: ${product.name}`);
+        }}
+      />
     </div>
   );
 }
