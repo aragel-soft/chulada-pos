@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, Printer, Wallet, Lock, Trash, Percent } from "lucide-react";
+import { Plus, X, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -12,6 +12,7 @@ import { playSound } from "@/lib/sounds";
 import { TicketTable } from "@/features/sales/components/TicketTable";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
+import { ProductDetailPanel } from "@/features/sales/components/ProductDetailPanel";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { printSaleTicket } from "@/lib/api/printers";
@@ -318,138 +319,22 @@ export default function SalesPage() {
         </div>
 
         {/* ── DERECHA (30%): Panel de Detalle + Totales ── */}
-        <div className="w-[30%] flex flex-col bg-white min-w-[280px]">
-          
-          {/* Detalle del producto seleccionado */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {selectedItem ? (
-              <div className="space-y-4">
-                <h3 className="font-bold text-lg text-zinc-800 leading-tight">
-                  {selectedItem.name}
-                </h3>
-                <div className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded w-fit">
-                  SKU: {selectedItem.code}
-                </div>
-                {selectedItem.description && (
-                  <p className="text-sm text-zinc-600">{selectedItem.description}</p>
-                )}
-                {selectedItem.category_name && (
-                  <div
-                    className="text-xs px-2 py-1 rounded-full w-fit font-medium"
-                    style={{
-                      backgroundColor: (selectedItem.category_color || "#64748b") + "20",
-                      color: selectedItem.category_color || "#64748b",
-                    }}
-                  >
-                    {selectedItem.category_name}
-                  </div>
-                )}
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-500">Precio Menudeo:</span>
-                    <span className="font-semibold">{formatCurrency(selectedItem.retail_price)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-500">Precio Mayoreo:</span>
-                    <span className="font-semibold">{formatCurrency(selectedItem.wholesale_price)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-500">Stock disponible:</span>
-                    <span className="font-semibold">{selectedItem.stock}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                <div className="text-4xl mb-2">🔍</div>
-                <p className="text-sm text-center">Seleccione un producto<br />para ver detalles</p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer fijo: Totales y Cobrar */}
-          <div className="p-4 border-t bg-white space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-            {activeTicket && activeTicket.items.length > 0 && (
-              <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 px-2"
-                  onClick={() => {
-                    clearTicket();
-                    setSelectedItemUuid(null);
-                  }}
-                >
-                  <Trash className="w-3 h-3 mr-1" /> Limpiar Todo
-                </Button>
-              </div>
-            )}
-
-            {/* Discount Info */}
-            {activeTicket && activeTicket.discountPercentage > 0 && (
-              <div className="space-y-1 pb-2 border-b">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-600">Subtotal:</span>
-                  <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm text-red-600 font-medium">
-                  <span className="flex items-center gap-1">
-                    <Percent className="w-3 h-3" />
-                    Descuento ({activeTicket.discountPercentage}%):
-                  </span>
-                  <span>
-                    -{formatCurrency(getTicketDiscountAmount())}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-between items-end">
-              <span className="text-lg font-bold text-zinc-700">Total:</span>
-              <span className="text-3xl font-extrabold text-[#480489] tabular-nums">
-                {formatCurrency(ticketTotal)}
-              </span>
-            </div>
-
-            {can("sales:create") && (
-              <Button
-                className="w-full bg-[#480489] hover:bg-[#360368] h-12 text-lg shadow-md transition-all active:scale-[0.99]"
-                disabled={!isShiftOpen || ticketTotal === 0}
-                onClick={handleCheckoutRequest}
-              >
-                <Wallet className="w-5 h-5 mr-2" />
-                Cobrar (F12)
-              </Button>
-            )}
-
-            {/* Info última venta + reimprimir */}
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t text-xs">
-              <div>
-                <span className="text-muted-foreground block">Anterior</span>
-                <span className="font-bold text-zinc-500">
-                  {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground block">Cambio</span>
-                <span className="font-bold text-green-600">
-                  {lastSale ? formatCurrency(lastSale.change) : "$0.00"}
-                </span>
-              </div>
-              <div className="flex items-end justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-[10px] border-[#480489] text-[#480489] hover:bg-purple-50 px-2"
-                  onClick={handleReprint}
-                  disabled={!lastSale}
-                >
-                  <Printer className="w-3 h-3 mr-1" /> Reimprimir
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProductDetailPanel
+          selectedItem={selectedItem}
+          activeTicket={activeTicket}
+          ticketSubtotal={ticketSubtotal}
+          ticketTotal={ticketTotal}
+          discountAmount={getTicketDiscountAmount()}
+          isShiftOpen={isShiftOpen}
+          lastSale={lastSale}
+          onClearTicket={() => {
+            clearTicket();
+            setSelectedItemUuid(null);
+          }}
+          onCheckout={handleCheckoutRequest}
+          onReprintLastSale={handleReprint}
+          canCreateSales={can("sales:create")}
+        />
       </div>
 
       {/* Dialog de Confirmación para Cerrar Ticket con Productos */}
