@@ -5,11 +5,11 @@ import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
 import { useAuthStore } from "@/stores/authStore";
 import { formatCurrency } from "@/lib/utils";
-import { usePosProducts } from "@/features/sales/hooks/usePosProducts";
+import { getProducts } from "@/lib/api/inventory/products";
 import { toast } from "sonner";
 import { useCartStore } from "@/features/sales/stores/cartStore";
 import { playSound } from "@/lib/sounds";
-import { CartItemRow } from "@/features/sales/components/CardItemRow";
+import { TicketTable } from "@/features/sales/components/TicketTable";
 import { MAX_OPEN_TICKETS } from "@/config/constants";
 import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
@@ -107,31 +107,32 @@ export default function SalesPage() {
     }
   }, [shift]);
 
-  // Products for scanner lookup
-  const {
-    products,
-  } = usePosProducts({
-    search: "",
-    enabled: !!shift && shift.status === "open",
-  });
-
   const handleScannerInput = useCallback(
-    (code: string) => {
+    async (code: string) => {
       const cleanCode = code.trim();
-      const product = products.find(
-        (p) => p.code === cleanCode || p.barcode === cleanCode
-      );
+      try {
+        const result = await getProducts(
+          { page: 1, pageSize: 5, search: cleanCode, sortBy: "name", sortOrder: "asc" },
+          { active_status: ["active"] }
+        );
+        const product = result.data.find(
+          (p) => p.code === cleanCode || p.barcode === cleanCode
+        );
 
-      if (product) {
-        addToCart(product);
-        playSound("success");
-        toast.success(`Agregado: ${product.name}`);
-      } else {
+        if (product) {
+          addToCart(product);
+          playSound("success");
+          toast.success(`Agregado: ${product.name}`);
+        } else {
+          playSound("error");
+          toast.error(`Producto no encontrado: ${cleanCode}`);
+        }
+      } catch {
         playSound("error");
-        toast.error(`Producto no encontrado: ${cleanCode}`);
+        toast.error(`Error al buscar producto: ${cleanCode}`);
       }
     },
-    [products, addToCart]
+    [addToCart]
   );
 
   useEffect(() => {
@@ -305,38 +306,15 @@ export default function SalesPage() {
 
         {/* ── IZQUIERDA (70%): Tabla del Ticket ── */}
         <div className="w-[70%] flex flex-col overflow-hidden border-r">
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-zinc-50/30">
-            {!activeTicket || activeTicket.items.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
-                <div className="text-5xl mb-3">📋</div>
-                <p className="text-base font-medium">Ticket vacío</p>
-                <p className="text-sm mt-1">Escanea un producto o presiona F3 para buscar</p>
-              </div>
-            ) : (
-              activeTicket.items.map((item) => (
-                <div
-                  key={item.uuid}
-                  className={`cursor-pointer rounded-lg transition-all ${
-                    selectedItemUuid === item.uuid
-                      ? "ring-2 ring-[#480489] ring-offset-1"
-                      : ""
-                  }`}
-                  onClick={() => setSelectedItemUuid(
-                    selectedItemUuid === item.uuid ? null : item.uuid
-                  )}
-                >
-                  <CartItemRow
-                    item={item}
-                    onUpdateQuantity={updateQuantity}
-                    onRemove={(uuid) => removeFromCart(uuid)}
-                    onTogglePriceType={() => toggleItemPriceType(item.uuid)}
-                    hasDiscount={(activeTicket?.discountPercentage || 0) > 0}
-                    discountPercentage={activeTicket?.discountPercentage || 0}
-                  />
-                </div>
-              ))
-            )}
-          </div>
+          <TicketTable
+            items={activeTicket?.items ?? []}
+            selectedUuid={selectedItemUuid}
+            onSelect={setSelectedItemUuid}
+            onUpdateQuantity={updateQuantity}
+            onRemove={(uuid) => removeFromCart(uuid)}
+            onTogglePriceType={(uuid) => toggleItemPriceType(uuid)}
+            discountPercentage={activeTicket?.discountPercentage ?? 0}
+          />
         </div>
 
         {/* ── DERECHA (30%): Panel de Detalle + Totales ── */}
