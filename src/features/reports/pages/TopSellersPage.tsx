@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { PaginationState } from "@tanstack/react-table";
+import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { topSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
@@ -15,17 +15,23 @@ export default function TopSellersPage() {
     pageIndex: 0,
     pageSize: 16,
   });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "total_revenue", desc: true }]);
 
   const categoryIds = useMemo(
     () => (selectedCategories.size > 0 ? Array.from(selectedCategories) : undefined),
     [selectedCategories]
   );
 
+  const sortField = sorting.length > 0 ? sorting[0].id : undefined;
+  const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : undefined;
+
   const { data, isLoading, error } = useTopSellers(
     dateRange && dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined, 
     categoryIds, 
     pagination.pageIndex + 1, 
-    pagination.pageSize
+    pagination.pageSize,
+    sortField,
+    sortOrder,
   );
 
   const fetchCategories = useCallback(async () => {
@@ -49,8 +55,11 @@ export default function TopSellersPage() {
         initialSorting={[{ id: "total_revenue", desc: true }]}
         showColumnFilters={false}
         manualPagination={true}
+        manualSorting={true}
         pagination={pagination}
         onPaginationChange={setPagination}
+        sorting={sorting}
+        onSortingChange={setSorting}
         rowCount={data?.total || 0}
         columnTitles={{
           ranking: "#",

@@ -4,10 +4,12 @@ import { TopSellingProduct, DateRange } from "@/types/reports";
 import { PaginatedResponse } from "@/types/pagination";
 
 export const useTopSellers = (
-  dateRange: DateRange | undefined, 
+  dateRange: DateRange | undefined,
   categoryIds?: string[],
   page: number = 1,
-  pageSize: number = 16
+  pageSize: number = 16,
+  sortBy?: string,
+  sortOrder?: string,
 ) => {
   const [data, setData] = useState<PaginatedResponse<TopSellingProduct> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,20 +19,22 @@ export const useTopSellers = (
     let isMounted = true;
 
     const fetchData = async () => {
-      if (!dateRange?.from || !dateRange?.to) return; 
-      
+      if (!dateRange?.from || !dateRange?.to) return;
+
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const result = await getTopSellingProducts(
-          dateRange.from, 
-          dateRange.to, 
-          page, 
-          pageSize, 
-          categoryIds
+          dateRange.from,
+          dateRange.to,
+          page,
+          pageSize,
+          categoryIds,
+          sortBy,
+          sortOrder,
         );
-        
+
         if (isMounted) {
           setData(result);
         }
@@ -50,7 +54,7 @@ export const useTopSellers = (
     return () => {
       isMounted = false;
     };
-  }, [dateRange?.from, dateRange?.to, categoryIds, page, pageSize]);
+  }, [dateRange?.from, dateRange?.to, categoryIds, page, pageSize, sortBy, sortOrder]);
 
   return { data, isLoading, error };
 };
