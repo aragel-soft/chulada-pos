@@ -7,12 +7,14 @@ interface ScannerInputProps {
   onScan: (code: string) => void;
   onManualSearch: () => void;
   disabled?: boolean;
+  size?: "sm" | "default" | "lg";
 }
 
 export const ScannerInput = ({
   onScan,
   onManualSearch,
   disabled = false,
+  size = "default",
 }: ScannerInputProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -69,18 +71,22 @@ export const ScannerInput = ({
         <Input
           ref={inputRef}
           onKeyDown={handleKeyDown}
-          className="pl-10 pr-4 h-12 text-lg bg-white border-zinc-200 shadow-sm transition-colors duration-200 focus-visible:ring-0 focus-visible:border-[#480489] hover:border-[#480489]/50 font-mono"
+          className={`pl-10 pr-4 bg-white border-zinc-200 shadow-sm transition-colors duration-200 focus-visible:ring-0 focus-visible:border-[#480489] hover:border-[#480489]/50 font-mono
+          ${size === "sm" ? "h-8 text-sm" : size === "default" ? "h-10 text-base" : "h-12 text-lg"}
+          `}
           placeholder="Escanear código de barras..."
           autoComplete="off"
           disabled={disabled}
+          
         />
       </div>
 
       <Button
         variant="outline"
-        className="h-12 px-4 border-zinc-200 hover:border-[#480489] hover:bg-purple-50 hover:text-[#480489] transition-colors shrink-0"
+        className="border-zinc-200 hover:border-[#480489] hover:bg-purple-50 hover:text-[#480489] transition-colors shrink-0"
         onClick={onManualSearch}
         disabled={disabled}
+        size={size}
       >
         <Search className="w-4 h-4 mr-2" />
         Buscar (F3)

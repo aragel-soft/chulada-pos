@@ -3,7 +3,7 @@ import { CartItem } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Gift, Tag, Package, Percent } from "lucide-react";
+import { Minus, Plus, Trash2, Gift, Tag, Percent } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -181,7 +181,7 @@ export const TicketTable = ({
         <div className="grid grid-cols-[1fr_120px_70px_100px_100px_110px_100px_40px] gap-1 px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
           <span>Producto</span>
           <span className="text-center">Cantidad</span>
-          <span className="text-center" title="Inventario"><Package className="h-3 w-3 mx-auto" /></span>
+          <span className="text-center" title="Stock Disponible">Disp.</span>
           <span className="text-right">Menudeo</span>
           <span className="text-right">Mayoreo</span>
           <span className="text-right">P. Final</span>
@@ -223,25 +223,27 @@ export const TicketTable = ({
                 onClick={() => onSelect(isSelected ? null : item.uuid)}
               >
                 {/* Producto */}
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-zinc-800 truncate" title={item.name}>
-                    {item.name}
+                <div className="min-w-0 flex flex-col justify-center py-0.5">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="font-medium text-sm text-zinc-800 truncate" title={item.name}>
+                      {item.name}
+                    </span>
+                    {badges.length > 0 && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {badges.map((b, i) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className={`text-[9px] px-1.5 py-0 h-4 font-semibold border ${b.className}`}
+                          >
+                            {b.icon && <b.icon className="h-2.5 w-2.5 mr-0.5" />}
+                            {b.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground font-mono">{item.code}</div>
-                  {badges.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {badges.map((b, i) => (
-                        <Badge
-                          key={i}
-                          variant="outline"
-                          className={`text-[9px] px-1.5 py-0 h-4 font-semibold border ${b.className}`}
-                        >
-                          {b.icon && <b.icon className="h-2.5 w-2.5 mr-0.5" />}
-                          {b.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                  <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{item.code}</div>
                 </div>
 
                 {/* Cantidad */}

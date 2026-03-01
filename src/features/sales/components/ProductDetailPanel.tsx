@@ -1,10 +1,9 @@
 import { CartItem } from "@/types/sales";
 import { Ticket } from "@/types/sales";
-import { LastSaleInfo } from "@/features/sales/stores/salesStore";
 import { Button } from "@/components/ui/button";
 import { AppAvatar } from "@/components/ui/app-avatar";
 import { formatCurrency } from "@/lib/utils";
-import { Percent, Wallet, Trash, Search, Package } from "lucide-react";
+import { Percent, Wallet, Trash, Package, PackageOpen } from "lucide-react";
 
 interface ProductDetailPanelProps {
   selectedItem: CartItem | null;
@@ -13,10 +12,8 @@ interface ProductDetailPanelProps {
   ticketTotal: number;
   discountAmount: number;
   isShiftOpen: boolean;
-  lastSale: LastSaleInfo | null;
   onClearTicket: () => void;
   onCheckout: () => void;
-  onReprintLastSale: () => void;
   canCreateSales: boolean;
 }
 
@@ -27,10 +24,8 @@ export function ProductDetailPanel({
   ticketTotal,
   discountAmount,
   isShiftOpen,
-  lastSale,
   onClearTicket,
   onCheckout,
-  onReprintLastSale,
   canCreateSales,
 }: ProductDetailPanelProps) {
   
@@ -101,48 +96,52 @@ export function ProductDetailPanel({
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 space-y-4">
-            <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center text-4xl shadow-inner">
-              <Search className="w-8 h-8 text-zinc-400" />
+          <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-6">
+            <div className="w-full max-w-[240px] aspect-square rounded-2xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center space-y-4 bg-zinc-50/50">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-zinc-100">
+                <PackageOpen className="w-8 h-8 text-zinc-300" />
+              </div>
+              <p className="text-sm text-center font-medium text-zinc-500">
+                Selecciona un producto<br />para ver sus detalles
+              </p>
             </div>
-            <p className="text-sm text-center font-medium max-w-[200px]">
-              Selecciona un producto<br />para ver sus detalles
-            </p>
           </div>
         )}
       </div>
 
       {/* ── ABAJO: Totales y Cobrar (Footer fijo) ── */}
       <div className="p-4 border-t bg-zinc-50 space-y-3 z-10 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.03)] border-l">
-        {hasItems && (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50 hover:border-red-300 transition-colors"
-              onClick={onClearTicket}
-              title="Vaciar ticket completo"
-            >
-              <Trash className="w-3.5 h-3.5 mr-1.5" /> Vaciar Ticket
-            </Button>
-          </div>
-        )}
-
         {/* Desglose de Totales */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-zinc-200 space-y-2">
-          {hasDiscount && (
-            <>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500 font-medium">Subtotal:</span>
-                <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm text-red-600 font-medium bg-red-50 p-1.5 rounded pr-2">
-                <span className="flex items-center gap-1.5">
-                  <div className="bg-red-100 p-0.5 rounded-sm">
-                    <Percent className="w-3 h-3 text-red-600" />
-                  </div>
-                  Descuento ({activeTicket.discountPercentage}%):
-                </span>
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-zinc-200">
+          {hasItems && (
+            <div className="flex justify-between items-center mb-3 pb-2 border-b border-zinc-100">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Resumen de Venta</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                onClick={onClearTicket}
+                title="Vaciar ticket completo"
+              >
+                <Trash className="w-3 h-3 mr-1" /> Vaciar Ticket
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {hasDiscount && (
+              <>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-zinc-500 font-medium">Subtotal:</span>
+                  <span className="font-semibold">{formatCurrency(ticketSubtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm text-red-600 font-medium bg-red-50 p-1.5 rounded pr-2">
+                  <span className="flex items-center gap-1.5">
+                    <div className="bg-red-100 p-0.5 rounded-sm">
+                      <Percent className="w-3 h-3 text-red-600" />
+                    </div>
+                    Descuento ({activeTicket.discountPercentage}%):
+                  </span>
                 <span>
                   -{formatCurrency(discountAmount)}
                 </span>
@@ -156,6 +155,7 @@ export function ProductDetailPanel({
             <span className="text-4xl font-black text-[#480489] tabular-nums tracking-tight">
               {formatCurrency(ticketTotal)}
             </span>
+          </div>
           </div>
         </div>
 
@@ -172,33 +172,6 @@ export function ProductDetailPanel({
             <span className="ml-2 text-sm font-medium opacity-80 bg-black/20 px-2 py-0.5 rounded text-white">(F12)</span>
           </Button>
         )}
-
-        {/* Info última venta + reimprimir */}
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-zinc-200 text-xs mt-3">
-          <div className="bg-white p-1.5 rounded border border-zinc-100 shadow-sm text-center">
-            <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Anterior</span>
-            <span className="font-bold text-zinc-600">
-              {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
-            </span>
-          </div>
-          <div className="bg-white p-1.5 rounded border border-zinc-100 shadow-sm text-center">
-            <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Cambio</span>
-            <span className="font-bold text-emerald-600">
-              {lastSale ? formatCurrency(lastSale.change) : "$0.00"}
-            </span>
-          </div>
-          <div className="flex items-center justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-full w-full max-h-9 text-[10px] border-[#480489]/30 text-[#480489] hover:bg-purple-50 hover:border-[#480489] transition-colors"
-              onClick={onReprintLastSale}
-              disabled={!lastSale}
-            >
-              Reimprimir
-            </Button>
-          </div>
-        </div>
       </div>
     </div>
   );
