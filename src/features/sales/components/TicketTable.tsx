@@ -3,7 +3,7 @@ import { CartItem } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Gift, Tag, Percent } from "lucide-react";
+import { Minus, Plus, Trash2, Gift, Tag, Percent, Receipt } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -193,10 +193,16 @@ export const TicketTable = ({
       {/* Table Body */}
       <div className="flex-1 overflow-y-auto">
         {items.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60 py-16">
-            <div className="text-5xl mb-3">📋</div>
-            <p className="text-base font-medium">Ticket vacío</p>
-            <p className="text-sm mt-1">Escanea un producto o presiona F3 para buscar</p>
+          <div className="h-full flex flex-col items-center justify-center p-8">
+            <div className="w-full max-w-lg py-12 px-6 rounded-2xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center space-y-4 bg-zinc-50/50">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-zinc-100">
+                <Receipt className="w-8 h-8 text-zinc-300" />
+              </div>
+              <p className="text-lg font-bold text-zinc-700">Ticket vacío</p>
+              <p className="text-sm text-center font-medium text-zinc-500">
+                Escanea un producto o presiona <span className="font-bold text-[#480489] bg-purple-100 px-1.5 py-0.5 rounded">F3</span> para buscar
+              </p>
+            </div>
           </div>
         ) : (
           items.map((item) => {

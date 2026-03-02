@@ -151,7 +151,7 @@ export function ProductDetailPanel({
           )}
 
           <div className="flex justify-between items-end pt-1">
-            <span className="text-sm uppercase tracking-wider font-bold text-zinc-500">Total</span>
+            <span className="text-xl uppercase tracking-wider font-bold text-zinc-500">Total</span>
             <span className="text-4xl font-black text-[#480489] tabular-nums tracking-tight">
               {formatCurrency(ticketTotal)}
             </span>
