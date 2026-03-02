@@ -3,7 +3,7 @@ import { CartItem } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Gift, Tag, Percent, Receipt } from "lucide-react";
+import { Minus, Plus, Trash2, Gift, Tag, Percent, Receipt, Barcode } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -249,7 +249,14 @@ export const TicketTable = ({
                       </div>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{item.code}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1.5">
+                    <span className="text-sm  bg-muted px-1 rounded">{item.code}</span>
+                    {item.barcode && (
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Barcode className="h-3 w-3" /> {item.barcode}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Cantidad */}
