@@ -26,7 +26,6 @@ export function ManualSearchModal({ isOpen, onClose, onProductSelect }: ManualSe
   };
 
   const handleSearchEnter = (searchValue: string) => {
-    // If there's exactly one product in the search results and they hit enter, select it
     if (products.length === 1 && searchValue.trim() !== "") {
       handleSelect(products[0]);
       return true;
