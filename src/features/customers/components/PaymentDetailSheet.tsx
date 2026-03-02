@@ -18,7 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCurrency } from "@/lib/utils";
-import { getPaymentDetails, printPaymentReceipt } from "@/lib/api/account";
+import { getPaymentDetails } from "@/lib/api/account";
+import { printPaymentReceipt } from "@/lib/api/printers";
 import { AccountMovement } from "@/types/account";
 
 const PAYMENT_METHOD_LABELS: Record<

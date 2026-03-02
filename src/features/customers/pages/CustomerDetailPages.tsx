@@ -24,6 +24,7 @@ import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { useAuthStore } from "@/stores/authStore";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { PaymentDetailPanel } from "@/features/customers/components/PaymentDetailSheet";
+import { printPaymentReceipt } from "@/lib/api/printers";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -161,7 +162,7 @@ export default function CustomerDetailPage() {
       setIsProcessingPayment(true);
       const apiMethod = method === "card_transfer" ? "card" : method;
 
-      await registerDebtPayment({
+      const paymentId = await registerDebtPayment({
         customer_id: customer.id,
         user_id: user.id,
         shift_id: shift.id.toString(),
@@ -179,7 +180,12 @@ export default function CustomerDetailPage() {
 
       if (shouldPrint) {
         toast.info("Imprimiendo recibo...");
-        // TODO: Call printer service here
+        try {
+          await printPaymentReceipt(paymentId);
+          toast.success("Recibo enviado a imprimir");
+        } catch (printError) {
+          toast.error("Error al imprimir recibo", { description: String(printError) });
+        }
       }
     } catch (error) {
       toast.error("Error al registrar el abono");

@@ -45,6 +45,7 @@ fn main() {
             commands::printer::print_sale_ticket,
             commands::printer::print_return_voucher,
             commands::printer::print_shift_ticket,
+            commands::printer::print_payment_receipt,
             // Inventory - Products
             commands::inventory::products::get_products,
             commands::inventory::products::get_product_by_id,
@@ -103,7 +104,6 @@ fn main() {
             commands::customers::account::get_customer_account_statement,
             commands::customers::account::register_debt_payment,
             commands::customers::account::get_payment_details,
-            commands::customers::account::print_payment_receipt,
             // Sales - History
             commands::sales::history::get_sales_history,
             commands::sales::history::get_sale_details,
