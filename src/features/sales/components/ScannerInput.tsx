@@ -19,34 +19,34 @@ export const ScannerInput = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const focusInput = useCallback(() => {
-    // Don't steal focus from open modals/dialogs
     const hasOpenDialog = document.querySelector('[role="dialog"]');
     if (!hasOpenDialog && inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
 
-  // Auto-focus on mount
   useEffect(() => {
     focusInput();
-  }, [focusInput]);
 
-  // Re-focus when clicking on the background (outside modals)
-  useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-
-      // If click is inside a dialog or the input itself, don't refocus
-      if (target.closest('[role="dialog"]') || target.closest("input") || target.closest("textarea")) {
-        return;
+      if (!target.closest('[role="dialog"], input, textarea')) {
+        requestAnimationFrame(focusInput);
       }
-
-      // Small delay to let click processing finish
-      requestAnimationFrame(() => focusInput());
     };
-
     document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((m) => m.removedNodes.length > 0)) {
+        setTimeout(focusInput, 50);
+      }
+    });
+    observer.observe(document.body, { childList: true });
+
+    return () => {
+      document.removeEventListener("click", handleClick);
+      observer.disconnect();
+    };
   }, [focusInput]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
