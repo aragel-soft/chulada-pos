@@ -42,6 +42,7 @@ export function ProductDetailPanel({
             {/* Imagen centrada grande */}
             <div className="flex justify-center mb-4">
               <AppAvatar
+                key={selectedItem.uuid}
                 path={selectedItem.image_url || null}
                 name={selectedItem.name}
                 className="w-32 h-32 text-4xl shadow-md border-4 border-zinc-50"
