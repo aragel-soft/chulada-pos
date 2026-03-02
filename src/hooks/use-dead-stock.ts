@@ -9,7 +9,9 @@ export const useDeadStock = (
   dateRange: DateRange | undefined,
   categoryIds?: string[],
   page: number = 1,
-  pageSize: number = 16
+  pageSize: number = 16,
+  sortBy?: string,
+  sortOrder?: string,
 ) => {
   const [data, setData] = useState<PaginatedResponse<DeadStockProduct> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,8 @@ export const useDeadStock = (
         page,
         pageSize,
         stableCategoryIds.current,
+        sortBy,
+        sortOrder,
       );
       setData(result);
     } catch (err) {
@@ -41,7 +45,7 @@ export const useDeadStock = (
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange, categoryKey, page, pageSize]);
+  }, [dateRange, categoryKey, page, pageSize, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchData();
