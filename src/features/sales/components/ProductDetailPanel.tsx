@@ -11,6 +11,7 @@ import {
   Package,
   PackageOpen,
   Barcode,
+  Tag,
 } from "lucide-react";
 
 interface ProductDetailPanelProps {
@@ -100,24 +101,44 @@ export function ProductDetailPanel({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 pt-4 px-2">
-              <div className="flex flex-col items-center justify-center p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">
-                  Menudeo
-                </span>
-                <span className="font-black text-xl text-zinc-800 tracking-tight">
-                  {formatCurrency(selectedItem.retail_price)}
-                </span>
+            {selectedItem.priceType === "promo" &&
+            selectedItem.promotionName ? (
+              <div className="pt-4 px-2">
+                <div className="flex flex-col items-center justify-center p-3 bg-fuchsia-50 rounded-xl border border-fuchsia-200">
+                  <div className="flex items-center gap-1.5 text-fuchsia-600 mb-1">
+                    <Tag className="w-4 h-4" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">
+                      En Promoción
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium text-fuchsia-800 text-center mb-1">
+                    {selectedItem.promotionName}
+                  </span>
+                  <span className="font-black text-2xl text-fuchsia-900 tracking-tight">
+                    {formatCurrency(selectedItem.finalPrice)}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col items-center justify-center p-3 bg-amber-50 rounded-xl border border-amber-100/50">
-                <span className="text-[10px] text-amber-700/60 font-bold uppercase tracking-wider mb-0.5">
-                  Mayoreo
-                </span>
-                <span className="font-black text-xl text-amber-600 tracking-tight">
-                  {formatCurrency(selectedItem.wholesale_price)}
-                </span>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 pt-4 px-2">
+                <div className="flex flex-col items-center justify-center p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">
+                    Menudeo
+                  </span>
+                  <span className="font-black text-xl text-zinc-800 tracking-tight">
+                    {formatCurrency(selectedItem.retail_price)}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center justify-center p-3 bg-amber-50 rounded-xl border border-amber-100/50">
+                  <span className="text-[10px] text-amber-700/60 font-bold uppercase tracking-wider mb-0.5">
+                    Mayoreo
+                  </span>
+                  <span className="font-black text-xl text-amber-600 tracking-tight">
+                    {formatCurrency(selectedItem.wholesale_price)}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
             {selectedItem.description &&
               selectedItem.description.trim() !== "" && (
                 <div className="my-3 px-2">
