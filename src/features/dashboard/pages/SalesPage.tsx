@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus,
   X,
@@ -184,7 +184,8 @@ export default function SalesPage() {
         );
 
         if (product) {
-          addToCart(product);
+          const addedUuid = addToCart(product);
+          if (addedUuid) setSelectedItemUuid(addedUuid);
           playSound("success");
           toast.success(`Agregado: ${product.name}`);
         } else {
@@ -207,6 +208,24 @@ export default function SalesPage() {
   useEffect(() => {
     setSelectedItemUuid(null);
   }, [activeTicketId]);
+
+  const selectedItemRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedItemUuid) {
+      const item = activeTicket?.items.find((i) => i.uuid === selectedItemUuid);
+      if (item) {
+        selectedItemRef.current = item.id;
+      } else if (selectedItemRef.current) {
+        const survivor = activeTicket?.items.find(i => i.id === selectedItemRef.current);
+        if (survivor) {
+          setSelectedItemUuid(survivor.uuid);
+        } else {
+          selectedItemRef.current = null;
+          setSelectedItemUuid(null);
+        }
+      }
+    }
+  }, [activeTicket?.items, selectedItemUuid]);
 
   const handleProcessSale = async (
     method: string,
@@ -553,7 +572,8 @@ export default function SalesPage() {
         isOpen={isManualSearchOpen}
         onClose={() => setIsManualSearchOpen(false)}
         onProductSelect={(product) => {
-          addToCart(product);
+          const addedUuid = addToCart(product);
+          if (addedUuid) setSelectedItemUuid(addedUuid);
           playSound("success");
           toast.success(`Agregado: ${product.name}`);
         }}

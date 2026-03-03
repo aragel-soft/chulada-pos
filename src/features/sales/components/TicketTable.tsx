@@ -218,7 +218,7 @@ export const TicketTable = ({
                     ? "bg-purple-50 border-l-4 border-l-[#480489]"
                     : "hover:bg-zinc-50 border-l-4 border-l-transparent"
                 }`}
-                onClick={() => onSelect(isSelected ? null : item.uuid)}
+                onClick={() => onSelect(item.uuid)}
               >
                 {/* Producto */}
                 <div className="min-w-0 flex flex-col justify-center py-0.5">
