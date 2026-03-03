@@ -731,7 +731,7 @@ fn calculate_sale_items<'a>(
                 let unit_price = if item.price_type == "kit_item" {
                     0.0
                 } else if item.price_type == "wholesale" {
-                    wholesale
+                    if wholesale > 0.0 { wholesale } else { retail }
                 } else {
                     retail
                 };
