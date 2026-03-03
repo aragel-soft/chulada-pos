@@ -305,7 +305,7 @@ export const TicketTable = ({
                     disabled={isPromo || isKit || discountPercentage > 0}
                     title={wholesaleActive ? "Precio activo" : "Clic para usar mayoreo"}
                   >
-                    {formatCurrency(item.wholesale_price)}
+                    {formatCurrency(item.wholesale_price || item.retail_price)}
                   </button>
                 </div>
 
