@@ -24,6 +24,7 @@ import { CheckoutModal } from "@/features/sales/components/CheckoutModal";
 import { ManualSearchModal } from "@/features/sales/components/ManualSearchModal";
 import { ProductDetailPanel } from "@/features/sales/components/ProductDetailPanel";
 import { useProcessSale } from "@/features/sales/hooks/useProcessSale";
+import { useCartSync } from "@/features/sales/hooks/useCartSync";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { printSaleTicket } from "@/lib/api/printers";
 import { useSalesStore } from "@/features/sales/stores/salesStore";
@@ -52,6 +53,8 @@ export default function SalesPage() {
   const { processSale, isProcessing } = useProcessSale();
   const { fetchKits } = useKitStore();
   const { fetchPromotions } = usePromotionsStore();
+
+  useCartSync();
 
   useEffect(() => {
     if (shift?.status === "open") {

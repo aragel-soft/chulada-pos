@@ -23,6 +23,7 @@ interface CartState {
   toggleItemPriceType: (uuid: string) => void;
   toggleTicketPriceType: () => void;
   clearTicket: () => void;
+  syncItemsBaseData: (products: Product[]) => void;
   
   // Discount methods
   setTicketDiscount: (percentage: number) => void;
@@ -361,6 +362,66 @@ export const useCartStore = create<CartState>()(
             priceType: 'retail',
             discountPercentage: 0
           };
+          return { tickets: newTickets };
+        });
+      },
+
+      syncItemsBaseData: (freshProducts: Product[]) => {
+        set((state) => {
+          let hasChanges = false;
+          const freshMap = new Map(freshProducts.map(p => [p.id, p]));
+
+          const newTickets = state.tickets.map(ticket => {
+            let ticketChanged = false;
+            const newItems = ticket.items.map(item => {
+              const fresh = freshMap.get(item.id);
+              if (!fresh) return item;
+
+              if (
+                item.name !== fresh.name ||
+                item.description !== fresh.description ||
+                item.retail_price !== fresh.retail_price ||
+                item.wholesale_price !== fresh.wholesale_price ||
+                item.stock !== fresh.stock ||
+                item.barcode !== fresh.barcode ||
+                item.code !== fresh.code ||
+                item.image_url !== fresh.image_url
+              ) {
+                ticketChanged = true;
+                hasChanges = true;
+                
+                const wholesale = fresh.wholesale_price !== null && fresh.wholesale_price !== undefined && fresh.wholesale_price !== 0 ? fresh.wholesale_price : fresh.retail_price;
+                const finalPrice = item.priceType === 'wholesale' ? wholesale : fresh.retail_price;
+
+                return {
+                  ...item,
+                  ...fresh,
+                  uuid: item.uuid,
+                  quantity: item.quantity,
+                  priceType: item.priceType,
+                  kitOptionId: item.kitOptionId,
+                  promotionId: item.promotionId,
+                  promotionInstanceId: item.promotionInstanceId,
+                  promotionName: item.promotionName,
+                  finalPrice,
+                };
+              }
+              return item;
+            });
+
+            if (ticketChanged) {
+               const processedItems = CartProcessor.processCart(newItems, {
+                  kitDefs: useKitStore.getState().kitDefs,
+                  promotionDefs: usePromotionsStore.getState().promotionDefs,
+                  ticketPriceType: ticket.priceType,
+                  discountPercentage: ticket.discountPercentage
+                });
+               return { ...ticket, items: processedItems };
+            }
+            return ticket;
+          });
+
+          if (!hasChanges) return state;
           return { tickets: newTickets };
         });
       },
