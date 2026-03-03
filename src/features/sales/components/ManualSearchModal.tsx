@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CatalogSearch } from "@/features/sales/components/CatalogSearch";
 import { ProductsGrid } from "@/features/sales/components/ProductsGrid";
@@ -24,6 +25,12 @@ export function ManualSearchModal({ isOpen, onClose, onProductSelect }: ManualSe
     onProductSelect(product);
     onClose();
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+    }
+  }, [isOpen, setSearchQuery]);
 
   const handleSearchEnter = (searchValue: string) => {
     if (products.length === 1 && searchValue.trim() !== "") {
