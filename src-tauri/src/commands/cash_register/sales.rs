@@ -793,6 +793,18 @@ pub fn process_sale(
     // Validate & Apply Kit Rules
     let validated_items = apply_kit_rules(&conn, &payload.items)?;
 
+    // Validate Credit Restrictions
+    if payload.payment_method == "credit" {
+        if payload.discount_percentage > 0.0 {
+            return Err("Las ventas a crédito no aplican con descuentos globales.".to_string());
+        }
+        
+        let has_wholesale = payload.items.iter().any(|item| item.price_type == "wholesale");
+        if has_wholesale {
+            return Err("Las ventas a crédito no aplican con precios de mayoreo.".to_string());
+        }
+    }
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // Use local system time instead of SQLite's CURRENT_TIMESTAMP (which is UTC)

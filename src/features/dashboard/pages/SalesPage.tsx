@@ -300,6 +300,17 @@ export default function SalesPage() {
         total={ticketTotal}
         isProcessing={isProcessing}
         onProcessSale={handleProcessSale}
+        hasWholesale={isWholesale}
+        discountPercentage={activeTicket?.discountPercentage}
+        onClearRestrictions={() => {
+          if (isWholesale) {
+            toggleTicketPriceType();
+          }
+          if (hasDiscount) {
+            clearTicketDiscount();
+          }
+          toast.success("Promociones removidas exitosamente");
+        }}
       />
 
       <KitSelectionModal
