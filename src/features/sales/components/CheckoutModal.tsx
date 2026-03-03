@@ -46,8 +46,6 @@ import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
 import { validateVoucher } from "@/lib/api/cash-register/sales";
 import { VoucherValidationResponse } from "@/types/sale";
-
-
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -68,6 +66,9 @@ interface CheckoutModalProps {
   isProcessing: boolean;
   variant?: "sale" | "debt";
   defaultCustomerId?: string;
+  hasWholesale?: boolean;
+  discountPercentage?: number;
+  onClearRestrictions?: () => number;
 }
 
 type PaymentMethod = "cash" | "card_transfer" | "mixed" | "credit";
@@ -82,6 +83,9 @@ export function CheckoutModal({
   isProcessing,
   variant = "sale",
   defaultCustomerId,
+  hasWholesale = false,
+  discountPercentage = 0,
+  onClearRestrictions,
 }: CheckoutModalProps) {
   const shift = useCashRegisterStore((state) => state.shift);
   const user = useAuthStore((state) => state.user);
@@ -128,7 +132,7 @@ export function CheckoutModal({
         setTimeout(() => cashInputRef.current?.focus(), 100);
       }
     }
-  }, [isOpen, total, variant, isShiftOpen]);
+  }, [isOpen, isShiftOpen]);
 
   const numericCash = parseFloat(cashAmount) || 0;
   const numericCard = parseFloat(cardAmount) || 0;
@@ -317,8 +321,10 @@ export function CheckoutModal({
     // If fully paid by voucher (sale only)
     if (variant === "sale" && remainingTotal === 0 && voucherData) return true;
 
-    if (method === "credit")
+    if (method === "credit") {
+      if (hasWholesale || discountPercentage > 0) return false;
       return !!selectedCustomer && !isCreditLimitExceeded();
+    }
 
     if (variant === "sale") {
       if (method === "card_transfer") return true;
@@ -649,10 +655,33 @@ export function CheckoutModal({
 
               {/* Right: Content */}
               <div className="flex-1 p-4 bg-white flex flex-col justify-center space-y-6 overflow-y-auto">
-                {/* CUSTOMER SEARCH (Only Sale-Credit) */}
+                {/* CUSTOMER SEARCH OR RESTRICTIONS (Only Sale-Credit) */}
                 {method === "credit" && variant === "sale" && (
                   <div className="flex flex-col h-full justify-start space-y-4 pt-0 overflow-y-auto">
-                    <div className="space-y-4">
+                    {(hasWholesale || discountPercentage > 0) ? (
+                      <div className="flex flex-col items-center justify-center p-8 bg-red-50 border-2 border-red-200 rounded-xl space-y-4 text-center mt-8">
+                        <AlertCircle className="w-12 h-12 text-red-500" />
+                        <h4 className="font-bold text-red-700 text-lg">
+                          Venta a Crédito no disponible
+                        </h4>
+                        <p className="text-sm text-red-600 font-medium pb-2">
+                          Las ventas a crédito no aplican con precios de mayoreo ni descuentos.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="w-full bg-red-600 hover:bg-red-700 font-bold"
+                          onClick={() => {
+                            const newTotal = onClearRestrictions?.() ?? total;
+                            setCashAmount(newTotal.toString());
+                          }}
+                        >
+                          Remover promociones y continuar
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-4">
                       <label className="text-lg font-bold block text-[#480489]">
                         Cliente para Crédito
                       </label>
@@ -824,6 +853,8 @@ export function CheckoutModal({
                         <p>Busca un cliente</p>
                       </div>
                     )}
+                    </>
+                  )}
                   </div>
                 )}
 

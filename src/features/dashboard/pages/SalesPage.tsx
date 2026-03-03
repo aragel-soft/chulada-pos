@@ -77,7 +77,6 @@ export default function SalesPage() {
     getTicketSubtotal,
     getTicketDiscountAmount,
     clearTicket,
-    toggleItemPriceType,
     setTicketDiscount,
     clearTicketDiscount,
     toggleTicketPriceType,
@@ -301,6 +300,18 @@ export default function SalesPage() {
         total={ticketTotal}
         isProcessing={isProcessing}
         onProcessSale={handleProcessSale}
+        hasWholesale={isWholesale}
+        discountPercentage={activeTicket?.discountPercentage}
+        onClearRestrictions={() => {
+          if (isWholesale) {
+            toggleTicketPriceType();
+          }
+          if (hasDiscount) {
+            clearTicketDiscount();
+          }
+          toast.success("Promociones removidas exitosamente");
+          return getTicketTotal();
+        }}
       />
 
       <KitSelectionModal
@@ -480,7 +491,6 @@ export default function SalesPage() {
               onSelect={setSelectedItemUuid}
               onUpdateQuantity={updateQuantity}
               onRemove={(uuid) => removeFromCart(uuid)}
-              onTogglePriceType={(uuid) => toggleItemPriceType(uuid)}
               discountPercentage={activeTicket?.discountPercentage ?? 0}
             />
           </div>

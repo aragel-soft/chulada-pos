@@ -3,7 +3,7 @@ import { CartItem } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Gift, Tag, Percent, Receipt, Barcode } from "lucide-react";
+import { Minus, Plus, Trash2, Gift, Tag, Receipt, Barcode } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -15,7 +15,6 @@ interface TicketTableProps {
   onSelect: (uuid: string | null) => void;
   onUpdateQuantity: (uuid: string, qty: number) => void;
   onRemove: (uuid: string) => void;
-  onTogglePriceType: (uuid: string) => void;
   discountPercentage: number;
 }
 
@@ -27,7 +26,7 @@ interface BadgeInfo {
   icon?: typeof Tag;
 }
 
-function getItemBadges(item: CartItem, discountPercentage: number): BadgeInfo[] {
+function getItemBadges(item: CartItem): BadgeInfo[] {
   const badges: BadgeInfo[] = [];
 
   if (item.priceType === "kit_item") {
@@ -95,7 +94,10 @@ function InlineQuantityEditor({
   };
 
   return (
-    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="flex items-center gap-0.5"
+      onClick={(e) => e.stopPropagation()}
+    >
       <Button
         variant="ghost"
         size="icon"
@@ -148,7 +150,10 @@ function InlineQuantityEditor({
 
 // ── Compute Final Price After Discount ──
 
-function computeRowSubtotal(item: CartItem, discountPercentage: number): number {
+function computeRowSubtotal(
+  item: CartItem,
+  discountPercentage: number,
+): number {
   if (item.priceType === "promo") {
     return item.finalPrice * item.quantity;
   }
@@ -163,7 +168,6 @@ export const TicketTable = ({
   onSelect,
   onUpdateQuantity,
   onRemove,
-  onTogglePriceType,
   discountPercentage,
 }: TicketTableProps) => {
   return (
@@ -173,7 +177,9 @@ export const TicketTable = ({
         <div className="grid grid-cols-[1fr_120px_70px_100px_100px_110px_100px_40px] gap-1 px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
           <span>Producto</span>
           <span className="text-center">Cantidad</span>
-          <span className="text-center" title="Existencia">Exist.</span>
+          <span className="text-center" title="Existencia">
+            Exist.
+          </span>
           <span className="text-right">Menudeo</span>
           <span className="text-right">Mayoreo</span>
           <span className="text-right">P. Final</span>
@@ -192,7 +198,11 @@ export const TicketTable = ({
               </div>
               <p className="text-lg font-bold text-zinc-700">Ticket vacío</p>
               <p className="text-sm text-center font-medium text-zinc-500">
-                Escanea un producto o presiona <span className="font-bold text-[#480489] bg-purple-100 px-1.5 py-0.5 rounded">F3</span> para buscar
+                Escanea un producto o presiona{" "}
+                <span className="font-bold text-[#480489] bg-purple-100 px-1.5 py-0.5 rounded">
+                  F3
+                </span>{" "}
+                para buscar
               </p>
             </div>
           </div>
@@ -201,9 +211,7 @@ export const TicketTable = ({
             const isSelected = selectedUuid === item.uuid;
             const isRetail = item.priceType === "retail";
             const isWholesale = item.priceType === "wholesale";
-            const isPromo = item.priceType === "promo";
-            const isKit = item.priceType === "kit_item";
-            const badges = getItemBadges(item, discountPercentage);
+            const badges = getItemBadges(item);
             const rowSubtotal = computeRowSubtotal(item, discountPercentage);
 
             // Determine which price column is active
@@ -223,7 +231,10 @@ export const TicketTable = ({
                 {/* Producto */}
                 <div className="min-w-0 flex flex-col justify-center py-0.5">
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="font-medium text-sm text-zinc-800 truncate" title={item.name}>
+                    <span
+                      className="font-medium text-sm text-zinc-800 truncate"
+                      title={item.name}
+                    >
                       {item.name}
                     </span>
                     {badges.length > 0 && (
@@ -234,7 +245,9 @@ export const TicketTable = ({
                             variant="outline"
                             className={`text-[9px] px-1.5 py-0 h-4 font-semibold border ${b.className}`}
                           >
-                            {b.icon && <b.icon className="h-2.5 w-2.5 mr-0.5" />}
+                            {b.icon && (
+                              <b.icon className="h-2.5 w-2.5 mr-0.5" />
+                            )}
                             {b.label}
                           </Badge>
                         ))}
@@ -242,7 +255,9 @@ export const TicketTable = ({
                     )}
                   </div>
                   <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1.5">
-                    <span className="text-sm  bg-muted px-1 rounded">{item.code}</span>
+                    <span className="text-sm  bg-muted px-1 rounded">
+                      {item.code}
+                    </span>
                     {item.barcode && (
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
                         <Barcode className="h-3 w-3" /> {item.barcode}
@@ -267,46 +282,28 @@ export const TicketTable = ({
 
                 {/* Precio Menudeo */}
                 <div className="flex items-center justify-end">
-                  <button
-                    type="button"
+                  <div
                     className={`text-sm tabular-nums transition-colors ${
                       retailActive
                         ? "font-bold text-zinc-800"
-                        : "text-zinc-400 cursor-pointer hover:text-zinc-600"
-                    } ${isPromo || isKit ? "cursor-default" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isPromo && !isKit && !retailActive && discountPercentage === 0) {
-                        onTogglePriceType(item.uuid);
-                      }
-                    }}
-                    disabled={isPromo || isKit || discountPercentage > 0}
-                    title={retailActive ? "Precio activo" : "Clic para usar menudeo"}
+                        : "text-zinc-400"
+                    }`}
                   >
                     {formatCurrency(item.retail_price)}
-                  </button>
+                  </div>
                 </div>
 
                 {/* Precio Mayoreo */}
                 <div className="flex items-center justify-end">
-                  <button
-                    type="button"
+                  <div
                     className={`text-sm tabular-nums transition-colors ${
                       wholesaleActive
                         ? "font-bold text-amber-700"
-                        : "text-zinc-400 cursor-pointer hover:text-zinc-600"
-                    } ${isPromo || isKit ? "cursor-default" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isPromo && !isKit && !wholesaleActive && discountPercentage === 0) {
-                        onTogglePriceType(item.uuid);
-                      }
-                    }}
-                    disabled={isPromo || isKit || discountPercentage > 0}
-                    title={wholesaleActive ? "Precio activo" : "Clic para usar mayoreo"}
+                        : "text-zinc-400"
+                    }`}
                   >
                     {formatCurrency(item.wholesale_price || item.retail_price)}
-                  </button>
+                  </div>
                 </div>
 
                 {/* Precio Final Aplicado */}
@@ -315,7 +312,7 @@ export const TicketTable = ({
                     {formatCurrency(
                       item.priceType === "promo"
                         ? item.finalPrice
-                        : item.finalPrice * (1 - discountPercentage / 100)
+                        : item.finalPrice * (1 - discountPercentage / 100),
                     )}
                   </span>
                 </div>
@@ -328,7 +325,10 @@ export const TicketTable = ({
                 </div>
 
                 {/* Delete */}
-                <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button
                     variant="ghost"
                     size="icon"
