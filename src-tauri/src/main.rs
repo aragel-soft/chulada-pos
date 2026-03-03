@@ -23,6 +23,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::auth::authenticate_user,
             commands::auth::debug_database,
+            commands::auth::get_machine_id,
             // Settings - Users
             commands::settings::users::check_username_available,
             commands::settings::users::create_user,

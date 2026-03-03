@@ -1,10 +1,13 @@
 import AppRouter from '@/routes/AppRouter';
 import { Toaster } from "@/components/ui/sonner";
+import { LicenseGuard } from '@/features/auth/components/LicenseGuard';
 
 function App() {
   return (
     <>
-      <AppRouter />
+      <LicenseGuard>
+        <AppRouter />
+      </LicenseGuard>
       <Toaster />
     </>
   );

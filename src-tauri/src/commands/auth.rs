@@ -6,14 +6,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct Permission {
-//     pub id: String,
-//     pub name: String,
-//     pub display_name: String,
-//     pub module: String,
-// }
+use machine_uid;
 
 #[derive(Debug,  Serialize, Deserialize)]
 pub struct User {
@@ -62,7 +55,6 @@ fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError> {
         .is_ok())
 }
 
-/// Comando Tauri: Autenticar usuario
 #[tauri::command]
 pub async fn authenticate_user(
     username: String,
@@ -71,7 +63,6 @@ pub async fn authenticate_user(
 ) -> Result<AuthResponse, AuthError> {
     let conn = db.lock().unwrap();
 
-    // Query para obtener usuario con su rol
     let mut stmt = conn.prepare(
         "SELECT 
             u.id, 
@@ -157,12 +148,6 @@ pub async fn authenticate_user(
                 }
             };
 
-            // // Obtener módulos únicos de los permisos
-            // let mut modules: Vec<String> = permissions.iter().map(|p| p.module.clone()).collect();
-            // modules.sort_unstable();
-            // modules.dedup();
-
-
             // Login exitoso
             Ok(AuthResponse {
                 success: true,
@@ -219,4 +204,9 @@ pub fn debug_database(db: State<'_, Mutex<Connection>>) -> Result<String, AuthEr
     output.push_str(&format!("✅ Usuario admin existe: {}\n", admin_exists == 1));
     
     Ok(output)
+}
+
+#[tauri::command]
+pub fn get_machine_id() -> Result<String, String> {
+    machine_uid::get().map_err(|e| e.to_string())
 }
