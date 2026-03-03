@@ -64,7 +64,7 @@ export function ProductDetailPanel({
                 variant="secondary"
                 className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded-md"
               >
-                SKU: {selectedItem.code}
+                Código: {selectedItem.code}
               </Badge>
               {selectedItem.barcode && (
                 <Badge
@@ -79,7 +79,7 @@ export function ProductDetailPanel({
                 variant="secondary"
                 className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded-md flex items-center gap-1 self-start"
               >
-                <Package className="w-3 h-3" /> {selectedItem.stock} en stock
+                <Package className="w-3 h-3" /> {selectedItem.stock} en existencia
               </Badge>
             </div>
 

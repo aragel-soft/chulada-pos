@@ -181,7 +181,7 @@ export const TicketTable = ({
         <div className="grid grid-cols-[1fr_120px_70px_100px_100px_110px_100px_40px] gap-1 px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
           <span>Producto</span>
           <span className="text-center">Cantidad</span>
-          <span className="text-center" title="Stock Disponible">Disp.</span>
+          <span className="text-center" title="Existencia">Exist.</span>
           <span className="text-right">Menudeo</span>
           <span className="text-right">Mayoreo</span>
           <span className="text-right">P. Final</span>
