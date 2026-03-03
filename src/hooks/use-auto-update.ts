@@ -38,19 +38,15 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
         const update = await check();
 
         if (update) {
-          console.log(`[AutoUpdate] Actualización disponible: v${update.version}`);
           setAvailableVersion(update.version);
           setPendingUpdate(update);
           setStatus('available');
           setShowDialog(true);
         } else {
-          console.log('[AutoUpdate] La aplicación está actualizada.');
           setStatus('idle');
         }
       } catch (err) {
-        // No crashear si no hay conexión o falla el check
-        console.error('[AutoUpdate] Error al comprobar actualizaciones:', err);
-        setStatus('idle'); // Silenciosamente volver a idle
+        setStatus('idle');
       }
     };
 
@@ -73,7 +69,6 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
         switch (event.event) {
           case 'Started':
             contentLength = event.data.contentLength;
-            console.log(`[AutoUpdate] Descarga iniciada, tamaño: ${contentLength} bytes`);
             setStatus('downloading');
             break;
           case 'Progress':
@@ -84,18 +79,15 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
             }
             break;
           case 'Finished':
-            console.log('[AutoUpdate] Descarga completada.');
             setStatus('installing');
             setDownloadProgress(100);
             break;
         }
       });
 
-      console.log('[AutoUpdate] Instalación completada. Reiniciando...');
       // Reiniciar la app para aplicar cambios
       await relaunch();
     } catch (err) {
-      console.error('[AutoUpdate] Error durante la actualización:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido durante la actualización');
       setStatus('error');
     }
