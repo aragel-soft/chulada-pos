@@ -52,14 +52,6 @@ function getItemBadges(item: CartItem, discountPercentage: number): BadgeInfo[] 
     });
   }
 
-  if (discountPercentage > 0 && item.priceType !== "promo") {
-    badges.push({
-      label: `Desc. -${discountPercentage}%`,
-      className: "bg-red-100 text-red-700 border-red-200",
-      icon: Percent,
-    });
-  }
-
   return badges;
 }
 
