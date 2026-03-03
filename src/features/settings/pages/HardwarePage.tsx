@@ -1,10 +1,11 @@
 // Imports
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Printer, Save, Monitor, CreditCard, Settings2 } from "lucide-react"
+import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2 } from "lucide-react"
+import { backupDatabase } from "@/lib/api/backup"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -52,6 +53,7 @@ export default function HardwarePage() {
   } = useHardwareStore()
   // Hooks de Zustand
   const { can } = useAuthStore();
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   // Initialize form
   const form = useForm<HardwareFormValues>({
@@ -296,6 +298,58 @@ export default function HardwarePage() {
                 </Card>
               </div>
             </div>
+
+            {/* Respaldo en la Nube */}
+            <Card>
+              <CardHeader className="pb-3 border-b bg-muted/20">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <CloudUpload className="h-4 w-4 text-primary" />
+                  Respaldo en la Nube
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
+                  <p>
+                    El sistema genera un respaldo comprimido (.gz) de la base de datos 
+                    automáticamente al cerrar un turno. Usa este botón para forzar un respaldo manual 
+                    en cualquier momento.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                  disabled={isBackingUp}
+                  onClick={async () => {
+                    setIsBackingUp(true);
+                    try {
+                      const fileName = await backupDatabase();
+                      toast.success("Respaldo completado", {
+                        description: `Archivo: ${fileName}`,
+                      });
+                    } catch (err) {
+                      toast.error("Error al crear respaldo", {
+                        description: String(err),
+                      });
+                    } finally {
+                      setIsBackingUp(false);
+                    }
+                  }}
+                >
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Respaldando...
+                    </>
+                  ) : (
+                    <>
+                      <CloudUpload className="mr-2 h-4 w-4" />
+                      Forzar Respaldo en la Nube
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
             {/* Barra de Guardado Flotante o Estática al final */}
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
