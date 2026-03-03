@@ -77,7 +77,6 @@ export default function SalesPage() {
     getTicketSubtotal,
     getTicketDiscountAmount,
     clearTicket,
-    toggleItemPriceType,
     setTicketDiscount,
     clearTicketDiscount,
     toggleTicketPriceType,
@@ -480,7 +479,6 @@ export default function SalesPage() {
               onSelect={setSelectedItemUuid}
               onUpdateQuantity={updateQuantity}
               onRemove={(uuid) => removeFromCart(uuid)}
-              onTogglePriceType={(uuid) => toggleItemPriceType(uuid)}
               discountPercentage={activeTicket?.discountPercentage ?? 0}
             />
           </div>

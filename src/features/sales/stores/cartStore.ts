@@ -20,7 +20,6 @@ interface CartState {
   addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => string | undefined;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
-  toggleItemPriceType: (uuid: string) => void;
   toggleTicketPriceType: () => void;
   clearTicket: () => void;
   syncItemsBaseData: (products: Product[]) => void;
@@ -321,40 +320,7 @@ export const useCartStore = create<CartState>()(
 
 
 
-      toggleItemPriceType: (uuid: string) => {
-        set((state) => {
-          const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
-          if (ticketIndex === -1) return state;
 
-          const currentTicket = state.tickets[ticketIndex];
-          const newItems = currentTicket.items.map(item => {
-            if (item.uuid === uuid) {
-              if (item.priceType === 'kit_item' || item.priceType === 'promo') return item; 
-
-              const newType: 'retail' | 'wholesale' = item.priceType === 'retail' ? 'wholesale' : 'retail';
-              const wholesale = item.wholesale_price !== null && item.wholesale_price !== undefined && item.wholesale_price !== 0 ? item.wholesale_price : item.retail_price;
-
-              return {
-                ...item,
-                priceType: newType,
-                finalPrice: newType === 'retail' ? item.retail_price : wholesale
-              };
-            }
-            return item;
-          });
-
-          const processedItems = CartProcessor.processCart(newItems, {
-            kitDefs: useKitStore.getState().kitDefs,
-            promotionDefs: usePromotionsStore.getState().promotionDefs,
-            ticketPriceType: currentTicket.priceType,
-            discountPercentage: currentTicket.discountPercentage
-          });
-
-          const newTickets = [...state.tickets];
-          newTickets[ticketIndex] = { ...currentTicket, items: processedItems };
-          return { tickets: newTickets };
-        });
-      },
 
       clearTicket: () => {
         set((state) => {
