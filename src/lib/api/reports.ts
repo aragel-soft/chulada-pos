@@ -23,6 +23,8 @@ export const getTopSellingProducts = async (
   page: number = 1,
   pageSize: number = 16,
   categoryIds?: string[],
+  sortBy?: string,
+  sortOrder?: string,
 ): Promise<PaginatedResponse<TopSellingProduct>> => {
   try {
     return await invoke<PaginatedResponse<TopSellingProduct>>("get_top_selling_products", {
@@ -31,6 +33,8 @@ export const getTopSellingProducts = async (
       page,
       pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
+      sortBy: sortBy || null,
+      sortOrder: sortOrder || null,
     });
   } catch (error) {
     throw new Error(`Error fetching top selling products: ${error}`);
@@ -43,6 +47,8 @@ export const getDeadStockReport = async (
   page: number = 1,
   pageSize: number = 16,
   categoryIds?: string[],
+  sortBy?: string,
+  sortOrder?: string,
 ): Promise<PaginatedResponse<DeadStockProduct>> => {
   try {
     return await invoke<PaginatedResponse<DeadStockProduct>>("get_dead_stock_report", {
@@ -51,6 +57,8 @@ export const getDeadStockReport = async (
       page,
       pageSize,
       categoryIds: categoryIds?.length ? categoryIds : null,
+      sortBy: sortBy || null,
+      sortOrder: sortOrder || null,
     });
   } catch (error) {
     throw new Error(`Error fetching dead stock report: ${error}`);
@@ -68,11 +76,15 @@ export const getInventoryValuation = async (): Promise<InventoryValuation> => {
 export const getLowStockProducts = async (
   page: number = 1,
   pageSize: number = 16,
+  sortBy?: string,
+  sortOrder?: string,
 ): Promise<PaginatedResponse<LowStockProduct>> => {
   try {
     return await invoke<PaginatedResponse<LowStockProduct>>("get_low_stock_products", {
       page,
       pageSize,
+      sortBy: sortBy || null,
+      sortOrder: sortOrder || null,
     });
   } catch (error) {
     throw new Error(`Error fetching low stock products: ${error}`);
