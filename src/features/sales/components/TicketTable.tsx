@@ -3,7 +3,7 @@ import { CartItem } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2, Gift, Tag, Percent, Receipt, Barcode } from "lucide-react";
+import { Minus, Plus, Trash2, Gift, Tag, Receipt, Barcode } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -27,7 +27,7 @@ interface BadgeInfo {
   icon?: typeof Tag;
 }
 
-function getItemBadges(item: CartItem, discountPercentage: number): BadgeInfo[] {
+function getItemBadges(item: CartItem): BadgeInfo[] {
   const badges: BadgeInfo[] = [];
 
   if (item.priceType === "kit_item") {
@@ -203,7 +203,7 @@ export const TicketTable = ({
             const isWholesale = item.priceType === "wholesale";
             const isPromo = item.priceType === "promo";
             const isKit = item.priceType === "kit_item";
-            const badges = getItemBadges(item, discountPercentage);
+            const badges = getItemBadges(item);
             const rowSubtotal = computeRowSubtotal(item, discountPercentage);
 
             // Determine which price column is active
