@@ -49,12 +49,11 @@ export function PaymentDetailPanel({
 
   const handleReprint = async () => {
     if (!payment) return;
-    toast.info("Imprimiendo comprobante...");
+    toast.info("Imprimiendo recibo...");
     try {
       await printPaymentReceipt(payment.id);
-      toast.success("Comprobante enviado a imprimir");
     } catch (e) {
-      toast.error("Error al reimprimir", { description: String(e) });
+      toast.error("Error al imprimir recibo", { description: String(e) });
     }
   };
 

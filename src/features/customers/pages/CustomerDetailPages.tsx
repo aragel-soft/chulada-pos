@@ -182,7 +182,6 @@ export default function CustomerDetailPage() {
         toast.info("Imprimiendo recibo...");
         try {
           await printPaymentReceipt(paymentId);
-          toast.success("Recibo enviado a imprimir");
         } catch (printError) {
           toast.error("Error al imprimir recibo", { description: String(printError) });
         }
