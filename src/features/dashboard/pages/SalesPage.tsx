@@ -310,6 +310,7 @@ export default function SalesPage() {
             clearTicketDiscount();
           }
           toast.success("Promociones removidas exitosamente");
+          return getTicketTotal();
         }}
       />
 

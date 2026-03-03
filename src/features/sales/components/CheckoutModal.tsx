@@ -46,8 +46,6 @@ import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
 import { validateVoucher } from "@/lib/api/cash-register/sales";
 import { VoucherValidationResponse } from "@/types/sale";
-
-
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
@@ -70,7 +68,7 @@ interface CheckoutModalProps {
   defaultCustomerId?: string;
   hasWholesale?: boolean;
   discountPercentage?: number;
-  onClearRestrictions?: () => void;
+  onClearRestrictions?: () => number;
 }
 
 type PaymentMethod = "cash" | "card_transfer" | "mixed" | "credit";
@@ -673,7 +671,10 @@ export function CheckoutModal({
                           type="button"
                           variant="destructive"
                           className="w-full bg-red-600 hover:bg-red-700 font-bold"
-                          onClick={onClearRestrictions}
+                          onClick={() => {
+                            const newTotal = onClearRestrictions?.() ?? total;
+                            setCashAmount(newTotal.toString());
+                          }}
                         >
                           Remover promociones y continuar
                         </Button>
