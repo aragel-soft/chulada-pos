@@ -49,8 +49,11 @@ export async function backupDatabase(): Promise<string> {
     });
 
   if (error) {
-    throw new Error(`Failed to upload backup to Supabase: ${error.message}`);
+    if (error.message.includes("The resource already exists")) {
+      throw new Error("Ya se ha creado un respaldo en este minuto. Por favor, espera un momento para volver a intentarlo.");
+    }
+    
+    throw new Error(`Error al subir el respaldo: ${error.message}`);
   }
-
   return fileName;
 }
