@@ -42,8 +42,6 @@ const defaultValues: HardwareFormValues = {
   cashDrawerPort: "COM1",
 }
 
-
-
 export default function HardwarePage() {
   const {
     printers: storePrinters,
@@ -105,12 +103,9 @@ export default function HardwarePage() {
     })
   }
 
-
-
   return (
     <ScrollArea className="h-full w-full bg-slate-50/50 dark:bg-transparent">
       <div className="max-w-6xl mx-auto p-6 space-y-8 pb-20">
-
         {/* Header */}
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold tracking-tight">Hardware Local</h2>
@@ -125,7 +120,7 @@ export default function HardwarePage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
+              
               {/* Printer and Terminal */}
               <div className="space-y-6">
                 <Card className="h-full">
@@ -152,7 +147,6 @@ export default function HardwarePage() {
                     />
 
                     <Separator className="my-2" />
-
                     {/* Printer Selection */}
                     <FormField
                       control={form.control}
@@ -297,59 +291,64 @@ export default function HardwarePage() {
                   </CardContent>
                 </Card>
               </div>
-            </div>
 
-            {/* Respaldo en la Nube */}
-            <Card>
-              <CardHeader className="pb-3 border-b bg-muted/20">
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <CloudUpload className="h-4 w-4 text-primary" />
-                  Respaldo en la Nube
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
-                  <p>
-                    El sistema genera un respaldo comprimido (.gz) de la base de datos 
-                    automáticamente al cerrar un turno. Usa este botón para forzar un respaldo manual 
-                    en cualquier momento.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                  disabled={isBackingUp}
-                  onClick={async () => {
-                    setIsBackingUp(true);
-                    try {
-                      const fileName = await backupDatabase();
-                      toast.success("Respaldo completado", {
-                        description: `Archivo: ${fileName}`,
-                      });
-                    } catch (err) {
-                      toast.error("Error al crear respaldo", {
-                        description: String(err),
-                      });
-                    } finally {
-                      setIsBackingUp(false);
-                    }
-                  }}
-                >
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Respaldando...
-                    </>
-                  ) : (
-                    <>
-                      <CloudUpload className="mr-2 h-4 w-4" />
-                      Forzar Respaldo en la Nube
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+              {/* Respaldo en la Nube */}
+              <div className="space-y-6">
+                <Card className="h-full">
+                  <CardHeader className="pb-3 border-b bg-muted/20">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <CloudUpload className="h-4 w-4 text-primary" />
+                      Respaldo en la Nube
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
+                      <p>
+                        El sistema genera un respaldo comprimido (.gz) de la base de datos 
+                        automáticamente al cerrar un turno. Usa este botón para forzar un respaldo manual 
+                        en cualquier momento.
+                      </p>
+                    </div>
+                    <div className="flex justify-start">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                        disabled={isBackingUp}
+                        onClick={async () => {
+                          setIsBackingUp(true);
+                          try {
+                            const fileName = await backupDatabase();
+                            toast.success("Respaldo completado", {
+                              description: `Archivo: ${fileName}`,
+                            });
+                          } catch (err) {
+                            toast.error("Error al crear respaldo", {
+                              description: String(err),
+                            });
+                          } finally {
+                            setIsBackingUp(false);
+                          }
+                        }}
+                      >
+                        {isBackingUp ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Respaldando...
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload className="mr-2 h-4 w-4" />
+                            Forzar Respaldo en la Nube
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+            </div>
 
             {/* Barra de Guardado Flotante o Estática al final */}
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
@@ -357,7 +356,6 @@ export default function HardwarePage() {
                 type="submit"
                 size="lg"
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                // Aquí está la magia: isDirty detecta si hay cambios reales vs lo cargado inicialmente
                 disabled={!form.formState.isDirty || isStoreLoading}
               >
                 <Save className="mr-2 h-4 w-4" />
