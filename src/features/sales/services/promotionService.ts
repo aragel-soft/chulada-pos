@@ -171,9 +171,9 @@ function groupCartItemsByPromotion(
 
     if (normalQty > 0) {
       const key = `${productId}-normal`;
-      
-      const finalPrice = defaultPriceType === 'wholesale' 
-        ? (sampleItem.wholesale_price || sampleItem.retail_price) 
+
+      const finalPrice = defaultPriceType === 'wholesale'
+        ? (sampleItem.wholesale_price || sampleItem.retail_price)
         : sampleItem.retail_price;
 
       resultMap.set(key, {
@@ -203,7 +203,7 @@ export function detectAndApplyPromotions(
       .filter(item => item.priceType === 'kit_item' && item.kitTriggerId)
       .map(item => item.kitTriggerId)
   );
-  
+
   const eligibleItems = cartItems.filter(
     item => item.priceType !== 'kit_item' && !kitTriggerIds.has(item.uuid)
   );
@@ -220,9 +220,9 @@ export function detectAndApplyPromotions(
   const resultMap = groupCartItemsByPromotion(inventory, promotionInstances, eligibleItems, defaultPriceType);
 
   const ignoredItems = cartItems.filter(
-     item => item.priceType === 'kit_item' || kitTriggerIds.has(item.uuid)
+    item => item.priceType === 'kit_item' || kitTriggerIds.has(item.uuid)
   );
-  
+
   const newItems = [...ignoredItems, ...Array.from(resultMap.values())];
 
   return {
