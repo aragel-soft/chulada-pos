@@ -9,6 +9,7 @@ export interface CartItem extends Product {
   promotionId?: string;
   promotionInstanceId?: string;
   promotionName?: string;
+  kitTriggerId?: string;
 }
 
 export interface Ticket {
