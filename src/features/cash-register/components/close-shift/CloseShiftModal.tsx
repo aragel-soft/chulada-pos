@@ -33,6 +33,7 @@ import { printShiftTicket } from "@/lib/api/printers";
 import { toast } from "sonner";
 import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { backupDatabase } from "@/lib/api/backup";
 
 interface CloseShiftModalProps {
   shiftId: number;
@@ -97,6 +98,20 @@ export function CloseShiftModal({
         description: `Folio: ${closed.code ?? "—"}`,
       });
       printShiftTicket(closed.id).catch(() => {});
+
+      backupDatabase()
+        .then((fileName) => {
+          toast.success("Respaldo en la nube completado", {
+            description: fileName,
+          });
+        })
+        .catch((err) => {
+          console.error("Error en respaldo automático:", err);
+          toast.error("No se pudo completar el respaldo automático", {
+            description: String(err),
+          });
+        });
+
       onClose();
     } catch (err) {
       toast.error("Error al cerrar el turno", { description: String(err) });

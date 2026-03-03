@@ -116,6 +116,8 @@ fn main() {
             commands::reports::get_dead_stock_report,
             commands::reports::get_inventory_valuation,
             commands::reports::get_low_stock_products,
+            // Backup
+            commands::backup::get_database_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

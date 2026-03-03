@@ -1,9 +1,10 @@
 pub mod auth;
+pub mod backup;
 pub mod cash_register;
-pub mod inventory;
-pub mod printer;
-pub mod settings;
 pub mod customers;
-pub mod sales;
+pub mod inventory;
 pub mod kit_utils;
+pub mod printer;
 pub mod reports;
+pub mod sales;
+pub mod settings;
