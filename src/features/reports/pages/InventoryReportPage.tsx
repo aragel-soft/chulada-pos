@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Printer } from "lucide-react";
-import { PaginationState } from "@tanstack/react-table";
+import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { lowStockColumns } from "@/features/reports/components/columns/low-stock-columns";
 import { InventoryValuationCards } from "@/features/reports/components/InventoryValuationCards";
@@ -12,9 +12,16 @@ export default function InventoryReportPage() {
     pageIndex: 0,
     pageSize: 16,
   });
+  const [sorting, setSorting] = useState<SortingState>([{ id: "category_name", desc: false }]);
+
+  const sortField = sorting.length > 0 ? sorting[0].id : undefined;
+  const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : undefined;
+
   const { valuation, lowStockProducts, isLoading, error } = useInventoryReport(
     pagination.pageIndex + 1,
-    pagination.pageSize
+    pagination.pageSize,
+    sortField,
+    sortOrder,
   );
 
   const handlePrint = () => {
@@ -58,8 +65,11 @@ export default function InventoryReportPage() {
           initialSorting={[{ id: "category_name", desc: false }]}
           showColumnFilters={false}
           manualPagination={true}
+          manualSorting={true}
           pagination={pagination}
           onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={setSorting}
           rowCount={lowStockProducts?.total || 0}
           columnTitles={{
             product_name: "Producto",

@@ -266,6 +266,8 @@ pub fn get_top_selling_products(
     page: i64,
     page_size: i64,
     category_ids: Option<Vec<String>>,
+    sort_by: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<PaginatedResult<TopSellingProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
@@ -320,17 +322,15 @@ pub fn get_top_selling_products(
         category_filter_count
     );
 
-    let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
-        Box::new(from_date.clone()),
-        Box::new(to_date.clone()),
-    ];
-    
+    let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> =
+        vec![Box::new(from_date.clone()), Box::new(to_date.clone())];
+
     if let Some(ids) = &category_ids {
         for id in ids {
             count_params.push(Box::new(id.clone()));
         }
     }
-    
+
     let count_params_refs: Vec<&dyn rusqlite::types::ToSql> =
         count_params.iter().map(|p| p.as_ref()).collect();
 
@@ -382,10 +382,27 @@ pub fn get_top_selling_products(
         FROM product_sales ps, grand_total gt
         WHERE 1=1
           {}
-        ORDER BY ps.total_revenue DESC
+        ORDER BY {} {}
         LIMIT ?3 OFFSET ?4
     "#,
-        category_filter_data
+        category_filter_data,
+        match sort_by.as_deref() {
+            Some("product_name") => "ps.product_name",
+            Some("category_name") => "ps.category_name",
+            Some("quantity_sold") => "ps.quantity_sold",
+            Some("percentage_of_total") => "percentage_of_total",
+            _ => "ps.total_revenue",
+        },
+        match sort_order.as_deref() {
+            Some("desc") => "DESC",
+            Some("asc") => "ASC",
+            _ =>
+                if sort_by.is_none() {
+                    "DESC"
+                } else {
+                    "ASC"
+                },
+        }
     );
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
@@ -396,7 +413,7 @@ pub fn get_top_selling_products(
         Box::new(page_size),
         Box::new(offset),
     ];
-    
+
     if let Some(ids) = &category_ids {
         for id in ids {
             data_params.push(Box::new(id.clone()));
@@ -421,7 +438,9 @@ pub fn get_top_selling_products(
         })
         .map_err(|e| e.to_string())?;
 
-    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let data = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
     let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
 
     Ok(PaginatedResult {
@@ -441,6 +460,8 @@ pub fn get_dead_stock_report(
     page: i64,
     page_size: i64,
     category_ids: Option<Vec<String>>,
+    sort_by: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<PaginatedResult<DeadStockProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let store_id = get_current_store_id(&conn)?;
@@ -503,13 +524,13 @@ pub fn get_dead_stock_report(
         Box::new(to_date.clone()),
         Box::new(store_id.clone()),
     ];
-    
+
     if let Some(ids) = &category_ids {
         for id in ids {
             count_params.push(Box::new(id.clone()));
         }
     }
-    
+
     let count_params_refs: Vec<&dyn rusqlite::types::ToSql> =
         count_params.iter().map(|p| p.as_ref()).collect();
 
@@ -555,10 +576,28 @@ pub fn get_dead_stock_report(
                 AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
           )
           {}
-        ORDER BY stagnant_value DESC
+        ORDER BY {} {}
         LIMIT ?4 OFFSET ?5
     "#,
-        category_filter_data
+        category_filter_data,
+        match sort_by.as_deref() {
+            Some("product_name") => "p.name",
+            Some("category_name") => "category_name",
+            Some("current_stock") => "inv.stock",
+            Some("purchase_price") => "p.purchase_price",
+            Some("last_sale_date") => "last_sale_date",
+            _ => "stagnant_value",
+        },
+        match sort_order.as_deref() {
+            Some("desc") => "DESC",
+            Some("asc") => "ASC",
+            _ =>
+                if sort_by.is_none() {
+                    "DESC"
+                } else {
+                    "ASC"
+                },
+        }
     );
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
@@ -570,7 +609,7 @@ pub fn get_dead_stock_report(
         Box::new(page_size),
         Box::new(offset),
     ];
-    
+
     if let Some(ids) = &category_ids {
         for id in ids {
             data_params.push(Box::new(id.clone()));
@@ -595,7 +634,9 @@ pub fn get_dead_stock_report(
         })
         .map_err(|e| e.to_string())?;
 
-    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let data = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
     let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
 
     Ok(PaginatedResult {
@@ -639,6 +680,8 @@ pub fn get_low_stock_products(
     db: State<Mutex<Connection>>,
     page: i64,
     page_size: i64,
+    sort_by: Option<String>,
+    sort_order: Option<String>,
 ) -> Result<PaginatedResult<LowStockProduct>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let store_id = get_current_store_id(&conn)?;
@@ -658,7 +701,30 @@ pub fn get_low_stock_products(
         .query_row(count_sql, params![store_id], |row| row.get(0))
         .unwrap_or(0);
 
-    let sql = r#"
+    let order_column = match sort_by.as_deref() {
+        Some("product_name") => "p.name",
+        Some("current_stock") => "i.stock",
+        Some("minimum_stock") => "minimum_stock",
+        Some("suggested_order") => "suggested_order",
+        Some("purchase_price") => "p.purchase_price",
+        Some("retail_price") => "p.retail_price",
+        _ => "c.name",
+    };
+
+    let order_direction = match sort_order.as_deref() {
+        Some("desc") => "DESC",
+        Some("asc") => "ASC",
+        _ => {
+            if sort_by.is_none() {
+                "ASC"
+            } else {
+                "ASC"
+            }
+        }
+    };
+
+    let sql = format!(
+        r#"
         SELECT 
             p.name as product_name,
             p.code as product_code,
@@ -676,11 +742,13 @@ pub fn get_low_stock_products(
           AND p.is_active = 1
           AND i.store_id = ?1
           AND i.stock <= COALESCE(i.minimum_stock, 5)
-        ORDER BY c.name ASC, p.name ASC
+        ORDER BY {} {}
         LIMIT ?2 OFFSET ?3
-    "#;
+    "#,
+        order_column, order_direction
+    );
 
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![store_id, page_size, offset], |row| {
             Ok(LowStockProduct {
@@ -697,7 +765,9 @@ pub fn get_low_stock_products(
         })
         .map_err(|e| e.to_string())?;
 
-    let data = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let data = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
     let total_pages = (total_count as f64 / page_size as f64).ceil() as i64;
 
     Ok(PaginatedResult {

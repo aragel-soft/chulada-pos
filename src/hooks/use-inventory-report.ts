@@ -12,7 +12,9 @@ const INITIAL_VALUATION: InventoryValuation = {
 
 export const useInventoryReport = (
   page: number = 1,
-  pageSize: number = 16
+  pageSize: number = 16,
+  sortBy?: string,
+  sortOrder?: string,
 ) => {
   const [valuation, setValuation] = useState<InventoryValuation>(INITIAL_VALUATION);
   const [lowStockProducts, setLowStockProducts] = useState<PaginatedResponse<LowStockProduct> | null>(null);
@@ -26,7 +28,7 @@ export const useInventoryReport = (
     try {
       const [valuationData, lowStockData] = await Promise.all([
         getInventoryValuation(),
-        getLowStockProducts(page, pageSize),
+        getLowStockProducts(page, pageSize, sortBy, sortOrder),
       ]);
       setValuation(valuationData);
       setLowStockProducts(lowStockData);
@@ -37,7 +39,7 @@ export const useInventoryReport = (
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchData();

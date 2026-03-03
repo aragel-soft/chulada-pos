@@ -134,8 +134,12 @@ function groupCartItemsByPromotion(
     const promoQty = assignedToPromo.get(productId) || 0;
     const normalQty = totalQty - promoQty;
 
-    const sampleItem = eligibleItems.find(i => i.id === productId);
+    const originalItems = eligibleItems.filter(i => i.id === productId);
+    const sampleItem = originalItems[0];
     if (!sampleItem) continue;
+
+    const originalUuids = originalItems.map(i => i.uuid);
+    const getNextUuid = () => originalUuids.shift() || uuidv4();
 
     const promoByPrice = new Map<number, { qty: number; instance: PromotionInstance }>();
 
@@ -159,7 +163,7 @@ function groupCartItemsByPromotion(
       const key = `${productId}-promo-${unitPrice.toFixed(2)}`;
       resultMap.set(key, {
         ...sampleItem,
-        uuid: uuidv4(),
+        uuid: getNextUuid(),
         quantity: qty,
         priceType: 'promo',
         finalPrice: unitPrice,
@@ -178,7 +182,7 @@ function groupCartItemsByPromotion(
 
       resultMap.set(key, {
         ...sampleItem,
-        uuid: uuidv4(),
+        uuid: getNextUuid(),
         quantity: normalQty,
         priceType: defaultPriceType,
         finalPrice: finalPrice,
