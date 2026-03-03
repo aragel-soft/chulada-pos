@@ -137,7 +137,7 @@ pub fn get_customer_account_statement(
 pub fn register_debt_payment(
     request: DebtPaymentRequest,
     db: State<Mutex<Connection>>,
-) -> Result<f64, String> {
+) -> Result<String, String> {
     let mut conn = db.lock().map_err(|e| e.to_string())?;
 
     if request.total_amount <= 0.0 {
@@ -218,7 +218,7 @@ pub fn register_debt_payment(
     .map_err(|e| format!("Error al actualizar saldo: {}", e))?;
 
     tx.commit().map_err(|e| e.to_string())?;
-    Ok(new_balance)
+    Ok(payment_id)
 }
 
 #[derive(Debug, Serialize)]
@@ -297,18 +297,4 @@ pub fn get_payment_details(
         .map_err(|e| format!("Pago no encontrado: {}", e))?;
 
     Ok(detail)
-}
-
-#[tauri::command]
-pub async fn print_payment_receipt(
-    app_handle: tauri::AppHandle,
-    payment_id: String,
-    _db: State<'_, Mutex<Connection>>,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::printer_utils::print_payment_from_db(app_handle, payment_id)
-    })
-    .await
-    .map_err(|e| format!("Error en hilo de impresión: {}", e))?
-    .map(|_| "Comprobante enviado a imprimir".to_string())
 }

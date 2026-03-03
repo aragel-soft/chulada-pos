@@ -21,3 +21,7 @@ export const printShiftTicket = async (shiftId: number | string): Promise<string
   const idValue = typeof shiftId === 'string' ? parseInt(shiftId, 10) : shiftId;
   return await invoke('print_shift_ticket', { shiftId: idValue });
 };
+
+export const printPaymentReceipt = async (paymentId: string | number): Promise<string> => {
+  return await invoke('print_payment_receipt', { paymentId: String(paymentId) });
+};
