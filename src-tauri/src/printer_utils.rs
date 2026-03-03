@@ -1067,7 +1067,7 @@ pub fn print_payment_from_db(
     let db_state: State<Mutex<Connection>> = app_handle.state();
     let conn = db_state.lock().map_err(|e| e.to_string())?;
 
-    // Fetch payment data with user and customer info
+    // Fetch payment data with customer info
     let payment = conn
         .query_row(
             r#"
@@ -1078,11 +1078,9 @@ pub fn print_payment_from_db(
             IFNULL(dp.card_transfer_amount, 0),
             dp.payment_method,
             dp.payment_date,
-            u.full_name,
             c.name,
-            dp.notes
+            c.code
           FROM debt_payments dp
-          JOIN users u ON dp.user_id = u.id
           JOIN customers c ON dp.customer_id = c.id
           WHERE dp.id = ?1
         "#,
@@ -1095,9 +1093,8 @@ pub fn print_payment_from_db(
                     row.get::<_, f64>(3)?,            // card_amount
                     row.get::<_, String>(4)?,         // payment_method
                     row.get::<_, String>(5)?,         // payment_date
-                    row.get::<_, String>(6)?,         // user_name
-                    row.get::<_, String>(7)?,         // customer_name
-                    row.get::<_, Option<String>>(8)?, // notes
+                    row.get::<_, String>(6)?,         // customer_name
+                    row.get::<_, String>(7)?,         // customer_code
                 ))
             },
         )
@@ -1110,9 +1107,8 @@ pub fn print_payment_from_db(
         card_amount,
         payment_method,
         payment_date,
-        user_name,
         customer_name,
-        notes,
+        customer_code,
     ) = payment;
 
     // Fetch business settings
@@ -1151,7 +1147,7 @@ pub fn print_payment_from_db(
     // HEADER
     print_store_header(&mut builder, &settings, &app_handle);
 
-    builder.add_separator('=');
+    builder.add_separator('-');
 
     // TITLE
     builder.align_center();
@@ -1185,8 +1181,9 @@ pub fn print_payment_from_db(
     // DETAILS
     builder.align_left();
     builder.add_text_ln(&format!("Fecha: {}", remove_accents(&payment_date)));
+    builder.add_text_ln(&format!("No. Cliente: {}", remove_accents(&customer_code)));
     builder.add_text_ln(&format!("Cliente: {}", remove_accents(&customer_name)));
-    builder.add_text_ln(&format!("Cajero: {}", remove_accents(&user_name)));
+    
 
     let method_label = match payment_method.as_str() {
         "cash" => "Efectivo",
@@ -1204,14 +1201,6 @@ pub fn print_payment_from_db(
     }
     if card_amount > 0.0 {
         builder.add_text_ln(&format!("  Tarjeta:  ${:.2}", card_amount));
-    }
-
-    // Notes
-    if let Some(ref n) = notes {
-        if !n.is_empty() {
-            builder.add_text("\n");
-            builder.add_text_ln(&format!("Notas: {}", remove_accents(n)));
-        }
     }
 
     // FOOTER

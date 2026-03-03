@@ -17,12 +17,13 @@ interface CartState {
   createTicket: () => void;
   closeTicket: (id: string) => void;
   setActiveTicket: (id: string) => void;
-  addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => void;
+  addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => string | undefined;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleItemPriceType: (uuid: string) => void;
   toggleTicketPriceType: () => void;
   clearTicket: () => void;
+  syncItemsBaseData: (products: Product[]) => void;
   
   // Discount methods
   setTicketDiscount: (percentage: number) => void;
@@ -87,6 +88,7 @@ export const useCartStore = create<CartState>()(
       setActiveTicket: (id) => set({ activeTicketId: id }),
 
       addToCart: (product: Product, options?: { priceType?: 'retail' | 'wholesale' | 'kit_item', quantity?: number }) => {
+        let addedUuid: string | undefined;
         set((state) => {
           const ticketIndex = state.tickets.findIndex(t => t.id === state.activeTicketId);
           if (ticketIndex === -1) return state;
@@ -103,6 +105,7 @@ export const useCartStore = create<CartState>()(
             const currentQty = newItems[existingItemIndex].quantity;
             if (currentQty + targetQuantity <= product.stock) {
                  newItems[existingItemIndex].quantity += targetQuantity;
+                 addedUuid = newItems[existingItemIndex].uuid;
             } else {
                  toast.error(`Stock insuficiente para: ${product.name}`);
                  return state; // Cancel add
@@ -121,9 +124,12 @@ export const useCartStore = create<CartState>()(
 
             const finalPrice = product.retail_price;
 
+            const newUuid = uuidv4();
+            addedUuid = newUuid;
+
             newItems.push({
               ...product,
-              uuid: uuidv4(),
+              uuid: newUuid,
               quantity: targetQuantity,
               priceType: targetPriceType,
               finalPrice: finalPrice,
@@ -143,6 +149,7 @@ export const useCartStore = create<CartState>()(
 
           return { tickets: newTickets };
         });
+        return addedUuid;
       },
 
       toggleTicketPriceType: () => {
@@ -361,6 +368,66 @@ export const useCartStore = create<CartState>()(
             priceType: 'retail',
             discountPercentage: 0
           };
+          return { tickets: newTickets };
+        });
+      },
+
+      syncItemsBaseData: (freshProducts: Product[]) => {
+        set((state) => {
+          let hasChanges = false;
+          const freshMap = new Map(freshProducts.map(p => [p.id, p]));
+
+          const newTickets = state.tickets.map(ticket => {
+            let ticketChanged = false;
+            const newItems = ticket.items.map(item => {
+              const fresh = freshMap.get(item.id);
+              if (!fresh) return item;
+
+              if (
+                item.name !== fresh.name ||
+                item.description !== fresh.description ||
+                item.retail_price !== fresh.retail_price ||
+                item.wholesale_price !== fresh.wholesale_price ||
+                item.stock !== fresh.stock ||
+                item.barcode !== fresh.barcode ||
+                item.code !== fresh.code ||
+                item.image_url !== fresh.image_url
+              ) {
+                ticketChanged = true;
+                hasChanges = true;
+                
+                const wholesale = fresh.wholesale_price !== null && fresh.wholesale_price !== undefined && fresh.wholesale_price !== 0 ? fresh.wholesale_price : fresh.retail_price;
+                const finalPrice = item.priceType === 'wholesale' ? wholesale : fresh.retail_price;
+
+                return {
+                  ...item,
+                  ...fresh,
+                  uuid: item.uuid,
+                  quantity: item.quantity,
+                  priceType: item.priceType,
+                  kitOptionId: item.kitOptionId,
+                  promotionId: item.promotionId,
+                  promotionInstanceId: item.promotionInstanceId,
+                  promotionName: item.promotionName,
+                  finalPrice,
+                };
+              }
+              return item;
+            });
+
+            if (ticketChanged) {
+               const processedItems = CartProcessor.processCart(newItems, {
+                  kitDefs: useKitStore.getState().kitDefs,
+                  promotionDefs: usePromotionsStore.getState().promotionDefs,
+                  ticketPriceType: ticket.priceType,
+                  discountPercentage: ticket.discountPercentage
+                });
+               return { ...ticket, items: processedItems };
+            }
+            return ticket;
+          });
+
+          if (!hasChanges) return state;
           return { tickets: newTickets };
         });
       },

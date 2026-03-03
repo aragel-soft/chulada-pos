@@ -11,7 +11,7 @@ export const getCustomerAccountStatement = async (customerId: string): Promise<A
   }
 };
 
-export const registerDebtPayment = async (request: DebtPaymentRequest): Promise<number> => {
+export const registerDebtPayment = async (request: DebtPaymentRequest): Promise<string> => {
   try {
     return await invoke("register_debt_payment", {
       request,
@@ -24,14 +24,6 @@ export const registerDebtPayment = async (request: DebtPaymentRequest): Promise<
 export const getPaymentDetails = async (paymentId: string): Promise<PaymentDetail> => {
   try {
     return await invoke("get_payment_details", { paymentId });
-  } catch (error) {
-    throw error;
-  }
-};
-
-export const printPaymentReceipt = async (paymentId: string): Promise<string> => {
-  try {
-    return await invoke("print_payment_receipt", { paymentId });
   } catch (error) {
     throw error;
   }
