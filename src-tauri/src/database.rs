@@ -1,10 +1,11 @@
-use rusqlite::{Connection};
-use std::fs;
 use rusqlite::types::ToSql;
-use std::path::Path;
-use tauri::Manager;
+use rusqlite::Connection;
 use std::collections::HashSet;
 use std::error::Error;
+use std::fs;
+use tauri::Manager;
+
+include!(concat!(env!("OUT_DIR"), "/embedded_migrations.rs"));
 
 pub struct DynamicQuery {
     pub sql_parts: Vec<String>,
@@ -16,17 +17,18 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
         .path()
         .app_data_dir()
         .expect("No se pudo obtener el directorio de datos");
-            
+
     fs::create_dir_all(&app_dir).expect("No se pudo crear el directorio de datos");
-    
+
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path)?;
-    //let conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-    //Es necesario comentar la ejecución automática de migraciones para evitar problemas en las pruebas.
-    println!("Base de datos inicializada en {:?}", app_dir.join("database.db"));
-    run_migrations(&mut conn)?; 
-    
+    println!(
+        "Base de datos inicializada en {:?}",
+        app_dir.join("database.db")
+    );
+    run_migrations(&mut conn)?;
+
     Ok(conn)
 }
 
@@ -50,56 +52,34 @@ fn run_migrations(conn: &mut Connection) -> std::result::Result<(), Box<dyn Erro
 
         let mut set = HashSet::new();
         for migration_name in applied_migrations_iter {
-            set.insert(migration_name?); 
+            set.insert(migration_name?);
         }
         set
-    }; 
+    };
 
     println!("Migraciones ya aplicadas: {:?}", applied_set.len());
 
-    // Obtiene todos los archivos de migración .sql del directorio de migraciones.
-    
-    let migrations_dir = Path::new("../src-tauri/src/migrations"); 
-    
-    let mut all_migrations = Vec::new();
-    
-    let entries = fs::read_dir(migrations_dir)?;
-    
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        
-        if path.is_file() && path.extension().map_or(false, |s| s == "sql") {
-            all_migrations.push(path);
-        }
-    }
-    
-    all_migrations.sort();
-
-
-    // Compara las migraciones del disco con las aplicadas y ejecuta las pendientes.
-    println!("Total de archivos de migración encontrados: {}", all_migrations.len());
+    println!(
+        "Total de migraciones embebidas: {}",
+        EMBEDDED_MIGRATIONS.len()
+    );
     let mut new_migrations_run = 0;
 
-    for path in all_migrations {
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
-
-        if applied_set.contains(&file_name) {
+    for (file_name, sql_content) in EMBEDDED_MIGRATIONS {
+        if applied_set.contains(*file_name) {
             continue;
         }
 
         println!("-> Aplicando nueva migración: {}", file_name);
 
-        let sql_content = fs::read_to_string(&path)?;
-
         // Ejecuta la migración dentro de una transacción.
         let tx = conn.transaction()?;
-        
-        tx.execute_batch(&sql_content)?;
-        tx.execute("INSERT INTO __migrations (name) VALUES (?)", [&file_name])?;
-        
+
+        tx.execute_batch(sql_content)?;
+        tx.execute("INSERT INTO __migrations (name) VALUES (?)", [file_name])?;
+
         tx.commit()?;
-        
+
         new_migrations_run += 1;
     }
 
@@ -108,7 +88,7 @@ fn run_migrations(conn: &mut Connection) -> std::result::Result<(), Box<dyn Erro
     } else {
         println!("Se aplicaron {} nuevas migraciones.", new_migrations_run);
     }
-    
+
     println!("DATABASE_READY");
     Ok(())
 }
@@ -131,11 +111,11 @@ impl DynamicQuery {
 }
 
 pub fn get_current_store_id(conn: &Connection) -> Result<String, String> {
-  let mut stmt = conn
-    .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
-    .map_err(|e| e.to_string())?;
-  let store_id: String = stmt
-    .query_row([], |row| row.get(0))
-    .unwrap_or_else(|_| "store-main".to_string());
-  Ok(store_id)
+    let mut stmt = conn
+        .prepare("SELECT value FROM system_settings WHERE key = 'logical_store_name'")
+        .map_err(|e| e.to_string())?;
+    let store_id: String = stmt
+        .query_row([], |row| row.get(0))
+        .unwrap_or_else(|_| "store-main".to_string());
+    Ok(store_id)
 }
