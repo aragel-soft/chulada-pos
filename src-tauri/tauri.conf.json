@@ -26,7 +26,9 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -40,5 +42,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/aragel-soft/chulada-pos/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ1RjZDMTMwOTNBMjNGRTgKUldUb1A2S1RNTUgyUlZHeHNjUU1NRS9YUHV1NEFPb1ZxOUNXc0dSYzBYeHU2U2drNWJxUmZIaEcK"
+    }
   }
 }
