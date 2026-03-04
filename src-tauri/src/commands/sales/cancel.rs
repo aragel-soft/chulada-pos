@@ -191,6 +191,32 @@ pub fn cancel_sale(
         }
     }
 
+    // Revert voucher balances
+    let vouchers_used: Vec<(String, f64)> = {
+        let mut stmt_vouchers = tx
+            .prepare(
+                "SELECT voucher_id, amount FROM sale_vouchers WHERE sale_id = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let result = stmt_vouchers
+            .query_map([&payload.sale_id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        result
+    };
+
+    for (voucher_id, amount) in &vouchers_used {
+        tx.execute(
+            "UPDATE store_vouchers SET current_balance = current_balance + ?1, is_active = 1, updated_at = ?2, used_at = NULL WHERE id = ?3",
+            params![amount, now_local, voucher_id],
+        )
+        .map_err(|e| format!("Error revirtiendo vale {}: {}", voucher_id, e))?;
+    }
+
     // Commit
     tx.commit().map_err(|e| e.to_string())?;
 
