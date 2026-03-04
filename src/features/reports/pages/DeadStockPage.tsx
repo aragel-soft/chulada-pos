@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { deadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
+import { getDeadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 import { useDeadStock } from "@/hooks/use-dead-stock";
 import { useReportsContext } from "@/features/reports/context/ReportsContext";
@@ -52,10 +52,12 @@ export default function DeadStockPage() {
     fetchCategories();
   }, [fetchCategories]);
 
+  const columns = useMemo(() => getDeadStockColumns(categories), [categories]);
+
   return (
     <div className="flex flex-col gap-4 h-full">
       <DataTable
-        columns={deadStockColumns}
+        columns={columns}
         data={data?.data || []}
         isLoading={isLoading}
         initialSorting={[{ id: "stagnant_value", desc: true }]}

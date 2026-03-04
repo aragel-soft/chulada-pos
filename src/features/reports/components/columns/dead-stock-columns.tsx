@@ -4,6 +4,8 @@ import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-col
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { CategoryListDto } from "@/types/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-MX", {
@@ -11,7 +13,7 @@ const formatCurrency = (amount: number) =>
     currency: "MXN",
   }).format(amount);
 
-export const deadStockColumns: ColumnDef<DeadStockProduct>[] = [
+export const getDeadStockColumns = (categories: CategoryListDto[] = []): ColumnDef<DeadStockProduct>[] => [
   {
     accessorKey: "product_name",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Producto" />,
@@ -37,7 +39,7 @@ export const deadStockColumns: ColumnDef<DeadStockProduct>[] = [
           color: row.original.category_color || "#64748b",
         }}
       >
-        {row.original.category_name || "General"}
+        {getCategoryFullPath(row.original.category_id, categories)}
       </Badge>
     ),
   },

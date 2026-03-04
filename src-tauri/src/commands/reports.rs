@@ -47,6 +47,7 @@ pub struct TopSellingProduct {
     pub ranking: i64,
     pub product_name: String,
     pub product_code: String,
+    pub category_id: String,
     pub category_name: String,
     pub category_color: Option<String>,
     pub quantity_sold: f64,
@@ -58,6 +59,7 @@ pub struct TopSellingProduct {
 pub struct DeadStockProduct {
     pub product_name: String,
     pub product_code: String,
+    pub category_id: String,
     pub category_name: String,
     pub category_color: Option<String>,
     pub current_stock: i64,
@@ -371,6 +373,7 @@ pub fn get_top_selling_products(
             ROW_NUMBER() OVER (ORDER BY ps.total_revenue DESC) as ranking,
             ps.product_name,
             ps.product_code,
+            ps.category_id,
             ps.category_name,
             ps.category_color,
             ps.quantity_sold,
@@ -429,11 +432,12 @@ pub fn get_top_selling_products(
                 ranking: row.get(0)?,
                 product_name: row.get(1)?,
                 product_code: row.get(2)?,
-                category_name: row.get(3)?,
-                category_color: row.get(4)?,
-                quantity_sold: row.get(5)?,
-                total_revenue: row.get(6)?,
-                percentage_of_total: row.get(7)?,
+                category_id: row.get(3)?,
+                category_name: row.get(4)?,
+                category_color: row.get(5)?,
+                quantity_sold: row.get(6)?,
+                total_revenue: row.get(7)?,
+                percentage_of_total: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -543,6 +547,7 @@ pub fn get_dead_stock_report(
         SELECT 
             p.name as product_name,
             p.code as product_code,
+            COALESCE(p.category_id, '') as category_id,
             COALESCE(c.name, 'Sin Categoría') as category_name,
             c.color as category_color,
             inv.stock as current_stock,
@@ -624,12 +629,13 @@ pub fn get_dead_stock_report(
             Ok(DeadStockProduct {
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
-                category_name: row.get(2)?,
-                category_color: row.get(3)?,
-                current_stock: row.get(4)?,
-                purchase_price: row.get(5)?,
-                stagnant_value: row.get(6)?,
-                last_sale_date: row.get(7)?,
+                category_id: row.get(2)?,
+                category_name: row.get(3)?,
+                category_color: row.get(4)?,
+                current_stock: row.get(5)?,
+                purchase_price: row.get(6)?,
+                stagnant_value: row.get(7)?,
+                last_sale_date: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;

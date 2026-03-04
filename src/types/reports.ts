@@ -32,6 +32,7 @@ export interface TopSellingProduct {
   ranking: number;
   product_name: string;
   product_code: string;
+  category_id: string;
   category_name: string;
   category_color: string | null;
   quantity_sold: number;
@@ -42,6 +43,7 @@ export interface TopSellingProduct {
 export interface DeadStockProduct {
   product_name: string;
   product_code: string;
+  category_id: string;
   category_name: string;
   category_color: string | null;
   current_stock: number;

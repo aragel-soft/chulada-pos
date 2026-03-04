@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { topSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
+import { getTopSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 import { useTopSellers } from "@/hooks/use-top-sellers";
 import { useReportsContext } from "@/features/reports/context/ReportsContext";
@@ -52,10 +52,12 @@ export default function TopSellersPage() {
     fetchCategories();
   }, [fetchCategories]);
 
+  const columns = useMemo(() => getTopSellersColumns(categories), [categories]);
+
   return (
     <div className="flex flex-col gap-4 h-full">
       <DataTable
-        columns={topSellersColumns}
+        columns={columns}
         data={data?.data || []} 
         isLoading={isLoading}
         initialSorting={[{ id: "total_revenue", desc: true }]}
