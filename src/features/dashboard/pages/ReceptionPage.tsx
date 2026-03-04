@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useReceptionStore } from "@/stores/receptionStore";
 import { useAuthStore } from "@/stores/authStore";
 import { ReceptionGrid } from "@/features/inventory/components/reception/ReceptionGrid";
-import { ProductScannerInput } from "@/features/inventory/components/reception/ProductScannerInput";
+import { ScannerInput } from "@/features/sales/components/ScannerInput";
 import { Button } from "@/components/ui/button";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { ManualSearchModal } from "@/features/sales/components/ManualSearchModal";
@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   Pencil,
 } from "lucide-react";
+import { getProducts } from "@/lib/api/inventory/products";
 import { toast } from "sonner";
+import { playSound } from "@/lib/sounds";
 import { processBulkReception } from "@/lib/api/inventory/inventory-movements";
 import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
 import {
@@ -96,23 +98,47 @@ export default function ReceptionPage() {
     executeReception();
   };
 
+  const handleScannerInput = async (code: string) => {
+    const cleanCode = code.trim();
+    try {
+      const result = await getProducts(
+        {
+          page: 1,
+          pageSize: 5,
+          search: cleanCode,
+          sortBy: "name",
+          sortOrder: "asc",
+        },
+        { active_status: [] },
+      );
+      const product = result.data.find(
+        (p) => p.code === cleanCode || p.barcode === cleanCode,
+      );
+
+      if (product) {
+        addItem(product);
+        playSound("success");
+        toast.success(`Agregado: ${product.name}`);
+      } else {
+        playSound("error");
+        toast.error(`Producto no encontrado: ${cleanCode}`);
+      }
+    } catch {
+      playSound("error");
+      toast.error(`Error al buscar producto: ${cleanCode}`);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col gap-4 p-1">
       {/* HEADER */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 flex gap-2">
-          <ProductScannerInput
-            onProductSelect={(product) => addItem(product)}
-            className="flex-1"
-            autoFocus={true}
+           <ScannerInput
+            onScan={handleScannerInput}
+            onManualSearch={() => setIsManualSearchOpen(true)}
+            size="default"
           />
-          <Button
-            variant="outline"
-            onClick={() => setIsManualSearchOpen(true)}
-            className="h-12 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors px-4 shadow-sm"
-          >
-            Buscar Manualmente (F3)
-          </Button>
         </div>
 
         <div className="flex gap-2 shrink-0">
