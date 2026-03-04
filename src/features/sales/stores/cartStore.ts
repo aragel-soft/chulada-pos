@@ -8,6 +8,9 @@ import { usePromotionsStore } from './promotionsStore';
 import { toast } from 'sonner';
 import * as CartProcessor from '@/features/sales/services/cartProcessor';
 import { Ticket } from '@/types/sales';
+import { useOutOfStockWarningStore } from './outOfStockWarningStore';
+import { useBusinessStore } from '@/stores/businessStore';
+
 
 
 interface CartState {
@@ -106,15 +109,27 @@ export const useCartStore = create<CartState>()(
                  newItems[existingItemIndex].quantity += targetQuantity;
                  addedUuid = newItems[existingItemIndex].uuid;
             } else {
-                 toast.error(`Stock insuficiente para: ${product.name}`);
-                 return state; // Cancel add
+                 const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                 if (allowOutOfStock) {
+                     newItems[existingItemIndex].quantity += targetQuantity;
+                     addedUuid = newItems[existingItemIndex].uuid;
+                     useOutOfStockWarningStore.getState().openWarning(product.name);
+                 } else {
+                     toast.error(`Stock insuficiente para: ${product.name}`);
+                     return state; // Cancel add
+                 }
             }
           } else {
             // Check stock for new item
             const totalInCart = newItems.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
             if (totalInCart + targetQuantity > product.stock) {
-                toast.error(`Stock insuficiente para: ${product.name}`);
-                return state;
+                const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                if (allowOutOfStock) {
+                    useOutOfStockWarningStore.getState().openWarning(product.name);
+                } else {
+                    toast.error(`Stock insuficiente para: ${product.name}`);
+                    return state;
+                }
             }
 
             if (currentTicket.discountPercentage > 0 && targetPriceType !== 'kit_item') {
@@ -292,8 +307,13 @@ export const useCartStore = create<CartState>()(
               }
               
               if (quantity > item.stock) {
-                   toast.error(`Stock máximo disponible: ${item.stock}`);
-                   return state;
+                   const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                   if (allowOutOfStock) {
+                       useOutOfStockWarningStore.getState().openWarning(item.name);
+                   } else {
+                       toast.error(`Stock máximo disponible: ${item.stock}`);
+                       return state;
+                   }
               }
           }
 

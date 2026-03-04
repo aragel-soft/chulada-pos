@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Minus, Plus, Trash2, Gift, Tag, Receipt, Barcode } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+import { useBusinessStore } from "@/stores/businessStore";
 
 // ── Types ──
 
@@ -56,19 +57,23 @@ function getItemBadges(item: CartItem): BadgeInfo[] {
 
 // ── Inline Quantity Editor ──
 
-function InlineQuantityEditor({
-  item,
-  onUpdateQuantity,
-  onRemove,
-}: {
+interface InlineQuantityEditorProps {
   item: CartItem;
   onUpdateQuantity: (uuid: string, qty: number) => void;
   onRemove: (uuid: string) => void;
-}) {
+}
+
+export function InlineQuantityEditor({
+  item,
+  onUpdateQuantity,
+  onRemove,
+}: InlineQuantityEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempQty, setTempQty] = useState(item.quantity.toString());
   const inputRef = useRef<HTMLInputElement>(null);
+  const allowOutOfStockSales = useBusinessStore((state) => state.settings?.allowOutOfStockSales ?? false);
 
+  // Sync tempQty when item.quantity changes from outside
   useEffect(() => {
     if (isEditing && inputRef.current) inputRef.current.select();
   }, [isEditing]);
@@ -81,7 +86,7 @@ function InlineQuantityEditor({
     setIsEditing(false);
     const val = parseInt(tempQty);
     if (!isNaN(val) && val > 0) {
-      if (val > item.stock) {
+      if (!allowOutOfStockSales && val > item.stock) {
         toast.warning(`Stock máximo disponible: ${item.stock}`);
         setTempQty(item.stock.toString());
         onUpdateQuantity(item.uuid, item.stock);
@@ -140,7 +145,7 @@ function InlineQuantityEditor({
         size="icon"
         className="h-7 w-7 rounded-full hover:bg-zinc-200 hover:text-green-600"
         onClick={() => onUpdateQuantity(item.uuid, item.quantity + 1)}
-        disabled={item.quantity >= item.stock}
+        disabled={!allowOutOfStockSales && item.quantity >= item.stock}
       >
         <Plus className="h-3.5 w-3.5" />
       </Button>
@@ -276,8 +281,9 @@ export const TicketTable = ({
                 </div>
 
                 {/* Stock */}
-                <div className="flex items-center justify-center text-xs text-muted-foreground tabular-nums">
-                  {item.stock}
+                <div className={`flex flex-col items-center justify-center text-xs tabular-nums ${item.stock <= 0 || item.quantity > item.stock ? "text-red-500 font-bold" : "text-muted-foreground"}`}>
+                  <span>{item.stock}</span>
+                  {(item.stock <= 0 || item.quantity > item.stock) && <span className="text-[9px] leading-none mt-0.5">Supera Exist.</span>}
                 </div>
 
                 {/* Precio Menudeo */}
