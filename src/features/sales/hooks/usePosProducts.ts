@@ -6,14 +6,15 @@ import { Product } from "@/types/inventory";
 interface UsePosProductsProps {
   enabled?: boolean;
   activeStatus?: string[];
+  categoryIds?: string[];
 }
 
-export const usePosProducts = ({ enabled = true, activeStatus = ["active"] }: UsePosProductsProps = {}) => {
+export const usePosProducts = ({ enabled = true, activeStatus = ["active"], categoryIds }: UsePosProductsProps = {}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const PAGE_SIZE = 50; 
 
   const query = useInfiniteQuery({
-    queryKey: ["pos-products", searchQuery],
+    queryKey: ["pos-products", searchQuery, categoryIds],
     queryFn: async ({ pageParam = 1 }) => {
       const response = await getProducts(
         {
@@ -24,7 +25,8 @@ export const usePosProducts = ({ enabled = true, activeStatus = ["active"] }: Us
           sortOrder: "asc",
         },
         {
-          active_status: activeStatus
+          active_status: activeStatus,
+          category_ids: categoryIds?.length ? categoryIds : undefined,
         }
       );
       return response;
