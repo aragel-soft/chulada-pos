@@ -236,7 +236,7 @@ export function ReturnStepTwo({
           </ScrollArea>
           <div className="p-4 bg-muted/10 border-t">
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total Devolución</span>
+              <span>{isCancellation ? "Total Cancelación" : "Total Devolución"}</span>
               <span>{formatCurrency(totalAmount)}</span>
             </div>
           </div>
@@ -251,9 +251,9 @@ export function ReturnStepTwo({
             
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reason">
-                  {isCancellation ? "Motivo de cancelación" : "Motivo de la devolución"} <span className="text-red-500">*</span>
-                </Label>
+                { !isCancellation && <Label htmlFor="reason">
+                  Motivo de la devolución <span className="text-red-500">*</span>
+                </Label>}
                 {isCancellation ? (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800 font-medium">
                     Cancelación de venta
@@ -280,7 +280,7 @@ export function ReturnStepTwo({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notas adicionales (opcional)</Label>
+                <Label htmlFor="notes">Notas adicionales {isCancellation ? <span className="text-red-500">*</span> : "(opcional)"}</Label>
                 <Textarea
                   id="notes"
                   placeholder="Detalles adicionales sobre la devolución..."
@@ -291,6 +291,15 @@ export function ReturnStepTwo({
               </div>
 
 
+              {isCancellation ? (
+                <Alert className="bg-red-50 border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertTitle className="text-red-800">Advertencia</AlertTitle>
+                  <AlertDescription className="text-red-700 text-xs mt-1">
+                    Al confirmar, la venta será cancelada por completo. Se revertirá el inventario y, si aplica, el saldo de crédito del cliente. <strong>Esta acción no se puede deshacer.</strong>
+                  </AlertDescription>
+                </Alert>
+              ) : (
               <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertTitle className="text-blue-800">Información</AlertTitle>
@@ -298,6 +307,7 @@ export function ReturnStepTwo({
                   Al confirmar, se generará un <strong>Vale de Tienda</strong> por el monto total de <strong>{formatCurrency(totalAmount)}</strong>. No se realizan devoluciones en efectivo ni tarjeta.
                 </AlertDescription>
               </Alert>
+              )}
             </div>
           </div>
         </div>
