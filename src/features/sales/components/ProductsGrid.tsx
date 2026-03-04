@@ -11,6 +11,7 @@ interface ProductsGridProps {
   hasNextPage: boolean;
   fetchNextPage: () => void;
   onProductSelect: (product: Product) => void;
+  forceAllowSelect?: boolean;
 }
 
 export const ProductsGrid = ({
@@ -20,6 +21,7 @@ export const ProductsGrid = ({
   hasNextPage,
   fetchNextPage,
   onProductSelect,
+  forceAllowSelect,
 }: ProductsGridProps) => {
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -68,6 +70,7 @@ export const ProductsGrid = ({
             key={product.id}
             product={product}
             onClick={onProductSelect}
+            forceAllowSelect={forceAllowSelect}
           />
         ))}
 

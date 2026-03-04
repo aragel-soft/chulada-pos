@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useReceptionStore } from "@/stores/receptionStore";
 import { useAuthStore } from "@/stores/authStore";
 import { ReceptionGrid } from "@/features/inventory/components/reception/ReceptionGrid";
-import { ProductScannerInput } from "@/features/inventory/components/reception/ProductScannerInput";
+import { ScannerInput } from "@/features/sales/components/ScannerInput";
 import { Button } from "@/components/ui/button";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import { ManualSearchModal } from "@/features/sales/components/ManualSearchModal";
 import { formatCurrency } from "@/lib/utils";
 import {
   CheckCircle2,
@@ -12,7 +14,9 @@ import {
   AlertTriangle,
   Pencil,
 } from "lucide-react";
+import { getProducts } from "@/lib/api/inventory/products";
 import { toast } from "sonner";
+import { playSound } from "@/lib/sounds";
 import { processBulkReception } from "@/lib/api/inventory/inventory-movements";
 import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
 import {
@@ -44,6 +48,17 @@ export default function ReceptionPage() {
   const [showZeroCostWarning, setShowZeroCostWarning] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
+
+  useHotkeys("f12", () => {
+    if (items.length > 0 && !isProcessing) {
+      handleProcessClick();
+    }
+  }, [items, isProcessing]);
+
+  useHotkeys("f3", () => {
+    setIsManualSearchOpen((prev) => !prev);
+  }, []);
 
   const executeReception = async () => {
     if (!user?.id) return;
@@ -83,15 +98,46 @@ export default function ReceptionPage() {
     executeReception();
   };
 
+  const handleScannerInput = async (code: string) => {
+    const cleanCode = code.trim();
+    try {
+      const result = await getProducts(
+        {
+          page: 1,
+          pageSize: 5,
+          search: cleanCode,
+          sortBy: "name",
+          sortOrder: "asc",
+        },
+        { active_status: [] },
+      );
+      const product = result.data.find(
+        (p) => p.code === cleanCode || p.barcode === cleanCode,
+      );
+
+      if (product) {
+        addItem(product);
+        playSound("success");
+        toast.success(`Agregado: ${product.name}`);
+      } else {
+        playSound("error");
+        toast.error(`Producto no encontrado: ${cleanCode}`);
+      }
+    } catch {
+      playSound("error");
+      toast.error(`Error al buscar producto: ${cleanCode}`);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col gap-4 p-1">
       {/* HEADER */}
       <div className="flex gap-4 items-center">
-        <div className="flex-1">
-          <ProductScannerInput
-            onProductSelect={(product) => addItem(product)}
-            className="w-full"
-            autoFocus={true}
+        <div className="flex-1 flex gap-2">
+           <ScannerInput
+            onScan={handleScannerInput}
+            onManualSearch={() => setIsManualSearchOpen(true)}
+            size="default"
           />
         </div>
 
@@ -162,7 +208,7 @@ export default function ReceptionPage() {
             ) : (
               <CheckCircle2 className="w-5 h-5 mr-2" />
             )}
-            Procesar Entrada
+            Procesar Entrada (F12)
           </Button>
         </div>
       </div>
@@ -208,6 +254,16 @@ export default function ReceptionPage() {
           }
           setIsProductDialogOpen(false);
           setActiveProductId(null);
+        }}
+      />
+      <ManualSearchModal
+        isOpen={isManualSearchOpen}
+        onClose={() => setIsManualSearchOpen(false)}
+        activeStatus={[]}
+        forceAllowSelect={true}
+        onProductSelect={(product) => {
+          addItem(product);
+          setIsManualSearchOpen(false);
         }}
       />
     </div>

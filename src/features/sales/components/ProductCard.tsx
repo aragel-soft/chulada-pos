@@ -10,20 +10,22 @@ import { useBusinessStore } from "@/stores/businessStore";
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
+  forceAllowSelect?: boolean;
 }
 
-export function ProductCard({ product, onClick }: ProductCardProps) {
+export function ProductCard({ product, onClick, forceAllowSelect }: ProductCardProps) {
   const hasStock = product.stock > 0;
   const isLowStock = product.stock > 0 && product.stock <= (product.min_stock || 0);
   const allowOutOfStockSales = useBusinessStore((state) => state.settings?.allowOutOfStockSales ?? false);
+  const canSelect = hasStock || allowOutOfStockSales || forceAllowSelect;
 
   return (
     <Card 
       className={cn(
         "cursor-pointer transition-all hover:shadow-md hover:border-[#480489]/50 group relative overflow-hidden",
-        (!hasStock && !allowOutOfStockSales) && "opacity-60 grayscale"
+        (!canSelect) && "opacity-60 grayscale"
       )}
-      onClick={() => (hasStock || allowOutOfStockSales) && onClick(product)}
+      onClick={() => canSelect && onClick(product)}
     >
       <CardContent className="p-3">
         <div className="flex justify-between items-start mb-2 absolute top-2 right-2 z-10">
