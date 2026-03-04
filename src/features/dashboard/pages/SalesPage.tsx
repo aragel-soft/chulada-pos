@@ -35,6 +35,7 @@ import { usePromotionsStore } from "@/features/sales/stores/promotionsStore";
 import { ScannerInput } from "@/features/sales/components/ScannerInput";
 import { CashMovementModal } from "@/features/cash-register/components/CashMovementModal";
 import { DiscountModal } from "@/features/sales/components/DiscountModal";
+import { OutOfStockWarningModal } from "@/features/sales/components/OutOfStockWarningModal";
 
 import {
   AlertDialog,
@@ -184,9 +185,11 @@ export default function SalesPage() {
 
         if (product) {
           const addedUuid = addToCart(product);
-          if (addedUuid) setSelectedItemUuid(addedUuid);
-          playSound("success");
-          toast.success(`Agregado: ${product.name}`);
+          if (addedUuid) {
+            setSelectedItemUuid(addedUuid);
+            playSound("success");
+            toast.success(`Agregado: ${product.name}`);
+          }
         } else {
           playSound("error");
           toast.error(`Producto no encontrado: ${cleanCode}`);
@@ -583,9 +586,11 @@ export default function SalesPage() {
         onClose={() => setIsManualSearchOpen(false)}
         onProductSelect={(product) => {
           const addedUuid = addToCart(product);
-          if (addedUuid) setSelectedItemUuid(addedUuid);
-          playSound("success");
-          toast.success(`Agregado: ${product.name}`);
+          if (addedUuid) {
+            setSelectedItemUuid(addedUuid);
+            playSound("success");
+            toast.success(`Agregado: ${product.name}`);
+          }
         }}
       />
 
@@ -603,6 +608,8 @@ export default function SalesPage() {
           }
         }}
       />
+      
+      <OutOfStockWarningModal />
     </div>
   );
 }

@@ -731,7 +731,11 @@ fn calculate_sale_items<'a>(
                 let unit_price = if item.price_type == "kit_item" {
                     0.0
                 } else if item.price_type == "wholesale" {
-                    if wholesale > 0.0 { wholesale } else { retail }
+                    if wholesale > 0.0 {
+                        wholesale
+                    } else {
+                        retail
+                    }
                 } else {
                     retail
                 };
@@ -789,23 +793,58 @@ pub fn process_sale(
             MAX_DISCOUNT_PERCENTAGE, payload.discount_percentage
         ));
     }
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    
+    let allow_out_of_stock_str: Result<String, _> = tx.query_row(
+        "SELECT value FROM system_settings WHERE key = 'allow_out_of_stock_sales'",
+        [],
+        |row| row.get(0),
+    );
+
+    let allow_out_of_stock_sales: bool = allow_out_of_stock_str.unwrap_or_else(|_| "false".to_string()) == "true";
+    
+    let store_id = get_store_id(&tx)?;
+
+    if !allow_out_of_stock_sales {
+        for item in &payload.items {
+            let stock_items: f64 = tx
+                .query_row(
+                    "SELECT stock FROM store_inventory WHERE product_id = ?1 AND store_id = ?2",
+                    params![item.product_id, store_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+
+            if stock_items < item.quantity {
+              let product_name: String = tx
+                .query_row(
+                    "SELECT name FROM products WHERE id = ?1 AND is_active = 1 LIMIT 1",
+                    params![item.product_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+                return Err(format!("Existencias insuficiente para: {}", product_name));
+            }
+        }
+    }
 
     // Validate & Apply Kit Rules
-    let validated_items = apply_kit_rules(&conn, &payload.items)?;
+    let validated_items = apply_kit_rules(&tx, &payload.items)?;
 
     // Validate Credit Restrictions
     if payload.payment_method == "credit" {
         if payload.discount_percentage > 0.0 {
             return Err("Las ventas a crédito no aplican con descuentos globales.".to_string());
         }
-        
-        let has_wholesale = payload.items.iter().any(|item| item.price_type == "wholesale");
+
+        let has_wholesale = payload
+            .items
+            .iter()
+            .any(|item| item.price_type == "wholesale");
         if has_wholesale {
             return Err("Las ventas a crédito no aplican con precios de mayoreo.".to_string());
         }
     }
-
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // Use local system time instead of SQLite's CURRENT_TIMESTAMP (which is UTC)
     let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -872,7 +911,6 @@ pub fn process_sale(
     // Prepare Data for Insertion
     let sale_id = Uuid::new_v4().to_string();
     let folio = generate_smart_folio(&tx)?;
-    let store_id = get_store_id(&tx)?;
 
     let has_discount = total_item_discounts > 0.0;
 

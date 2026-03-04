@@ -574,6 +574,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
                 tax_rate: 0.0,
                 apply_tax: false,
                 logo_path: "".to_string(),
+                allow_out_of_stock_sales: false,
             }
         });
 
@@ -782,6 +783,7 @@ pub fn print_voucher_from_db(app_handle: tauri::AppHandle, sale_id: String) -> R
             tax_rate: 0.0,
             apply_tax: false,
             logo_path: "".to_string(),
+            allow_out_of_stock_sales: false,
         }
     });
 
@@ -1126,6 +1128,7 @@ pub fn print_payment_from_db(
             tax_rate: 0.0,
             apply_tax: false,
             logo_path: "".to_string(),
+            allow_out_of_stock_sales: false,
         }
     });
 
@@ -1277,6 +1280,7 @@ pub fn print_shift_summary(
         tax_rate: 0.0,
         apply_tax: false,
         logo_path: "".to_string(),
+        allow_out_of_stock_sales: false,
     });
 
     drop(conn);

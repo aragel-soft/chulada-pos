@@ -13,6 +13,7 @@ export interface BusinessSettings {
   applyTax: boolean;
   logoPath: string;
   logicalStoreName: string;
+  allowOutOfStockSales: boolean;
 }
 
 export const getBusinessSettings = async (): Promise<BusinessSettings> => {
