@@ -9,9 +9,10 @@ interface ManualSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductSelect: (product: Product) => void;
+  forceAllowSelect?: boolean;
 }
 
-export function ManualSearchModal({ isOpen, onClose, onProductSelect }: ManualSearchModalProps) {
+export function ManualSearchModal({ isOpen, onClose, onProductSelect, forceAllowSelect }: ManualSearchModalProps) {
   const {
     products,
     isLoading,
@@ -66,6 +67,7 @@ export function ManualSearchModal({ isOpen, onClose, onProductSelect }: ManualSe
               hasNextPage={hasNextPage}
               fetchNextPage={fetchNextPage}
               onProductSelect={handleSelect}
+              forceAllowSelect={forceAllowSelect}
             />
           </div>
         </div>
