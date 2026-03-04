@@ -13,6 +13,9 @@ import {
   Barcode,
   Tag,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getAllCategories } from "@/lib/api/inventory/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
 interface ProductDetailPanelProps {
   selectedItem: CartItem | null;
@@ -39,6 +42,7 @@ export function ProductDetailPanel({
 }: ProductDetailPanelProps) {
   const hasItems = activeTicket && activeTicket.items.length > 0;
   const hasDiscount = activeTicket && activeTicket.discountPercentage > 0;
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: getAllCategories, staleTime: Infinity });
 
   return (
     <div className="w-[30%] flex flex-col bg-white min-w-[280px]">
@@ -96,7 +100,7 @@ export function ProductDetailPanel({
                     color: selectedItem.category_color || "#64748b",
                   }}
                 >
-                  {selectedItem.category_name}
+                  {getCategoryFullPath(selectedItem.category_id, categories)}
                 </div>
               </div>
             )}
