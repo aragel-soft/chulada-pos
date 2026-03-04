@@ -57,7 +57,7 @@ export function OutOfStockWarningModal() {
             onClick={closeWarning}
             className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white font-bold px-8"
           >
-            Entendido (Enter)
+            Entendido
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
