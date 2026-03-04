@@ -58,6 +58,7 @@ export function ReturnStepTwo({
   
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  const [showCancellationConfirm, setShowCancellationConfirm] = useState(false);
 
   // Set reason to "cancellation" when mode changes
   useEffect(() => {
@@ -75,7 +76,7 @@ export function ReturnStepTwo({
     0
   );
 
-  const handleConfirm = async () => {
+  const handleInitialConfirm = () => {
     setFieldErrors(null);
     setGeneralErrors([]);
     
@@ -99,6 +100,14 @@ export function ReturnStepTwo({
       return;
     }
 
+    if (isCancellation) {
+      setShowCancellationConfirm(true);
+    } else {
+      handleFinalConfirm();
+    }
+  };
+
+  const handleFinalConfirm = async () => {
     try {
       const code = await onConfirm(reason, notes);
       setVoucherCode(code);
@@ -107,9 +116,30 @@ export function ReturnStepTwo({
         onCancel();
       }, 100);
     } catch (err) {
+      setShowCancellationConfirm(false);
       setGeneralErrors([String(err)]);
     }
   };
+
+  // Keyboard'Enter'
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        
+        if (generalErrors.length > 0) {
+          setGeneralErrors([]);
+        } else if (showCancellationConfirm) {
+          handleFinalConfirm();
+        } else {
+          handleInitialConfirm();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reason, notes, returnItems, showCancellationConfirm, generalErrors]);
 
   if (voucherCode === "UNDER_CONSTRUCTION") {
     return (
@@ -164,6 +194,40 @@ export function ReturnStepTwo({
             <AlertDialogAction onClick={() => setGeneralErrors([])} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Entendido
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* CANCELLATION CONFIRM MODAL */}
+      <AlertDialog open={showCancellationConfirm} onOpenChange={setShowCancellationConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              ¿Estás completamente seguro?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-slate-700 py-2">
+              Esta acción <strong>cancelará la venta definitivamente</strong>. Se revertirá el inventario, los vales aplicados y el saldo si fue a crédito.
+              <br/><br/>
+              No hay paso atrás después de confirmar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCancellationConfirm(false)}
+              disabled={isProcessing}
+            >
+              Regresar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleFinalConfirm}
+              disabled={isProcessing}
+              className="bg-red-700 hover:bg-red-800"
+            >
+              {isProcessing ? "Cancelando..." : "Sí, Cancelar Venta"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -337,7 +401,7 @@ export function ReturnStepTwo({
 
         <Button 
           variant="destructive"
-          onClick={handleConfirm} 
+          onClick={handleInitialConfirm} 
           disabled={isProcessing}
           className={cn(BUTTON_STYLES.destructive, isCancellation ? "bg-red-700 hover:bg-red-800" : "bg-purple-900 hover:bg-purple-950")}
         >
