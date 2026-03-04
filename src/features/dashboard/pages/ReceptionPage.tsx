@@ -4,6 +4,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { ReceptionGrid } from "@/features/inventory/components/reception/ReceptionGrid";
 import { ProductScannerInput } from "@/features/inventory/components/reception/ProductScannerInput";
 import { Button } from "@/components/ui/button";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import { ManualSearchModal } from "@/features/sales/components/ManualSearchModal";
 import { formatCurrency } from "@/lib/utils";
 import {
   CheckCircle2,
@@ -44,6 +46,17 @@ export default function ReceptionPage() {
   const [showZeroCostWarning, setShowZeroCostWarning] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
+
+  useHotkeys("f12", () => {
+    if (items.length > 0 && !isProcessing) {
+      handleProcessClick();
+    }
+  }, [items, isProcessing]);
+
+  useHotkeys("f3", () => {
+    setIsManualSearchOpen((prev) => !prev);
+  }, []);
 
   const executeReception = async () => {
     if (!user?.id) return;
@@ -87,12 +100,19 @@ export default function ReceptionPage() {
     <div className="h-full flex flex-col gap-4 p-1">
       {/* HEADER */}
       <div className="flex gap-4 items-center">
-        <div className="flex-1">
+        <div className="flex-1 flex gap-2">
           <ProductScannerInput
             onProductSelect={(product) => addItem(product)}
-            className="w-full"
+            className="flex-1"
             autoFocus={true}
           />
+          <Button
+            variant="outline"
+            onClick={() => setIsManualSearchOpen(true)}
+            className="h-12 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors px-4 shadow-sm"
+          >
+            Buscar Manualmente (F3)
+          </Button>
         </div>
 
         <div className="flex gap-2 shrink-0">
@@ -162,7 +182,7 @@ export default function ReceptionPage() {
             ) : (
               <CheckCircle2 className="w-5 h-5 mr-2" />
             )}
-            Procesar Entrada
+            Procesar Entrada (F12)
           </Button>
         </div>
       </div>
@@ -208,6 +228,15 @@ export default function ReceptionPage() {
           }
           setIsProductDialogOpen(false);
           setActiveProductId(null);
+        }}
+      />
+      <ManualSearchModal
+        isOpen={isManualSearchOpen}
+        onClose={() => setIsManualSearchOpen(false)}
+        forceAllowSelect={true}
+        onProductSelect={(product) => {
+          addItem(product);
+          setIsManualSearchOpen(false);
         }}
       />
     </div>
