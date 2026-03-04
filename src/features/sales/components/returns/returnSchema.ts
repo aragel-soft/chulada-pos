@@ -100,4 +100,12 @@ export const returnValidationSchema = z.object({
   reason: z.string().min(1, "Selecciona un motivo."),
   notes: z.string().optional(),
   items: z.array(returnItemSchema).superRefine(validateReturnItems),
+}).superRefine((data, ctx) => {
+  if (data.reason === "cancellation" && (!data.notes || data.notes.trim() === "")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Las notas son obligatorias para la cancelación.",
+      path: ["notes"],
+    });
+  }
 });

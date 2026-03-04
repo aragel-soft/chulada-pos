@@ -21,11 +21,14 @@ interface ReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
   mode?: ReturnModalMode;
+  onCancelSale?: (saleId: string, reason: string, notes: string) => Promise<void>;
+  isCancelling?: boolean;
 }
 
-export function ReturnModal({ sale, isOpen, onClose, mode = "return" }: ReturnModalProps) {
+export function ReturnModal({ sale, isOpen, onClose, mode = "return", onCancelSale, isCancelling }: ReturnModalProps) {
   const { processReturn, isProcessing: hookIsProcessing } = useProcessReturn();
   const isCancellation = mode === "cancellation";
+  const isProcessing = isCancellation ? (isCancelling ?? false) : hookIsProcessing;
 
   // --- WIZARD DESIGN ---
   const WIZARD_STEPS = [
@@ -50,6 +53,10 @@ export function ReturnModal({ sale, isOpen, onClose, mode = "return" }: ReturnMo
   };
   
   const handleConfirmReturn = async (reason: string, notes: string): Promise<string> => {
+    if (isCancellation && onCancelSale) {
+      await onCancelSale(sale.id, reason, notes);
+      return "";
+    }
     const voucherCode = await processReturn(sale.id, returnItems, reason, notes);
     return voucherCode;
   };
@@ -181,7 +188,7 @@ export function ReturnModal({ sale, isOpen, onClose, mode = "return" }: ReturnMo
               onBack={handleBack}
               onConfirm={handleConfirmReturn}
               onCancel={onClose}
-              isProcessing={hookIsProcessing}
+              isProcessing={isProcessing}
               mode={mode}
             />
           )}

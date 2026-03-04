@@ -27,6 +27,8 @@ import { ReturnModal } from "@/features/sales/components/returns/ReturnModal";
 import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-design";
 import { useAuthStore } from "@/stores/authStore";
 import { printSaleTicket, printReturnVoucher } from "@/lib/api/printers";
+import { useCancelSale } from "@/features/sales/hooks/useCancelSale";
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 
 const RETURN_REASON_LABELS: Record<string, string> = {
   quality: "Producto dañado / Mala calidad",
@@ -48,13 +50,17 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
   const { data: sale, isLoading } = useSaleDetail(saleId);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [cancellationModalOpen, setCancellationModalOpen] = useState(false);
+  const { cancelSale, isProcessing: isCancelling } = useCancelSale();
 
   const daysSinceSale = sale
     ? differenceInDays(new Date(), new Date(sale.sale_date))
     : 999;
   const canReturn = daysSinceSale <= 30;
+  const { shift: activeShift } = useCashRegisterStore();
   
-  const canCancel = daysSinceSale < 2 && sale?.status !== "cancelled" && sale?.status !== "fully_returned" && sale?.status !== "partial_return";
+  const canCancel = sale?.status === "completed" && 
+    !!activeShift && 
+    sale?.cash_register_shift_id === String(activeShift.id);
   
   const showActionButtons = sale?.status !== "cancelled" && sale?.status !== "fully_returned";
   
@@ -180,7 +186,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                   </TooltipProvider>
                 )}
 
-                {can("history:devolution") && (
+                {can("history:cancel") && (
                   <TooltipProvider>
                     <Tooltip delayDuration={300}>
                       <TooltipTrigger asChild>
@@ -197,12 +203,12 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                           </Button>
                         </div>
                       </TooltipTrigger>
-                      {(!canCancel && can("history:devolution")) && (
+                      {(!canCancel && can("history:cancel")) && (
                         <TooltipContent className="bg-destructive text-destructive-foreground border-destructive/20">
                           <p>
                             {sale.status === "partial_return"
                               ? "No se puede cancelar una venta con devoluciones"
-                              : "Excede el tiempo permitido para cancelación"
+                              : "Solo se puede cancelar una venta dentro del mismo turno de caja"
                             }
                           </p>
                         </TooltipContent>
@@ -231,6 +237,8 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
           isOpen={cancellationModalOpen}
           onClose={() => setCancellationModalOpen(false)}
           mode="cancellation"
+          onCancelSale={cancelSale}
+          isCancelling={isCancelling}
         />
       )}
 
@@ -257,7 +265,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
               </tbody>
             </table>
 
-            {(sale.notes || sale.returns?.length > 0) && (
+            {(sale.notes || sale.returns?.length > 0 || sale.status === "cancelled") && (
               <div className="space-y-2.5 mt-2">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas y Movimientos</h3>
                 
@@ -270,27 +278,38 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                   </div>
                 )}
 
+                {sale.status === "cancelled" && sale.cancellation_reason && (
+                  <div className="p-2.5 rounded-md border text-sm bg-red-50 border-red-200">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Ban className="h-3 w-3 text-red-700" />
+                        <span className="font-semibold text-xs text-red-800">Cancelación</span>
+                      </div>
+                      {sale.cancelled_at && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(sale.cancelled_at), "dd/MM/yy HH:mm", { locale: es })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-red-600">{sale.cancellation_reason}</p>
+                  </div>
+                )}
+
                 {sale.returns?.map((ret) => {
                   const reasonLabel = RETURN_REASON_LABELS[ret.reason] || ret.reason;
                   
                   return (
                     <div 
                       key={ret.id} 
-                      className={`p-2.5 rounded-md border text-sm ${
-                        ret.reason === "cancellation" 
-                          ? "bg-red-50 border-red-200" 
-                          : "bg-purple-50 border-purple-200"
-                      }`}
+                      className="p-2.5 rounded-md border text-sm bg-purple-50 border-purple-200"
                     >
                       <div className="flex items-center justify-between mb-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className={`font-semibold text-xs ${
-                            ret.reason === "cancellation" ? "text-red-800" : "text-purple-800"
-                          }`}>
-                            {ret.reason === "cancellation" ? "Cancelación" : "Devolución"}
+                          <span className="font-semibold text-xs text-purple-800">
+                            Devolución
                           </span>
                           <span className="text-muted-foreground text-xs">•</span>
-                          <span className={`text-xs ${ret.reason === "cancellation" ? "text-red-700" : "text-purple-700"}`}>
+                          <span className="text-xs text-purple-700">
                             {reasonLabel}
                           </span>
                         </div>
@@ -299,7 +318,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                         </span>
                       </div>
                       {ret.notes && (
-                        <p className={`mt-0.5 text-xs ${ret.reason === "cancellation" ? "text-red-600" : "text-purple-600"}`}>
+                        <p className="mt-0.5 text-xs text-purple-600">
                           {ret.notes}
                         </p>
                       )}

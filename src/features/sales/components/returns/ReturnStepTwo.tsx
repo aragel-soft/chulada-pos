@@ -58,6 +58,7 @@ export function ReturnStepTwo({
   
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  const [showCancellationConfirm, setShowCancellationConfirm] = useState(false);
 
   // Set reason to "cancellation" when mode changes
   useEffect(() => {
@@ -75,7 +76,7 @@ export function ReturnStepTwo({
     0
   );
 
-  const handleConfirm = async () => {
+  const handleInitialConfirm = () => {
     setFieldErrors(null);
     setGeneralErrors([]);
     
@@ -92,13 +93,22 @@ export function ReturnStepTwo({
       
       const combinedGeneralErrors = [
         ...flattened.formErrors,
-        ...(flattened.fieldErrors['items'] || [])
+        ...(flattened.fieldErrors['items'] || []),
+        ...(flattened.fieldErrors['notes'] || [])
       ];
       
       setGeneralErrors(combinedGeneralErrors);
       return;
     }
 
+    if (isCancellation) {
+      setShowCancellationConfirm(true);
+    } else {
+      handleFinalConfirm();
+    }
+  };
+
+  const handleFinalConfirm = async () => {
     try {
       const code = await onConfirm(reason, notes);
       setVoucherCode(code);
@@ -107,9 +117,30 @@ export function ReturnStepTwo({
         onCancel();
       }, 100);
     } catch (err) {
+      setShowCancellationConfirm(false);
       setGeneralErrors([String(err)]);
     }
   };
+
+  // Keyboard'Enter'
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        
+        if (generalErrors.length > 0) {
+          setGeneralErrors([]);
+        } else if (showCancellationConfirm) {
+          handleFinalConfirm();
+        } else {
+          handleInitialConfirm();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reason, notes, returnItems, showCancellationConfirm, generalErrors]);
 
   if (voucherCode === "UNDER_CONSTRUCTION") {
     return (
@@ -164,6 +195,40 @@ export function ReturnStepTwo({
             <AlertDialogAction onClick={() => setGeneralErrors([])} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Entendido
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* CANCELLATION CONFIRM MODAL */}
+      <AlertDialog open={showCancellationConfirm} onOpenChange={setShowCancellationConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              ¿Estás completamente seguro?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-slate-700 py-2">
+              Esta acción <strong>cancelará la venta definitivamente</strong>. Se revertirá el inventario, los vales aplicados y el saldo si fue a crédito.
+              <br/><br/>
+              No hay paso atrás después de confirmar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCancellationConfirm(false)}
+              disabled={isProcessing}
+            >
+              Regresar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleFinalConfirm}
+              disabled={isProcessing}
+              className="bg-red-700 hover:bg-red-800"
+            >
+              {isProcessing ? "Cancelando..." : "Sí, Cancelar Venta"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -236,7 +301,7 @@ export function ReturnStepTwo({
           </ScrollArea>
           <div className="p-4 bg-muted/10 border-t">
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total Devolución</span>
+              <span>{isCancellation ? "Total Cancelación" : "Total Devolución"}</span>
               <span>{formatCurrency(totalAmount)}</span>
             </div>
           </div>
@@ -251,9 +316,9 @@ export function ReturnStepTwo({
             
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reason">
-                  {isCancellation ? "Motivo de cancelación" : "Motivo de la devolución"} <span className="text-red-500">*</span>
-                </Label>
+                { !isCancellation && <Label htmlFor="reason">
+                  Motivo de la devolución <span className="text-red-500">*</span>
+                </Label>}
                 {isCancellation ? (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800 font-medium">
                     Cancelación de venta
@@ -280,7 +345,7 @@ export function ReturnStepTwo({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notas adicionales (opcional)</Label>
+                <Label htmlFor="notes">Notas adicionales {isCancellation ? <span className="text-red-500">*</span> : "(opcional)"}</Label>
                 <Textarea
                   id="notes"
                   placeholder="Detalles adicionales sobre la devolución..."
@@ -291,6 +356,15 @@ export function ReturnStepTwo({
               </div>
 
 
+              {isCancellation ? (
+                <Alert className="bg-red-50 border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertTitle className="text-red-800">Advertencia</AlertTitle>
+                  <AlertDescription className="text-red-700 text-xs mt-1">
+                    Al confirmar, la venta será cancelada por completo. Se revertirá el inventario y, si aplica, el saldo de crédito del cliente. <strong>Esta acción no se puede deshacer.</strong>
+                  </AlertDescription>
+                </Alert>
+              ) : (
               <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertTitle className="text-blue-800">Información</AlertTitle>
@@ -298,6 +372,7 @@ export function ReturnStepTwo({
                   Al confirmar, se generará un <strong>Vale de Tienda</strong> por el monto total de <strong>{formatCurrency(totalAmount)}</strong>. No se realizan devoluciones en efectivo ni tarjeta.
                 </AlertDescription>
               </Alert>
+              )}
             </div>
           </div>
         </div>
@@ -327,7 +402,7 @@ export function ReturnStepTwo({
 
         <Button 
           variant="destructive"
-          onClick={handleConfirm} 
+          onClick={handleInitialConfirm} 
           disabled={isProcessing}
           className={cn(BUTTON_STYLES.destructive, isCancellation ? "bg-red-700 hover:bg-red-800" : "bg-purple-900 hover:bg-purple-950")}
         >

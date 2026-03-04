@@ -18,3 +18,13 @@ export const getSaleDetails = async (saleId: string): Promise<SaleDetail> => {
     throw error;
   }
 };
+
+export interface CancelSaleRequest {
+  sale_id: string;
+  reason: string;
+  user_id: string;
+}
+
+export const cancelSale = async (payload: CancelSaleRequest): Promise<void> => {
+  return await invoke('cancel_sale', { payload });
+};
