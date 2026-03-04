@@ -93,7 +93,8 @@ export function ReturnStepTwo({
       
       const combinedGeneralErrors = [
         ...flattened.formErrors,
-        ...(flattened.fieldErrors['items'] || [])
+        ...(flattened.fieldErrors['items'] || []),
+        ...(flattened.fieldErrors['notes'] || [])
       ];
       
       setGeneralErrors(combinedGeneralErrors);
