@@ -112,6 +112,8 @@ fn main() {
             commands::sales::history::get_sale_details,
             // Sales - Returns
             commands::sales::returns::process_return,
+            // Sales - Cancel
+            commands::sales::cancel::cancel_sale,
             // Reports
             commands::reports::get_sales_report,
             commands::reports::get_top_selling_products,

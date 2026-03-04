@@ -277,3 +277,14 @@ pub async fn save_logo_image(
 
     Ok(file_path.to_string_lossy().to_string())
 }
+
+pub fn get_store_id(conn: &Connection) -> Result<String, String> {
+    let store_id: String = conn
+        .query_row(
+            "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "store-main".to_string());
+    Ok(store_id)
+}
