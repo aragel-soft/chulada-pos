@@ -262,10 +262,10 @@ export default function BusinessSettingsPage() {
                       control={form.control}
                       name="allowOutOfStockSales"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/50 mt-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base text-orange-600 flex items-center gap-2">Vender sin existencias</FormLabel>
-                            <FormDescription>
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-red-200 p-4 bg-red-50 mt-4 gap-4">
+                          <div className="space-y-1">
+                            <FormLabel className="text-base font-semibold flex items-center gap-2">Vender sin existencias</FormLabel>
+                            <FormDescription className="text-sm">
                               Permite agregar productos al ticket aunque su inventario sea cero o baje a números negativos.
                             </FormDescription>
                           </div>
@@ -273,6 +273,7 @@ export default function BusinessSettingsPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
+                              className="shrink-0"
                             />
                           </FormControl>
                         </FormItem>
