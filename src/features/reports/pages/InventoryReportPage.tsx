@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Printer } from "lucide-react";
 import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { lowStockColumns } from "@/features/reports/components/columns/low-stock-columns";
+import { getLowStockColumns } from "@/features/reports/components/columns/low-stock-columns";
 import { InventoryValuationCards } from "@/features/reports/components/InventoryValuationCards";
 import { useInventoryReport } from "@/hooks/use-inventory-report";
 import { Button } from "@/components/ui/button";
+import { getAllCategories } from "@/lib/api/inventory/categories";
+import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
+import { CategoryListDto } from "@/types/categories";
+import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 
 export default function InventoryReportPage() {
   const [pagination, setPagination] = useState<PaginationState>({
@@ -13,16 +17,42 @@ export default function InventoryReportPage() {
     pageSize: 16,
   });
   const [sorting, setSorting] = useState<SortingState>([{ id: "category_name", desc: false }]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categories, setCategories] = useState<CategoryListDto[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
   const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : undefined;
 
+  const categoryIds = useMemo(
+    () => selectedCategories.size > 0
+      ? expandCategoryIdsWithChildren(Array.from(selectedCategories), categories)
+      : undefined,
+    [selectedCategories, categories]
+  );
+
   const { valuation, lowStockProducts, isLoading, error } = useInventoryReport(
     pagination.pageIndex + 1,
     pagination.pageSize,
+    categoryIds,
     sortField,
     sortOrder,
   );
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const cats = await getAllCategories();
+      setCategoryOptions(buildCategoryOptions(cats));
+      setCategories(cats);
+    } catch (error) {
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const columns = useMemo(() => getLowStockColumns(categories), [categories]);
 
   const handlePrint = () => {
     window.print();
@@ -59,7 +89,7 @@ export default function InventoryReportPage() {
         </div>
 
         <DataTable
-          columns={lowStockColumns}
+          columns={columns}
           data={lowStockProducts?.data || []}
           isLoading={isLoading}
           initialSorting={[{ id: "category_name", desc: false }]}
@@ -80,6 +110,15 @@ export default function InventoryReportPage() {
             purchase_price: "P. Compra",
             retail_price: "P. Venta",
           }}
+          toolbar={(table) => (
+            <ReportToolbar
+              table={table}
+              categoryOptions={categoryOptions}
+              selectedCategories={selectedCategories}
+              onCategoryChange={setSelectedCategories}
+              searchPlaceholder="Buscar producto bajo de stock..."
+            />
+          )}
           actions={() => (
             <Button
               variant="outline"

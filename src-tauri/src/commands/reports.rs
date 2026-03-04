@@ -79,6 +79,7 @@ pub struct InventoryValuation {
 pub struct LowStockProduct {
     pub product_name: String,
     pub product_code: String,
+    pub category_id: String,
     pub category_name: String,
     pub category_color: Option<String>,
     pub current_stock: i64,
@@ -686,6 +687,7 @@ pub fn get_low_stock_products(
     db: State<Mutex<Connection>>,
     page: i64,
     page_size: i64,
+    category_ids: Option<Vec<String>>,
     sort_by: Option<String>,
     sort_order: Option<String>,
 ) -> Result<PaginatedResult<LowStockProduct>, String> {
@@ -693,7 +695,33 @@ pub fn get_low_stock_products(
     let store_id = get_current_store_id(&conn)?;
 
     let offset = (page - 1) * page_size;
-    let count_sql = r#"
+
+    let category_filter_count = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 2))
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let category_filter_data = match &category_ids {
+        Some(ids) if !ids.is_empty() => {
+            let placeholders: Vec<String> = ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 4))
+                .collect();
+            format!("AND p.category_id IN ({})", placeholders.join(", "))
+        }
+        _ => String::new(),
+    };
+
+    let count_sql = format!(
+        r#"
         SELECT COUNT(p.id)
         FROM products p
         JOIN store_inventory i ON p.id = i.product_id
@@ -701,10 +729,25 @@ pub fn get_low_stock_products(
           AND p.is_active = 1
           AND i.store_id = ?1
           AND i.stock <= COALESCE(i.minimum_stock, 5)
-    "#;
+          {}
+    "#,
+        category_filter_count
+    );
+
+    let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> =
+        vec![Box::new(store_id.clone())];
+
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            count_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let count_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        count_params.iter().map(|p| p.as_ref()).collect();
 
     let total_count: i64 = conn
-        .query_row(count_sql, params![store_id], |row| row.get(0))
+        .query_row(&count_sql, count_params_refs.as_slice(), |row| row.get(0))
         .unwrap_or(0);
 
     let order_column = match sort_by.as_deref() {
@@ -734,6 +777,7 @@ pub fn get_low_stock_products(
         SELECT 
             p.name as product_name,
             p.code as product_code,
+            COALESCE(p.category_id, '') as category_id,
             COALESCE(c.name, 'Sin Categoría') as category_name,
             c.color as category_color,
             i.stock as current_stock,
@@ -748,25 +792,44 @@ pub fn get_low_stock_products(
           AND p.is_active = 1
           AND i.store_id = ?1
           AND i.stock <= COALESCE(i.minimum_stock, 5)
+          {}
         ORDER BY {} {}
         LIMIT ?2 OFFSET ?3
     "#,
+        category_filter_data,
         order_column, order_direction
     );
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let mut data_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+        Box::new(store_id),
+        Box::new(page_size),
+        Box::new(offset),
+    ];
+
+    if let Some(ids) = &category_ids {
+        for id in ids {
+            data_params.push(Box::new(id.clone()));
+        }
+    }
+
+    let data_params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        data_params.iter().map(|p| p.as_ref()).collect();
+
     let rows = stmt
-        .query_map(params![store_id, page_size, offset], |row| {
+        .query_map(data_params_refs.as_slice(), |row| {
             Ok(LowStockProduct {
                 product_name: row.get(0)?,
                 product_code: row.get(1)?,
-                category_name: row.get(2)?,
-                category_color: row.get(3)?,
-                current_stock: row.get(4)?,
-                minimum_stock: row.get(5)?,
-                suggested_order: row.get(6)?,
-                purchase_price: row.get(7)?,
-                retail_price: row.get(8)?,
+                category_id: row.get(2)?,
+                category_name: row.get(3)?,
+                category_color: row.get(4)?,
+                current_stock: row.get(5)?,
+                minimum_stock: row.get(6)?,
+                suggested_order: row.get(7)?,
+                purchase_price: row.get(8)?,
+                retail_price: row.get(9)?,
             })
         })
         .map_err(|e| e.to_string())?;
