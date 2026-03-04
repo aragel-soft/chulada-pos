@@ -6,6 +6,7 @@ import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 import { useDeadStock } from "@/hooks/use-dead-stock";
 import { useReportsContext } from "@/features/reports/context/ReportsContext";
 import { getAllCategories } from "@/lib/api/inventory/categories";
+import { buildCategoryOptions } from "@/lib/utils/categoryUtils";
 
 export default function DeadStockPage() {
   const { dateRange } = useReportsContext();
@@ -37,7 +38,7 @@ export default function DeadStockPage() {
   const fetchCategories = useCallback(async () => {
     try {
       const cats = await getAllCategories();
-      setCategoryOptions(cats.map((c: any) => ({ label: c.name, value: c.id })));
+      setCategoryOptions(buildCategoryOptions(cats));
     } catch (error) {
     }
   }, []);
