@@ -5,9 +5,10 @@ import { Product } from "@/types/inventory";
 
 interface UsePosProductsProps {
   enabled?: boolean;
+  activeStatus?: string[];
 }
 
-export const usePosProducts = ({ enabled = true }: UsePosProductsProps = {}) => {
+export const usePosProducts = ({ enabled = true, activeStatus = ["active"] }: UsePosProductsProps = {}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const PAGE_SIZE = 50; 
 
@@ -23,7 +24,7 @@ export const usePosProducts = ({ enabled = true }: UsePosProductsProps = {}) => 
           sortOrder: "asc",
         },
         {
-          active_status: ["active"]
+          active_status: activeStatus
         }
       );
       return response;

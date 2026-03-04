@@ -233,6 +233,7 @@ export default function ReceptionPage() {
       <ManualSearchModal
         isOpen={isManualSearchOpen}
         onClose={() => setIsManualSearchOpen(false)}
+        activeStatus={[]}
         forceAllowSelect={true}
         onProductSelect={(product) => {
           addItem(product);

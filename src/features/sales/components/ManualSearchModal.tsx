@@ -10,9 +10,10 @@ interface ManualSearchModalProps {
   onClose: () => void;
   onProductSelect: (product: Product) => void;
   forceAllowSelect?: boolean;
+  activeStatus?: string[];
 }
 
-export function ManualSearchModal({ isOpen, onClose, onProductSelect, forceAllowSelect }: ManualSearchModalProps) {
+export function ManualSearchModal({ isOpen, onClose, onProductSelect, forceAllowSelect, activeStatus }: ManualSearchModalProps) {
   const {
     products,
     isLoading,
@@ -20,7 +21,7 @@ export function ManualSearchModal({ isOpen, onClose, onProductSelect, forceAllow
     hasNextPage,
     fetchNextPage,
     setSearchQuery,
-  } = usePosProducts();
+  } = usePosProducts({ activeStatus });
 
   const handleSelect = (product: Product) => {
     onProductSelect(product);
