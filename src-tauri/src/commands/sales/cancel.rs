@@ -133,7 +133,7 @@ pub fn cancel_sale(
             "INSERT INTO inventory_movements (
                 id, product_id, store_id, user_id, type, reason,
                 quantity, previous_stock, new_stock, reference, notes, created_at
-            ) VALUES (?1, ?2, ?3, ?4, 'IN', 'Cancelación de Venta', ?5, ?6, ?7, ?8, ?9, ?10)",
+            ) VALUES (?1, ?2, ?3, ?4, 'IN', 'CANCELLED_SALE', ?5, ?6, ?7, ?8, ?9, ?10)",
         )
         .map_err(|e| e.to_string())?;
 

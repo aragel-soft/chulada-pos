@@ -73,6 +73,7 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
         RETURN: "Devolución",
         DAMAGED: "Merma / Daño",
         INITIAL_STOCK: "Inventario Inicial",
+        CANCELLED_SALE: "Venta Cancelada",
       };
       return (
         <span className="capitalize">
