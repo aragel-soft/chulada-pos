@@ -60,6 +60,7 @@ pub struct SaleDetailView {
   pub user_avatar: Option<String>,
   pub cancellation_reason: Option<String>,
   pub cancelled_at: Option<String>,
+  pub cash_register_shift_id: Option<String>,
   pub items: Vec<SaleItemView>,
   pub returns: Vec<ReturnSummary>,
   pub voucher: Option<VoucherInfo>,
@@ -267,7 +268,8 @@ pub fn get_sale_details(
       s.subtotal, s.discount_percentage, s.discount_amount, s.total,
       s.cash_amount, s.card_transfer_amount, s.notes,
       u.username, u.avatar_url,
-      s.cancellation_reason, s.cancelled_at
+      s.cancellation_reason, s.cancelled_at,
+      s.cash_register_shift_id
     FROM sales s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
@@ -318,6 +320,7 @@ pub fn get_sale_details(
         notes: row.get(11)?,
         cancellation_reason: row.get(14).unwrap_or(None),
         cancelled_at: row.get(15).unwrap_or(None),
+        cash_register_shift_id: row.get(16).unwrap_or(None),
         user_name: row.get(12).unwrap_or("Desconocido".to_string()),
         user_avatar: resolved_avatar,
         items: Vec::new(),

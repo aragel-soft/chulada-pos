@@ -34,16 +34,17 @@ pub fn cancel_sale(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // 1. Validate sale exists and is 'completed'
-    let (status, folio, payment_method, total, customer_id, sale_date): (
+    let (status, folio, payment_method, total, customer_id, sale_shift_id, sale_date): (
         String,
         String,
         String,
         f64,
         Option<String>,
+        Option<String>,
         String,
     ) = tx
         .query_row(
-            "SELECT status, folio, payment_method, total, customer_id, sale_date FROM sales WHERE id = ?1",
+            "SELECT status, folio, payment_method, total, customer_id, cash_register_shift_id, sale_date FROM sales WHERE id = ?1",
             [&payload.sale_id],
             |row| {
                 Ok((
@@ -53,6 +54,7 @@ pub fn cancel_sale(
                     row.get(3)?,
                     row.get(4)?,
                     row.get(5)?,
+                    row.get(6)?,
                 ))
             },
         )
@@ -63,6 +65,28 @@ pub fn cancel_sale(
             "Solo se pueden cancelar ventas completadas. Estado actual: '{}'",
             status
         ));
+    }
+
+    // Validate cancellation is within the same active shift
+    let active_shift_id: Option<i64> = tx
+        .query_row(
+            "SELECT id FROM cash_register_shifts WHERE status = 'open' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+
+    let sale_shift_as_i64 = sale_shift_id
+        .as_ref()
+        .and_then(|s| s.parse::<i64>().ok());
+
+    match (&active_shift_id, &sale_shift_as_i64) {
+        (Some(active), Some(sale_shift)) if active == sale_shift => {},
+        _ => {
+            return Err(
+                "Solo se puede cancelar una venta dentro del mismo turno de caja.".to_string(),
+            );
+        }
     }
 
     // Validate cancellation time limit (1 hour)

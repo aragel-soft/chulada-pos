@@ -44,6 +44,7 @@ export interface SaleDetail extends SaleMaster {
   user_avatar?: string;
   cancellation_reason?: string;
   cancelled_at?: string;
+  cash_register_shift_id?: string;
   items: SaleHistoryItem[];
   returns: ReturnSummary[];
   voucher?: VoucherInfo;

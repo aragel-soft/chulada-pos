@@ -28,6 +28,7 @@ import { BADGE_CONFIGS, BadgeType } from "@/features/sales/constants/sales-desig
 import { useAuthStore } from "@/stores/authStore";
 import { printSaleTicket, printReturnVoucher } from "@/lib/api/printers";
 import { useCancelSale } from "@/features/sales/hooks/useCancelSale";
+import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 
 const RETURN_REASON_LABELS: Record<string, string> = {
   quality: "Producto dañado / Mala calidad",
@@ -55,11 +56,15 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
     ? differenceInDays(new Date(), new Date(sale.sale_date))
     : 999;
   const canReturn = daysSinceSale <= 30;
+  const { shift: activeShift } = useCashRegisterStore();
   const hoursSinceSale = sale
     ? differenceInHours(new Date(), new Date(sale.sale_date))
     : 999;
   
-  const canCancel = hoursSinceSale < 1 && sale?.status !== "cancelled" && sale?.status !== "fully_returned" && sale?.status !== "partial_return";
+  const canCancel = sale?.status === "completed" && 
+    hoursSinceSale < 1 &&
+    !!activeShift && 
+    sale?.cash_register_shift_id === String(activeShift.id);
   
   const showActionButtons = sale?.status !== "cancelled" && sale?.status !== "fully_returned";
   
