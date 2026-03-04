@@ -33,7 +33,7 @@ pub fn cancel_sale(
     let mut conn = db.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // 1. Validate sale exists and is 'completed'
+    // Validate sale is 'completed'
     let (status, folio, payment_method, total, customer_id, sale_shift_id): (
         String,
         String,
@@ -65,7 +65,7 @@ pub fn cancel_sale(
         ));
     }
 
-    // Validate cancellation is within the same active shift
+    // Validate same active shift
     let active_shift_id: Option<i64> = tx
         .query_row(
             "SELECT id FROM cash_register_shifts WHERE status = 'open' LIMIT 1",
@@ -91,14 +91,14 @@ pub fn cancel_sale(
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
 
-    // 2. Update sale status
+    // Update sale status
     tx.execute(
         "UPDATE sales SET status = 'cancelled', cancellation_reason = ?1, cancelled_by = ?2, cancelled_at = ?3, updated_at = ?3 WHERE id = ?4",
         params![reason, payload.user_id, now_local, payload.sale_id],
     )
     .map_err(|e| format!("Error actualizando estado de venta: {}", e))?;
 
-    // 3. Revert inventory for each sale_item
+    // Revert inventory for each sale_item
     let store_id = get_store_id(&tx)?;
 
     let items: Vec<(String, f64, String)> = {
@@ -168,7 +168,7 @@ pub fn cancel_sale(
     drop(stmt_update);
     drop(stmt_movement);
 
-    // 4. Revert credit balance if credit sale
+    // Revert credit balance if credit sale
     if payment_method == "credit" {
         if let Some(cid) = &customer_id {
             let rows = tx
@@ -191,7 +191,7 @@ pub fn cancel_sale(
         }
     }
 
-    // 5. Commit
+    // Commit
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(CancelSaleResponse {
