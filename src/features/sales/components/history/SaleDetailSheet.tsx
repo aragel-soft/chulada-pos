@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, X, Ban, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { format, differenceInDays, differenceInHours } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { AppAvatar } from "@/components/ui/app-avatar";
 import { Button } from "@/components/ui/button";
@@ -57,12 +57,8 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
     : 999;
   const canReturn = daysSinceSale <= 30;
   const { shift: activeShift } = useCashRegisterStore();
-  const hoursSinceSale = sale
-    ? differenceInHours(new Date(), new Date(sale.sale_date))
-    : 999;
   
   const canCancel = sale?.status === "completed" && 
-    hoursSinceSale < 1 &&
     !!activeShift && 
     sale?.cash_register_shift_id === String(activeShift.id);
   
@@ -212,7 +208,7 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                           <p>
                             {sale.status === "partial_return"
                               ? "No se puede cancelar una venta con devoluciones"
-                              : "Excede el tiempo permitido para cancelación"
+                              : "Solo se puede cancelar una venta dentro del mismo turno de caja"
                             }
                           </p>
                         </TooltipContent>

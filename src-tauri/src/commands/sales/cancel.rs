@@ -34,17 +34,16 @@ pub fn cancel_sale(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // 1. Validate sale exists and is 'completed'
-    let (status, folio, payment_method, total, customer_id, sale_shift_id, sale_date): (
+    let (status, folio, payment_method, total, customer_id, sale_shift_id): (
         String,
         String,
         String,
         f64,
         Option<String>,
         Option<String>,
-        String,
     ) = tx
         .query_row(
-            "SELECT status, folio, payment_method, total, customer_id, cash_register_shift_id, sale_date FROM sales WHERE id = ?1",
+            "SELECT status, folio, payment_method, total, customer_id, cash_register_shift_id FROM sales WHERE id = ?1",
             [&payload.sale_id],
             |row| {
                 Ok((
@@ -54,7 +53,6 @@ pub fn cancel_sale(
                     row.get(3)?,
                     row.get(4)?,
                     row.get(5)?,
-                    row.get(6)?,
                 ))
             },
         )
@@ -87,20 +85,6 @@ pub fn cancel_sale(
                 "Solo se puede cancelar una venta dentro del mismo turno de caja.".to_string(),
             );
         }
-    }
-
-    // Validate cancellation time limit (1 hour)
-    let sale_datetime = chrono::NaiveDateTime::parse_from_str(&sale_date, "%Y-%m-%d %H:%M:%S")
-        .or_else(|_| chrono::DateTime::parse_from_rfc3339(&sale_date).map(|dt| dt.naive_utc()))
-        .map_err(|_| format!("Error parseando fecha de venta: {}", sale_date))?;
-
-    let now = chrono::Local::now().naive_local();
-    let hours_since_sale = (now - sale_datetime).num_hours();
-
-    if hours_since_sale >= 1 {
-        return Err(
-            "Esta venta excede el tiempo permitido para cancelación (1 hora)".to_string(),
-        );
     }
 
     let now_local = chrono::Local::now()
