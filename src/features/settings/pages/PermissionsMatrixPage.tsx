@@ -66,13 +66,6 @@ const MODULE_NAMES: Record<string, string> = {
   settings: "Configuración",
   customers: "Clientes",
   permissions: "Permisos",
-  dashboard: "Historial de Ventas",
-  inventory_movements: "Movimientos de Inventario",
-  kits: "Kits",
-  promotions: "Promociones",
-  business_settings: "Configuración del Negocio",
-  hardware: "Hardware",
-  ticket_settings: "Configuración de Tickets",
 };
 
 const ADMIN_ROLE_ID = "550e8400-e29b-41d4-a716-446655440001";
