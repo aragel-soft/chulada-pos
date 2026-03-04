@@ -23,11 +23,13 @@ export const productSchema = z.object({
   
   retail_price: z.coerce.
     number()
-    .positive("El precio debe ser mayor a 0"),
+    .positive("El precio debe ser mayor a 0")
+    .multipleOf(0.01, "El precio debe ser en incrementos de $0.01"),
     
   wholesale_price: z.coerce
     .number()
     .nonnegative("El costo no puede ser negativo")
+    .multipleOf(0.01, "El precio debe ser en incrementos de $0.01")
     .optional()
     .default(0),
     

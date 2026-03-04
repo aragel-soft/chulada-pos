@@ -596,7 +596,6 @@ export function ProductDialog({
                       </FormLabel>
                       <FormControl>
                         <MoneyInput 
-                          step="0.50"
                           className="font-semibold h-10" 
                           {...field} 
                         />
@@ -614,7 +613,6 @@ export function ProductDialog({
                       <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
                       <FormControl>
                         <MoneyInput 
-                          step="0.50"
                           className="h-10" 
                           {...field} 
                         />
@@ -633,7 +631,6 @@ export function ProductDialog({
                         <FormLabel>Costo de Compra</FormLabel>
                         <FormControl>
                           <MoneyInput 
-                            step="0.50"
                             className="bg-muted/20 h-10" 
                             {...field} 
                           />
