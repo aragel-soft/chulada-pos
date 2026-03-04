@@ -5,26 +5,25 @@ import { formatCurrency } from "@/lib/utils";
 import { Barcode, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppAvatar } from "@/components/ui/app-avatar"; 
-
-// TODO: Move this to a configuration setting from the database
-const ALLOW_OUT_OF_STOCK_SALES = true;
+import { useBusinessStore } from "@/stores/businessStore";
 
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
 }
 
-export const ProductCard = ({ product, onClick }: ProductCardProps) => {
+export function ProductCard({ product, onClick }: ProductCardProps) {
   const hasStock = product.stock > 0;
-  const isLowStock = hasStock && product.stock <= (product.min_stock || 5);
+  const isLowStock = product.stock > 0 && product.stock <= (product.min_stock || 0);
+  const allowOutOfStockSales = useBusinessStore((state) => state.settings?.allowOutOfStockSales ?? false);
 
   return (
     <Card 
       className={cn(
         "cursor-pointer transition-all hover:shadow-md hover:border-[#480489]/50 group relative overflow-hidden",
-        (!hasStock && !ALLOW_OUT_OF_STOCK_SALES) && "opacity-60 grayscale"
+        (!hasStock && !allowOutOfStockSales) && "opacity-60 grayscale"
       )}
-      onClick={() => (hasStock || ALLOW_OUT_OF_STOCK_SALES) && onClick(product)}
+      onClick={() => (hasStock || allowOutOfStockSales) && onClick(product)}
     >
       <CardContent className="p-3">
         <div className="flex justify-between items-start mb-2 absolute top-2 right-2 z-10">

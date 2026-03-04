@@ -15,6 +15,7 @@ export const businessSettingsSchema = z.object({
     .min(0, "Mínimo 0%")
     .max(100, "Máximo 100%"),
   applyTax: z.boolean(),
+  allowOutOfStockSales: z.boolean(),
 });
 
 export type BusinessSettingsFormValues = z.infer<typeof businessSettingsSchema>;

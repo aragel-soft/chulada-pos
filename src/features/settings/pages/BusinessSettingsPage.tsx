@@ -57,6 +57,7 @@ export default function BusinessSettingsPage() {
       maxCashLimit: 2000,
       taxRate: 0,
       applyTax: false,
+      allowOutOfStockSales: false,
     },
   });
 
@@ -72,6 +73,7 @@ export default function BusinessSettingsPage() {
         maxCashLimit: settings.maxCashLimit,
         taxRate: settings.taxRate,
         applyTax: settings.applyTax,
+        allowOutOfStockSales: settings.allowOutOfStockSales,
       });
     }
   }, [settings, form]);
@@ -89,6 +91,7 @@ export default function BusinessSettingsPage() {
       if (dirtyFields.maxCashLimit) patch.maxCashLimit = formValues.maxCashLimit;
       if (dirtyFields.taxRate) patch.taxRate = formValues.taxRate;
       if (dirtyFields.applyTax) patch.applyTax = formValues.applyTax;
+      if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = formValues.allowOutOfStockSales;
 
       await updateSettings(patch);
 
@@ -255,10 +258,30 @@ export default function BusinessSettingsPage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="allowOutOfStockSales"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/50 mt-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base text-orange-600 flex items-center gap-2">Vender sin existencias</FormLabel>
+                            <FormDescription>
+                              Permite agregar productos al ticket aunque su inventario sea cero o baje a números negativos.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </CardContent>
                 </Card>
 
-                <Card>
+                {false && <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary">
                       <Receipt className="h-5 w-5" />
@@ -316,7 +339,7 @@ export default function BusinessSettingsPage() {
                       />
                     )}
                   </CardContent>
-                </Card>
+                </Card>}
               </div>
             </div>
 

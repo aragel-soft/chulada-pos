@@ -9,9 +9,8 @@ import { toast } from 'sonner';
 import * as CartProcessor from '@/features/sales/services/cartProcessor';
 import { Ticket } from '@/types/sales';
 import { useOutOfStockWarningStore } from './outOfStockWarningStore';
+import { useBusinessStore } from '@/stores/businessStore';
 
-// TODO: Move this to a configuration setting from the database
-const ALLOW_OUT_OF_STOCK_SALES = true;
 
 
 interface CartState {
@@ -110,7 +109,8 @@ export const useCartStore = create<CartState>()(
                  newItems[existingItemIndex].quantity += targetQuantity;
                  addedUuid = newItems[existingItemIndex].uuid;
             } else {
-                 if (ALLOW_OUT_OF_STOCK_SALES) {
+                 const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                 if (allowOutOfStock) {
                      newItems[existingItemIndex].quantity += targetQuantity;
                      addedUuid = newItems[existingItemIndex].uuid;
                      useOutOfStockWarningStore.getState().openWarning(product.name);
@@ -123,7 +123,8 @@ export const useCartStore = create<CartState>()(
             // Check stock for new item
             const totalInCart = newItems.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
             if (totalInCart + targetQuantity > product.stock) {
-                if (ALLOW_OUT_OF_STOCK_SALES) {
+                const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                if (allowOutOfStock) {
                     useOutOfStockWarningStore.getState().openWarning(product.name);
                 } else {
                     toast.error(`Stock insuficiente para: ${product.name}`);
@@ -306,7 +307,8 @@ export const useCartStore = create<CartState>()(
               }
               
               if (quantity > item.stock) {
-                   if (ALLOW_OUT_OF_STOCK_SALES) {
+                   const allowOutOfStock = useBusinessStore.getState().settings?.allowOutOfStockSales ?? false;
+                   if (allowOutOfStock) {
                        useOutOfStockWarningStore.getState().openWarning(item.name);
                    } else {
                        toast.error(`Stock máximo disponible: ${item.stock}`);
