@@ -13,7 +13,7 @@ import { Product } from "@/types/inventory";
 import { CategoryListDto } from "@/types/categories";
 import { getProducts, getAllTags } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
-import { buildCategoryOptions } from "@/lib/utils/categoryUtils";
+import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
 import { ProductDialog } from "../components/products/ProductDialog";
 import { BulkEditProductDialog } from "../components/products/BulkEditProductDialog";
 import { DeleteProductsDialog } from "../components/products/DeleteProductsDialog";
@@ -91,7 +91,7 @@ export default function ProductsPage() {
           sortOrder: sortOrder,
         },
         {
-          category_ids: categoryFilter?.length ? categoryFilter : undefined,
+          category_ids: categoryFilter?.length ? expandCategoryIdsWithChildren(categoryFilter, categories) : undefined,
           tag_ids: tagFilter?.length ? tagFilter : undefined,
           stock_status: stockFilter?.length ? stockFilter : undefined,
           active_status: statusFilter?.length ? statusFilter : undefined
