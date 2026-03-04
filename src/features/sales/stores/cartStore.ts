@@ -8,6 +8,10 @@ import { usePromotionsStore } from './promotionsStore';
 import { toast } from 'sonner';
 import * as CartProcessor from '@/features/sales/services/cartProcessor';
 import { Ticket } from '@/types/sales';
+import { useOutOfStockWarningStore } from './outOfStockWarningStore';
+
+// TODO: Move this to a configuration setting from the database
+const ALLOW_OUT_OF_STOCK_SALES = true;
 
 
 interface CartState {
@@ -106,15 +110,25 @@ export const useCartStore = create<CartState>()(
                  newItems[existingItemIndex].quantity += targetQuantity;
                  addedUuid = newItems[existingItemIndex].uuid;
             } else {
-                 toast.error(`Stock insuficiente para: ${product.name}`);
-                 return state; // Cancel add
+                 if (ALLOW_OUT_OF_STOCK_SALES) {
+                     newItems[existingItemIndex].quantity += targetQuantity;
+                     addedUuid = newItems[existingItemIndex].uuid;
+                     useOutOfStockWarningStore.getState().openWarning(product.name);
+                 } else {
+                     toast.error(`Stock insuficiente para: ${product.name}`);
+                     return state; // Cancel add
+                 }
             }
           } else {
             // Check stock for new item
             const totalInCart = newItems.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
             if (totalInCart + targetQuantity > product.stock) {
-                toast.error(`Stock insuficiente para: ${product.name}`);
-                return state;
+                if (ALLOW_OUT_OF_STOCK_SALES) {
+                    useOutOfStockWarningStore.getState().openWarning(product.name);
+                } else {
+                    toast.error(`Stock insuficiente para: ${product.name}`);
+                    return state;
+                }
             }
 
             if (currentTicket.discountPercentage > 0 && targetPriceType !== 'kit_item') {
@@ -292,8 +306,12 @@ export const useCartStore = create<CartState>()(
               }
               
               if (quantity > item.stock) {
-                   toast.error(`Stock máximo disponible: ${item.stock}`);
-                   return state;
+                   if (ALLOW_OUT_OF_STOCK_SALES) {
+                       useOutOfStockWarningStore.getState().openWarning(item.name);
+                   } else {
+                       toast.error(`Stock máximo disponible: ${item.stock}`);
+                       return state;
+                   }
               }
           }
 
