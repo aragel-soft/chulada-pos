@@ -795,8 +795,14 @@ pub fn process_sale(
     }
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     
-    // TODO: Obtener esto de la configuración de base de datos
-    let allow_out_of_stock_sales: bool = false;
+    let allow_out_of_stock_str: Result<String, _> = tx.query_row(
+        "SELECT value FROM system_settings WHERE key = 'allow_out_of_stock_sales'",
+        [],
+        |row| row.get(0),
+    );
+
+    let allow_out_of_stock_sales: bool = allow_out_of_stock_str.unwrap_or_else(|_| "false".to_string()) == "true";
+    
     let store_id = get_store_id(&tx)?;
 
     if !allow_out_of_stock_sales {

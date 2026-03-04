@@ -21,6 +21,7 @@ pub struct BusinessSettings {
     pub tax_rate: f64,
     pub apply_tax: bool,
     pub logo_path: String,
+    pub allow_out_of_stock_sales: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -103,6 +104,10 @@ pub fn fetch_business_settings(conn: &Connection) -> Result<BusinessSettings, St
             .map(|v| v == "true")
             .unwrap_or(false),
         logo_path: settings_map.get("logo_path").cloned().unwrap_or_default(),
+        allow_out_of_stock_sales: settings_map
+            .get("allow_out_of_stock_sales")
+            .map(|v| v == "true")
+            .unwrap_or(false),
     })
 }
 
@@ -121,6 +126,7 @@ pub struct BusinessSettingsPatch {
     pub tax_rate: Option<f64>,
     pub apply_tax: Option<bool>,
     pub logo_path: Option<String>,
+    pub allow_out_of_stock_sales: Option<bool>,
 }
 
 #[tauri::command]
@@ -174,6 +180,9 @@ pub fn update_business_settings(
     }
     if let Some(v) = settings.logo_path {
         params.push(("logo_path", v));
+    }
+    if let Some(v) = settings.allow_out_of_stock_sales {
+        params.push(("allow_out_of_stock_sales", v.to_string()));
     }
 
     // Check for logical_store_name change to migrate inventory
