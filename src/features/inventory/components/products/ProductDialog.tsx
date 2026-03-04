@@ -56,6 +56,7 @@ import { getAllCategories } from "@/lib/api/inventory/categories";
 import { CreateProductPayload, UpdateProductPayload, ImageAction, Product } from "@/types/inventory";
 import { useAppImage } from "@/hooks/use-app-image";
 import { cn } from "@/lib/utils";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
 interface ProductDialogProps {
   open: boolean;
@@ -505,7 +506,7 @@ export function ProductDialog({
                                         color: selectedCategory.color || '#64748b',
                                       }}
                                     >
-                                      {selectedCategory.name}
+                                      {getCategoryFullPath(selectedCategory.id, categories)}
                                     </Badge>
                                   ) : loadingCategories ? (
                                     "Cargando..."
@@ -525,7 +526,7 @@ export function ProductDialog({
                                     {categories.map((cat) => (
                                       <CommandItem
                                         key={cat.id}
-                                        value={`${cat.name} ${cat.id}`}
+                                        value={`${getCategoryFullPath(cat.id, categories)} ${cat.id}`}
                                         onSelect={() => {
                                           form.setValue("category_id", cat.id, { 
                                             shouldValidate: true,
@@ -548,7 +549,7 @@ export function ProductDialog({
                                             color: cat.color || '#64748b',
                                           }}
                                         >
-                                          {cat.name}
+                                          {getCategoryFullPath(cat.id, categories)}
                                         </Badge>
                                       </CommandItem>
                                     ))}
