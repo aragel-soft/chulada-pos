@@ -85,10 +85,7 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
     accessorKey: "quantity",
     header: ({ column }) => (
       <div className="flex justify-center">
-        <DataTableColumnHeader
-          column={column}
-          title="Cantidad"
-        />
+        <DataTableColumnHeader column={column} title="Cantidad" />
       </div>
     ),
     cell: ({ row }) => {
@@ -131,8 +128,8 @@ export const getColumns = (): ColumnDef<InventoryMovement>[] => [
       <div className="flex items-center gap-2">
         <AppAvatar
           name={row.original.user_name}
-          className="h-6 w-6"
-          variant="muted"
+          path={row.original.user_avatar}
+          className="h-8 w-8"
         />
         <span
           className="text-sm truncate max-w-[120px]"
