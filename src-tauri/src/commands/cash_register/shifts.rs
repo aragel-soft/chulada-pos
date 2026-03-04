@@ -96,7 +96,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
                 COALESCE(SUM(total), 0.0),
                 COALESCE(SUM(card_transfer_amount), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND NOT status = 'canceled'",
+             WHERE cash_register_shift_id = ?1 AND NOT status = 'cancelled'",
             params![shift_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
@@ -107,7 +107,7 @@ pub fn calculate_shift_totals(conn: &Connection, shift_id: i64, initial_cash: f6
         .query_row(
             "SELECT COALESCE(SUM(total), 0.0)
              FROM sales
-             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND NOT status = 'canceled'",
+             WHERE cash_register_shift_id = ?1 AND payment_method = 'credit' AND NOT status = 'cancelled'",
             params![shift_id],
             |row| row.get(0),
         )

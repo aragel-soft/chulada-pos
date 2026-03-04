@@ -1,10 +1,10 @@
-use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
 use uuid::Uuid;
+use crate::commands::settings::business::get_store_id;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ReturnItemRequest {
@@ -32,17 +32,6 @@ pub struct ReturnResponse {
 
 fn generate_voucher_code(sale_folio: &str) -> String {
     format!("V{}", sale_folio)
-}
-
-fn get_store_id(tx: &Connection) -> Result<String, String> {
-    let store_id: String = tx
-        .query_row(
-            "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| "store-main".to_string());
-    Ok(store_id)
 }
 
 /// Validates that returned kits follow the kit rules
@@ -516,7 +505,7 @@ fn create_return_records(
 }
 
 /// Helper to calculate and update the sale's final status
-fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<(), String> {
+fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
     let mut sale_items_map: HashMap<String, (f64, f64)> = HashMap::new(); // id -> (original, returned)
 
     {
@@ -571,9 +560,7 @@ fn update_sale_status(tx: &Connection, sale_id: &str, reason: &str) -> Result<()
         }
     }
 
-    let new_status = if fully_returned && has_returns && reason == "cancellation" {
-        "cancelled"
-    } else if fully_returned && has_returns {
+    let new_status = if fully_returned && has_returns {
         "fully_returned"
     } else if has_returns {
         "partial_return"
@@ -606,32 +593,6 @@ pub fn process_return(
     }
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
-
-    let sale_date: Option<String> = tx
-        .query_row(
-            "SELECT sale_date FROM sales WHERE id = ?",
-            [&payload.sale_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?;
-
-    let sale_date = sale_date.ok_or(format!("Venta no encontrada: {}", payload.sale_id))?;
-
-    if payload.reason == "cancellation" {
-        let sale_datetime = chrono::NaiveDateTime::parse_from_str(&sale_date, "%Y-%m-%d %H:%M:%S")
-            .or_else(|_| chrono::DateTime::parse_from_rfc3339(&sale_date).map(|dt| dt.naive_utc()))
-            .map_err(|_| format!("Error parseando fecha de venta: {}", sale_date))?;
-
-        let now = Utc::now().naive_utc();
-        let hours_since_sale = (now - sale_datetime).num_hours();
-
-        if hours_since_sale >= 1 {
-            return Err(
-                "Esta venta excede el tiempo permitido para cancelación (1 hora)".to_string(),
-            );
-        }
-    }
 
     let mut validated_items: Vec<(ReturnItemRequest, String, String, String)> = Vec::new();
     let mut available_quantities: HashMap<String, f64> = HashMap::new();
@@ -753,8 +714,8 @@ pub fn process_return(
     // Create Return Records
     create_return_records(&tx, &payload, return_total, &validated_items, &return_id)?;
 
-    // Update Sale Status (passes reason to detect cancellation)
-    update_sale_status(&tx, &payload.sale_id, &payload.reason)?;
+    // Update Sale Status
+    update_sale_status(&tx, &payload.sale_id)?;
 
     tx.commit().map_err(|e| e.to_string())?;
 

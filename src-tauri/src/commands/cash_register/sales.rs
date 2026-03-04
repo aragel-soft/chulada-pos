@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use tauri::State;
 use uuid::Uuid;
+use crate::commands::settings::business::get_store_id;
 
 // Business Constants
 const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
@@ -1089,17 +1090,6 @@ pub fn process_sale(
         change,
         voucher_used: voucher_amount_used,
     })
-}
-
-fn get_store_id(tx: &Connection) -> Result<String, String> {
-    let store_id: String = tx
-        .query_row(
-            "SELECT value FROM system_settings WHERE key = 'logical_store_name'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| "store-main".to_string());
-    Ok(store_id)
 }
 
 fn generate_smart_folio(conn: &Connection) -> Result<String, String> {
