@@ -3,7 +3,7 @@ use rusqlite::types::ToSql;
 use rusqlite::OptionalExtension;
 use serde::{Serialize, Deserialize};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 use crate::database::DynamicQuery;
 use crate::database::get_current_store_id;
@@ -13,6 +13,7 @@ pub struct InventoryMovementView {
   id: String,
   product_name: String,
   user_name: String,
+  user_avatar: Option<String>,
   r#type: String,    // 'IN' o 'OUT' (r# para escapar palabra reservada)
   reason: String,
   quantity: i64,
@@ -67,6 +68,7 @@ pub struct BulkReceptionPayload {
 
 #[tauri::command]
 pub fn get_inventory_movements(
+  app_handle: AppHandle,
   db_state: State<'_, Mutex<Connection>>,
   page: i64,
   page_size: i64,
@@ -75,6 +77,8 @@ pub fn get_inventory_movements(
   filters: Option<MovementsFilter>,
 ) -> Result<PaginatedResponse<InventoryMovementView>, String> {
   let conn = db_state.lock().unwrap();
+  let app_dir = app_handle.path().app_data_dir().unwrap();
+
   let mut dq = DynamicQuery::new();
   dq.add_condition("1=1");
   
@@ -149,6 +153,7 @@ pub fn get_inventory_movements(
       m.id,
       p.name as product_name,
       u.full_name as user_name,
+      u.avatar_url as user_avatar,
       m.type,
       m.reason,
       m.quantity,
@@ -180,18 +185,28 @@ pub fn get_inventory_movements(
 
   let movements = stmt
     .query_map(rusqlite::params_from_iter(data_params.iter()), |row| {
+      let raw_avatar: Option<String> = row.get(3)?;
+      let resolved_avatar = raw_avatar.map(|path| {
+        if path.starts_with("http") {
+          path
+        } else {
+          app_dir.join(path).to_string_lossy().to_string()
+        }
+      });
+
       Ok(InventoryMovementView {
         id: row.get(0)?,
         product_name: row.get(1)?,
         user_name: row.get(2).unwrap_or_else(|_| "Sistema".to_string()),
-        r#type: row.get(3)?,
-        reason: row.get(4)?,
-        quantity: row.get(5)?,
-        previous_stock: row.get(6)?,
-        new_stock: row.get(7)?,
-        formatted_date: row.get(8)?,
-        notes: row.get(9)?,
-        reference: row.get(10)?,
+        user_avatar: resolved_avatar,
+        r#type: row.get(4)?,
+        reason: row.get(5)?,
+        quantity: row.get(6)?,
+        previous_stock: row.get(7)?,
+        new_stock: row.get(8)?,
+        formatted_date: row.get(9)?,
+        notes: row.get(10)?,
+        reference: row.get(11)?,
       })
     })
     .map_err(|e| e.to_string())?

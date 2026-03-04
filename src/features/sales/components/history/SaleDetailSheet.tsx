@@ -5,11 +5,10 @@ import { useSaleDetail } from "@/hooks/use-sales-history";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, User, X, Ban, Printer } from "lucide-react";
+import { Loader2, X, Ban, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AppAvatar } from "@/components/ui/app-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -123,12 +122,11 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
         {sale && (
           <>
             <div className="flex items-center gap-3 bg-white p-2.5 rounded-md border shadow-sm">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={sale.user_avatar} />
-                <AvatarFallback>
-                  <User className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
+                <AppAvatar
+                  name={sale?.user_name || 'Usuario'}
+                  path={sale?.user_avatar || null}
+                  className="h-8 w-8"
+                />
               <div className="flex-1 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground leading-tight">Vendedor</p>

@@ -2,6 +2,7 @@ export interface InventoryMovement {
   id: string;
   product_name: string;
   user_name: string;
+  user_avatar?: string;
   type: 'IN' | 'OUT';
   reason: string;
   quantity: number;
