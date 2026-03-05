@@ -238,6 +238,96 @@ def migrate_categories(conn):
     print(f"✅ Categories migration completed: {inserted_records} records inserted.")
 
 # ==========================================
+# PHASE 2: PRODUCTS
+# ==========================================
+def migrate_products(conn):
+    print("\n--- Migrating Products ---")
+    
+    product_files = glob.glob(os.path.join(CSV_DIR, 'PRODUCTOS_*.csv'))
+    
+    if not product_files:
+        print("⚠️ No file matching PRODUCTOS_*.csv was found.")
+        return
+    
+    csv_file = product_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    
+    # Fallback category (ID '0' in your old system usually means "- Sin Departamento -")
+    # We grab its new UUID. If not found, we pick the first available category.
+    default_category_id = category_map.get('0') 
+    if not default_category_id and category_map:
+        default_category_id = list(category_map.values())[0]
+        
+    if not default_category_id:
+        print("❌ ERROR: Cannot migrate products without at least one category mapped.")
+        return
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_code = row['CODIGO'].strip()
+            
+            # --- DATA CLEANING ---
+            name = row['DESCRIPCION'].strip()
+            dept_id = row['DEPT'].strip()
+            
+            retail_price = safe_float(row['PVENTA'])
+            wholesale_price = safe_float(row['MAYOREO'])
+            purchase_price = safe_float(row['PCOSTO'])
+            
+            # Fallback if wholesale price wasn't configured
+            if wholesale_price == 0.0:
+                wholesale_price = retail_price
+                
+            # Soft delete check
+            is_active = 1
+            if "(Eliminado" in name:
+                name = name.split("(Eliminado")[0].strip()
+                is_active = 0
+                
+            # Ensure code is never completely empty
+            code = old_code
+            if not code:
+                # Generate a safe temporary code
+                code = f"PROD-NO-CODE-{uuid.uuid4().hex[:6].upper()}"
+                
+            # If code is strictly numeric, assume it's a barcode
+            barcode = old_code if old_code.isdigit() else None
+            
+            # --- RELATIONSHIP MAPPING ---
+            category_id = category_map.get(dept_id, default_category_id)
+            
+            # Save mapping (Critical for Inventory Movements and Sale Items)
+            # Using old_code as the key since that's what ties it to the other files
+            product_map[old_code] = new_uuid
+            
+            # --- SQLITE INSERTION ---
+            try:
+                # unit_of_measure will take the default 'piece'
+                cursor.execute("""
+                    INSERT INTO products (
+                        id, code, barcode, name, category_id,
+                        retail_price, wholesale_price, purchase_price,
+                        is_active
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, code, barcode, name, category_id,
+                    retail_price, wholesale_price, purchase_price,
+                    is_active
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting product '{name}' (Code: {code}): {e}")
+
+    conn.commit()
+    print(f"✅ Products migration completed: {inserted_records} records inserted.")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -252,6 +342,7 @@ def main():
         migrate_customers(conn)
         migrate_users(conn)
         migrate_categories(conn)
+        migrate_products(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
@@ -260,4 +351,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
