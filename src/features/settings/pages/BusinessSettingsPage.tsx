@@ -345,7 +345,7 @@ export default function BusinessSettingsPage() {
 
                         return (
                           <FormItem>
-                            <FormLabel>Opciones de Descuento Rápido</FormLabel>
+                            <FormLabel className="!text-foreground">Opciones de Descuento Rápido </FormLabel>
                             <div className="border rounded-lg overflow-hidden">
                               <div className="max-h-[200px] overflow-y-auto">
                                 {presets.length > 0 ? (
