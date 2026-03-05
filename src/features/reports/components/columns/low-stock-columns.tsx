@@ -3,8 +3,10 @@ import { LowStockProduct } from "@/types/reports";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { CategoryListDto } from "@/types/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
-export const lowStockColumns: ColumnDef<LowStockProduct>[] = [
+export const getLowStockColumns = (categories: CategoryListDto[] = []): ColumnDef<LowStockProduct>[] => [
   {
     accessorKey: "product_name",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Producto" />,
@@ -30,7 +32,7 @@ export const lowStockColumns: ColumnDef<LowStockProduct>[] = [
           color: row.original.category_color || "#64748b",
         }}
       >
-        {row.original.category_name || "General"}
+        {getCategoryFullPath(row.original.category_id, categories)}
       </Badge>
     ),
   },

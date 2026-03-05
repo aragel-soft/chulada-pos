@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
+import { CategoryListDto } from "@/types/categories";
 import { getProducts, getAllTags } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
+import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
 import { ProductDialog } from "../components/products/ProductDialog";
 import { BulkEditProductDialog } from "../components/products/BulkEditProductDialog";
 import { DeleteProductsDialog } from "../components/products/DeleteProductsDialog";
@@ -38,6 +40,7 @@ export default function ProductsPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categories, setCategories] = useState<CategoryListDto[]>([]);
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([]);
 
   const fetchOptions = useCallback(async () => {
@@ -46,9 +49,8 @@ export default function ProductsPage() {
         getAllCategories(),
         getAllTags(),
       ]);
-      setCategoryOptions(
-        cats.map((c: any) => ({ label: c.name, value: c.id })),
-      );
+      setCategoryOptions(buildCategoryOptions(cats));
+      setCategories(cats);
       setTagOptions(
         tags.map((t: any) => ({
           label: typeof t === "string" ? t : t.name,
@@ -89,7 +91,7 @@ export default function ProductsPage() {
           sortOrder: sortOrder,
         },
         {
-          category_ids: categoryFilter?.length ? categoryFilter : undefined,
+          category_ids: categoryFilter?.length ? expandCategoryIdsWithChildren(categoryFilter, categories) : undefined,
           tag_ids: tagFilter?.length ? tagFilter : undefined,
           stock_status: stockFilter?.length ? stockFilter : undefined,
           active_status: statusFilter?.length ? statusFilter : undefined
@@ -128,7 +130,7 @@ export default function ProductsPage() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
-  const columns = useMemo(() => getColumns(can), [can]);
+  const columns = useMemo(() => getColumns(can, categories), [can, categories]);
 
   return (
     <>

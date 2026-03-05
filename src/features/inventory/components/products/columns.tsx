@@ -5,6 +5,8 @@ import { AppAvatar } from "@/components/ui/app-avatar";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { formatCurrency } from "@/lib/utils";
 import { Product } from "@/types/inventory";
+import { CategoryListDto } from "@/types/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 import { Barcode } from "lucide-react";
 import {
   HoverCard,
@@ -16,6 +18,7 @@ import { format } from "date-fns";
 
 export const getColumns = (
   can: (permission: string) => boolean,
+  categories: CategoryListDto[] = [],
 ): ColumnDef<Product>[] => [
   {
     id: "select",
@@ -108,7 +111,7 @@ export const getColumns = (
               color: row.original.category_color || "#64748b",
             }}
           >
-            {row.original.category_name || "General"}
+            {getCategoryFullPath(row.original.category_id, categories)}
           </Badge>
         </div>
       </div>

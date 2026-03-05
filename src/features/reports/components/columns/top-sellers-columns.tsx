@@ -2,6 +2,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { TopSellingProduct } from "@/types/reports";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
+import { CategoryListDto } from "@/types/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("es-MX", {
@@ -9,7 +11,7 @@ const formatCurrency = (amount: number) =>
     currency: "MXN",
   }).format(amount);
 
-export const topSellersColumns: ColumnDef<TopSellingProduct>[] = [
+export const getTopSellersColumns = (categories: CategoryListDto[] = []): ColumnDef<TopSellingProduct>[] => [
   {
     accessorKey: "ranking",
     header: ({ column }) => <DataTableColumnHeader column={column} title="#" />,
@@ -47,7 +49,7 @@ export const topSellersColumns: ColumnDef<TopSellingProduct>[] = [
           color: row.original.category_color || "#64748b",
         }}
       >
-        {row.original.category_name || "General"}
+        {getCategoryFullPath(row.original.category_id, categories)}
       </Badge>
     ),
   },

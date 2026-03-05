@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { PaginationState, SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
-import { deadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
+import { getDeadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 import { useDeadStock } from "@/hooks/use-dead-stock";
 import { useReportsContext } from "@/features/reports/context/ReportsContext";
 import { getAllCategories } from "@/lib/api/inventory/categories";
+import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
+import { CategoryListDto } from "@/types/categories";
 
 export default function DeadStockPage() {
   const { dateRange } = useReportsContext();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categories, setCategories] = useState<CategoryListDto[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -18,8 +21,10 @@ export default function DeadStockPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "stagnant_value", desc: true }]);
 
   const categoryIds = useMemo(
-    () => (selectedCategories.size > 0 ? Array.from(selectedCategories) : undefined),
-    [selectedCategories]
+    () => selectedCategories.size > 0 
+      ? expandCategoryIdsWithChildren(Array.from(selectedCategories), categories) 
+      : undefined,
+    [selectedCategories, categories]
   );
 
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
@@ -37,7 +42,8 @@ export default function DeadStockPage() {
   const fetchCategories = useCallback(async () => {
     try {
       const cats = await getAllCategories();
-      setCategoryOptions(cats.map((c: any) => ({ label: c.name, value: c.id })));
+      setCategoryOptions(buildCategoryOptions(cats));
+      setCategories(cats);
     } catch (error) {
     }
   }, []);
@@ -46,10 +52,12 @@ export default function DeadStockPage() {
     fetchCategories();
   }, [fetchCategories]);
 
+  const columns = useMemo(() => getDeadStockColumns(categories), [categories]);
+
   return (
     <div className="flex flex-col gap-4 h-full">
       <DataTable
-        columns={deadStockColumns}
+        columns={columns}
         data={data?.data || []}
         isLoading={isLoading}
         initialSorting={[{ id: "stagnant_value", desc: true }]}

@@ -76,6 +76,7 @@ export const getInventoryValuation = async (): Promise<InventoryValuation> => {
 export const getLowStockProducts = async (
   page: number = 1,
   pageSize: number = 16,
+  categoryIds?: string[],
   sortBy?: string,
   sortOrder?: string,
 ): Promise<PaginatedResponse<LowStockProduct>> => {
@@ -83,6 +84,7 @@ export const getLowStockProducts = async (
     return await invoke<PaginatedResponse<LowStockProduct>>("get_low_stock_products", {
       page,
       pageSize,
+      categoryIds: categoryIds?.length ? categoryIds : null,
       sortBy: sortBy || null,
       sortOrder: sortOrder || null,
     });

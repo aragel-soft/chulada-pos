@@ -13,6 +13,7 @@ const INITIAL_VALUATION: InventoryValuation = {
 export const useInventoryReport = (
   page: number = 1,
   pageSize: number = 16,
+  categoryIds?: string[],
   sortBy?: string,
   sortOrder?: string,
 ) => {
@@ -28,7 +29,7 @@ export const useInventoryReport = (
     try {
       const [valuationData, lowStockData] = await Promise.all([
         getInventoryValuation(),
-        getLowStockProducts(page, pageSize, sortBy, sortOrder),
+        getLowStockProducts(page, pageSize, categoryIds, sortBy, sortOrder),
       ]);
       setValuation(valuationData);
       setLowStockProducts(lowStockData);
@@ -39,7 +40,7 @@ export const useInventoryReport = (
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, sortBy, sortOrder]);
+  }, [page, pageSize, categoryIds, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchData();

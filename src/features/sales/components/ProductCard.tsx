@@ -6,6 +6,9 @@ import { Barcode, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppAvatar } from "@/components/ui/app-avatar"; 
 import { useBusinessStore } from "@/stores/businessStore";
+import { useQuery } from "@tanstack/react-query";
+import { getAllCategories } from "@/lib/api/inventory/categories";
+import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 
 interface ProductCardProps {
   product: Product;
@@ -18,6 +21,7 @@ export function ProductCard({ product, onClick, forceAllowSelect }: ProductCardP
   const isLowStock = product.stock > 0 && product.stock <= (product.min_stock || 0);
   const allowOutOfStockSales = useBusinessStore((state) => state.settings?.allowOutOfStockSales ?? false);
   const canSelect = hasStock || allowOutOfStockSales || forceAllowSelect;
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: getAllCategories, staleTime: Infinity });
 
   return (
     <Card 
@@ -38,7 +42,7 @@ export function ProductCard({ product, onClick, forceAllowSelect }: ProductCardP
                 color: product.category_color || "#64748b",
               }}
             >
-              {product.category_name}
+              {getCategoryFullPath(product.category_id, categories)}
             </Badge>
           )}
         </div>
