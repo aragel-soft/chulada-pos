@@ -105,7 +105,7 @@ def migrate_customers(conn):
     print(f"✅ Customers migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 2: USERS
+# PHASE 1.1: USERS
 # ==========================================
 def migrate_users(conn):
     print("\n--- Migrating Users ---")
@@ -125,17 +125,25 @@ def migrate_users(conn):
     CASHIER_ROLE_ID = '550e8400-e29b-41d4-a716-446655440003'
     
     with open(csv_file, mode='r', encoding='utf-8-sig') as file:
-        reader = csv.DictReader(file)
+        # We use csv.reader instead of DictReader to safely handle unquoted commas in PERMISOS
+        reader = csv.reader(file)
+        header = next(reader) # Skip header
         
         for row in reader:
+            if not row: 
+                continue # Skip empty lines
+                
             new_uuid = str(uuid.uuid4())
-            old_id = row['ID'].strip()
+            old_id = row[0].strip()
             
-            full_name = row['NOMBRE_COMPLETO'].strip()
-            username = row['USUARIO'].strip()
-            raw_password = row['CLAVE'].strip()
-            is_active = 1 if row['ACTIVO'] == '1' else 0
-            created_at = row['CREATED_ON'].strip()
+            # Safe indices before the unquoted commas mess up the row
+            full_name = row[1].strip()
+            username = row[4].strip()
+            raw_password = row[5].strip()
+            is_active = 1 if row[6].strip() == '1' else 0
+            
+            # Since PERMISOS splits into dynamic lengths, CREATED_ON is always the 3rd item from the end
+            created_at = row[-3].strip() if len(row) >= 3 else ""
             
             # --- DATA CLEANING ---
             if not username:
@@ -146,17 +154,17 @@ def migrate_users(conn):
                 
             if "(Eliminado" in full_name or "(Eliminado" in username:
                 is_active = 0
-                username = f"{username}_{old_id}_eliminado"
+                username = f"{username}"
                 
             if not raw_password:
                 raw_password = "1234" # Fallback pin if empty
                 
-            if not created_at:
+            # Extra safety check to guarantee we didn't accidentally grab a permission string
+            if not created_at or "inventario" in created_at or "ventas" in created_at:
                 created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # --- PASSWORD HASHING (ARGON2) ---
             try:
-                # This generates the PHC string format compatible with Rust
                 hashed_password = ph.hash(raw_password)
             except Exception as e:
                 print(f"⚠️ Error hashing password for user '{username}': {e}")
@@ -180,6 +188,7 @@ def migrate_users(conn):
 
     conn.commit()
     print(f"✅ Users migration completed: {inserted_records} records inserted.")
+    
 # ==========================================
 # PHASE 3: CATEGORIES (DEPARTAMENTOS)
 # ==========================================
