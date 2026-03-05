@@ -10,8 +10,12 @@ export const CASH_REGISTER_CONFIG = {
 };
 
 export const CUSTOMER_CONFIG = {
-  DEFAULT_CREDIT_LIMIT: 500,
-  MAX_CREDIT_LIMIT: 10000,
+  get DEFAULT_CREDIT_LIMIT() {
+    return useBusinessStore.getState().settings?.defaultCreditLimit ?? 500;
+  },
+  get MAX_CREDIT_LIMIT() {
+    return useBusinessStore.getState().settings?.maxCreditLimit ?? 10000;
+  },
 };
 
 // Luego se guardaran en configuración

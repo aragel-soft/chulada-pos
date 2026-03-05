@@ -22,6 +22,8 @@ pub struct BusinessSettings {
     pub apply_tax: bool,
     pub logo_path: String,
     pub allow_out_of_stock_sales: bool,
+    pub default_credit_limit: f64,
+    pub max_credit_limit: f64,
     pub discount_preset_options: String,
     pub max_discount_percentage: f64,
     pub max_open_tickets: i64,
@@ -43,6 +45,8 @@ impl Default for BusinessSettings {
             apply_tax: false,
             logo_path: String::new(),
             allow_out_of_stock_sales: false,
+            default_credit_limit: 500.0,
+            max_credit_limit: 10000.0,
             discount_preset_options: "5,10".to_string(),
             max_discount_percentage: 20.0,
             max_open_tickets: 5,
@@ -134,6 +138,14 @@ pub fn fetch_business_settings(conn: &Connection) -> Result<BusinessSettings, St
             .get("allow_out_of_stock_sales")
             .map(|v| v == "true")
             .unwrap_or(false),
+        default_credit_limit: settings_map
+            .get("default_credit_limit")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(500.0),
+        max_credit_limit: settings_map
+            .get("max_credit_limit")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10000.0),
         discount_preset_options: settings_map
             .get("discount_preset_options")
             .cloned()
@@ -165,6 +177,8 @@ pub struct BusinessSettingsPatch {
     pub apply_tax: Option<bool>,
     pub logo_path: Option<String>,
     pub allow_out_of_stock_sales: Option<bool>,
+    pub default_credit_limit: Option<f64>,
+    pub max_credit_limit: Option<f64>,
     pub discount_preset_options: Option<String>,
     pub max_discount_percentage: Option<f64>,
     pub max_open_tickets: Option<i64>,
@@ -224,6 +238,12 @@ pub fn update_business_settings(
     }
     if let Some(v) = settings.allow_out_of_stock_sales {
         params.push(("allow_out_of_stock_sales", v.to_string()));
+    }
+    if let Some(v) = settings.default_credit_limit {
+        params.push(("default_credit_limit", v.to_string()));
+    }
+    if let Some(v) = settings.max_credit_limit {
+        params.push(("max_credit_limit", v.to_string()));
     }
     if let Some(v) = settings.discount_preset_options {
         params.push(("discount_preset_options", v));
