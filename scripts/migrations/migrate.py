@@ -104,7 +104,7 @@ def migrate_customers(conn):
     print(f"✅ Customers migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 1.1: USERS
+# PHASE 2: USERS
 # ==========================================
 def migrate_users(conn):
     print("\n--- Migrating Users ---")
@@ -181,7 +181,7 @@ def migrate_users(conn):
     print(f"✅ Users migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 1.2: CATEGORIES (DEPARTAMENTOS)
+# PHASE 3: CATEGORIES (DEPARTAMENTOS)
 # ==========================================
 def migrate_categories(conn):
     print("\n--- Migrating Categories (Departamentos) ---")
@@ -238,7 +238,7 @@ def migrate_categories(conn):
     print(f"✅ Categories migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 2: PRODUCTS
+# PHASE 4: PRODUCTS
 # ==========================================
 def migrate_products(conn):
     print("\n--- Migrating Products ---")
@@ -328,7 +328,7 @@ def migrate_products(conn):
     print(f"✅ Products migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 3: CASH REGISTER SHIFTS (OPERACIONES)
+# PHASE 5: CASH REGISTER SHIFTS (OPERACIONES)
 # ==========================================
 def migrate_shifts(conn):
     print("\n--- Migrating Cash Register Shifts (Operaciones) ---")
@@ -404,6 +404,74 @@ def migrate_shifts(conn):
     print(f"✅ Shifts migration completed: {inserted_records} records inserted.")
 
 # ==========================================
+# PHASE 6: CASH MOVEMENTS (MOVIMIENTOS)
+# ==========================================
+def migrate_cash_movements(conn):
+    print("\n--- Migrating Cash Movements (Movimientos) ---")
+    
+    movement_files = glob.glob(os.path.join(CSV_DIR, 'MOVIMIENTOS_*.csv'))
+    
+    if not movement_files:
+        print("⚠️ No file matching MOVIMIENTOS_*.csv was found.")
+        return
+    
+    csv_file = movement_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            old_id_str = row['ID'].strip()
+            shift_id_str = row['OPERACION_ID'].strip()
+            
+            if not old_id_str or not shift_id_str:
+                skipped_records += 1
+                continue
+                
+            movement_id = int(old_id_str)
+            shift_id = int(shift_id_str)
+            
+            amount = safe_float(row['MONTO'])
+            created_at = row['CUANDO_FUE'].strip()
+            comments = row['COMENTARIOS'].strip()
+            old_type = row['TIPO'].strip().lower()
+            
+            # --- DATA CLEANING AND TRANSFORMATION ---
+            movement_type = 'out' if old_type == 's' else 'in'
+            
+            # Concept cannot be null. If comments are empty, generate a default concept.
+            if comments:
+                concept = comments[:50] # Keep it short for the concept field
+                description = comments  # Keep full text for description
+            else:
+                concept = 'Entrada de efectivo' if movement_type == 'in' else 'Salida de efectivo'
+                description = None
+                
+            # --- SQLITE INSERTION ---
+            try:
+                cursor.execute("""
+                    INSERT INTO cash_movements (
+                        id, cash_register_shift_id, type, amount, 
+                        concept, description, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    movement_id, shift_id, movement_type, amount, 
+                    concept, description, created_at
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                # If a movement points to a shift that wasn't migrated (orphaned record), SQLite will catch it
+                print(f"❌ Integrity error inserting movement ID '{movement_id}' (Shift: {shift_id}): {e}")
+
+    conn.commit()
+    print(f"✅ Cash Movements migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -420,6 +488,7 @@ def main():
         migrate_categories(conn)
         migrate_products(conn)
         migrate_shifts(conn)
+        migrate_cash_movements(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
