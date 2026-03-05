@@ -13,7 +13,10 @@ INSERT OR IGNORE INTO "system_settings" ("key", "value", "updated_at") VALUES
 ('tax_rate', '0', '2026-03-04 16:10:23'),
 ('apply_tax', 'false', '2026-03-04 16:10:23'),
 ('logo_path', '', '2026-03-04 16:10:23'),
-('allow_out_of_stock_sales', 'true', '2026-03-04 19:03:53');
+('allow_out_of_stock_sales', 'true', '2026-03-04 19:03:53'),
+('discount_preset_options', '5,10', '2026-03-04 16:10:23'),
+('max_discount_percentage', '20', '2026-03-04 16:10:23'),
+('max_open_tickets', '5', '2026-03-04 16:10:23');
 
 -- ================================
 -- USUARIO ADMINISTRADOR PRINCIPAL
