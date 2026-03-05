@@ -15,11 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { AppAvatar } from "@/components/ui/app-avatar"
 
 import { CreateUserDialog } from "../components/CreateUserDialog";
 import { DeleteUsersDialog } from "../components/DeleteUsersDialog";
@@ -92,12 +88,11 @@ export function UsersListPage() {
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={row.original.avatar_url ? convertFileSrc(row.original.avatar_url) : undefined} alt={row.original.full_name} />
-              <AvatarFallback>
-                {row.original.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <AppAvatar
+              path={row.original.avatar_url || ""}
+              name={row.original.full_name || row.original.username}
+              className="h-5 w-5 text-[9px]"
+            />
             <span className="font-medium">{row.original.full_name}</span>
           </div>
         ),

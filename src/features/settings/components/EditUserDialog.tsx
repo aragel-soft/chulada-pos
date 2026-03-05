@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Upload, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { useAppImage } from '@/hooks/use-app-image';
 
 import {
   Dialog,
@@ -52,6 +52,8 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
   const [isDragging, setIsDragging] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const resolvedAvatarSrc = useAppImage(user?.avatar_url);
 
   const form = useForm<EditUserForm>({
     resolver: zodResolver(editUserSchema),
@@ -242,7 +244,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
                   >
                     <img
                       ref={imageRef}
-                      src={avatarFile ? URL.createObjectURL(avatarFile) : convertFileSrc(avatarPreview)}
+                      src={avatarFile ? URL.createObjectURL(avatarFile) : (avatarPreview?.startsWith('data:') ? avatarPreview : resolvedAvatarSrc)}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                       style={{
