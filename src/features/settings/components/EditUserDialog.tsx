@@ -31,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AvatarUpload } from '@/components/ui/avatar-upload';
+import { useAuthStore } from '@/stores/authStore';
 
 import { getAllRoles, saveAvatar, updateUser } from '@/lib/api/users';
 import type { User, UpdateUserPayload } from '@/types/users';
@@ -47,6 +48,7 @@ interface EditUserDialogProps {
 export function EditUserDialog({ open, onOpenChange, user, currentUserId }: EditUserDialogProps) {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
+  const updateAuthUser = useAuthStore((state) => state.updateUser);
 
   const form = useForm<EditUserForm>({
     resolver: zodResolver(editUserSchema),
@@ -104,9 +106,15 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
         current_user_id: currentUserId,
       };
 
-      return await updateUser(payload);
+      return { updatedUser: await updateUser(payload), avatarUrl };
     },
-    onSuccess: () => {
+    onSuccess: ({ updatedUser, avatarUrl }) => {
+      if (user?.id === currentUserId) {
+        updateAuthUser({
+          full_name: updatedUser.full_name,
+          avatar_url: avatarUrl,
+        });
+      }
       toast.success('Usuario actualizado correctamente');
       handleClose();
     },
