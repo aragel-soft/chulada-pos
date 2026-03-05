@@ -328,6 +328,82 @@ def migrate_products(conn):
     print(f"✅ Products migration completed: {inserted_records} records inserted.")
 
 # ==========================================
+# PHASE 3: CASH REGISTER SHIFTS (OPERACIONES)
+# ==========================================
+def migrate_shifts(conn):
+    print("\n--- Migrating Cash Register Shifts (Operaciones) ---")
+    
+    shift_files = glob.glob(os.path.join(CSV_DIR, 'OPERACIONES_*.csv'))
+    
+    if not shift_files:
+        print("⚠️ No file matching OPERACIONES_*.csv was found.")
+        return
+    
+    csv_file = shift_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    
+    fallback_user_id = list(user_map.values())[0] if user_map else None
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            old_id = row['ID'].strip()
+            shift_id = int(old_id) 
+            
+            initial_cash = safe_float(row['DINERO_EN_CAJA'])
+            opening_date = row['INICIO_EN'].strip()
+            closing_date = row['CERRO_EN'].strip()
+            
+            old_user_id = row['INICIO_USUARIO_ID'].strip()
+            user_id = user_map.get(old_user_id, fallback_user_id)
+            
+            # --- FORCE CLOSED STATUS ---
+            # We assume all historical shifts are closed to prevent ghost shifts
+            status = 'closed'
+            
+            # If for some reason closing_date is empty in the CSV, 
+            # we use the opening_date to satisfy the schema requirement for closed shifts
+            if not closing_date:
+                closing_date = opening_date
+                
+            # Assume the user who opened it, closed it
+            closing_user_id = user_id
+                
+            total_sales = safe_float(row['VENTAS'])
+            cash_withdrawal = safe_float(row['SALIDAS'])
+            cash_entries = safe_float(row['ENTRADAS'])
+            cash_income = safe_float(row['INGRESOS_EFECTIVO'])
+            
+            expected_cash = initial_cash + cash_entries + cash_income - cash_withdrawal
+            
+            shift_map[old_id] = shift_id
+            
+            try:
+                cursor.execute("""
+                    INSERT INTO cash_register_shifts (
+                        id, initial_cash, opening_date, closing_date, 
+                        opening_user_id, closing_user_id, status, 
+                        expected_cash, cash_withdrawal, total_sales,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    shift_id, initial_cash, opening_date, closing_date,
+                    user_id, closing_user_id, status,
+                    expected_cash, cash_withdrawal, total_sales,
+                    opening_date, closing_date
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting shift ID '{shift_id}': {e}")
+
+    conn.commit()
+    print(f"✅ Shifts migration completed: {inserted_records} records inserted.")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -343,6 +419,7 @@ def main():
         migrate_users(conn)
         migrate_categories(conn)
         migrate_products(conn)
+        migrate_shifts(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
