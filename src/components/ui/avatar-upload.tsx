@@ -219,7 +219,7 @@ export function AvatarUpload({
           <span className="text-xs text-gray-500 mt-2">Subir avatar</span>
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             className="hidden"
             onChange={handleFileSelect}
           />
@@ -279,7 +279,7 @@ export function AvatarUpload({
               Cambiar
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 className="hidden"
                 onChange={handleFileSelect}
               />
