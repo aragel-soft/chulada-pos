@@ -3,11 +3,21 @@ import sqlite3
 import uuid
 import os
 import glob
+import shutil
+from datetime import datetime
+
+try:
+    from argon2 import PasswordHasher
+except ImportError:
+    print("⚠️ Missing dependency. Please install argon2-cffi:")
+    print("pip install argon2-cffi")
+    exit(1)
 
 # ==========================================
 # CONFIGURATION AND PATHS
 # ==========================================
-DB_PATH = 'database.db'
+EMPTY_DB_PATH = 'database.empty.db' # Your clean template
+DB_PATH = 'database.db'             # The working file
 CSV_DIR = './' 
 
 # In-Memory Mapping Dictionaries (Old ID -> New UUID)
@@ -18,11 +28,19 @@ product_map = {}
 shift_map = {} 
 sale_map = {}
 
+# Initialize Argon2 Hasher with default secure parameters
+ph = PasswordHasher()
+
+def reset_database():
+    """Copies the empty database template to create a fresh working database."""
+    if not os.path.exists(EMPTY_DB_PATH):
+        raise FileNotFoundError(f"Empty database template not found at: {EMPTY_DB_PATH}")
+    
+    print(f"🔄 Resetting database: Copying {EMPTY_DB_PATH} -> {DB_PATH}")
+    shutil.copy2(EMPTY_DB_PATH, DB_PATH)
+
 def get_db_connection():
     """Creates and returns the SQLite database connection."""
-    if not os.path.exists(DB_PATH):
-        raise FileNotFoundError(f"Database not found at: {DB_PATH}")
-    
     conn = sqlite3.connect(DB_PATH)
     # Enable foreign key support to catch relationship errors
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -42,39 +60,32 @@ def safe_float(value, default=0.0):
 # ==========================================
 def migrate_customers(conn):
     print("\n--- Migrating Customers ---")
-    
-    # Search for the CSV file regardless of the timestamp
     customer_files = glob.glob(os.path.join(CSV_DIR, 'CLIENTES_*.csv'))
     
     if not customer_files:
         print("⚠️ No file matching CLIENTES_*.csv was found.")
         return
     
-    csv_file = customer_files[0] # Take the first match
+    csv_file = customer_files[0]
     print(f"📄 Reading file: {csv_file}")
     
     cursor = conn.cursor()
     inserted_records = 0
     
-    # using utf-8-sig to handle potential BOM (Byte Order Mark) from Windows Excel exports
     with open(csv_file, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
-        
         for row in reader:
             new_uuid = str(uuid.uuid4())
             old_id = row['NUMERO'].strip()
             
-            # Data cleaning
             name = row['NOMBRE'].strip()
             address = row['DIRECCION'].strip()
             phone = row['TELEFONO'].strip()
             current_balance = safe_float(row['DSALDOACTUAL'])
-            credit_limit = safe_float(row['LIMITE_CREDITO'], 500.0) # 500.0 default from schema
+            credit_limit = safe_float(row['LIMITE_CREDITO'], 500.0) 
             
-            # Save in memory for future phases (e.g., debt_payments and sales)
             customer_map[old_id] = new_uuid
             
-            # SQLite Insertion
             try:
                 cursor.execute("""
                     INSERT INTO customers (
@@ -98,6 +109,9 @@ def migrate_customers(conn):
 def main():
     print("Starting migration to ChuladaPOS...")
     try:
+        # Step 0: Ensure a clean slate
+        reset_database()
+        
         conn = get_db_connection()
         
         # Execute phases
