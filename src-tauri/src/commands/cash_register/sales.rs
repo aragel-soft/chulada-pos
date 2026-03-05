@@ -7,8 +7,6 @@ use tauri::State;
 use uuid::Uuid;
 use crate::commands::settings::business::get_store_id;
 
-
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleItemRequest {
     pub id: Option<String>,
