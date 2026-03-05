@@ -16,7 +16,13 @@ export const businessSettingsSchema = z.object({
     .max(100, "Máximo 100%"),
   applyTax: z.boolean(),
   allowOutOfStockSales: z.boolean(),
-  discountPresetOptions: z.string().min(1, "Agrega al menos una opción de descuento"),
+  discountPresetOptions: z.string().min(1, "Agrega al menos una opción de descuento").refine(
+    (val) => {
+      const nums = val.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n));
+      return nums.every(n => n >= 1 && n <= 50);
+    },
+    "Cada descuento debe ser entre 1% y 50%"
+  ),
   maxDiscountPercentage: z
     .number()
     .min(1, "Debe ser al menos 1%")

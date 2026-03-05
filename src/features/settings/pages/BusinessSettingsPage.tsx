@@ -320,7 +320,12 @@ export default function BusinessSettingsPage() {
 
                         const addPreset = () => {
                           const val = Number(newPreset);
-                          if (isNaN(val) || val <= 0 || val > 100) return;
+                          if (isNaN(val) || val <= 0) return;
+                          if (val > 50) {
+                            form.setError("discountPresetOptions", { message: "El descuento máximo permitido es 50%" });
+                            return;
+                          }
+                          form.clearErrors("discountPresetOptions");
                           if (presets.length >= 4) return;
                           if (presets.includes(val)) {
                             setNewPreset("");
@@ -392,15 +397,10 @@ export default function BusinessSettingsPage() {
                                 </Button>
                               </div>
                             </div>
+                            <FormMessage />
                             <FormDescription>
                               Botones rápidos que aparecen en la ventana de descuento (F8). Se ordenan automáticamente.
-                              {presets.length > 0 && (
-                                <span className="block mt-1 font-medium text-foreground">
-                                  Descuento máximo permitido: <strong>{Math.max(...presets)}%</strong> (se aplica automáticamente del mayor valor)
-                                </span>
-                              )}
                             </FormDescription>
-                            <FormMessage />
                           </FormItem>
                         );
                       }}
