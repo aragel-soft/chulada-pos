@@ -20,7 +20,7 @@ export const businessSettingsSchema = z.object({
   maxDiscountPercentage: z
     .number()
     .min(1, "Debe ser al menos 1%")
-    .max(100, "No puede ser mayor a 100%"),
+    .max(50, "No puede ser mayor a 50%"),
   maxOpenTickets: z
     .number()
     .int("Debe ser un número entero")

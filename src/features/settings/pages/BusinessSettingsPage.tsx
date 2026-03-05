@@ -379,7 +379,7 @@ export default function BusinessSettingsPage() {
                                 <Input
                                   type="number"
                                   min={1}
-                                  max={100}
+                                  max={50}
                                   placeholder={presets.length >= 4 ? "Máximo 4" : "Ej: 15"}
                                   value={newPreset}
                                   onChange={(e) => setNewPreset(e.target.value)}
