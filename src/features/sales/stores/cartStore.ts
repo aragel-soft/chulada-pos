@@ -46,7 +46,7 @@ export const useCartStore = create<CartState>()(
 
       createTicket: () => {
         set((state) => {
-          if (state.tickets.length >= MAX_OPEN_TICKETS) return state;
+          if (state.tickets.length >= MAX_OPEN_TICKETS.value) return state;
           const existingNumbers = state.tickets
             .map(t => {
               const match = t.name.match(/Ticket (\d+)/);

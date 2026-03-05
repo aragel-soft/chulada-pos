@@ -22,6 +22,32 @@ pub struct BusinessSettings {
     pub apply_tax: bool,
     pub logo_path: String,
     pub allow_out_of_stock_sales: bool,
+    pub discount_preset_options: String,
+    pub max_discount_percentage: f64,
+    pub max_open_tickets: i64,
+}
+
+impl Default for BusinessSettings {
+    fn default() -> Self {
+        Self {
+            store_name: "Mi Tienda".to_string(),
+            logical_store_name: "store-main".to_string(),
+            store_address: String::new(),
+            ticket_header: String::new(),
+            ticket_footer: "Gracias por su compra".to_string(),
+            ticket_footer_lines: String::new(),
+            default_cash_fund: 500.0,
+            max_cash_limit: 2000.0,
+            currency_symbol: "$".to_string(),
+            tax_rate: 0.0,
+            apply_tax: false,
+            logo_path: String::new(),
+            allow_out_of_stock_sales: false,
+            discount_preset_options: "5,10".to_string(),
+            max_discount_percentage: 20.0,
+            max_open_tickets: 5,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -108,6 +134,18 @@ pub fn fetch_business_settings(conn: &Connection) -> Result<BusinessSettings, St
             .get("allow_out_of_stock_sales")
             .map(|v| v == "true")
             .unwrap_or(false),
+        discount_preset_options: settings_map
+            .get("discount_preset_options")
+            .cloned()
+            .unwrap_or("5,10".to_string()),
+        max_discount_percentage: settings_map
+            .get("max_discount_percentage")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20.0),
+        max_open_tickets: settings_map
+            .get("max_open_tickets")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5),
     })
 }
 
@@ -127,6 +165,9 @@ pub struct BusinessSettingsPatch {
     pub apply_tax: Option<bool>,
     pub logo_path: Option<String>,
     pub allow_out_of_stock_sales: Option<bool>,
+    pub discount_preset_options: Option<String>,
+    pub max_discount_percentage: Option<f64>,
+    pub max_open_tickets: Option<i64>,
 }
 
 #[tauri::command]
@@ -183,6 +224,15 @@ pub fn update_business_settings(
     }
     if let Some(v) = settings.allow_out_of_stock_sales {
         params.push(("allow_out_of_stock_sales", v.to_string()));
+    }
+    if let Some(v) = settings.discount_preset_options {
+        params.push(("discount_preset_options", v));
+    }
+    if let Some(v) = settings.max_discount_percentage {
+        params.push(("max_discount_percentage", v.to_string()));
+    }
+    if let Some(v) = settings.max_open_tickets {
+        params.push(("max_open_tickets", v.to_string()));
     }
 
     // Check for logical_store_name change to migrate inventory

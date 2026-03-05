@@ -480,7 +480,7 @@ export default function SalesPage() {
               size="icon"
               className="h-8 w-8 ml-1 rounded-full text-[#480489] hover:bg-purple-50"
               onClick={createTicket}
-              disabled={tickets.length >= MAX_OPEN_TICKETS}
+              disabled={tickets.length >= MAX_OPEN_TICKETS.value}
               title="Nuevo Ticket"
             >
               <Plus className="w-4 h-4" />

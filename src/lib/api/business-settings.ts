@@ -14,6 +14,9 @@ export interface BusinessSettings {
   logoPath: string;
   logicalStoreName: string;
   allowOutOfStockSales: boolean;
+  discountPresetOptions: string;
+  maxDiscountPercentage: number;
+  maxOpenTickets: number;
 }
 
 export const getBusinessSettings = async (): Promise<BusinessSettings> => {

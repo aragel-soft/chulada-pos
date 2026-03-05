@@ -7,9 +7,6 @@ use tauri::State;
 use uuid::Uuid;
 use crate::commands::settings::business::get_store_id;
 
-// Business Constants
-const MAX_DISCOUNT_PERCENTAGE: f64 = 20.0; // TODO: Make this configurable
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SaleItemRequest {
     pub id: Option<String>,
@@ -783,15 +780,29 @@ pub fn process_sale(
         return Err("No hay items en la venta.".to_string());
     }
 
+    // Read max discount from system settings
+    let max_discount_percentage: f64 = {
+        let conn_ref = &*conn;
+        conn_ref
+            .query_row(
+                "SELECT value FROM system_settings WHERE key = 'max_discount_percentage'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20.0)
+    };
+
     // Validate discount percentage
     if payload.discount_percentage < 0.0 {
         return Err("El porcentaje de descuento no puede ser negativo.".to_string());
     }
 
-    if payload.discount_percentage > MAX_DISCOUNT_PERCENTAGE {
+    if payload.discount_percentage > max_discount_percentage {
         return Err(format!(
             "El descuento máximo permitido es {}%. Descuento solicitado: {}%",
-            MAX_DISCOUNT_PERCENTAGE, payload.discount_percentage
+            max_discount_percentage, payload.discount_percentage
         ));
     }
     let tx = conn.transaction().map_err(|e| e.to_string())?;

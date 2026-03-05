@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Store, Save, Coins, Receipt } from "lucide-react";
+import { Store, Save, Coins, Receipt, ShoppingCart, Plus, X, Percent } from "lucide-react";
 
 import {
   Form,
@@ -58,6 +58,9 @@ export default function BusinessSettingsPage() {
       taxRate: 0,
       applyTax: false,
       allowOutOfStockSales: false,
+      discountPresetOptions: "5,10",
+      maxDiscountPercentage: 20,
+      maxOpenTickets: 5,
     },
   });
 
@@ -74,6 +77,9 @@ export default function BusinessSettingsPage() {
         taxRate: settings.taxRate,
         applyTax: settings.applyTax,
         allowOutOfStockSales: settings.allowOutOfStockSales,
+        discountPresetOptions: settings.discountPresetOptions || "5,10",
+        maxDiscountPercentage: settings.maxDiscountPercentage || 20,
+        maxOpenTickets: settings.maxOpenTickets || 5,
       });
     }
   }, [settings, form]);
@@ -92,6 +98,9 @@ export default function BusinessSettingsPage() {
       if (dirtyFields.taxRate) patch.taxRate = formValues.taxRate;
       if (dirtyFields.applyTax) patch.applyTax = formValues.applyTax;
       if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = formValues.allowOutOfStockSales;
+      if (dirtyFields.discountPresetOptions) patch.discountPresetOptions = formValues.discountPresetOptions;
+      if (dirtyFields.maxDiscountPercentage) patch.maxDiscountPercentage = formValues.maxDiscountPercentage;
+      if (dirtyFields.maxOpenTickets) patch.maxOpenTickets = formValues.maxOpenTickets;
 
       await updateSettings(patch);
 
@@ -276,6 +285,145 @@ export default function BusinessSettingsPage() {
                               className="shrink-0"
                             />
                           </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Ventas */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                      <ShoppingCart className="h-5 w-5" />
+                      Ventas
+                    </CardTitle>
+                    <CardDescription>
+                      Configuración de descuentos y tickets.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Discount Presets Mini Table */}
+                    <FormField
+                      control={form.control}
+                      name="discountPresetOptions"
+                      render={({ field }) => {
+                        const presets = field.value
+                          ? field.value.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b)
+                          : [];
+                        const [newPreset, setNewPreset] = useState("");
+
+                        const syncMax = (values: number[]) => {
+                          const max = values.length > 0 ? Math.max(...values) : 0;
+                          form.setValue("maxDiscountPercentage", max, { shouldDirty: true });
+                        };
+
+                        const addPreset = () => {
+                          const val = Number(newPreset);
+                          if (isNaN(val) || val <= 0) return;
+                          if (val > 50) {
+                            form.setError("discountPresetOptions", { message: "El descuento máximo permitido es 50%" });
+                            return;
+                          }
+                          form.clearErrors("discountPresetOptions");
+                          if (presets.length >= 4) return;
+                          if (presets.includes(val)) {
+                            setNewPreset("");
+                            return;
+                          }
+                          const updated = [...presets, val].sort((a, b) => a - b);
+                          field.onChange(updated.join(","));
+                          syncMax(updated);
+                          setNewPreset("");
+                        };
+
+                        const removePreset = (val: number) => {
+                          const updated = presets.filter(p => p !== val);
+                          field.onChange(updated.length > 0 ? updated.join(",") : "");
+                          syncMax(updated);
+                        };
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="!text-foreground">Opciones de Descuento Rápido </FormLabel>
+                            <div className="border rounded-lg overflow-hidden">
+                              <div className="max-h-[200px] overflow-y-auto">
+                                {presets.length > 0 ? (
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="bg-muted/50 text-left">
+                                        <th className="p-2 font-medium">Descuento</th>
+                                        <th className="p-2 font-medium w-12"></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {presets.map((p) => (
+                                        <tr key={p} className="border-t hover:bg-muted/20">
+                                          <td className="p-2 flex items-center gap-2">
+                                            <Percent className="h-3.5 w-3.5 text-[#480489]" />
+                                            <span className="font-semibold">{p}%</span>
+                                          </td>
+                                          <td className="p-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => removePreset(p)}
+                                              className="text-destructive hover:text-destructive/80 transition-colors"
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <p className="p-3 text-sm text-muted-foreground text-center">No hay opciones configuradas</p>
+                                )}
+                              </div>
+                              <div className="border-t p-2 flex gap-2 bg-muted/20">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={50}
+                                  placeholder={presets.length >= 4 ? "Máximo 4" : "Ej: 15"}
+                                  value={newPreset}
+                                  onChange={(e) => setNewPreset(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPreset(); }}}
+                                  className="h-8 text-sm"
+                                  disabled={presets.length >= 4}
+                                />
+                                <Button type="button" size="sm" variant="outline" onClick={addPreset} className="h-8 px-3 shrink-0" disabled={presets.length >= 4}>
+                                  <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
+                                </Button>
+                              </div>
+                            </div>
+                            <FormMessage />
+                            <FormDescription>
+                              Botones rápidos que aparecen en la ventana de descuento (F8). Se ordenan automáticamente.
+                            </FormDescription>
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="maxOpenTickets"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Máximo de Tickets Abiertos</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={20}
+                              {...field}
+                              onChange={e => field.onChange(e.target.valueAsNumber)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Cantidad máxima de tickets que se pueden tener abiertos a la vez.
+                          </FormDescription>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />

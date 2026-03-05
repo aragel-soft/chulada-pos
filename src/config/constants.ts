@@ -15,10 +15,21 @@ export const CUSTOMER_CONFIG = {
 };
 
 // Luego se guardaran en configuración
-export const MAX_OPEN_TICKETS = 5;
+export const MAX_OPEN_TICKETS = {
+  get value() {
+    return useBusinessStore.getState().settings?.maxOpenTickets ?? 5;
+  },
+};
 
 export const DISCOUNT_CONFIG = {
-  PRESET_OPTIONS: [5, 10], 
+  get PRESET_OPTIONS() {
+    const raw = useBusinessStore.getState().settings?.discountPresetOptions ?? "5,10";
+    return raw
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => !isNaN(n) && n > 0)
+      .sort((a, b) => a - b);
+  },
 };
 
 export const INVENTORY_MOVEMENT_REASONS = {
