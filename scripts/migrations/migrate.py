@@ -2,63 +2,111 @@ import csv
 import sqlite3
 import uuid
 import os
-from datetime import datetime
+import glob
 
 # ==========================================
-# CONFIGURACIÓN Y RUTAS
+# CONFIGURATION AND PATHS
 # ==========================================
-DB_PATH = '../../src-tauri/database.db' # Ajusta la ruta a donde tengas una DB limpia (o una copia para pruebas)
-CSV_DIR = './' # Asumiendo que los CSV están en la misma carpeta que este script
+DB_PATH = 'database.db'
+CSV_DIR = './' 
 
-# Diccionarios de Mapeo en Memoria (Viejo ID -> Nuevo UUID/ID)
-map_usuarios = {}
-map_departamentos = {}
-map_clientes = {}
-map_productos = {}
-map_operaciones = {} # Para los turnos de caja (cash_register_shifts)
-map_ventas = {}
+# In-Memory Mapping Dictionaries (Old ID -> New UUID)
+customer_map = {}
+category_map = {}
+user_map = {}
+product_map = {}
+shift_map = {} 
+sale_map = {}
 
 def get_db_connection():
-    """Crea y retorna la conexión a la base de datos SQLite."""
+    """Creates and returns the SQLite database connection."""
     if not os.path.exists(DB_PATH):
-        raise FileNotFoundError(f"No se encontró la base de datos en: {DB_PATH}")
+        raise FileNotFoundError(f"Database not found at: {DB_PATH}")
     
     conn = sqlite3.connect(DB_PATH)
-    # Habilitar soporte para llaves foráneas para que SQLite nos avise si rompemos algo
+    # Enable foreign key support to catch relationship errors
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
-# ==========================================
-# FASE 1: USUARIOS, DEPARTAMENTOS Y CLIENTES
-# ==========================================
-def migrar_departamentos(conn):
-    print("Migrando Departamentos...")
-    cursor = conn.cursor()
-    # Aquí irá la lógica para DEPARTAMENTOS.csv
-    conn.commit()
-
-def migrar_usuarios(conn):
-    print("Migrando Usuarios...")
-    cursor = conn.cursor()
-    # Aquí irá la lógica para USUARIOS.csv
-    conn.commit()
+def safe_float(value, default=0.0):
+    """Converts empty or null strings to a safe float."""
+    try:
+        if not value or value.strip() == '':
+            return default
+        return float(value)
+    except ValueError:
+        return default
 
 # ==========================================
-# FUNCIÓN PRINCIPAL (ORQUESTADOR)
+# PHASE 1: CUSTOMERS
+# ==========================================
+def migrate_customers(conn):
+    print("\n--- Migrating Customers ---")
+    
+    # Search for the CSV file regardless of the timestamp
+    customer_files = glob.glob(os.path.join(CSV_DIR, 'CLIENTES_*.csv'))
+    
+    if not customer_files:
+        print("⚠️ No file matching CLIENTES_*.csv was found.")
+        return
+    
+    csv_file = customer_files[0] # Take the first match
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    
+    # using utf-8-sig to handle potential BOM (Byte Order Mark) from Windows Excel exports
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_id = row['NUMERO'].strip()
+            
+            # Data cleaning
+            name = row['NOMBRE'].strip()
+            address = row['DIRECCION'].strip()
+            phone = row['TELEFONO'].strip()
+            current_balance = safe_float(row['DSALDOACTUAL'])
+            credit_limit = safe_float(row['LIMITE_CREDITO'], 500.0) # 500.0 default from schema
+            
+            # Save in memory for future phases (e.g., debt_payments and sales)
+            customer_map[old_id] = new_uuid
+            
+            # SQLite Insertion
+            try:
+                cursor.execute("""
+                    INSERT INTO customers (
+                        id, code, name, phone, address, 
+                        credit_limit, current_balance, is_active
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                """, (
+                    new_uuid, old_id, name, phone, address, 
+                    credit_limit, current_balance
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting customer '{name}' (Old ID: {old_id}): {e}")
+
+    conn.commit()
+    print(f"✅ Customers migration completed: {inserted_records} records inserted.")
+
+# ==========================================
+# MAIN ORCHESTRATOR
 # ==========================================
 def main():
-    print("Iniciando migración a ChuladaPOS...")
+    print("Starting migration to ChuladaPOS...")
     try:
         conn = get_db_connection()
         
-        # Ejecutar por fases (descomentaremos conforme avancemos)
-        # migrar_departamentos(conn)
-        # migrar_usuarios(conn)
+        # Execute phases
+        migrate_customers(conn)
         
         conn.close()
-        print("Migración completada con éxito.")
+        print("\n🎉 Migration process finished successfully.")
     except Exception as e:
-        print(f"ERROR CRÍTICO DURANTE LA MIGRACIÓN: {e}")
+        print(f"\n💥 CRITICAL ERROR DURING MIGRATION: {e}")
 
 if __name__ == "__main__":
     main()
