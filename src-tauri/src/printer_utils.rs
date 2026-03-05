@@ -383,7 +383,6 @@ pub struct TicketData {
     pub change: f64,
     pub customer_name: Option<String>,
     pub customer_code: Option<String>,
-    pub customer_phone: Option<String>,
 }
 
 pub struct TicketItem {
@@ -660,22 +659,22 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         sale_payment_method,
     ) = sale_info;
 
-    let (cust_name, cust_code, cust_phone) = if sale_payment_method == "credit" {
+    let (cust_name, cust_code) = if sale_payment_method == "credit" {
         // Fetch customer info for credit sales
-        let result: Option<(String, Option<String>, Option<String>)> = conn
+        let result: Option<(String, Option<String>)> = conn
             .query_row(
-                "SELECT c.name, c.code, c.phone FROM customers c 
+                "SELECT c.name, c.code FROM customers c 
                  WHERE c.id = ?1",
                 [&customer_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .ok();
         match result {
-            Some((name, code, phone)) => (Some(name), code, phone),
-            None => (None, None, None),
+            Some((name, code)) => (Some(name), code),
+            None => (None, None),
         }
     } else {
-        (None, None, None)
+        (None, None)
     };
 
     drop(conn); // Unlock DB before printing
@@ -731,8 +730,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         voucher_amount,
         change,
         customer_name: cust_name,
-        customer_code: cust_code,
-        customer_phone: cust_phone,
+        customer_code: cust_code
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
