@@ -4,6 +4,7 @@ import uuid
 import os
 import glob
 import shutil
+import random
 from datetime import datetime
 
 try:
@@ -179,7 +180,6 @@ def migrate_users(conn):
 
     conn.commit()
     print(f"✅ Users migration completed: {inserted_records} records inserted.")
-
 # ==========================================
 # PHASE 3: CATEGORIES (DEPARTAMENTOS)
 # ==========================================
@@ -199,6 +199,20 @@ def migrate_categories(conn):
     cursor = conn.cursor()
     inserted_records = 0
     
+    # Color palette for random assignment (Extracted from UI constants)
+    category_colors = [
+        # WARM
+        "#DC2626", "#881337", "#E11D48", "#EA580C", "#D97706", "#CA8A04", "#78350F",
+        # NATURE
+        "#65A30D", "#3F6212", "#16A34A", "#059669", "#0D9488",
+        # COLD
+        "#0891B2", "#0284C7", "#2563EB", "#1E3A8A", "#4F46E5", "#607D8B",
+        # CREATIVE
+        "#7C3AED", "#9333EA", "#C026D3", "#DB2777", "#BE185D",
+        # NEUTRAL
+        "#334155"
+    ]
+    
     with open(csv_file, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         
@@ -216,6 +230,9 @@ def migrate_categories(conn):
                 name = name.split("(Eliminado")[0].strip()
                 is_active = 0  # Double-check that it is inactive
                 
+            # Pick a random color from the palette
+            random_color = random.choice(category_colors)
+                
             # --- MAP STORAGE ---
             # Save to memory map for the Products phase! This is critical.
             category_map[old_id] = new_uuid
@@ -227,16 +244,16 @@ def migrate_categories(conn):
                 # parent_category_id will be NULL since the old system has a flat hierarchy.
                 cursor.execute("""
                     INSERT INTO categories (
-                        id, name, is_active
-                    ) VALUES (?, ?, ?)
-                """, (new_uuid, name, is_active))
+                        id, name, color, is_active
+                    ) VALUES (?, ?, ?, ?)
+                """, (new_uuid, name, random_color, is_active))
                 inserted_records += 1
             except sqlite3.IntegrityError as e:
                 print(f"❌ Integrity error inserting category '{name}' (Old ID: {old_id}): {e}")
 
     conn.commit()
     print(f"✅ Categories migration completed: {inserted_records} records inserted.")
-
+    
 # ==========================================
 # PHASE 4: PRODUCTS
 # ==========================================
