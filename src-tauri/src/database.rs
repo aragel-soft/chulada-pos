@@ -1,5 +1,7 @@
 use rusqlite::types::ToSql;
-use rusqlite::Connection;
+use rusqlite::{Connection, functions::FunctionFlags};
+use strsim::levenshtein;
+use deunicode::deunicode;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
@@ -23,6 +25,48 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+
+    // --- BÚSQUEDA DIFUSA (FUZZY SEARCH) ---
+    // Registramos la función 'fuzzy_match' para calcular la distancia de Levenshtein
+    conn.create_scalar_function(
+        "fuzzy_match",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            let s1_raw = ctx.get::<String>(0)?;
+            let s2_raw = ctx.get::<String>(1)?;
+            
+            // Normalize: quitamos acentos y pasamos a minúsculas
+            let s1 = deunicode(&s1_raw).to_lowercase();
+            let s2 = deunicode(&s2_raw).to_lowercase();
+            
+            let parts2: Vec<&str> = s2.split_whitespace().collect();
+            if parts2.is_empty() || s1.contains(&s2) {
+                return Ok(0);
+            }
+            
+            let parts1: Vec<&str> = s1.split_whitespace().collect();
+            if parts1.is_empty() {
+                return Ok(s2.len() as i32); // Si s1 está vacío, la distancia es el largo de s2
+            }
+
+            // Para cada palabra de la búsqueda (s2), buscamos su mejor coincidencia en el texto (s1)
+            // y sumamos las distancias de cada mejor coincidencia.
+            let mut total_distance = 0;
+
+            for word2 in &parts2 {
+                let best_match_for_word2 = parts1
+                    .iter()
+                    .map(|word1| levenshtein(word1, word2))
+                    .min()
+                    .unwrap_or(100);
+                
+                total_distance += best_match_for_word2;
+            }
+            
+            Ok(total_distance as i32)
+        },
+    )?;
     println!(
         "Base de datos inicializada en {:?}",
         app_dir.join("database.db")

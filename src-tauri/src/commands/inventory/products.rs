@@ -167,13 +167,29 @@ pub fn get_products(
     let mut dq = DynamicQuery::new();
     dq.add_condition("p.deleted_at IS NULL");
 
+    let mut is_fuzzy_search = false;
+
     if let Some(s) = &search {
         if !s.is_empty() {
-            dq.add_condition("(p.name LIKE ? OR p.description LIKE ? OR p.code LIKE ? OR p.barcode LIKE ? OR c.name LIKE ?)");
+            is_fuzzy_search = true;
+            // Combina coincidencias exactas (LIKE) o tolerancia a errores (fuzzy_match <= 3)
+            dq.add_condition("(
+                p.name LIKE ? OR 
+                p.description LIKE ? OR 
+                p.code LIKE ? OR 
+                p.barcode LIKE ? OR 
+                c.name LIKE ? OR
+                fuzzy_match(p.name, ?) <= 3
+            )");
             let pattern = format!("%{}%", s);
+            
+            // Para los 5 LIKE
             for _ in 0..5 {
                 dq.add_param(pattern.clone());
             }
+            
+            // Para el fuzzy_match (usamos el término exacto sin % para medir Levenshtein)
+            dq.add_param(s.clone());
         }
     }
 
@@ -276,18 +292,27 @@ pub fn get_products(
         Some("stock") => "stock",
         Some("is_active") => "p.is_active",
         Some("name") => "p.name",
-        _ => "p.created_at",
+        _ => if is_fuzzy_search { "fuzzy_distance" } else { "p.created_at" },
     };
 
-    let default_direction = if sort_by.is_none() { "DESC" } else { "ASC" };
+    let default_direction = if sort_by.is_none() && !is_fuzzy_search { "DESC" } else { "ASC" };
     let order_direction = match sort_order.as_deref() {
         Some("desc") => "DESC",
         _ => default_direction,
     };
 
+    let search_term_param = search.clone().unwrap_or_default();
+    
+    let fuzzy_distance_select = if is_fuzzy_search {
+        "fuzzy_match(p.name, ?) as fuzzy_distance,"
+    } else {
+        "0 as fuzzy_distance,"
+    };
+
     let data_sql = format!(
         "
     SELECT 
+      {}
       p.id, 
       p.code, 
       p.barcode, 
@@ -311,24 +336,38 @@ pub fn get_products(
     ORDER BY {} {} 
     LIMIT ? OFFSET ?
     ",
-        where_clause, order_column, order_direction
+        fuzzy_distance_select, where_clause, order_column, order_direction
     );
 
     let limit = page_size;
     let offset = (page - 1) * page_size;
 
-    let mut data_params: Vec<&dyn ToSql> = Vec::new();
-    data_params.push(&store_id);
-    for p in &dq.params {
-        data_params.push(p.as_ref());
+    let mut data_params: Vec<Box<dyn ToSql>> = Vec::new();
+    
+    // 1er param: ? de fuzzy_distance en SELECT
+    if is_fuzzy_search {
+        data_params.push(Box::new(search_term_param));
     }
-    data_params.push(&limit);
-    data_params.push(&offset);
+    
+    // 2do param: ? store_id
+    data_params.push(Box::new(store_id));
+    
+    // 3er..nth param: params generados por el WHERE 
+    for p in dq.params {
+        data_params.push(p);
+    }
+    
+    // Ultimos 2: limit y offset
+    data_params.push(Box::new(limit));
+    data_params.push(Box::new(offset));
+
+    // Convertir el vec de Box<dyn ToSql> a vec de &dyn ToSql
+    let sql_params: Vec<&dyn ToSql> = data_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
 
     let products = stmt
-        .query_map(rusqlite::params_from_iter(data_params.iter()), |row| {
+        .query_map(rusqlite::params_from_iter(sql_params.iter()), |row| {
             map_product_row(row, &app_dir)
         })
         .map_err(|e| e.to_string())?
@@ -350,7 +389,7 @@ fn map_product_row(
     row: &rusqlite::Row,
     app_dir: &std::path::Path,
 ) -> rusqlite::Result<ProductView> {
-    let raw_image: Option<String> = row.get(13)?;
+    let raw_image: Option<String> = row.get(14)?;
 
     let resolved_image = raw_image.map(|path| {
         if path.starts_with("http") {
@@ -361,22 +400,22 @@ fn map_product_row(
     });
 
     Ok(ProductView {
-        id: row.get(0)?,
-        code: row.get(1)?,
-        barcode: row.get(2)?,
-        name: row.get(3)?,
-        description: row.get(4)?,
-        category_id: row.get(5)?,
-        category_name: row.get(6)?,
-        category_color: row.get(7)?,
-        retail_price: row.get(8)?,
-        wholesale_price: row.get(9)?,
-        purchase_price: row.get(10)?,
-        stock: row.get(11)?,
-        min_stock: row.get(12)?,
+        id: row.get(1)?,
+        code: row.get(2)?,
+        barcode: row.get(3)?,
+        name: row.get(4)?,
+        description: row.get(5)?,
+        category_id: row.get(6)?,
+        category_name: row.get(7)?,
+        category_color: row.get(8)?,
+        retail_price: row.get(9)?,
+        wholesale_price: row.get(10)?,
+        purchase_price: row.get(11)?,
+        stock: row.get(12)?,
+        min_stock: row.get(13)?,
         image_url: resolved_image,
-        is_active: row.get(14)?,
-        created_at: row.get(15)?,
+        is_active: row.get(15)?,
+        created_at: row.get(16)?,
     })
 }
 
