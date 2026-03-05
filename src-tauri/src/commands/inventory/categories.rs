@@ -114,30 +114,51 @@ pub async fn get_categories(
 ) -> Result<PaginatedResponse<CategoryListDto>, String> {
     let conn = db.lock().map_err(|e| format!("Error de conexión: {}", e))?;
 
-    let search_term = match search.as_deref() {
-        Some(s) if !s.trim().is_empty() => Some(format!("%{}%", s.trim())),
-        _ => None,
-    };
-    let has_search = search_term.is_some();
+    let search_trimmed = search.as_ref().map(|s| s.trim().to_string()).unwrap_or_default();
+    let has_search = !search_trimmed.is_empty();
+    let search_len = search_trimmed.len();
+    let use_fuzzy = has_search && search_len >= 3;
+    let fuzzy_threshold = if search_len <= 4 { 1 } else if search_len <= 7 { 2 } else { 3 };
 
-    let count_sql = if has_search {
-        r#"SELECT COUNT(*) FROM categories c 
-           WHERE c.deleted_at IS NULL 
-           AND (
-               (c.name LIKE ?1 OR c.description LIKE ?1)
-               OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
-               OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
-           )"#
+    let escaped_like = format!("%{}%", search_trimmed).replace("'", "''");
+    let escaped_search = search_trimmed.replace("'", "''");
+
+    let filter_clause = if has_search {
+        if use_fuzzy {
+            format!(
+                r#" AND (
+                    (c.name LIKE '{}' OR c.description LIKE '{}' OR fuzzy_match(c.name, '{}') <= {})
+                    OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE '{}' OR sub.description LIKE '{}'))
+                    OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE '{}' OR parent.description LIKE '{}'))
+                )"#,
+                escaped_like, escaped_like, escaped_search, fuzzy_threshold,
+                escaped_like, escaped_like,
+                escaped_like, escaped_like
+            )
+        } else {
+            format!(
+                r#" AND (
+                    (c.name LIKE '{}' OR c.description LIKE '{}')
+                    OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE '{}' OR sub.description LIKE '{}'))
+                    OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE '{}' OR parent.description LIKE '{}'))
+                )"#,
+                escaped_like, escaped_like,
+                escaped_like, escaped_like,
+                escaped_like, escaped_like
+            )
+        }
     } else {
-        "SELECT COUNT(*) FROM categories c WHERE c.deleted_at IS NULL"
+        String::new()
     };
 
-    let total: i64 = if let Some(ref s) = search_term {
-        conn.query_row(count_sql, [s], |row| row.get(0))
-    } else {
-        conn.query_row(count_sql, [], |row| row.get(0))
-    }
-    .map_err(|e| format!("Error contando categorías: {}", e))?;
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM categories c WHERE c.deleted_at IS NULL{}",
+        filter_clause
+    );
+
+    let total: i64 = conn
+        .query_row(&count_sql, [], |row| row.get(0))
+        .map_err(|e| format!("Error contando categorías: {}", e))?;
 
     let (sort_column, parent_column) = match sort_by.as_deref() {
         Some("name") => ("c.name", "parent.name"),
@@ -152,7 +173,29 @@ pub async fn get_categories(
         _ => "ASC",
     };
 
-    let base_query = r#"
+    let order_clause = if use_fuzzy && sort_by.is_none() {
+        format!(
+            "ORDER BY fuzzy_match(c.name, '{}') ASC, c.name ASC",
+            escaped_search
+        )
+    } else {
+        format!(
+            r#"
+        ORDER BY 
+            COALESCE({}, {}) {}, 
+            COALESCE(parent.id, c.id) {}, 
+            CASE WHEN c.parent_category_id IS NULL THEN 0 ELSE 1 END ASC,
+            {} {}
+        "#,
+            parent_column, sort_column, sort_direction, sort_direction, sort_column, sort_direction
+        )
+    };
+
+    let safe_page = if page < 1 { 1 } else { page };
+    let offset = (safe_page - 1) * page_size;
+
+    let final_query = format!(
+        r#"
         SELECT 
             c.id, 
             c.name, 
@@ -167,62 +210,22 @@ pub async fn get_categories(
         FROM categories c
         LEFT JOIN categories parent ON c.parent_category_id = parent.id
         WHERE c.deleted_at IS NULL
-    "#;
-
-    let filter_clause = if has_search {
-        r#" AND (
-                (c.name LIKE ?1 OR c.description LIKE ?1)
-                OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE ?1 OR sub.description LIKE ?1))
-                OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE ?1 OR parent.description LIKE ?1))
-            )"#
-    } else {
-        ""
-    };
-
-    let order_clause = format!(
-        r#"
-        ORDER BY 
-            COALESCE({}, {}) {}, 
-            COALESCE(parent.id, c.id) {}, 
-            CASE WHEN c.parent_category_id IS NULL THEN 0 ELSE 1 END ASC,
-            {} {}
+        {}
+        {}
+        LIMIT {} OFFSET {}
         "#,
-        parent_column, sort_column, sort_direction, sort_direction, sort_column, sort_direction
+        filter_clause, order_clause, page_size, offset
     );
-
-    let pagination_clause = if has_search {
-        " LIMIT ?2 OFFSET ?3"
-    } else {
-        " LIMIT ?1 OFFSET ?2"
-    };
-
-    let final_query = format!(
-        "{}{}{}{}",
-        base_query, filter_clause, order_clause, pagination_clause
-    );
-
-    let safe_page = if page < 1 { 1 } else { page };
-    let offset = (safe_page - 1) * page_size;
 
     let mut stmt = conn
         .prepare(&final_query)
         .map_err(|e| format!("Error al preparar query: {}", e))?;
 
-    let categories = if let Some(ref s) = search_term {
-        stmt.query_map(rusqlite::params![s, page_size, offset], |row| {
-            map_category_row(row)
-        })
+    let categories = stmt
+        .query_map([], |row| map_category_row(row))
         .map_err(|e| format!("Error ejecutando query: {}", e))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Error procesando filas: {}", e))?
-    } else {
-        stmt.query_map(rusqlite::params![page_size, offset], |row| {
-            map_category_row(row)
-        })
-        .map_err(|e| format!("Error ejecutando query: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Error procesando filas: {}", e))?
-    };
+        .map_err(|e| format!("Error procesando filas: {}", e))?;
 
     let total_pages = (total as f64 / page_size as f64).ceil() as i64;
 
@@ -234,6 +237,7 @@ pub async fn get_categories(
         total_pages,
     })
 }
+
 
 #[derive(serde::Deserialize)]
 pub struct CreateCategoryDto {
