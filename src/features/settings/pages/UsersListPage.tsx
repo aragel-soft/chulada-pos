@@ -3,7 +3,6 @@ import {useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAuthStore } from "@/stores/authStore";
 import { ColumnDef, RowSelectionState } from "@tanstack/react-table"
 import {

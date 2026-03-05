@@ -23,7 +23,6 @@ export function AppAvatar({ name, path, className, variant = 'default' }: AppAva
   const src = useAppImage(path);
   const initials = getInitials(name);
 
-
   const variantStyles = {
     default: "bg-purple-600 text-white", 
     muted: "bg-muted text-muted-foreground border",
@@ -32,7 +31,7 @@ export function AppAvatar({ name, path, className, variant = 'default' }: AppAva
   
   return (
     <Avatar className={className}>
-      {src && <AvatarImage src={src} alt={name}/>}
+      <AvatarImage key={src || 'fallback'} src={src} alt={name}/>
       <AvatarFallback className={cn("font-semibold", variantStyles[variant])}>
         {initials}
       </AvatarFallback>

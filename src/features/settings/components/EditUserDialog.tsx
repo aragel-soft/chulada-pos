@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import {
@@ -49,6 +49,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
   const updateAuthUser = useAuthStore((state) => state.updateUser);
+  const queryClient = useQueryClient();
 
   const form = useForm<EditUserForm>({
     resolver: zodResolver(editUserSchema),
@@ -86,14 +87,14 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
     mutationFn: async (data: EditUserForm) => {
       if (!user) throw new Error("No user selected");
 
-      let avatarUrl = user.avatar_url;
+      let avatarUrl: string | undefined | null = user.avatar_url;
 
       if (avatarFile) {
         const arrayBuffer = await avatarFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
         avatarUrl = await saveAvatar(Array.from(uint8Array), data.username);
       } else if (avatarRemoved) {
-        avatarUrl = undefined;
+        avatarUrl = null;
       }
 
       const payload: UpdateUserPayload = {
@@ -112,10 +113,11 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
       if (user?.id === currentUserId) {
         updateAuthUser({
           full_name: updatedUser.full_name,
-          avatar_url: avatarUrl,
+          avatar_url: avatarUrl ?? undefined,
         });
       }
       toast.success('Usuario actualizado correctamente');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       handleClose();
     },
     onError: (error: any) => {
