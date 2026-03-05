@@ -104,6 +104,83 @@ def migrate_customers(conn):
     print(f"✅ Customers migration completed: {inserted_records} records inserted.")
 
 # ==========================================
+# PHASE 1.1: USERS
+# ==========================================
+def migrate_users(conn):
+    print("\n--- Migrating Users ---")
+    user_files = glob.glob(os.path.join(CSV_DIR, 'USUARIOS_*.csv'))
+    
+    if not user_files:
+        print("⚠️ No file matching USUARIOS_*.csv was found.")
+        return
+    
+    csv_file = user_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    
+    # ID of the Cashier role from your database
+    CASHIER_ROLE_ID = '550e8400-e29b-41d4-a716-446655440003'
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_id = row['ID'].strip()
+            
+            full_name = row['NOMBRE_COMPLETO'].strip()
+            username = row['USUARIO'].strip()
+            raw_password = row['CLAVE'].strip()
+            is_active = 1 if row['ACTIVO'] == '1' else 0
+            created_at = row['CREATED_ON'].strip()
+            
+            # --- DATA CLEANING ---
+            if not username:
+                username = f"usuario_{old_id}"
+                
+            if username.lower() == 'admin':
+                username = "admin_migrado"
+                
+            if "(Eliminado" in full_name or "(Eliminado" in username:
+                is_active = 0
+                username = f"{username}_{old_id}_eliminado"
+                
+            if not raw_password:
+                raw_password = "1234" # Fallback pin if empty
+                
+            if not created_at:
+                created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # --- PASSWORD HASHING (ARGON2) ---
+            try:
+                # This generates the PHC string format compatible with Rust
+                hashed_password = ph.hash(raw_password)
+            except Exception as e:
+                print(f"⚠️ Error hashing password for user '{username}': {e}")
+                hashed_password = ""
+
+            user_map[old_id] = new_uuid
+            
+            try:
+                cursor.execute("""
+                    INSERT INTO users (
+                        id, username, password_hash, full_name, 
+                        role_id, is_active, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, username, hashed_password, full_name, 
+                    CASHIER_ROLE_ID, is_active, created_at, created_at
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting user '{username}' (Old ID: {old_id}): {e}")
+
+    conn.commit()
+    print(f"✅ Users migration completed: {inserted_records} records inserted.")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -116,6 +193,7 @@ def main():
         
         # Execute phases
         migrate_customers(conn)
+        migrate_users(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
