@@ -560,23 +560,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
     // Fetch Sale Data & Settings from DB
     let (sale_info, original_items, business_settings) = {
         // Fetch Settings
-        let settings = fetch_business_settings(&conn).unwrap_or_else(|_| {
-            crate::commands::settings::business::BusinessSettings {
-                store_name: "Error loading settings".to_string(),
-                logical_store_name: "store-main".to_string(),
-                store_address: "".to_string(),
-                ticket_header: "".to_string(),
-                ticket_footer: "".to_string(),
-                ticket_footer_lines: "".to_string(),
-                default_cash_fund: 0.0,
-                max_cash_limit: 0.0,
-                currency_symbol: "$".to_string(),
-                tax_rate: 0.0,
-                apply_tax: false,
-                logo_path: "".to_string(),
-                allow_out_of_stock_sales: false,
-            }
-        });
+        let settings = fetch_business_settings(&conn).unwrap_or_default();
 
         // Fetch Header
         let sale_row = conn.query_row(
@@ -769,23 +753,7 @@ pub fn print_voucher_from_db(app_handle: tauri::AppHandle, sale_id: String) -> R
         .map_err(|e| format!("Venta no encontrada: {}", e))?;
 
     // Fetch business settings
-    let settings = fetch_business_settings(&conn).unwrap_or_else(|_| {
-        crate::commands::settings::business::BusinessSettings {
-            store_name: "".to_string(),
-            logical_store_name: "store-main".to_string(),
-            store_address: "".to_string(),
-            ticket_header: "".to_string(),
-            ticket_footer: "".to_string(),
-            ticket_footer_lines: "".to_string(),
-            default_cash_fund: 0.0,
-            max_cash_limit: 0.0,
-            currency_symbol: "$".to_string(),
-            tax_rate: 0.0,
-            apply_tax: false,
-            logo_path: "".to_string(),
-            allow_out_of_stock_sales: false,
-        }
-    });
+    let settings = fetch_business_settings(&conn).unwrap_or_default();
 
     drop(conn); // Unlock DB before printing
 
@@ -1114,23 +1082,7 @@ pub fn print_payment_from_db(
     ) = payment;
 
     // Fetch business settings
-    let settings = fetch_business_settings(&conn).unwrap_or_else(|_| {
-        crate::commands::settings::business::BusinessSettings {
-            store_name: "".to_string(),
-            logical_store_name: "store-main".to_string(),
-            store_address: "".to_string(),
-            ticket_header: "".to_string(),
-            ticket_footer: "".to_string(),
-            ticket_footer_lines: "".to_string(),
-            default_cash_fund: 0.0,
-            max_cash_limit: 0.0,
-            currency_symbol: "$".to_string(),
-            tax_rate: 0.0,
-            apply_tax: false,
-            logo_path: "".to_string(),
-            allow_out_of_stock_sales: false,
-        }
-    });
+    let settings = fetch_business_settings(&conn).unwrap_or_default();
 
     drop(conn);
 
@@ -1267,21 +1219,7 @@ pub fn print_shift_summary(
         }
     }
 
-    let settings = fetch_business_settings(&conn).unwrap_or_else(|_| BusinessSettings {
-        store_name: "Error loading settings".to_string(),
-        logical_store_name: "store-main".to_string(),
-        store_address: "".to_string(),
-        ticket_header: "".to_string(),
-        ticket_footer: "".to_string(),
-        ticket_footer_lines: "".to_string(),
-        default_cash_fund: 0.0,
-        max_cash_limit: 0.0,
-        currency_symbol: "$".to_string(),
-        tax_rate: 0.0,
-        apply_tax: false,
-        logo_path: "".to_string(),
-        allow_out_of_stock_sales: false,
-    });
+    let settings = fetch_business_settings(&conn).unwrap_or_default();
 
     drop(conn);
 
