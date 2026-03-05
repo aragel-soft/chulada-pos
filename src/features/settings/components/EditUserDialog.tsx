@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useAppImage } from '@/hooks/use-app-image';
 
 import {
   Dialog,
@@ -32,10 +30,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AvatarUpload } from '@/components/ui/avatar-upload';
 
 import { getAllRoles, saveAvatar, updateUser } from '@/lib/api/users';
 import type { User, UpdateUserPayload } from '@/types/users';
-import {editUserSchema, type EditUserForm } from '../schemas/userSchema';
+import { editUserSchema, type EditUserForm } from '../schemas/userSchema';
 
 
 interface EditUserDialogProps {
@@ -46,14 +45,8 @@ interface EditUserDialogProps {
 }
 
 export function EditUserDialog({ open, onOpenChange, user, currentUserId }: EditUserDialogProps) {
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
-  const [isDragging, setIsDragging] = useState(false);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const resolvedAvatarSrc = useAppImage(user?.avatar_url);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
 
   const form = useForm<EditUserForm>({
     resolver: zodResolver(editUserSchema),
@@ -67,7 +60,6 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
     },
   });
 
-  // Reset form when user changes
   useEffect(() => {
     if (user && open) {
       form.reset({
@@ -77,12 +69,8 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
         is_active: user.is_active,
         avatar_url: user.avatar_url || undefined,
       });
-      if (user.avatar_url) {
-        setAvatarPreview(user.avatar_url);
-      } else {
-        setAvatarPreview(null);
-      }
       setAvatarFile(null);
+      setAvatarRemoved(false);
     }
   }, [user, open, form]);
 
@@ -96,20 +84,19 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
     mutationFn: async (data: EditUserForm) => {
       if (!user) throw new Error("No user selected");
 
-      let avatarUrl = user.avatar_url; 
-      
+      let avatarUrl = user.avatar_url;
+
       if (avatarFile) {
         const arrayBuffer = await avatarFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
         avatarUrl = await saveAvatar(Array.from(uint8Array), data.username);
-      } 
-      else if (!avatarPreview && user.avatar_url) {
-        avatarUrl = undefined; 
+      } else if (avatarRemoved) {
+        avatarUrl = undefined;
       }
 
       const payload: UpdateUserPayload = {
         id: user.id,
-        username: data.username, // Not used for update but kept for consistency
+        username: data.username,
         full_name: data.full_name,
         role_id: data.role_id,
         is_active: data.is_active,
@@ -117,9 +104,7 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
         current_user_id: currentUserId,
       };
 
-      const updatedUser = await updateUser(payload);
-
-      return updatedUser;
+      return await updateUser(payload);
     },
     onSuccess: () => {
       toast.success('Usuario actualizado correctamente');
@@ -149,57 +134,21 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
 
   const handleClose = () => {
     form.reset();
-    setAvatarPreview(null);
     setAvatarFile(null);
-    setImagePosition({ x: 50, y: 50 });
+    setAvatarRemoved(false);
     onOpenChange(false);
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleAvatarChange = (file: File | null) => {
     if (file) {
       setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-        setImagePosition({ x: 50, y: 50 });
-        form.setValue('avatar_url', 'changed', { shouldDirty: true }); 
-      };
-      reader.readAsDataURL(file);
+      setAvatarRemoved(false);
+      form.setValue('avatar_url', 'changed', { shouldDirty: true });
+    } else {
+      setAvatarFile(null);
+      setAvatarRemoved(true);
+      form.setValue('avatar_url', '', { shouldDirty: true });
     }
-  };
-
-  const handleRemoveAvatar = () => {
-    setAvatarPreview(null);
-    setAvatarFile(null);
-    setImagePosition({ x: 50, y: 50 });
-    form.setValue('avatar_url', '', { shouldDirty: true });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    setIsDragging(true);
-    e.preventDefault();
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-
-    // Inverted controls
-    const x = 100 - ((e.clientX - rect.left) / rect.width) * 100;
-    const y = 100 - ((e.clientY - rect.top) / rect.height) * 100;
-
-    setImagePosition({
-      x: Math.max(0, Math.min(100, x)),
-      y: Math.max(0, Math.min(100, y)),
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
   };
 
   const onSubmit = (data: EditUserForm) => {
@@ -220,53 +169,10 @@ export function EditUserDialog({ open, onOpenChange, user, currentUserId }: Edit
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="flex flex-col items-center gap-3">
-              {!avatarPreview ? (
-                <label className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
-                  <Upload className="w-8 h-8 text-gray-400" />
-                  <span className="text-xs text-gray-500 mt-2">Subir avatar</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              ) : (
-                <div className="relative">
-                  <div
-                    ref={containerRef}
-                    className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-300 cursor-move"
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                  >
-                    <img
-                      ref={imageRef}
-                      src={avatarFile ? URL.createObjectURL(avatarFile) : (avatarPreview?.startsWith('data:') ? avatarPreview : resolvedAvatarSrc)}
-                      alt="Avatar preview"
-                      className="w-full h-full object-cover"
-                      style={{
-                        objectPosition: `${imagePosition.x}% ${imagePosition.y}%`,
-                      }}
-                      draggable={false}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                    data-testid="btn-remove-avatar"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Arrastra para centrar
-                  </p>
-                </div>
-              )}
-            </div>
+            <AvatarUpload
+              existingPath={avatarRemoved ? null : user?.avatar_url}
+              onChange={handleAvatarChange}
+            />
 
             <FormField
               control={form.control}

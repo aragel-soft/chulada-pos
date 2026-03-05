@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -30,10 +30,11 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { AvatarUpload } from '@/components/ui/avatar-upload';
 
 import { createUser, getAllRoles, saveAvatar, checkUsernameAvailable } from '@/lib/api/users';
 import type { CreateUserPayload } from '@/types/users';
-import {createUserSchema, type CreateUserForm} from '@/features/settings/schemas/userSchema';
+import { createUserSchema, type CreateUserForm } from '@/features/settings/schemas/userSchema';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -41,14 +42,9 @@ interface CreateUserDialogProps {
 }
 
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
-  const [isDragging, setIsDragging] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<CreateUserForm>({
     resolver: zodResolver(createUserSchema) as any,
@@ -89,9 +85,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         avatar_url: avatarUrl,
       };
 
-      console.time("Creación de usuario");
       const newUser = await createUser(payload);
-      console.timeEnd("Creación de usuario");
 
       if (avatarUrl && !newUser.avatar_url) {
         return { ...newUser, avatar_url: avatarUrl };
@@ -116,63 +110,18 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
   const handleClose = () => {
     form.reset();
-    setAvatarPreview(null);
     setAvatarFile(null);
-    setImagePosition({ x: 50, y: 50 });
     setShowPassword(false);
     setShowConfirmPassword(false);
     onOpenChange(false);
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-        setImagePosition({ x: 50, y: 50 });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleRemoveAvatar = () => {
-    setAvatarPreview(null);
-    setAvatarFile(null);
-    setImagePosition({ x: 50, y: 50 });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    setIsDragging(true);
-    e.preventDefault();
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-
-    // Inverted controls
-    const x = 100 - ((e.clientX - rect.left) / rect.width) * 100;
-    const y = 100 - ((e.clientY - rect.top) / rect.height) * 100;
-
-    setImagePosition({
-      x: Math.max(0, Math.min(100, x)),
-      y: Math.max(0, Math.min(100, y)),
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const handleAvatarChange = (file: File | null) => {
+    setAvatarFile(file);
   };
 
   const onSubmit = async (data: CreateUserForm) => {
-    console.time("Validación de usuario");
     const isAvailable = await checkUsernameAvailable(data.username);
-    console.timeEnd("Validación de usuario");
     if (!isAvailable) {
       form.setError('username', {
         type: 'manual',
@@ -204,52 +153,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="flex flex-col items-center gap-3">
-              {!avatarPreview ? (
-                <label className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
-                  <Upload className="w-8 h-8 text-gray-400" />
-                  <span className="text-xs text-gray-500 mt-2">Subir avatar</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              ) : (
-                <div className="relative">
-                  <div
-                    ref={containerRef}
-                    className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-300 cursor-move"
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                  >
-                    <img
-                      ref={imageRef}
-                      src={avatarPreview}
-                      alt="Avatar preview"
-                      className="w-full h-full object-cover"
-                      style={{
-                        objectPosition: `${imagePosition.x}% ${imagePosition.y}%`,
-                      }}
-                      draggable={false}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Arrastra para centrar
-                  </p>
-                </div>
-              )}
-            </div>
+            <AvatarUpload
+              onChange={handleAvatarChange}
+            />
 
             <FormField
               control={form.control}
