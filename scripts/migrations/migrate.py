@@ -472,6 +472,112 @@ def migrate_cash_movements(conn):
     print(f"✅ Cash Movements migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
 
 # ==========================================
+# PHASE 5.1: SALES (VENTASTICKETS)
+# ==========================================
+def migrate_sales(conn):
+    print("\n--- Migrating Sales (VentasTickets) ---")
+    
+    sale_files = glob.glob(os.path.join(CSV_DIR, 'VENTATICKETS_*.csv'))
+    
+    if not sale_files:
+        print("⚠️ No file matching VENTATICKETS_*.csv was found.")
+        return
+    
+    csv_file = sale_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    
+    fallback_user_id = list(user_map.values())[0] if user_map else None
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            old_id = row['ID'].strip()
+            new_uuid = str(uuid.uuid4())
+            
+            if not old_id:
+                skipped_records += 1
+                continue
+                
+            # --- DATA CLEANING & FORMATTING ---
+            # Pad folio with zeros to reach 8 characters
+            old_folio = row['FOLIO'].strip()
+            folio = old_folio.zfill(8)
+            
+            sale_date = row['VENDIDO_EN'].strip()
+            created_at = row['CREADO_EN'].strip()
+            if not sale_date:
+                sale_date = created_at
+                
+            subtotal = safe_float(row['SUBTOTAL'])
+            total = safe_float(row['TOTAL'])
+            
+            # Form of payment mapping ('e' = efectivo, 't' = tarjeta, 'c' = credito)
+            old_payment_method = row['FORMA_PAGO'].strip().lower()
+            if old_payment_method == 'e':
+                payment_method = 'cash'
+                cash_amount = total
+                card_transfer_amount = 0.0
+            elif old_payment_method == 't':
+                payment_method = 'card' # Or 'transfer', we will standardize to card
+                cash_amount = 0.0
+                card_transfer_amount = total
+            elif old_payment_method == 'c':
+                payment_method = 'credit'
+                cash_amount = 0.0
+                card_transfer_amount = 0.0
+            else:
+                payment_method = 'cash' # Fallback
+                cash_amount = total
+                card_transfer_amount = 0.0
+                
+            notes = row['NOTAS'].strip() if row['NOTAS'].strip() else None
+            
+            # Handle cancellations
+            is_cancelled = row['ESTA_CANCELADO'].strip().lower() in ['t', 'true', '1']
+            status = 'cancelled' if is_cancelled else 'completed'
+            cancelled_at = sale_date if is_cancelled else None
+            
+            # --- RELATIONSHIP MAPPING ---
+            old_customer_id = row['CLIENTE_ID'].strip()
+            customer_id = customer_map.get(old_customer_id) if old_customer_id else None
+            
+            old_user_id = row['CAJERO_ID'].strip()
+            user_id = user_map.get(old_user_id, fallback_user_id)
+            
+            old_shift_id = row['OPERACION_ID'].strip()
+            shift_id = shift_map.get(old_shift_id)
+            
+            # Save to memory map for Sale Items phase
+            sale_map[old_id] = new_uuid
+            
+            # --- SQLITE INSERTION ---
+            try:
+                cursor.execute("""
+                    INSERT INTO sales (
+                        id, folio, sale_date, subtotal, total, 
+                        status, customer_id, user_id, cash_register_shift_id, 
+                        payment_method, cash_amount, card_transfer_amount, 
+                        notes, created_at, updated_at, cancelled_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, folio, sale_date, subtotal, total,
+                    status, customer_id, user_id, shift_id,
+                    payment_method, cash_amount, card_transfer_amount,
+                    notes, created_at, created_at, cancelled_at
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting sale Folio '{folio}': {e}")
+
+    conn.commit()
+    print(f"✅ Sales migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -489,6 +595,7 @@ def main():
         migrate_products(conn)
         migrate_shifts(conn)
         migrate_cash_movements(conn)
+        migrate_sales(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
