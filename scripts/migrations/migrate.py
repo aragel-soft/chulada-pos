@@ -181,6 +181,63 @@ def migrate_users(conn):
     print(f"✅ Users migration completed: {inserted_records} records inserted.")
 
 # ==========================================
+# PHASE 1.2: CATEGORIES (DEPARTAMENTOS)
+# ==========================================
+def migrate_categories(conn):
+    print("\n--- Migrating Categories (Departamentos) ---")
+    
+    # We use glob to find the file regardless of the timestamp
+    category_files = glob.glob(os.path.join(CSV_DIR, 'DEPARTAMENTOS_*.csv'))
+    
+    if not category_files:
+        print("⚠️ No file matching DEPARTAMENTOS_*.csv was found.")
+        return
+    
+    csv_file = category_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_id = row['ID'].strip()
+            
+            # --- DATA CLEANING ---
+            name = row['NOMBRE'].strip()
+            is_active = 1 if row['ACTIVO'].strip() == '1' else 0
+            
+            # Clean up the name for soft-deleted categories
+            if "(Eliminado" in name:
+                # We split by "(Eliminado" and keep the first part to have a clean name
+                name = name.split("(Eliminado")[0].strip()
+                is_active = 0  # Double-check that it is inactive
+                
+            # --- MAP STORAGE ---
+            # Save to memory map for the Products phase! This is critical.
+            category_map[old_id] = new_uuid
+            
+            # --- SQLITE INSERTION ---
+            try:
+                # We only insert id, name and is_active. 
+                # sequence, created_at, updated_at will take their SQLite DEFAULT values.
+                # parent_category_id will be NULL since the old system has a flat hierarchy.
+                cursor.execute("""
+                    INSERT INTO categories (
+                        id, name, is_active
+                    ) VALUES (?, ?, ?)
+                """, (new_uuid, name, is_active))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting category '{name}' (Old ID: {old_id}): {e}")
+
+    conn.commit()
+    print(f"✅ Categories migration completed: {inserted_records} records inserted.")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -194,6 +251,7 @@ def main():
         # Execute phases
         migrate_customers(conn)
         migrate_users(conn)
+        migrate_categories(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
