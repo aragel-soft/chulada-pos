@@ -16,6 +16,16 @@ export const businessSettingsSchema = z.object({
     .max(100, "Máximo 100%"),
   applyTax: z.boolean(),
   allowOutOfStockSales: z.boolean(),
+  discountPresetOptions: z.string().min(1, "Agrega al menos una opción de descuento"),
+  maxDiscountPercentage: z
+    .number()
+    .min(1, "Debe ser al menos 1%")
+    .max(100, "No puede ser mayor a 100%"),
+  maxOpenTickets: z
+    .number()
+    .int("Debe ser un número entero")
+    .min(1, "Mínimo 1 ticket")
+    .max(20, "Máximo 20 tickets"),
 });
 
 export type BusinessSettingsFormValues = z.infer<typeof businessSettingsSchema>;
