@@ -50,3 +50,4 @@ coverage/
 
 # Migrations
 scripts/migrations/*.csv
+scripts/migrations/*.db
