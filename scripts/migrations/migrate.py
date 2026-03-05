@@ -472,7 +472,7 @@ def migrate_cash_movements(conn):
     print(f"✅ Cash Movements migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
 
 # ==========================================
-# PHASE 5.1: SALES (VENTASTICKETS)
+# PHASE 7: SALES (VENTASTICKETS)
 # ==========================================
 def migrate_sales(conn):
     print("\n--- Migrating Sales (VentasTickets) ---")
@@ -578,6 +578,93 @@ def migrate_sales(conn):
     print(f"✅ Sales migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
 
 # ==========================================
+# PHASE 8: SALE ITEMS (VENTATICKETS_ARTICULOS)
+# ==========================================
+def migrate_sale_items(conn):
+    print("\n--- Migrating Sale Items (Artículos de Ventas) ---")
+    
+    item_files = glob.glob(os.path.join(CSV_DIR, 'VENTATICKETS_ARTICULOS_*.csv'))
+    
+    if not item_files:
+        print("⚠️ No file matching VENTATICKETS_ARTICULOS_*.csv was found.")
+        return
+    
+    csv_file = item_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    
+    # Fallback product for items that were permanently deleted in the old system 
+    # but still exist in the sales history.
+    fallback_product_id = list(product_map.values())[0] if product_map else None
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_ticket_id = row['TICKET_ID'].strip()
+            old_product_code = row['PRODUCTO_CODIGO'].strip()
+            
+            # 1. Resolve Sale ID
+            sale_id = sale_map.get(old_ticket_id)
+            if not sale_id:
+                # If the parent sale doesn't exist (maybe skipped), we can't insert the item
+                skipped_records += 1
+                continue
+                
+            # 2. Resolve Product ID
+            product_id = product_map.get(old_product_code, fallback_product_id)
+            if not product_id:
+                skipped_records += 1
+                continue
+            
+            # --- DATA CLEANING & TRANSFORMATION ---
+            product_name = row['PRODUCTO_NOMBRE'].strip()
+            product_code = old_product_code
+            
+            quantity = safe_float(row['CANTIDAD'])
+            unit_price = safe_float(row['PRECIO_USADO'])
+            
+            is_wholesale = row['USA_MAYOREO'].strip().lower() in ['t', 'true', '1']
+            price_type = 'wholesale' if is_wholesale else 'retail'
+            
+            discount_percentage = safe_float(row['PORCENTAJE_DESCUENTO'])
+            
+            # Subtotal is unit_price * quantity
+            subtotal = unit_price * quantity
+            
+            # Calculate discount amount and total
+            discount_amount = subtotal * (discount_percentage / 100)
+            total = subtotal - discount_amount
+            
+            created_at = row['PAGADO_EN'].strip()
+            if not created_at:
+                created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # --- SQLITE INSERTION ---
+            try:
+                cursor.execute("""
+                    INSERT INTO sale_items (
+                        id, sale_id, product_id, product_name, product_code,
+                        quantity, unit_price, price_type, discount_percentage,
+                        discount_amount, subtotal, total, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, sale_id, product_id, product_name, product_code,
+                    quantity, unit_price, price_type, discount_percentage,
+                    discount_amount, subtotal, total, created_at
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting item for Ticket '{old_ticket_id}': {e}")
+
+    conn.commit()
+    print(f"✅ Sale Items migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -596,6 +683,7 @@ def main():
         migrate_shifts(conn)
         migrate_cash_movements(conn)
         migrate_sales(conn)
+        migrate_sale_items(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
