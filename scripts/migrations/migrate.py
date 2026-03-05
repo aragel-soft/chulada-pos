@@ -665,6 +665,85 @@ def migrate_sale_items(conn):
     print(f"✅ Sale Items migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
 
 # ==========================================
+# PHASE 9: DEBT PAYMENTS (ABONOS)
+# ==========================================
+def migrate_debt_payments(conn):
+    print("\n--- Migrating Debt Payments (Abonos) ---")
+    
+    payment_files = glob.glob(os.path.join(CSV_DIR, 'ABONOS_*.csv'))
+    
+    if not payment_files:
+        print("⚠️ No file matching ABONOS_*.csv was found.")
+        return
+    
+    csv_file = payment_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    
+    # Use the default system Admin UUID as the fallback user
+    fallback_user_id = '450e8400-e29b-41d4-a716-446655440001'
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_id = row['ID'].strip()
+            
+            # --- DATA CLEANING & TRANSFORMATION ---
+            # Use the old ID as the folio, padded with zeros (e.g., '00000073')
+            folio = old_id.zfill(8)
+            
+            old_customer_id = row['CLIENTE_ID'].strip()
+            customer_id = customer_map.get(old_customer_id)
+            
+            if not customer_id:
+                # Can't migrate a payment without a valid customer mapping
+                skipped_records += 1
+                continue
+            
+            # Format: '2024-02-09' -> We use it for both payment_date and created_at
+            payment_date = row['DTFECHA'].strip()
+            if not payment_date:
+                payment_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # Append time so it's a valid timestamp if it only brings the date
+                if len(payment_date) <= 10:
+                    payment_date = f"{payment_date} 12:00:00"
+            
+            amount = safe_float(row['DMONTO'])
+            
+            # We assume all historical payments were in cash 
+            payment_method = 'cash'
+            cash_amount = amount
+            card_transfer_amount = 0.0
+            
+            notes = "Migrado del sistema anterior"
+            
+            # --- SQLITE INSERTION ---
+            try:
+                cursor.execute("""
+                    INSERT INTO debt_payments (
+                        id, folio, customer_id, amount, payment_date, 
+                        payment_method, user_id, notes, created_at,
+                        cash_amount, card_transfer_amount
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, folio, customer_id, amount, payment_date,
+                    payment_method, fallback_user_id, notes, payment_date,
+                    cash_amount, card_transfer_amount
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting Payment Folio '{folio}': {e}")
+
+    conn.commit()
+    print(f"✅ Debt Payments migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
+# ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
 def main():
@@ -684,6 +763,7 @@ def main():
         migrate_cash_movements(conn)
         migrate_sales(conn)
         migrate_sale_items(conn)
+        migrate_debt_payments(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
