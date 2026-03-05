@@ -743,6 +743,152 @@ def migrate_debt_payments(conn):
     conn.commit()
     print(f"✅ Debt Payments migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
 
+# ============================================================================================
+# PHASE 10: INVENTORY HISTORY (HISTORIAL DE MOVIMIENTOS) AND CURRENT STOCK (STORE INVENTORY)
+# ============================================================================================
+def migrate_inventory_history(conn):
+    print("\n--- Migrating Inventory History ---")
+    
+    history_files = glob.glob(os.path.join(CSV_DIR, 'HISTORIAL_INVENTARIO_*.csv'))
+    
+    if not history_files:
+        print("⚠️ No file matching HISTORIAL_INVENTARIO_*.csv was found.")
+        return
+        
+    csv_file = history_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    
+    fallback_user_id = '450e8400-e29b-41d4-a716-446655440001'
+    store_id = 'store-main' # Adjust if you implement multi-store in the future
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_product_code = row['CODIGO_PRODUCTO'].strip()
+            
+            product_id = product_map.get(old_product_code)
+            if not product_id:
+                skipped_records += 1
+                continue
+                
+            old_user_id = row['USUARIO_ID'].strip()
+            user_id = user_map.get(old_user_id, fallback_user_id)
+            
+            created_at = row['CUANDO_FUE'].strip()
+            if not created_at:
+                created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+            old_type = row['TIPO'].strip().lower()
+            raw_qty = safe_float(row['CANTIDAD'])
+            previous_stock_float = safe_float(row['HABIA'])
+            
+            # --- MAP MOVEMENT TYPE AND REASON ---
+            movement_type = 'IN'
+            reason = 'Ajuste'
+            
+            if old_type == 'e':
+                movement_type = 'IN'
+                reason = 'Entrada'
+            elif old_type == 's':
+                movement_type = 'OUT'
+                reason = 'Salida'
+            elif old_type == 'v':
+                movement_type = 'OUT'
+                reason = 'Venta'
+            elif old_type == 'd':
+                movement_type = 'IN'
+                reason = 'Devolución'
+            elif old_type == 'a':
+                # Adjustments can be positive or negative
+                if raw_qty < 0:
+                    movement_type = 'OUT'
+                    reason = 'Ajuste'
+                    raw_qty = abs(raw_qty) # Store absolute value
+                else:
+                    movement_type = 'IN'
+                    reason = 'Ajuste'
+            
+            # Convert to integers to match schema requirements
+            qty = int(raw_qty)
+            previous_stock = int(previous_stock_float)
+            
+            if movement_type == 'IN':
+                new_stock = previous_stock + qty
+            else:
+                new_stock = previous_stock - qty
+                
+            # --- SQLITE INSERTION ---
+            try:
+                cursor.execute("""
+                    INSERT INTO inventory_movements (
+                        id, product_id, store_id, user_id, type, reason,
+                        quantity, previous_stock, new_stock, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, product_id, store_id, user_id, movement_type, reason,
+                    qty, previous_stock, new_stock, created_at
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting movement for Product Code '{old_product_code}': {e}")
+
+    conn.commit()
+    print(f"✅ Inventory History migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
+def migrate_store_inventory(conn):
+    print("\n--- Migrating Current Store Inventory ---")
+    
+    product_files = glob.glob(os.path.join(CSV_DIR, 'PRODUCTOS_*.csv'))
+    
+    if not product_files:
+        print("⚠️ No file matching PRODUCTOS_*.csv was found.")
+        return
+        
+    csv_file = product_files[0]
+    print(f"📄 Reading file: {csv_file}")
+    
+    cursor = conn.cursor()
+    inserted_records = 0
+    skipped_records = 0
+    store_id = 'store-main' 
+    
+    with open(csv_file, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            new_uuid = str(uuid.uuid4())
+            old_code = row['CODIGO'].strip()
+            
+            product_id = product_map.get(old_code)
+            if not product_id:
+                skipped_records += 1
+                continue
+            
+            stock = int(safe_float(row['DINVENTARIO']))
+            min_stock_raw = row.get('DINVMINIMO', '5')
+            min_stock = int(safe_float(min_stock_raw, 5.0))
+            
+            try:
+                cursor.execute("""
+                    INSERT INTO store_inventory (
+                        id, store_id, product_id, stock, minimum_stock
+                    ) VALUES (?, ?, ?, ?, ?)
+                """, (
+                    new_uuid, store_id, product_id, stock, min_stock
+                ))
+                inserted_records += 1
+            except sqlite3.IntegrityError as e:
+                print(f"❌ Integrity error inserting store inventory for Product Code '{old_code}': {e}")
+
+    conn.commit()
+    print(f"✅ Store Inventory migration completed: {inserted_records} records inserted. ({skipped_records} skipped)")
+
 # ==========================================
 # MAIN ORCHESTRATOR
 # ==========================================
@@ -764,6 +910,8 @@ def main():
         migrate_sales(conn)
         migrate_sale_items(conn)
         migrate_debt_payments(conn)
+        migrate_inventory_history(conn)
+        migrate_store_inventory(conn)
         
         conn.close()
         print("\n🎉 Migration process finished successfully.")
