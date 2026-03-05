@@ -344,24 +344,19 @@ pub fn get_products(
 
     let mut data_params: Vec<Box<dyn ToSql>> = Vec::new();
     
-    // 1er param: ? de fuzzy_distance en SELECT
     if is_fuzzy_search {
         data_params.push(Box::new(search_term_param));
     }
     
-    // 2do param: ? store_id
     data_params.push(Box::new(store_id));
     
-    // 3er..nth param: params generados por el WHERE 
     for p in dq.params {
         data_params.push(p);
     }
     
-    // Ultimos 2: limit y offset
     data_params.push(Box::new(limit));
     data_params.push(Box::new(offset));
 
-    // Convertir el vec de Box<dyn ToSql> a vec de &dyn ToSql
     let sql_params: Vec<&dyn ToSql> = data_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;

@@ -26,8 +26,6 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
     let mut conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
-    // --- BÚSQUEDA DIFUSA (FUZZY SEARCH) ---
-    // Registramos la función 'fuzzy_match' para calcular la distancia de Levenshtein
     conn.create_scalar_function(
         "fuzzy_match",
         2,
@@ -36,7 +34,6 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
             let s1_raw = ctx.get::<String>(0)?;
             let s2_raw = ctx.get::<String>(1)?;
             
-            // Normalize: quitamos acentos y pasamos a minúsculas
             let s1 = deunicode(&s1_raw).to_lowercase();
             let s2 = deunicode(&s2_raw).to_lowercase();
             
@@ -47,11 +44,9 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
             
             let parts1: Vec<&str> = s1.split_whitespace().collect();
             if parts1.is_empty() {
-                return Ok(s2.len() as i32); // Si s1 está vacío, la distancia es el largo de s2
+                return Ok(s2.len() as i32);
             }
-
-            // Para cada palabra de la búsqueda (s2), buscamos su mejor coincidencia en el texto (s1)
-            // y sumamos las distancias de cada mejor coincidencia.
+            
             let mut total_distance = 0;
 
             for word2 in &parts2 {
