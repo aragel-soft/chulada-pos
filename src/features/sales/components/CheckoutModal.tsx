@@ -119,7 +119,7 @@ export function CheckoutModal({
   useEffect(() => {
     if (isOpen) {
       setMethod("cash");
-      setCashAmount(variant === "sale" ? total.toString() : "");
+      setCashAmount(variant === "sale" ? total.toFixed(2) : "");
       setCardAmount("");
       setNotes("");
       setSelectedCustomer(null);
@@ -176,17 +176,17 @@ export function CheckoutModal({
   useEffect(() => {
     if (method === "card_transfer") {
       if (variant === "sale") {
-        setCardAmount(remainingTotal.toString());
+        setCardAmount(remainingTotal.toFixed(2));
         setCashAmount("0");
       } else {
-        const valToMove = numericCash > 0 ? numericCash.toString() : "";
+        const valToMove = numericCash > 0 ? numericCash.toFixed(2) : "";
         setCardAmount(valToMove);
         setCashAmount("0");
       }
     } else if (method === "cash") {
       setCardAmount("0");
       if (variant === "debt" && numericCard > 0) {
-        setCashAmount(numericCard.toString());
+        setCashAmount(numericCard.toFixed(2));
       }
     }
   }, [method, variant]);
@@ -205,12 +205,12 @@ export function CheckoutModal({
   useEffect(() => {
     if (variant !== "sale" || !voucherData) return;
     if (method === "cash") {
-      setCashAmount(remainingTotal.toString());
+      setCashAmount(remainingTotal.toFixed(2));
     } else if (method === "card_transfer") {
-      setCardAmount(remainingTotal.toString());
+      setCardAmount(remainingTotal.toFixed(2));
     } else if (method === "mixed") {
       setCashAmount("");
-      setCardAmount(remainingTotal.toString());
+      setCardAmount(remainingTotal.toFixed(2));
     }
   }, [voucherAppliedAmount]);
 
@@ -673,7 +673,7 @@ export function CheckoutModal({
                           className="w-full bg-red-600 hover:bg-red-700 font-bold"
                           onClick={() => {
                             const newTotal = onClearRestrictions?.() ?? total;
-                            setCashAmount(newTotal.toString());
+                            setCashAmount(newTotal.toFixed(2));
                           }}
                         >
                           Remover promociones y continuar

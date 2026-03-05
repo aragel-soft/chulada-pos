@@ -33,7 +33,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -332,18 +332,10 @@ export function BulkEditProductDialog({
                         <FormItem>
                           <FormLabel className="!text-foreground">Precio Menudeo</FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1.5 text-muted-foreground">
-                                $
-                              </span>
-                                <Input
-                                  type="number"
-                                  step="0.50"
-                                  placeholder={isMixed("wholesale_price") ? "Varios..." : "0.00" }
-                                  className="pl-7"
-                                  {...field}
-                                />
-                            </div>
+                            <MoneyInput
+                              placeholder={isMixed("retail_price") ? "Varios..." : "0.00"}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -357,18 +349,10 @@ export function BulkEditProductDialog({
                         <FormItem>
                           <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1.5 text-muted-foreground">
-                                $
-                              </span>
-                                <Input
-                                  type="number"
-                                  step="0.50"
-                                  placeholder={isMixed("wholesale_price") ? "Varios..." : "0.00" }
-                                  className="pl-7"
-                                  {...field}
-                                />
-                              </div>
+                            <MoneyInput
+                              placeholder={isMixed("wholesale_price") ? "Varios..." : "0.00"}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

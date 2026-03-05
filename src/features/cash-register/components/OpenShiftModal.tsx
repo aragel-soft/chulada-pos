@@ -25,7 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -139,17 +139,11 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
                   <FormItem>
                     <FormLabel>Fondo Inicial</FormLabel>
                     <FormControl>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3 text-gray-500 font-bold text-lg">$</span>
-                        <Input
-                          className="pl-8 text-lg font-medium"
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          {...field}
-                          onKeyDown={handleKeyDown}
-                        />
-                      </div>
+                      <MoneyInput
+                        className="text-lg font-medium"
+                        {...field}
+                        onKeyDown={handleKeyDown}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
