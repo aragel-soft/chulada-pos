@@ -18,7 +18,7 @@ export function AvatarUpload({
   outputSize = 256,
   className,
 }: AvatarUploadProps) {
-  const [rawFile, setRawFile] = useState<File | null>(null);
+
   const [rawPreview, setRawPreview] = useState<string | null>(null);
   const [hasExisting, setHasExisting] = useState(!!existingPath);
 
@@ -52,7 +52,6 @@ export function AvatarUpload({
     const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) return;
 
-    setRawFile(file);
     setHasExisting(false);
     resetCrop();
 
@@ -64,7 +63,6 @@ export function AvatarUpload({
   };
 
   const handleRemove = () => {
-    setRawFile(null);
     setRawPreview(null);
     setHasExisting(false);
     resetCrop();
