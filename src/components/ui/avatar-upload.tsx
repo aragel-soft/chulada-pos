@@ -97,11 +97,7 @@ export function AvatarUpload({
     setIsDragging(false);
   }, [isDragging]);
 
-  useEffect(() => {
-    if (isEditing && !isDragging && imgNatural.w > 0) {
-      cropAndEmit();
-    }
-  }, [isDragging]);
+
 
   const handleWheel = (e: React.WheelEvent) => {
     if (!isEditing) return;
@@ -110,12 +106,7 @@ export function AvatarUpload({
     setScale((prev) => Math.max(0.5, Math.min(3, prev + delta)));
   };
 
-  useEffect(() => {
-    if (isEditing && imgNatural.w > 0) {
-      const timer = setTimeout(() => cropAndEmit(), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [scale]);
+
 
   const zoomIn = () => setScale((prev) => Math.min(3, prev + 0.15));
   const zoomOut = () => setScale((prev) => Math.max(0.5, prev - 0.15));
@@ -199,13 +190,17 @@ export function AvatarUpload({
     );
   }, [scale, position, size, outputSize, imgNatural, onChange]);
 
+  useEffect(() => {
+    if (isEditing && !isDragging && imgNatural.w > 0) {
+      const timer = setTimeout(() => cropAndEmit(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing, isDragging, imgNatural.w, imgNatural.h, scale, cropAndEmit]);
+
   const handleImageLoad = () => {
     const img = imageRef.current;
     if (!img) return;
     setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    if (isEditing) {
-      setTimeout(() => cropAndEmit(), 100);
-    }
   };
 
   return (
