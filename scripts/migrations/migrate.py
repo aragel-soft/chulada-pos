@@ -94,7 +94,7 @@ def migrate_customers(conn):
                         credit_limit, current_balance, is_active
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
                 """, (
-                    new_uuid, old_id, name, phone, address, 
+                    new_uuid, f"C-{old_id}", name, phone, address, 
                     credit_limit, current_balance
                 ))
                 inserted_records += 1
