@@ -6,6 +6,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (user: User) => void;
   logout: () => void;
+  updateUser: (data: Partial<User>) => void;
   can: (permission: string) => boolean;
 }
 
@@ -19,6 +20,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   logout: () => {
     set({ user: null, isAuthenticated: false });
+  },
+
+  updateUser: (data: Partial<User>) => {
+    const { user } = get();
+    if (user) {
+      set({ user: { ...user, ...data } });
+    }
   },
 
   // Lógica para verificar permisos
