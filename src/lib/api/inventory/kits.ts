@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams, PaginatedResponse } from "@/types/pagination";
-import { CreateKitPayload, KitDetails, KitListItem, KitDefinitionWithTrigger } from "@/types/kits";
+import { CreateKitPayload, KitDetails, KitListItem, KitDefinitionWithTrigger, ProductConflict } from "@/types/kits";
 
 export const getKits = async (params: PaginationParams): Promise<PaginatedResponse<KitListItem>> => {
   try {
@@ -32,7 +32,7 @@ export const getKitDetails = async (kitId: string): Promise<KitDetails> => {
   }
 };
 
-export const checkProductsInActiveKits = async (productIds: string[], excludeKitId?: string): Promise<string[]> => {
+export const checkProductsInActiveKits = async (productIds: string[], excludeKitId?: string): Promise<ProductConflict[]> => {
   try {
     return await invoke("check_products_in_active_kits", { productIds, excludeKitId });
   } catch (error) {
