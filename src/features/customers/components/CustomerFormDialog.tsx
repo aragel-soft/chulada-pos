@@ -39,7 +39,7 @@ import { Textarea } from "@/components/ui/text-area";
 import { MoneyInput } from "@/components/ui/money-input";
 
 import { Customer, CustomerInput, isRestoreError, RestoreRequiredError } from "@/types/customers";
-import { customerSchema, CustomerFormValues } from "@/features/customers/schemas/customerSchema";
+import { createCustomerSchema, CustomerFormValues } from "@/features/customers/schemas/customerSchema";
 import { upsertCustomer, restoreCustomer } from "@/lib/api/customers";
 import { CUSTOMER_CONFIG } from "@/config/constants";
 import { Label } from "@/components/ui/label";
@@ -67,9 +67,10 @@ export function CustomerFormDialog({
   const [restoreError, setRestoreError] = useState<RestoreRequiredError["payload"] | null>(null);
 
   const isEditing = !!customerToEdit;
+  const maxLimit = CUSTOMER_CONFIG.MAX_CREDIT_LIMIT;
 
   const form = useForm<CustomerFormValues>({
-    resolver: zodResolver(customerSchema) as any,
+    resolver: zodResolver(createCustomerSchema(maxLimit)) as any,
     defaultValues: {
       name: "",
       phone: "",

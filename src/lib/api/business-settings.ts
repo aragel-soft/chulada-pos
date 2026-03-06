@@ -14,6 +14,8 @@ export interface BusinessSettings {
   logoPath: string;
   logicalStoreName: string;
   allowOutOfStockSales: boolean;
+  defaultCreditLimit: number;
+  maxCreditLimit: number;
   discountPresetOptions: string;
   maxDiscountPercentage: number;
   maxOpenTickets: number;
