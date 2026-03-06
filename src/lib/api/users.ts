@@ -35,6 +35,7 @@ export async function getUsersList(params: PaginationParams): Promise<PaginatedR
       search: params.search || null,
       sortBy: params.sortBy || null,
       sortOrder: params.sortOrder || null,
+      includeDeleted: params.includeDeleted || false,
     });
   } catch (error) {
     throw error;

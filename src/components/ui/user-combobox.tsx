@@ -40,7 +40,7 @@ export function UserCombobox({
   const { data: users = [] } = useQuery({
     queryKey: ["users-list-filter"],
     queryFn: async () => {
-      const res = await getUsersList({ page: 1, pageSize: 1000 });
+      const res = await getUsersList({ page: 1, pageSize: 1000, includeDeleted: true });
       return res.data;
     },
     staleTime: 1000 * 60 * 10,

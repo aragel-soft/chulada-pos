@@ -37,11 +37,20 @@ pub fn get_users_list(
     search: Option<String>,
     sort_by: Option<String>,
     sort_order: Option<String>,
+    include_deleted: Option<bool>,
 ) -> Result<PaginatedResponse<UserView>, String> {
     let conn = db_state.lock().map_err(|e| e.to_string())?;
 
+    let show_deleted = include_deleted.unwrap_or(false);
+
     let search_term = search.as_ref().map(|s| format!("%{}%", s));
     let has_search = search.is_some() && !search.as_ref().unwrap().is_empty();
+
+    let deleted_clause = if show_deleted {
+        "1=1"
+    } else {
+        "u.deleted_at IS NULL"
+    };
 
     let search_clause = if has_search {
         " AND (u.full_name LIKE :search OR u.username LIKE :search OR r.display_name LIKE :search)"
@@ -51,8 +60,8 @@ pub fn get_users_list(
 
     // Count total
     let count_sql = format!(
-        "SELECT COUNT(*) FROM users u JOIN roles r ON u.role_id = r.id WHERE u.deleted_at IS NULL{}",
-        search_clause
+        "SELECT COUNT(*) FROM users u JOIN roles r ON u.role_id = r.id WHERE {}{}",
+        deleted_clause, search_clause
     );
 
     let total: i64 = if has_search {
@@ -93,11 +102,11 @@ pub fn get_users_list(
             u.is_active
         FROM users u
         JOIN roles r ON u.role_id = r.id
-        WHERE u.deleted_at IS NULL
+        WHERE {}
         {}
         ORDER BY {} {}
         LIMIT :limit OFFSET :offset",
-        search_clause, order_column, order_direction
+        deleted_clause, search_clause, order_column, order_direction
     );
 
     let limit = page_size;
