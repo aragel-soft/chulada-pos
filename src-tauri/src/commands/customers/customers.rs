@@ -207,14 +207,14 @@ pub fn get_customers(
   let has_search = !search_trimmed.is_empty();
   let search_len = search_trimmed.len();
   let use_fuzzy = has_search && search_len >= 3;
-  let fuzzy_threshold = if search_len <= 4 { 1 } else if search_len <= 7 { 2 } else { 3 };
+  let fuzzy_threshold = if search_len <= 4 { 20 } else if search_len <= 7 { 40 } else { 60 };
 
   let like_pattern = format!("%{}%", search_trimmed);
 
   let where_clause = if has_search {
     if use_fuzzy {
       format!(
-        "WHERE deleted_at IS NULL AND (lower(name) LIKE '{}' OR phone LIKE '{}' OR lower(code) LIKE '{}' OR lower(id) LIKE '{}' OR fuzzy_match(name, '{}') <= {})",
+        "WHERE deleted_at IS NULL AND (lower(name) LIKE '{}' OR phone LIKE '{}' OR lower(code) LIKE '{}' OR lower(id) LIKE '{}' OR fuzzy_match(name, '{}', 0.4) <= {})",
         like_pattern.replace("'", "''").to_lowercase(),
         like_pattern.replace("'", "''"),
         like_pattern.replace("'", "''").to_lowercase(),
@@ -257,7 +257,7 @@ pub fn get_customers(
   };
 
   let order_sql = if use_fuzzy && sort_by.is_none() {
-    format!("ORDER BY fuzzy_match(name, '{}') ASC", search_trimmed.replace("'", "''"))
+    format!("ORDER BY fuzzy_match(name, '{}', 0.4) ASC", search_trimmed.replace("'", "''"))
   } else if sort_column == "default_debt_priority" {
     "ORDER BY current_balance DESC, name ASC".to_string()
   } else {

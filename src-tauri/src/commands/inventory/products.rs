@@ -179,7 +179,7 @@ pub fn get_products(
                 p.code LIKE ? OR 
                 p.barcode LIKE ? OR 
                 c.name LIKE ? OR
-                fuzzy_match(p.name, ?) <= 3
+                fuzzy_match(p.name, ?, 0.4) <= 40
             )");
             let pattern = format!("%{}%", s);
             
@@ -304,7 +304,7 @@ pub fn get_products(
     let search_term_param = search.clone().unwrap_or_default();
     
     let fuzzy_distance_select = if is_fuzzy_search {
-        "fuzzy_match(p.name, ?) as fuzzy_distance,"
+        "fuzzy_match(p.name, ?, 0.4) as fuzzy_distance,"
     } else {
         "0 as fuzzy_distance,"
     };

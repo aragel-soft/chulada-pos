@@ -118,7 +118,7 @@ pub async fn get_categories(
     let has_search = !search_trimmed.is_empty();
     let search_len = search_trimmed.len();
     let use_fuzzy = has_search && search_len >= 3;
-    let fuzzy_threshold = if search_len <= 4 { 1 } else if search_len <= 7 { 2 } else { 3 };
+    let fuzzy_threshold = if search_len <= 4 { 20 } else if search_len <= 7 { 40 } else { 60 };
 
     let escaped_like = format!("%{}%", search_trimmed).replace("'", "''");
     let escaped_search = search_trimmed.replace("'", "''");
@@ -127,7 +127,7 @@ pub async fn get_categories(
         if use_fuzzy {
             format!(
                 r#" AND (
-                    (c.name LIKE '{}' OR c.description LIKE '{}' OR fuzzy_match(c.name, '{}') <= {})
+                    (c.name LIKE '{}' OR c.description LIKE '{}' OR fuzzy_match(c.name, '{}', 0.4) <= {})
                     OR c.id IN (SELECT parent_category_id FROM categories sub WHERE sub.deleted_at IS NULL AND (sub.name LIKE '{}' OR sub.description LIKE '{}'))
                     OR c.parent_category_id IN (SELECT id FROM categories parent WHERE parent.deleted_at IS NULL AND (parent.name LIKE '{}' OR parent.description LIKE '{}'))
                 )"#,
@@ -175,7 +175,7 @@ pub async fn get_categories(
 
     let order_clause = if use_fuzzy && sort_by.is_none() {
         format!(
-            "ORDER BY fuzzy_match(c.name, '{}') ASC, c.name ASC",
+            "ORDER BY fuzzy_match(c.name, '{}', 0.4) ASC, c.name ASC",
             escaped_search
         )
     } else {
