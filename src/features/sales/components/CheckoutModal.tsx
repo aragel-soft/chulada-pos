@@ -696,11 +696,6 @@ export function CheckoutModal({
                                       <span className="font-semibold">
                                         {selectedCustomer.name}
                                       </span>
-                                      {selectedCustomer.code && (
-                                        <span className="text-muted-foreground font-bold text-sm">
-                                          ({selectedCustomer.code})
-                                        </span>
-                                      )}
                                     </div>
                                     {selectedCustomer.phone && (
                                       <CopyablePhone
@@ -767,21 +762,12 @@ export function CheckoutModal({
                                           <div className="flex flex-col flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                               <span className="font-medium">{c.name}</span>
-                                              <span className="text-xs font-bold text-muted-foreground">
-                                                {`(${c.code})`}
-                                              </span>
                                               <CopyablePhone
                                                 phone={c.phone}
                                                 noCopy={true}
                                                 className="text-xs text-muted-foreground"
                                               />
                                             </div>
-                                            <span className="text-sm text-muted-foreground">
-                                              Saldo:{" "}
-                                              <span className="font-semibold font-bold">
-                                                {formatCurrency(c.current_balance)}
-                                              </span>
-                                            </span>
                                           </div>
                                         </CommandItem>
                                       ))}
@@ -811,13 +797,11 @@ export function CheckoutModal({
                                   {selectedCustomer.code && (
                                     <span>{selectedCustomer.code}</span>
                                   )}
-                                  {selectedCustomer.phone && (
                                     <CopyablePhone
                                       phone={selectedCustomer.phone}
                                       noCopy={true}
                                       className="text-sm"
                                     />
-                                  )}
                                 </div>
                               </div>
                               {isCreditLimitExceeded() ? (
