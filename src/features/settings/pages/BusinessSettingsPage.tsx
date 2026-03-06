@@ -240,9 +240,8 @@ export default function BusinessSettingsPage() {
                           <FormLabel>Fondo de Caja Predeterminado</FormLabel>
                           <FormControl>
                             <MoneyInput
-                              min={0}
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber || 0)}
+                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -260,9 +259,8 @@ export default function BusinessSettingsPage() {
                           <FormLabel>Máximo de Efectivo permitido al iniciar turno</FormLabel>
                           <FormControl>
                             <MoneyInput
-                              min={0}
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber || 0)}
+                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -284,9 +282,8 @@ export default function BusinessSettingsPage() {
                                <FormLabel>Límite por Defecto</FormLabel>
                                <FormControl>
                                  <MoneyInput
-                                   min={0}
                                    {...field}
-                                   onChange={e => field.onChange(e.target.valueAsNumber || 0)}
+                                   onChange={e => field.onChange(e.target.valueAsNumber)}
                                  />
                                </FormControl>
                                <FormMessage />
@@ -301,9 +298,8 @@ export default function BusinessSettingsPage() {
                                <FormLabel>Tope Máximo</FormLabel>
                                <FormControl>
                                  <MoneyInput
-                                   min={0}
                                    {...field}
-                                   onChange={e => field.onChange(e.target.valueAsNumber || 0)}
+                                   onChange={e => field.onChange(e.target.valueAsNumber)}
                                  />
                                </FormControl>
                                <FormMessage />
