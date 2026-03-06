@@ -24,9 +24,6 @@ import {
   BusinessSettingsFormValues,
   businessSettingsSchema,
 } from "@/features/settings/schemas/businessRulesSchema";
-import {
-  BusinessSettings,
-} from "@/lib/api/business-settings";
 import { useBusinessStore } from "@/stores/businessStore";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -89,29 +86,31 @@ export default function BusinessSettingsPage() {
     }
   }, [settings, form]);
 
-  const onSubmit = async () => {
+  const onSubmit = async (data: BusinessSettingsFormValues) => {
     try {
-      const patch: Partial<BusinessSettings> = {};
-      const formValues = form.getValues();
+      const parsedFormValues = businessSettingsSchema.parse(data);
+
+      const patch: Partial<BusinessSettingsFormValues> = {};
       const dirtyFields = form.formState.dirtyFields;
 
-      if (dirtyFields.storeName) patch.storeName = formValues.storeName;
-      if (dirtyFields.logicalStoreName) patch.logicalStoreName = formValues.logicalStoreName;
-      if (dirtyFields.storeAddress) patch.storeAddress = formValues.storeAddress;
-      if (dirtyFields.defaultCashFund) patch.defaultCashFund = formValues.defaultCashFund;
-      if (dirtyFields.maxCashLimit) patch.maxCashLimit = formValues.maxCashLimit;
-      if (dirtyFields.taxRate) patch.taxRate = formValues.taxRate;
-      if (dirtyFields.applyTax) patch.applyTax = formValues.applyTax;
-      if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = formValues.allowOutOfStockSales;
-      if (dirtyFields.defaultCreditLimit) patch.defaultCreditLimit = formValues.defaultCreditLimit;
-      if (dirtyFields.maxCreditLimit) patch.maxCreditLimit = formValues.maxCreditLimit;
-      if (dirtyFields.discountPresetOptions) patch.discountPresetOptions = formValues.discountPresetOptions;
-      if (dirtyFields.maxDiscountPercentage) patch.maxDiscountPercentage = formValues.maxDiscountPercentage;
-      if (dirtyFields.maxOpenTickets) patch.maxOpenTickets = formValues.maxOpenTickets;
+      if (dirtyFields.storeName) patch.storeName = parsedFormValues.storeName;
+      if (dirtyFields.logicalStoreName) patch.logicalStoreName = parsedFormValues.logicalStoreName;
+      if (dirtyFields.storeAddress) patch.storeAddress = parsedFormValues.storeAddress;
+      if (dirtyFields.defaultCashFund) patch.defaultCashFund = parsedFormValues.defaultCashFund;
+      if (dirtyFields.maxCashLimit) patch.maxCashLimit = parsedFormValues.maxCashLimit;
+      if (dirtyFields.taxRate) patch.taxRate = parsedFormValues.taxRate;
+      if (dirtyFields.applyTax) patch.applyTax = parsedFormValues.applyTax;
+      if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = parsedFormValues.allowOutOfStockSales;
+      if (dirtyFields.defaultCreditLimit) patch.defaultCreditLimit = parsedFormValues.defaultCreditLimit;
+      if (dirtyFields.maxCreditLimit) patch.maxCreditLimit = parsedFormValues.maxCreditLimit;
+      if (dirtyFields.discountPresetOptions) patch.discountPresetOptions = parsedFormValues.discountPresetOptions;
+      if (dirtyFields.maxDiscountPercentage) patch.maxDiscountPercentage = parsedFormValues.maxDiscountPercentage;
+      if (dirtyFields.maxOpenTickets) patch.maxOpenTickets = parsedFormValues.maxOpenTickets;
 
       await updateSettings(patch);
+      
 
-      form.reset(formValues);
+      form.reset(parsedFormValues);
 
     } catch (error) {
     }
@@ -241,7 +240,6 @@ export default function BusinessSettingsPage() {
                           <FormControl>
                             <MoneyInput
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -260,7 +258,6 @@ export default function BusinessSettingsPage() {
                           <FormControl>
                             <MoneyInput
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -283,7 +280,6 @@ export default function BusinessSettingsPage() {
                                <FormControl>
                                  <MoneyInput
                                    {...field}
-                                   onChange={e => field.onChange(e.target.valueAsNumber)}
                                  />
                                </FormControl>
                                <FormMessage />
@@ -299,7 +295,6 @@ export default function BusinessSettingsPage() {
                                <FormControl>
                                  <MoneyInput
                                    {...field}
-                                   onChange={e => field.onChange(e.target.valueAsNumber)}
                                  />
                                </FormControl>
                                <FormMessage />
