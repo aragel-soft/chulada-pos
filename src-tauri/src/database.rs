@@ -1,5 +1,7 @@
 use rusqlite::types::ToSql;
-use rusqlite::Connection;
+use rusqlite::{Connection, functions::FunctionFlags};
+use strsim::levenshtein;
+use deunicode::deunicode;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
@@ -23,6 +25,60 @@ pub fn init_database(app_handle: &tauri::AppHandle) -> Result<Connection, Box<dy
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+
+    conn.create_scalar_function(
+        "fuzzy_match",
+        3,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            let s1_raw = ctx.get::<String>(0)?;
+            let s2_raw = ctx.get::<String>(1)?;
+            let threshold = ctx.get::<f64>(2).unwrap_or(0.4);
+
+            let s1 = deunicode(&s1_raw).to_lowercase();
+            let s2 = deunicode(&s2_raw).to_lowercase();
+
+            if s2.is_empty() {
+                return Ok(0);
+            }
+
+            if s1.contains(&s2) {
+                return Ok(0);
+            }
+
+            let parts1: Vec<&str> = s1.split_whitespace().collect();
+            let parts2: Vec<&str> = s2.split_whitespace().collect();
+
+            if parts1.is_empty() {
+                return Ok(1000);
+            }
+
+            let mut total_score = 0.0f64;
+
+            for word2 in &parts2 {
+                let best_ratio = parts1
+                    .iter()
+                    .map(|word1| {
+                        let dist = levenshtein(word1, word2);
+                        let max_len = word1.len().max(word2.len());
+                        if max_len == 0 {
+                            1.0
+                        } else {
+                            1.0 - (dist as f64 / max_len as f64)
+                        }
+                    })
+                    .fold(0.0f64, f64::max);
+
+                if best_ratio < threshold {
+                    total_score += 1000.0;
+                } else {
+                    total_score += 1.0 - best_ratio;
+                }
+            }
+
+            Ok((total_score * 100.0) as i32)
+        },
+    )?;
     println!(
         "Base de datos inicializada en {:?}",
         app_dir.join("database.db")
