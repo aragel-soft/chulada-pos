@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { CUSTOMER_CONFIG } from "@/config/constants";
 
-export const customerSchema = z.object({
+export const createCustomerSchema = (maxCreditLimit: number) => z.object({
   id: z.string().optional(),
   
   name: z.string()
@@ -36,12 +35,12 @@ export const customerSchema = z.object({
       z.number()
         .min(0, "El crédito no puede ser negativo")
         .max(
-          CUSTOMER_CONFIG.MAX_CREDIT_LIMIT, 
-          `El límite máximo permitido es $${CUSTOMER_CONFIG.MAX_CREDIT_LIMIT}`
+          maxCreditLimit, 
+          `El límite máximo permitido es $${maxCreditLimit}`
         )
     ),
 
   is_active: z.boolean().default(true),
 });
 
-export type CustomerFormValues = z.infer<typeof customerSchema>;
+export type CustomerFormValues = z.infer<ReturnType<typeof createCustomerSchema>>;

@@ -50,9 +50,17 @@ pub fn upsert_customer(
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    // TODO: Cuando se haya implementado la configuración, leer de la tabla system_config
-    if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
-        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
+    let max_credit_limit: f64 = conn.query_row(
+        "SELECT value FROM system_settings WHERE key = 'max_credit_limit'",
+        [],
+        |row| {
+            let val_str: String = row.get(0)?;
+            Ok(val_str.parse::<f64>().unwrap_or(MAX_CREDIT_LIMIT_FALLBACK))
+        }
+    ).unwrap_or(MAX_CREDIT_LIMIT_FALLBACK);
+
+    if customer.credit_limit > max_credit_limit {
+        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", max_credit_limit));
     }
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
@@ -155,11 +163,20 @@ pub fn restore_customer(
     let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
     let db_path = app_dir.join("database.db");
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let max_credit_limit: f64 = conn.query_row(
+        "SELECT value FROM system_settings WHERE key = 'max_credit_limit'",
+        [],
+        |row| {
+            let val_str: String = row.get(0)?;
+            Ok(val_str.parse::<f64>().unwrap_or(MAX_CREDIT_LIMIT_FALLBACK))
+        }
+    ).unwrap_or(MAX_CREDIT_LIMIT_FALLBACK);
 
-    if customer.credit_limit > MAX_CREDIT_LIMIT_FALLBACK {
-        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", MAX_CREDIT_LIMIT_FALLBACK));
+    if customer.credit_limit > max_credit_limit {
+        return Err(format!("El límite de crédito excede el máximo permitido (${:.2})", max_credit_limit));
     }
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let rows_affected = tx.execute(
         "UPDATE customers SET 

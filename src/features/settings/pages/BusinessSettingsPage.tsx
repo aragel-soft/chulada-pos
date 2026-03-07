@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -23,9 +24,6 @@ import {
   BusinessSettingsFormValues,
   businessSettingsSchema,
 } from "@/features/settings/schemas/businessRulesSchema";
-import {
-  BusinessSettings,
-} from "@/lib/api/business-settings";
 import { useBusinessStore } from "@/stores/businessStore";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -58,6 +56,8 @@ export default function BusinessSettingsPage() {
       taxRate: 0,
       applyTax: false,
       allowOutOfStockSales: false,
+      defaultCreditLimit: 500,
+      maxCreditLimit: 10000,
       discountPresetOptions: "5,10",
       maxDiscountPercentage: 20,
       maxOpenTickets: 5,
@@ -77,6 +77,8 @@ export default function BusinessSettingsPage() {
         taxRate: settings.taxRate,
         applyTax: settings.applyTax,
         allowOutOfStockSales: settings.allowOutOfStockSales,
+        defaultCreditLimit: settings.defaultCreditLimit ?? 500,
+        maxCreditLimit: settings.maxCreditLimit ?? 10000,
         discountPresetOptions: settings.discountPresetOptions || "5,10",
         maxDiscountPercentage: settings.maxDiscountPercentage || 20,
         maxOpenTickets: settings.maxOpenTickets || 5,
@@ -84,27 +86,31 @@ export default function BusinessSettingsPage() {
     }
   }, [settings, form]);
 
-  const onSubmit = async () => {
+  const onSubmit = async (data: BusinessSettingsFormValues) => {
     try {
-      const patch: Partial<BusinessSettings> = {};
-      const formValues = form.getValues();
+      const parsedFormValues = businessSettingsSchema.parse(data);
+
+      const patch: Partial<BusinessSettingsFormValues> = {};
       const dirtyFields = form.formState.dirtyFields;
 
-      if (dirtyFields.storeName) patch.storeName = formValues.storeName;
-      if (dirtyFields.logicalStoreName) patch.logicalStoreName = formValues.logicalStoreName;
-      if (dirtyFields.storeAddress) patch.storeAddress = formValues.storeAddress;
-      if (dirtyFields.defaultCashFund) patch.defaultCashFund = formValues.defaultCashFund;
-      if (dirtyFields.maxCashLimit) patch.maxCashLimit = formValues.maxCashLimit;
-      if (dirtyFields.taxRate) patch.taxRate = formValues.taxRate;
-      if (dirtyFields.applyTax) patch.applyTax = formValues.applyTax;
-      if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = formValues.allowOutOfStockSales;
-      if (dirtyFields.discountPresetOptions) patch.discountPresetOptions = formValues.discountPresetOptions;
-      if (dirtyFields.maxDiscountPercentage) patch.maxDiscountPercentage = formValues.maxDiscountPercentage;
-      if (dirtyFields.maxOpenTickets) patch.maxOpenTickets = formValues.maxOpenTickets;
+      if (dirtyFields.storeName) patch.storeName = parsedFormValues.storeName;
+      if (dirtyFields.logicalStoreName) patch.logicalStoreName = parsedFormValues.logicalStoreName;
+      if (dirtyFields.storeAddress) patch.storeAddress = parsedFormValues.storeAddress;
+      if (dirtyFields.defaultCashFund) patch.defaultCashFund = parsedFormValues.defaultCashFund;
+      if (dirtyFields.maxCashLimit) patch.maxCashLimit = parsedFormValues.maxCashLimit;
+      if (dirtyFields.taxRate) patch.taxRate = parsedFormValues.taxRate;
+      if (dirtyFields.applyTax) patch.applyTax = parsedFormValues.applyTax;
+      if (dirtyFields.allowOutOfStockSales) patch.allowOutOfStockSales = parsedFormValues.allowOutOfStockSales;
+      if (dirtyFields.defaultCreditLimit) patch.defaultCreditLimit = parsedFormValues.defaultCreditLimit;
+      if (dirtyFields.maxCreditLimit) patch.maxCreditLimit = parsedFormValues.maxCreditLimit;
+      if (dirtyFields.discountPresetOptions) patch.discountPresetOptions = parsedFormValues.discountPresetOptions;
+      if (dirtyFields.maxDiscountPercentage) patch.maxDiscountPercentage = parsedFormValues.maxDiscountPercentage;
+      if (dirtyFields.maxOpenTickets) patch.maxOpenTickets = parsedFormValues.maxOpenTickets;
 
       await updateSettings(patch);
+      
 
-      form.reset(formValues);
+      form.reset(parsedFormValues);
 
     } catch (error) {
     }
@@ -218,10 +224,10 @@ export default function BusinessSettingsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary">
                       <Coins className="h-5 w-5" />
-                      Control de Efectivo
+                      Control de Valores
                     </CardTitle>
                     <CardDescription>
-                      Límites y fondos por defecto para las cajas.
+                      Límites de efectivo y crédito para clientes y cajas.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -232,11 +238,8 @@ export default function BusinessSettingsPage() {
                         <FormItem>
                           <FormLabel>Fondo de Caja Predeterminado</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              min={0}
+                            <MoneyInput
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -253,11 +256,8 @@ export default function BusinessSettingsPage() {
                         <FormItem>
                           <FormLabel>Máximo de Efectivo permitido al iniciar turno</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              min={0}
+                            <MoneyInput
                               {...field}
-                              onChange={e => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
                           <FormDescription>
@@ -267,6 +267,43 @@ export default function BusinessSettingsPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    <div className="pt-2 border-t mt-2">
+                       <h4 className="text-sm font-semibold mb-3 text-muted-foreground mt-2">Crédito a Clientes</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <FormField
+                           control={form.control}
+                           name="defaultCreditLimit"
+                           render={({ field }) => (
+                             <FormItem>
+                               <FormLabel>Límite por Defecto</FormLabel>
+                               <FormControl>
+                                 <MoneyInput
+                                   {...field}
+                                 />
+                               </FormControl>
+                               <FormMessage />
+                             </FormItem>
+                           )}
+                         />
+                         <FormField
+                           control={form.control}
+                           name="maxCreditLimit"
+                           render={({ field }) => (
+                             <FormItem>
+                               <FormLabel>Tope Máximo</FormLabel>
+                               <FormControl>
+                                 <MoneyInput
+                                   {...field}
+                                 />
+                               </FormControl>
+                               <FormMessage />
+                             </FormItem>
+                           )}
+                         />
+                       </div>
+                    </div>
+
                     <FormField
                       control={form.control}
                       name="allowOutOfStockSales"

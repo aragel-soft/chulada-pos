@@ -34,7 +34,7 @@ export interface UpdateUserPayload {
   full_name: string;
   role_id: string;
   is_active: boolean;
-  avatar_url?: string;
+  avatar_url?: string | null;
   current_user_id: string;
   username: string; 
 }

@@ -26,7 +26,6 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
     queryKey: ['sales-history', filters],
     queryFn: () => getSalesHistory(filters),
     placeholderData: keepPreviousData, 
-    staleTime: 1000 * 60 * 5, 
   });
 
   const actions = {
