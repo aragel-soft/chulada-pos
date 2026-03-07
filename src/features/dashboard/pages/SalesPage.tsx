@@ -321,7 +321,7 @@ export default function SalesPage() {
         isOpen={kitModalOpen}
         kit={pendingKit?.kit || null}
         triggerQuantity={pendingKit?.totalNeeded || 1}
-        alreadySelectedCount={pendingKit?.alreadySelectedCount || 0}
+        currentGiftsCount={pendingKit?.currentGiftsCount || {}}
         onConfirm={handleKitConfirm}
         onCancel={handleKitCancel}
       />

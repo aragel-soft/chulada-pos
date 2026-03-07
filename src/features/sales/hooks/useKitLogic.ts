@@ -13,7 +13,7 @@ interface PendingKit {
     triggerProducts: CartItem[];  // Multiple triggers of same kit
     isScan: boolean;
     totalNeeded: number;  // Total gifts needed for all triggers
-    alreadySelectedCount?: number;
+    currentGiftsCount?: Record<string, number>;
 }
 
 export function useKitLogic() {
@@ -45,9 +45,19 @@ export function useKitLogic() {
         for (const [_kitId, { kit, currentTriggers }] of kitGroups.entries()) {
             const totalNeeded = currentTriggers.reduce((sum, t) => sum + (t.quantity * kit.max_selections), 0);
 
-            const totalProvided = items
+            const currentGiftsCount: Record<string, number> = {};
+            let totalProvided = 0;
+
+            items
                 .filter(i => i.priceType === 'kit_item' && i.kitOptionId === kit.id)
-                .reduce((sum, i) => sum + i.quantity, 0);
+                .forEach(i => {
+                    const kitDefItem = kit.items.find(kItem => kItem.product_id === i.id);
+                    if (kitDefItem) {
+                        const ratio = kitDefItem.quantity > 0 ? kitDefItem.quantity : 1;
+                        totalProvided += (i.quantity / ratio);
+                        currentGiftsCount[kitDefItem.id] = (currentGiftsCount[kitDefItem.id] || 0) + i.quantity;
+                    }
+                });
 
             if (totalProvided < totalNeeded) {
                 incompleteKits.push({
@@ -55,7 +65,7 @@ export function useKitLogic() {
                     triggerProducts: currentTriggers,
                     isScan: false,
                     totalNeeded,
-                    alreadySelectedCount: totalProvided
+                    currentGiftsCount
                 });
             }
         }
