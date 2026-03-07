@@ -24,23 +24,34 @@ export const ProductsGrid = ({
   forceAllowSelect,
 }: ProductsGridProps) => {
   const observerTarget = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if ((isLoading || products.length <= 50) && scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [products, isLoading]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage) {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
           fetchNextPage();
         }
       },
-      { threshold: 1.0 } 
+      { threshold: 0, rootMargin: "100px" } 
     );
 
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
     }
 
-    return () => observer.disconnect();
-  }, [hasNextPage, fetchNextPage]);
+    return () => {
+      if (currentTarget) observer.unobserve(currentTarget);
+      observer.disconnect();
+    };
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   if (isLoading) {
     return (
@@ -63,7 +74,7 @@ export const ProductsGrid = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto pr-2">
+    <div ref={scrollContainerRef} className="h-full overflow-y-auto pr-2">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-4">
         {products.map((product) => (
           <ProductCard
