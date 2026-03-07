@@ -19,7 +19,7 @@
         "resizable": true,
         "minWidth": 320,
         "minHeight": 600,
-        "zoomHotkeysEnabled": true
+        "zoomHotkeysEnabled": false
       }
     ],
     "security": {
