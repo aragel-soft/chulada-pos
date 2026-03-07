@@ -6,7 +6,6 @@ export interface HardwareConfig {
   printerWidth: string;
   cashDrawerCommand: string;
   cashDrawerPort?: string;
-  zoomLevel?: number;
   paddingLines?: number;
 }
 
