@@ -767,7 +767,7 @@ export function CheckoutModal({
                                               <CopyablePhone
                                                 phone={c.phone}
                                                 noCopy={true}
-                                                className="text-xs text-muted-foreground"
+                                                  className="text-xs text-muted-foreground "
                                               />
                                             </div>
                                           </div>
