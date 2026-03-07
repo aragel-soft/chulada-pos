@@ -47,3 +47,7 @@ coverage/
 **/screenshots/
 **/videos/
 **/__screenshots__/
+
+# Migrations
+scripts/migrations/*.csv
+scripts/migrations/*.db
