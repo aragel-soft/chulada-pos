@@ -113,8 +113,7 @@ export function KitWizard({
               })) as SelectorItem[],
             });
           })
-          .catch((err) => {
-            console.error(err);
+          .catch(() => {
             toast.error("Error al cargar los detalles del kit");
             onOpenChange(false);
           })

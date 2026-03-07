@@ -9,9 +9,10 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Product, SelectorItem } from "@/types/inventory"; // Importamos tipos globales
+import { Product, SelectorItem } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { checkProductsInActiveKits } from "@/lib/api/inventory/kits";
+import { ProductConflict } from "@/types/kits";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,17 +74,44 @@ export function ProductSearchSelector({
 
   const productIdsToCheck = searchResults?.data.map((p) => p.id) || [];
 
-  const { data: busyProductIds } = useQuery({
-    queryKey: ["kits", "check-conflicts", productIdsToCheck],
+  // Busca conflictos con productos principales y complementos en kits activos
+  const { data: productConflicts } = useQuery({
+    queryKey: ["kits", "check-conflicts", mode, productIdsToCheck],
     queryFn: () => checkProductsInActiveKits(productIdsToCheck, currentKitId || undefined),
-    enabled: mode === "triggers" && productIdsToCheck.length > 0,
+    enabled: (mode === "triggers" || mode === "rewards") && productIdsToCheck.length > 0,
     staleTime: 0,
   });
 
+  const getBlockedReason = (productId: string): string | null => {
+    if (excludeProductIds.includes(productId)) return "excluded";
+    
+    if ((mode === "triggers" || mode === "rewards") && productConflicts) {
+      const conflict = productConflicts.find((c: ProductConflict) => c.product_id === productId);
+      if (conflict) {
+        if (mode === "rewards" && conflict.reason === "item") return null;
+        return conflict.reason;
+      }
+    }
+    
+    return null;
+  };
+
+  const getBlockedMessage = (reason: string): string => {
+    if (reason === "excluded") {
+      return "Ya seleccionado en la otra lista";
+    }
+    if (mode === "triggers") {
+      if (reason === "main") return "Ya es Producto Principal en otro kit";
+      if (reason === "item") return "Ya es Complemento en otro kit";
+    }
+    if (mode === "rewards") {
+      if (reason === "main") return "Ya es Producto Principal en otro kit";
+    }
+    return "Ocupado en otro kit";
+  };
+
   const isProductBlocked = (productId: string) => {
-    const isBusy = mode === "triggers" && busyProductIds?.includes(productId);
-    const isExcluded = excludeProductIds.includes(productId);
-    return isBusy || isExcluded;
+    return getBlockedReason(productId) !== null;
   };
 
   const handleAdd = (product: Product) => {
@@ -114,11 +142,7 @@ export function ProductSearchSelector({
         const isAlreadySelected = selectedItems.some(
           (i) => i.product.id === product.id,
         );
-        const isExcluded = excludeProductIds.includes(product.id);
-        const isBusy =
-          mode === "triggers" && busyProductIds?.includes(product.id);
-
-        return !isAlreadySelected && !isExcluded && !isBusy;
+        return !isAlreadySelected && !isProductBlocked(product.id);
       })
       .map((product) => ({
         product,
@@ -185,12 +209,8 @@ export function ProductSearchSelector({
                   const isSelected = selectedItems.some(
                     (i) => i.product.id === product.id,
                   );
-                  const isBusyInBackend =
-                    mode === "triggers" && busyProductIds?.includes(product.id);
-                  const isExcludedByProps = excludeProductIds.includes(
-                    product.id,
-                  );
-                  const isBlocked = isBusyInBackend || isExcludedByProps;
+                  const blockedReason = getBlockedReason(product.id);
+                  const isBlocked = blockedReason !== null;
 
                   return (
                     <TableRow
@@ -203,16 +223,9 @@ export function ProductSearchSelector({
                       <TableCell className="text-sm">
                         <div className="flex flex-col">
                           <span>{product.name}</span>
-                          {isBusyInBackend && (
+                          {blockedReason && (
                             <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> Ocupado en
-                              otro kit
-                            </span>
-                          )}
-                          {isExcludedByProps && !isBusyInBackend && (
-                            <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> Ya
-                              seleccionado en la otra lista
+                              <AlertCircle className="h-3 w-3" /> {getBlockedMessage(blockedReason)}
                             </span>
                           )}
                         </div>
