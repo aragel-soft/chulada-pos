@@ -57,6 +57,7 @@ export default function CustomersTable() {
     } else {
       setPage(newPagination.pageIndex + 1);
     }
+    setRowSelection({});
   };
 
   const queryParams: PaginationParams = useMemo(() => ({
