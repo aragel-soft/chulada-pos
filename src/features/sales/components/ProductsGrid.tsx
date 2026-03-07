@@ -25,12 +25,22 @@ export const ProductsGrid = ({
 }: ProductsGridProps) => {
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevFirstProductIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if ((isLoading || products.length <= 50) && scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = 0;
+    if (products.length === 0) {
+      prevFirstProductIdRef.current = null;
+    } else {
+      const currentFirstId = products[0].id;
+      
+      if (prevFirstProductIdRef.current !== null && prevFirstProductIdRef.current !== currentFirstId) {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+      }
+      prevFirstProductIdRef.current = currentFirstId;
     }
-  }, [products, isLoading]);
+  }, [products]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
