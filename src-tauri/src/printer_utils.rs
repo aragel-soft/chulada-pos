@@ -382,6 +382,7 @@ pub struct TicketData {
     pub voucher_amount: f64,
     pub change: f64,
     pub customer_name: Option<String>,
+    pub customer_code: Option<String>,
 }
 
 pub struct TicketItem {
@@ -564,7 +565,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
 
         // Fetch Header
         let sale_row = conn.query_row(
-            "SELECT folio, created_at, subtotal, discount_amount, total, cash_amount, card_transfer_amount, discount_percentage 
+            "SELECT folio, created_at, subtotal, discount_amount, total, cash_amount, card_transfer_amount, discount_percentage, customer_id, payment_method 
              FROM sales WHERE id = ?1",
             [&sale_id],
             |row| {
@@ -577,6 +578,8 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
                     row.get::<_, f64>(5)?,    // cash
                     row.get::<_, f64>(6)?,    // card
                     row.get::<_, f64>(7)?,    // discount_percentage
+                    row.get::<_, String>(8)?, // customer_id
+                    row.get::<_, String>(9)?, // payment_method
                 ))
             }
         ).map_err(|e| format!("Venta no encontrada: {}", e))?;
@@ -643,8 +646,6 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         }
     }
 
-    drop(conn); // Unlock DB before printing
-
     let (
         folio,
         date_str,
@@ -654,7 +655,31 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         cash,
         card,
         discount_percentage,
+        customer_id,
+        sale_payment_method,
     ) = sale_info;
+
+    let (cust_name, cust_code) = if sale_payment_method == "credit" {
+        // Fetch customer info for credit sales
+        let result: Option<(String, Option<String>)> = conn
+            .query_row(
+                "SELECT c.name, c.code FROM customers c 
+                 WHERE c.id = ?1",
+                [&customer_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .ok();
+        match result {
+            Some((name, code)) => (Some(name), code),
+            None => (None, None),
+        }
+    } else {
+        (None, None)
+    };
+
+    drop(conn); // Unlock DB before printing
+
+    let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
 
     let (final_items, subtotal, discount, total) = if returns_map.is_empty() {
         (original_items, orig_subtotal, orig_discount_amt, orig_total)
@@ -667,7 +692,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
             let actual_qty = item.quantity - returned_qty;
 
             if actual_qty > 0.001 {
-                let line_subtotal = actual_qty * item.unit_price; // Gross line total
+                let line_subtotal = actual_qty * item.unit_price;
                 new_subtotal += line_subtotal;
 
                 filtered_items.push(TicketItem {
@@ -691,8 +716,6 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         0.0
     };
 
-    let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
-
     let ticket_data = TicketData {
         business_settings,
         hardware_config: hardware_config.clone(),
@@ -706,7 +729,8 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         card_amount: card,
         voucher_amount,
         change,
-        customer_name: None,
+        customer_name: cust_name,
+        customer_code: cust_code
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
@@ -874,6 +898,9 @@ pub fn print_ticket(
     builder.add_text_ln(&format!("TOTAL ARTICULOS: {:>10.2}", total_items_count));
     if let Some(cust) = &data.customer_name {
         builder.add_text_ln(&format!("Cliente: {}", cust));
+        if let Some(code) = &data.customer_code {
+            builder.add_text_ln(&format!("No. Cliente: {}", code));
+        }
     }
 
     // ITEMS HEADER
@@ -1057,14 +1084,14 @@ pub fn print_payment_from_db(
             [&payment_id],
             |row| {
                 Ok((
-                    row.get::<_, String>(0)?,         // folio
-                    row.get::<_, f64>(1)?,            // amount
-                    row.get::<_, f64>(2)?,            // cash_amount
-                    row.get::<_, f64>(3)?,            // card_amount
-                    row.get::<_, String>(4)?,         // payment_method
-                    row.get::<_, String>(5)?,         // payment_date
-                    row.get::<_, String>(6)?,         // customer_name
-                    row.get::<_, String>(7)?,         // customer_code
+                    row.get::<_, String>(0)?, // folio
+                    row.get::<_, f64>(1)?,    // amount
+                    row.get::<_, f64>(2)?,    // cash_amount
+                    row.get::<_, f64>(3)?,    // card_amount
+                    row.get::<_, String>(4)?, // payment_method
+                    row.get::<_, String>(5)?, // payment_date
+                    row.get::<_, String>(6)?, // customer_name
+                    row.get::<_, String>(7)?, // customer_code
                 ))
             },
         )
@@ -1138,7 +1165,6 @@ pub fn print_payment_from_db(
     builder.add_text_ln(&format!("Fecha: {}", remove_accents(&payment_date)));
     builder.add_text_ln(&format!("No. Cliente: {}", remove_accents(&customer_code)));
     builder.add_text_ln(&format!("Cliente: {}", remove_accents(&customer_name)));
-    
 
     let method_label = match payment_method.as_str() {
         "cash" => "Efectivo",
@@ -1421,10 +1447,7 @@ pub fn print_shift_summary(
             &format!("-${:.2}", details.total_movements_out),
         );
         builder.set_bold(true);
-        builder.add_row_with_dots(
-            "Total Efectivo:",
-            &format!("${:.2}", details.total_cash),
-        );
+        builder.add_row_with_dots("Total Efectivo:", &format!("${:.2}", details.total_cash));
         builder.set_bold(false);
         builder.set_bold(true);
         builder.add_separator('-');
