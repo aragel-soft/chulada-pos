@@ -220,23 +220,42 @@ pub fn get_customers(
 ) -> Result<PaginatedResult<Customer>, String> {
   let conn = db_state.lock().unwrap();
 
-  let search_term = search.as_ref().map(|s| format!("%{}%", s.trim().to_lowercase()));
-  let has_search = search.is_some() && !search.as_ref().unwrap().trim().is_empty();
+  let search_trimmed = search.as_ref().map(|s| s.trim().to_string()).unwrap_or_default();
+  let has_search = !search_trimmed.is_empty();
+  let search_len = search_trimmed.len();
+  let use_fuzzy = has_search && search_len >= 3;
+  let fuzzy_threshold = if search_len <= 4 { 20 } else if search_len <= 7 { 40 } else { 60 };
+
+  let like_pattern = format!("%{}%", search_trimmed);
 
   let where_clause = if has_search {
-    "WHERE deleted_at IS NULL AND (lower(name) LIKE ?1 OR phone LIKE ?1 OR lower(code) LIKE ?1) OR lower(id) LIKE ?1"
+    if use_fuzzy {
+      format!(
+        "WHERE deleted_at IS NULL AND (lower(name) LIKE '{}' OR phone LIKE '{}' OR lower(code) LIKE '{}' OR lower(id) LIKE '{}' OR fuzzy_match(name, '{}', 0.4) <= {})",
+        like_pattern.replace("'", "''").to_lowercase(),
+        like_pattern.replace("'", "''"),
+        like_pattern.replace("'", "''").to_lowercase(),
+        like_pattern.replace("'", "''").to_lowercase(),
+        search_trimmed.replace("'", "''"),
+        fuzzy_threshold
+      )
+    } else {
+      format!(
+        "WHERE deleted_at IS NULL AND (lower(name) LIKE '{}' OR phone LIKE '{}' OR lower(code) LIKE '{}' OR lower(id) LIKE '{}')",
+        like_pattern.replace("'", "''").to_lowercase(),
+        like_pattern.replace("'", "''"),
+        like_pattern.replace("'", "''").to_lowercase(),
+        like_pattern.replace("'", "''").to_lowercase()
+      )
+    }
   } else {
-    "WHERE deleted_at IS NULL"
+    "WHERE deleted_at IS NULL".to_string()
   };
 
   let count_sql = format!("SELECT COUNT(*) FROM customers {}", where_clause);
-    
-  let total_count: i64 = if has_search {
-    conn.query_row(&count_sql, [search_term.as_ref().unwrap()], |row| row.get(0))
-  } else {
-    conn.query_row(&count_sql, [], |row| row.get(0))
-  }.map_err(|e| format!("Error contando clientes: {}", e))?;
-
+  let total_count: i64 = conn
+    .query_row(&count_sql, [], |row| row.get(0))
+    .map_err(|e| format!("Error contando clientes: {}", e))?;
 
   let sort_column = match sort_by.as_deref() {
     Some("code") => "code",
@@ -254,7 +273,9 @@ pub fn get_customers(
     _ => "ASC", 
   };
 
-  let order_sql = if sort_column == "default_debt_priority" {
+  let order_sql = if use_fuzzy && sort_by.is_none() {
+    format!("ORDER BY fuzzy_match(name, '{}', 0.4) ASC", search_trimmed.replace("'", "''"))
+  } else if sort_column == "default_debt_priority" {
     "ORDER BY current_balance DESC, name ASC".to_string()
   } else {
     format!("ORDER BY {} {}", sort_column, sort_direction)
@@ -275,17 +296,10 @@ pub fn get_customers(
 
   let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
 
-  let customers = if has_search {
-    stmt.query_map([search_term.unwrap()], |row| map_customer_row(row))
-      .map_err(|e| e.to_string())?
-      .collect::<Result<Vec<Customer>, _>>()
-      .map_err(|e| e.to_string())?
-  } else {
-    stmt.query_map([], |row| map_customer_row(row))
-      .map_err(|e| e.to_string())?
-      .collect::<Result<Vec<Customer>, _>>()
-      .map_err(|e| e.to_string())?
-  };
+  let customers = stmt.query_map([], |row| map_customer_row(row))
+    .map_err(|e| e.to_string())?
+    .collect::<Result<Vec<Customer>, _>>()
+    .map_err(|e| e.to_string())?;
 
   Ok(PaginatedResult {
     data: customers,

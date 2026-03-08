@@ -2,11 +2,12 @@ use argon2::{
     password_hash::{PasswordHash, PasswordVerifier},
     Argon2,
 };
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 use machine_uid;
+use chrono::{Utc, DateTime};
 
 #[derive(Debug,  Serialize, Deserialize)]
 pub struct User {
@@ -18,7 +19,6 @@ pub struct User {
     pub role_display_name: String,
     pub avatar_url: Option<String>,
     pub permissions: Vec<String>,
-    // pub modules: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,6 +26,12 @@ pub struct AuthResponse {
     pub success: bool,
     pub message: String,
     pub user: Option<User>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OfflineLicenseStatus {
+    pub valid: bool,
+    pub days_left: i64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -209,4 +215,54 @@ pub fn debug_database(db: State<'_, Mutex<Connection>>) -> Result<String, AuthEr
 #[tauri::command]
 pub fn get_machine_id() -> Result<String, String> {
     machine_uid::get().map_err(|e| e.to_string())
+}
+#[tauri::command]
+pub fn update_license_validation(
+    state: State<'_, Mutex<rusqlite::Connection>>,
+) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    let now_timestamp = Utc::now().timestamp();
+    
+    conn.execute(
+        "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        ["last_license_validation", &now_timestamp.to_string()],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn check_offline_license(
+    state: State<'_, Mutex<rusqlite::Connection>>,
+) -> Result<OfflineLicenseStatus, String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    
+    let last_val_str: Option<String> = conn.query_row(
+        "SELECT value FROM system_settings WHERE key = 'last_license_validation'",
+        [],
+        |row| row.get(0),
+    ).optional().map_err(|e| e.to_string())?;
+    
+    if let Some(date_str) = last_val_str {
+        if let Ok(last_timestamp) = date_str.parse::<i64>() {
+            let now = Utc::now();
+            
+            if let Some(last_date) = DateTime::from_timestamp(last_timestamp, 0) {
+                let duration = now.signed_duration_since(last_date);
+                let days_passed = duration.num_days();
+                
+                if days_passed <= 15 {
+                    return Ok(OfflineLicenseStatus {
+                        valid: true,
+                        days_left: 15 - days_passed,
+                    });
+                }
+            }
+        }
+    }
+    
+    Ok(OfflineLicenseStatus {
+        valid: false,
+        days_left: 0,
+    })
 }

@@ -23,7 +23,7 @@ tauri-plugin-opener = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-rusqlite = { version = "0.30", features = ["bundled"] } 
+rusqlite = { version = "0.30", features = ["bundled", "functions"] } 
 uuid = { version = "1.6", features = ["v4", "serde"] }
 argon2 = { version = "0.5", features = ["std"] }
 thiserror = "1.0"
@@ -34,6 +34,8 @@ image = "0.25.9"
 machine-uid = "0.5"
 tauri-plugin-updater = "2.10.0"
 tauri-plugin-process = "2.3.1"
+strsim = "0.11.1"
+deunicode = "1.4.2"
 
 [dev-dependencies]
 tauri-driver = "0.1"

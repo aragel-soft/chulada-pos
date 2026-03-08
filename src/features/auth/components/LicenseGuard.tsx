@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { supabase } from "@/lib/supabase";
 import { AlertCircle } from "lucide-react";
+import { toast } from "sonner"; 
+import {
+  getMachineId,
+  checkLicenseOnline,
+  updateLicenseValidation,
+  checkOfflineLicense,
+} from "@/lib/api/auth";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -11,32 +16,45 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
-    const checkLicense = async () => {
+    const verifyLicense = async () => {
       try {
-        const id = await invoke<string>("get_machine_id");
+        const id = await getMachineId();
         setMachineId(id);
 
-        const { data, error } = await supabase
-          .from("licenses")
-          .select("is_active")
-          .eq("machine_id", id)
-          .single();
+        const license = await checkLicenseOnline(id);
 
-        if (error || !data || !data.is_active) {
+        if (!license.is_active) {
           setStatus("rejected");
           setErrorMessage("Equipo No Autorizado");
           return;
         }
 
+        await updateLicenseValidation();
         setStatus("authorized");
+
       } catch (err) {
-        setStatus("rejected");
-        setErrorMessage("Error de conexión o validación de licencia");
+        try {
+          const offlineStatus = await checkOfflineLicense();
+          
+          if (offlineStatus.valid) {
+            toast.warning(`Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`, {
+              duration: 6000,
+            });
+            setStatus("authorized");
+          } else {
+            setStatus("rejected");
+            setErrorMessage("Se requiere conexión a internet para validar la licencia");
+          }
+        } catch (offlineErr) {
+          setStatus("rejected");
+          setErrorMessage("Error crítico al leer configuración local");
+        }
       }
     };
 
-    checkLicense();
+    verifyLicense();
   }, []);
+
 
   if (status === "loading") {
     return (
@@ -62,7 +80,7 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
         </h1>
         <p className="text-muted-foreground mb-8 max-w-md">
           Comunícate con soporte técnico y proporciona el siguiente
-          identificador para registrar tu equipo.
+          identificador para registrar tu equipo, o verifica tu conexión a internet.
         </p>
         <div className="p-4 rounded-lg border-2 border-dashed border-destructive/50 select-all">
           <p className="font-mono text-lg font-semibold tracking-wider text-foreground">

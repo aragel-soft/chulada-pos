@@ -21,8 +21,6 @@ export const usePosProducts = ({ enabled = true, activeStatus = ["active"], cate
           page: pageParam,
           pageSize: PAGE_SIZE,
           search: searchQuery.trim() || undefined, 
-          sortBy: "name", 
-          sortOrder: "asc",
         },
         {
           active_status: activeStatus,
