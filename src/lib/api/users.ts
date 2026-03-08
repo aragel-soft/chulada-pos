@@ -1,9 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { User, Role, CreateUserPayload, CreateUserError, UpdateUserPayload } from '@/types/users';
-
-export interface UserListOptions {
-  include_deleted?: boolean;
-}
+import type { PaginationParams, PaginatedResponse } from '@/types/pagination';
 
 export async function createUser(payload: CreateUserPayload): Promise<User> {
   try {
@@ -30,8 +27,19 @@ export async function saveAvatar(fileData: number[], username: string): Promise<
   return await invoke<string>('save_avatar', { fileData, username });
 }
 
-export async function getUsersList(options?: UserListOptions): Promise<User[]> {
-  return await invoke<User[]>('get_users_list', { options });
+export async function getUsersList(params: PaginationParams): Promise<PaginatedResponse<User>> {
+  try {
+    return await invoke<PaginatedResponse<User>>('get_users_list', {
+      page: params.page,
+      pageSize: params.pageSize,
+      search: params.search || null,
+      sortBy: params.sortBy || null,
+      sortOrder: params.sortOrder || null,
+      includeDeleted: params.includeDeleted || false,
+    });
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function updateUser(payload: UpdateUserPayload): Promise<User> {
@@ -41,7 +49,6 @@ export async function updateUser(payload: UpdateUserPayload): Promise<User> {
     try {
       const errorObj = JSON.parse(error as string);
       throw errorObj;
-    
     } catch (e) {
       if ((e as any).code) throw e;
       throw { code: 'UNKNOWN_ERROR', message: String(error) };
@@ -55,7 +62,6 @@ export async function deleteUsers(userIds: string[], currentUserId: string): Pro
     try {
       const errorObj = JSON.parse(error as string);
       throw errorObj;
-    
     } catch (e) {
       if ((e as any).code) throw e;
       throw { code: 'UNKNOWN_ERROR', message: String(error) };
