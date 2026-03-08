@@ -19,3 +19,12 @@ export interface LoginCredentials {
   username: string;
   password: string;
 }
+
+export interface OfflineLicenseStatus {
+  valid: boolean;
+  days_left: number;
+}
+
+export interface LicenseCheckResult {
+  is_active: boolean;
+}
