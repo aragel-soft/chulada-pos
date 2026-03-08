@@ -194,7 +194,10 @@ export function UsersListPage() {
         pagination={pagination}
         onPaginationChange={setPagination}
         globalFilter={globalFilter}
-        onGlobalFilterChange={(val) => setGlobalFilter(String(val))}
+        onGlobalFilterChange={(val) => {
+          setGlobalFilter(String(val));
+          setPagination(prev => ({ ...prev, pageIndex: 0 }));
+        }}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         actions={(table) => (
