@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 
 interface ZoomContextType {
@@ -8,45 +8,67 @@ interface ZoomContextType {
 
 const ZoomContext = createContext<ZoomContextType | undefined>(undefined);
 
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 1.5;
+const ZOOM_STEP_KEYBOARD = 0.1;
+const ZOOM_STEP_WHEEL = 0.05;
+
 export function ZoomProvider({ children }: { children: ReactNode }) {
   const [zoomEnabled, setZoomEnabled] = useState(() => {
     const saved = localStorage.getItem('zoom_status');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  // Use useRef to store the base pixel ratio
-  const basePixelRatio = useRef(window.devicePixelRatio);
-  const isRestoring = useRef(true);
+
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = localStorage.getItem('zoom_level');
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= ZOOM_MIN && parsed <= ZOOM_MAX) {
+        return parsed;
+      }
+    }
+    return 1.0;
+  });
 
   const toggleZoom = () => {
     setZoomEnabled((prev: boolean) => {
       const newState = !prev;
       localStorage.setItem('zoom_status', JSON.stringify(newState));
+      if (!newState) {
+        setZoomLevel(1.0);
+      }
       return newState;
     });
   };
 
   useEffect(() => {
-    const restoreZoom = async () => {
+    const applyZoom = async () => {
       try {
-        const savedLevel = localStorage.getItem('zoom_level');
-        if (savedLevel && zoomEnabled) {
-          const level = parseFloat(savedLevel);
-          if (!isNaN(level)) {
-            try {
-              const webview = getCurrentWebview();
-              await webview.setZoom(level);
-            } catch (err) {
-              console.error('[ZoomProvider] Failed to set zoom (Tauri API error):', err);
-            }
-          }
+        const webview = getCurrentWebview();
+        if (zoomEnabled) {
+          localStorage.setItem('zoom_level', String(zoomLevel));
+          await webview.setZoom(zoomLevel);
+        } else {
+          await webview.setZoom(1.0);
         }
-      } finally {
-        setTimeout(() => {
-          isRestoring.current = false;
-        }, 500);
+      } catch (err) {
+        console.error('[ZoomProvider] Failed to set zoom (Tauri API error):', err);
       }
     };
-    restoreZoom();
+    
+    applyZoom();
+  }, [zoomLevel, zoomEnabled]);
+
+  const handleZoomIn = useCallback((step: number) => {
+    setZoomLevel(prev => Math.min(prev + step, ZOOM_MAX));
+  }, []);
+
+  const handleZoomOut = useCallback((step: number) => {
+    setZoomLevel(prev => Math.max(prev - step, ZOOM_MIN));
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1.0);
   }, []);
 
   useEffect(() => {
@@ -54,46 +76,44 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
       const isZoomKey = (e.ctrlKey || e.metaKey) && ['=', '-', '0', '+'].includes(e.key);
 
       if (isZoomKey) {
+        e.preventDefault();
+        e.stopPropagation();
+
         if (zoomEnabled) {
-        } else {
-          e.preventDefault();
-          e.stopPropagation();
+          if (e.key === '=' || e.key === '+') {
+            handleZoomIn(ZOOM_STEP_KEYBOARD);
+          } else if (e.key === '-') {
+            handleZoomOut(ZOOM_STEP_KEYBOARD);
+          } else if (e.key === '0') {
+            handleZoomReset();
+          }
         }
       }
     };
 
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        if (zoomEnabled) {
-          // Allow default
-        } else {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }
-    };
+        e.preventDefault();
+        e.stopPropagation();
 
-    const handleResize = () => {
-      if (zoomEnabled) {
-        if (isRestoring.current) {
-          return;
+        if (zoomEnabled) {
+          if (e.deltaY < 0) {
+            handleZoomIn(ZOOM_STEP_WHEEL);
+          } else {
+            handleZoomOut(ZOOM_STEP_WHEEL);
+          }
         }
-        const currentRatio = window.devicePixelRatio;
-        const relativeZoom = currentRatio / basePixelRatio.current;
-        localStorage.setItem('zoom_level', String(relativeZoom));
       }
     };
 
     window.addEventListener('keydown', handleKeydown, { capture: true });
     window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('keydown', handleKeydown, { capture: true });
       window.removeEventListener('wheel', handleWheel, { capture: true });
-      window.removeEventListener('resize', handleResize);
     };
-  }, [zoomEnabled]);
+  }, [zoomEnabled, handleZoomIn, handleZoomOut, handleZoomReset]);
 
   return (
     <ZoomContext.Provider value={{ zoomEnabled, toggleZoom }}>

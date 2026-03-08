@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { supabase } from "@/lib/supabase";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner"; 
-
-interface OfflineLicenseStatus {
-  valid: boolean;
-  days_left: number;
-}
+import {
+  getMachineId,
+  checkLicenseOnline,
+  updateLicenseValidation,
+  checkOfflineLicense,
+} from "@/lib/api/auth";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -17,33 +16,25 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
-    const checkLicense = async () => {
+    const verifyLicense = async () => {
       try {
-        const id = await invoke<string>("get_machine_id");
+        const id = await getMachineId();
         setMachineId(id);
 
-        const { data, error } = await supabase
-          .from("licenses")
-          .select("is_active")
-          .eq("machine_id", id)
-          .single();
+        const license = await checkLicenseOnline(id);
 
-        if (error) {
-          throw new Error("Error de conexión a Supabase");
-        }
-
-        if (!data.is_active) {
+        if (!license.is_active) {
           setStatus("rejected");
           setErrorMessage("Equipo No Autorizado");
           return;
         }
 
-        await invoke("update_license_validation");
+        await updateLicenseValidation();
         setStatus("authorized");
 
       } catch (err) {
         try {
-          const offlineStatus = await invoke<OfflineLicenseStatus>("check_offline_license");
+          const offlineStatus = await checkOfflineLicense();
           
           if (offlineStatus.valid) {
             toast.warning(`Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`, {
@@ -61,8 +52,9 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    checkLicense();
+    verifyLicense();
   }, []);
+
 
   if (status === "loading") {
     return (

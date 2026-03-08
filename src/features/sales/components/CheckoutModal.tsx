@@ -42,6 +42,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { getCustomers } from "@/lib/api/customers";
+import { CopyablePhone } from "@/components/ui/copyable-phone";
 import { Customer } from "@/types/customers";
 import { useDebounce } from "@/hooks/use-debounce";
 import { validateVoucher } from "@/lib/api/cash-register/sales";
@@ -169,8 +170,7 @@ export function CheckoutModal({
     variant === "sale" ? Math.max(0, total - voucherAppliedAmount) : total;
 
   // Display total: for sale it's the remaining (after voucher), for debt it's what the user is paying
-  const displayTotal =
-    variant === "sale" ? remainingTotal : currentPaymentSum;
+  const displayTotal = variant === "sale" ? remainingTotal : currentPaymentSum;
 
   // Update amounts when method changes
   useEffect(() => {
@@ -236,10 +236,7 @@ export function CheckoutModal({
     if (method === "credit") searchCustomers();
   }, [debouncedSearch, method, isOpen]);
 
-  const handleNumericInput = (
-    value: string,
-    setter: (val: string) => void,
-  ) => {
+  const handleNumericInput = (value: string, setter: (val: string) => void) => {
     if (value === "" || /^\d*\.?\d*$/.test(value)) setter(value);
   };
 
@@ -296,16 +293,13 @@ export function CheckoutModal({
   const calculateChange = () => {
     if (variant === "debt") return 0;
     if (method === "cash") return numericCash - remainingTotal;
-    if (method === "mixed")
-      return numericCash + numericCard - remainingTotal;
+    if (method === "mixed") return numericCash + numericCard - remainingTotal;
     return 0;
   };
   const change = calculateChange();
 
   const missing =
-    variant === "sale"
-      ? remainingTotal - (numericCash + numericCard)
-      : 0;
+    variant === "sale" ? remainingTotal - (numericCash + numericCard) : 0;
 
   const isCreditLimitExceeded = () => {
     if (!selectedCustomer) return false;
@@ -439,8 +433,7 @@ export function CheckoutModal({
                       <p
                         className={cn(
                           "text-5xl font-extrabold tabular-nums",
-                          variant === "debt" &&
-                            currentPaymentSum > debtLimit
+                          variant === "debt" && currentPaymentSum > debtLimit
                             ? "text-red-500"
                             : "text-[#480489]",
                         )}
@@ -502,9 +495,7 @@ export function CheckoutModal({
                       >
                         <DialogContent className="max-w-md">
                           <DialogHeader>
-                            <DialogTitle>
-                              Aplicar Vale de Tienda
-                            </DialogTitle>
+                            <DialogTitle>Aplicar Vale de Tienda</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <div className="space-y-2">
@@ -517,9 +508,7 @@ export function CheckoutModal({
                                 placeholder="VALE-XXXX"
                                 value={voucherCode}
                                 onChange={(e) =>
-                                  setVoucherCode(
-                                    e.target.value.toUpperCase(),
-                                  )
+                                  setVoucherCode(e.target.value.toUpperCase())
                                 }
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter")
@@ -531,9 +520,7 @@ export function CheckoutModal({
                             <Button
                               className="w-full h-12 text-lg bg-[#480489] hover:bg-[#360368]"
                               onClick={handleValidateVoucher}
-                              disabled={
-                                !voucherCode || isValidatingVoucher
-                              }
+                              disabled={!voucherCode || isValidatingVoucher}
                             >
                               {isValidatingVoucher ? (
                                 <Loader2 className="animate-spin mr-2" />
@@ -623,7 +610,11 @@ export function CheckoutModal({
                       <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder={variant === "debt" ? "Folio, referencia..." : "Observaciones..."}
+                        placeholder={
+                          variant === "debt"
+                            ? "Folio, referencia..."
+                            : "Observaciones..."
+                        }
                         className="w-full text-sm border rounded-lg p-2.5 resize-none h-[72px] focus:outline-none focus:ring-2 focus:ring-[#480489]/30 focus:border-[#480489] transition-all placeholder:text-zinc-400"
                         autoFocus
                         maxLength={200}
@@ -658,14 +649,15 @@ export function CheckoutModal({
                 {/* CUSTOMER SEARCH OR RESTRICTIONS (Only Sale-Credit) */}
                 {method === "credit" && variant === "sale" && (
                   <div className="flex flex-col h-full justify-start space-y-4 pt-0 overflow-y-auto">
-                    {(hasWholesale || discountPercentage > 0) ? (
+                    {hasWholesale || discountPercentage > 0 ? (
                       <div className="flex flex-col items-center justify-center p-8 bg-red-50 border-2 border-red-200 rounded-xl space-y-4 text-center mt-8">
                         <AlertCircle className="w-12 h-12 text-red-500" />
                         <h4 className="font-bold text-red-700 text-lg">
                           Venta a Crédito no disponible
                         </h4>
                         <p className="text-sm text-red-600 font-medium pb-2">
-                          Las ventas a crédito no aplican con precios de mayoreo ni descuentos.
+                          Las ventas a crédito no aplican con precios de mayoreo
+                          ni descuentos.
                         </p>
                         <Button
                           type="button"
@@ -682,179 +674,203 @@ export function CheckoutModal({
                     ) : (
                       <>
                         <div className="space-y-4">
-                      <label className="text-lg font-bold block text-[#480489]">
-                        Cliente para Crédito
-                      </label>
-                      <Popover
-                        open={customerSearchOpen}
-                        onOpenChange={setCustomerSearchOpen}
-                        modal={true}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={customerSearchOpen}
-                            className="w-full justify-between h-14 text-lg"
+                          <label className="text-lg font-bold block text-[#480489]">
+                            Cliente para Crédito
+                          </label>
+                          <Popover
+                            open={customerSearchOpen}
+                            onOpenChange={setCustomerSearchOpen}
+                            modal={true}
                           >
-                            {selectedCustomer ? (
-                              <div className="flex items-center gap-2">
-                                <User className="w-5 h-5 text-[#480489]" />
-                                <span className="font-semibold">
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={customerSearchOpen}
+                                className="w-full justify-between h-14 text-lg"
+                              >
+                                {selectedCustomer ? (
+                                <div className="flex flex-col items-start">
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-4 h-4 text-[#480489]" />
+                                      <span className="font-semibold">
+                                        {selectedCustomer.name}
+                                      </span>
+                                    </div>
+                                    {selectedCustomer.phone && (
+                                      <CopyablePhone
+                                        phone={selectedCustomer.phone}
+                                        noCopy={true}
+                                        className="text-xs text-muted-foreground"
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    Buscar cliente...
+                                  </span>
+                                )}
+                                <Search className="ml-2 h-4 w-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-[--radix-popover-trigger-width] p-0"
+                              align="start"
+                            >
+                              <Command
+                                shouldFilter={false}
+                                className="rounded-lg border-0"
+                              >
+                                <CommandInput
+                                  placeholder="Buscar..."
+                                  value={customerSearchQuery}
+                                  onValueChange={setCustomerSearchQuery}
+                                />
+                                <CommandList>
+                                  <div className="max-h-[300px] overflow-y-auto">
+                                    {isSearchingCustomers && (
+                                      <div className="p-4 text-center text-sm text-muted-foreground">
+                                        <Loader2 className="w-4 h-4 animate-spin inline mr-2" />{" "}
+                                        Buscando...
+                                      </div>
+                                    )}
+                                    {!isSearchingCustomers &&
+                                      customers.length === 0 && (
+                                        <CommandEmpty>
+                                          No hay resultados.
+                                        </CommandEmpty>
+                                      )}
+                                    <CommandGroup>
+                                      {customers.map((c) => (
+                                        <CommandItem
+                                          key={c.id}
+                                          value={c.name}
+                                          onSelect={() => {
+                                            setSelectedCustomer(c);
+                                            setCustomerSearchOpen(false);
+                                          }}
+                                          className="border-b last:border-b-0"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4 shrink-0",
+                                              selectedCustomer?.id === c.id
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+                                          <div className="flex flex-col flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium">{c.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <CopyablePhone
+                                                phone={c.phone}
+                                                noCopy={true}
+                                                className="text-xs text-muted-foreground"
+                                              />
+                                            </div>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </div>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {selectedCustomer ? (
+                          <div
+                            className={cn(
+                              "rounded-xl p-6 border-2",
+                              isCreditLimitExceeded()
+                                ? "bg-red-50 border-red-200"
+                                : "bg-blue-50 border-blue-200",
+                            )}
+                          >
+                            <div className="flex justify-between mb-4">
+                              <div>
+                                <h4 className="font-bold text-lg">
                                   {selectedCustomer.name}
+                                </h4>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  {selectedCustomer.code && (
+                                    <span>{selectedCustomer.code}</span>
+                                  )}
+                                    <CopyablePhone
+                                      phone={selectedCustomer.phone}
+                                      noCopy={true}
+                                      className="text-sm"
+                                    />
+                                </div>
+                              </div>
+                              {isCreditLimitExceeded() ? (
+                                <AlertCircle className="w-8 h-8 text-red-500" />
+                              ) : (
+                                <Check className="w-8 h-8 text-blue-500" />
+                              )}
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Saldo Actual:</span>
+                                <span className="font-medium">
+                                  {formatCurrency(
+                                    selectedCustomer.current_balance,
+                                  )}
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Buscar cliente...
-                              </span>
-                            )}
-                            <Search className="ml-2 h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-[--radix-popover-trigger-width] p-0"
-                          align="start"
-                        >
-                          <Command
-                            shouldFilter={false}
-                            className="rounded-lg border-0"
-                          >
-                            <CommandInput
-                              placeholder="Buscar..."
-                              value={customerSearchQuery}
-                              onValueChange={setCustomerSearchQuery}
-                            />
-                            <CommandList>
-                              <div className="max-h-[300px] overflow-y-auto">
-                                {isSearchingCustomers && (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">
-                                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />{" "}
-                                    Buscando...
-                                  </div>
-                                )}
-                                {!isSearchingCustomers &&
-                                  customers.length === 0 && (
-                                    <CommandEmpty>
-                                      No hay resultados.
-                                    </CommandEmpty>
-                                  )}
-                                <CommandGroup>
-                                  {customers.map((c) => (
-                                    <CommandItem
-                                      key={c.id}
-                                      value={c.name}
-                                      onSelect={() => {
-                                        setSelectedCustomer(c);
-                                        setCustomerSearchOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          selectedCustomer?.id === c.id
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
-                                      <div className="flex flex-col">
-                                        <span>{c.name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          Saldo:{" "}
-                                          {formatCurrency(c.current_balance)}
-                                        </span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
+                              <div className="flex justify-between">
+                                <span>+ Compra:</span>
+                                <span className="font-bold">
+                                  {formatCurrency(remainingTotal)}
+                                </span>
                               </div>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {selectedCustomer ? (
-                      <div
-                        className={cn(
-                          "rounded-xl p-6 border-2",
-                          isCreditLimitExceeded()
-                            ? "bg-red-50 border-red-200"
-                            : "bg-blue-50 border-blue-200",
-                        )}
-                      >
-                        <div className="flex justify-between mb-4">
-                          <div>
-                            <h4 className="font-bold text-lg">
-                              {selectedCustomer.name}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              Estado de Cuenta
-                            </p>
-                          </div>
-                          {isCreditLimitExceeded() ? (
-                            <AlertCircle className="w-8 h-8 text-red-500" />
-                          ) : (
-                            <Check className="w-8 h-8 text-blue-500" />
-                          )}
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Saldo Actual:</span>
-                            <span className="font-medium">
-                              {formatCurrency(
-                                selectedCustomer.current_balance,
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>+ Compra:</span>
-                            <span className="font-bold">
-                              {formatCurrency(remainingTotal)}
-                            </span>
-                          </div>
-                          <div className="h-px bg-black/10 my-2" />
-                          <div className="flex justify-between text-base font-bold">
-                            <span>Nuevo Saldo:</span>
-                            <span
-                              className={
-                                isCreditLimitExceeded()
-                                  ? "text-red-600"
-                                  : "text-zinc-900"
-                              }
-                            >
-                              {formatCurrency(
-                                selectedCustomer.current_balance +
-                                  remainingTotal,
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground pt-2">
-                            <span>Límite:</span>
-                            <span>
-                              {formatCurrency(selectedCustomer.credit_limit)}
-                            </span>
-                          </div>
-                        </div>
-                        {isCreditLimitExceeded() && (
-                          <div className="mt-4 bg-red-100 text-red-800 p-3 rounded-md text-sm font-semibold flex items-center gap-2">
-                            <XCircle className="w-4 h-4" /> Excedido por{" "}
-                            {formatCurrency(
-                              selectedCustomer.current_balance +
-                                remainingTotal -
-                                selectedCustomer.credit_limit,
+                              <div className="h-px bg-black/10 my-2" />
+                              <div className="flex justify-between text-base font-bold">
+                                <span>Nuevo Saldo:</span>
+                                <span
+                                  className={
+                                    isCreditLimitExceeded()
+                                      ? "text-red-600"
+                                      : "text-zinc-900"
+                                  }
+                                >
+                                  {formatCurrency(
+                                    selectedCustomer.current_balance +
+                                      remainingTotal,
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-muted-foreground pt-2">
+                                <span>Límite:</span>
+                                <span>
+                                  {formatCurrency(
+                                    selectedCustomer.credit_limit,
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            {isCreditLimitExceeded() && (
+                              <div className="mt-4 bg-red-100 text-red-800 p-3 rounded-md text-sm font-semibold flex items-center gap-2">
+                                <XCircle className="w-4 h-4" /> Excedido por{" "}
+                                {formatCurrency(
+                                  selectedCustomer.current_balance +
+                                    remainingTotal -
+                                    selectedCustomer.credit_limit,
+                                )}
+                              </div>
                             )}
                           </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center flex-1 text-zinc-400 border-2 border-dashed rounded-xl border-zinc-200">
+                            <Search className="w-12 h-12 mb-2 opacity-20" />
+                            <p>Busca un cliente</p>
+                          </div>
                         )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center flex-1 text-zinc-400 border-2 border-dashed rounded-xl border-zinc-200">
-                        <Search className="w-12 h-12 mb-2 opacity-20" />
-                        <p>Busca un cliente</p>
-                      </div>
+                      </>
                     )}
-                    </>
-                  )}
                   </div>
                 )}
 
@@ -952,10 +968,7 @@ export function CheckoutModal({
                             symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                             value={cashAmount}
                             onChange={(e) =>
-                              handleNumericInput(
-                                e.target.value,
-                                setCashAmount,
-                              )
+                              handleNumericInput(e.target.value, setCashAmount)
                             }
                             placeholder="0.00"
                             autoFocus
@@ -978,10 +991,7 @@ export function CheckoutModal({
                             symbolClassName="left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-4xl"
                             value={cardAmount}
                             onChange={(e) =>
-                              handleNumericInput(
-                                e.target.value,
-                                setCardAmount,
-                              )
+                              handleNumericInput(e.target.value, setCardAmount)
                             }
                             readOnly={variant === "sale"}
                             tabIndex={variant === "sale" ? -1 : 0}
@@ -1031,8 +1041,6 @@ export function CheckoutModal({
                       </span>
                     </div>
                   )}
-
-
               </div>
             </div>
 
