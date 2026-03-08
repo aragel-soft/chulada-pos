@@ -311,12 +311,18 @@ pub fn get_kit_details(
     })
 }
 
+#[derive(Serialize)]
+pub struct ProductConflict {
+    product_id: String,
+    reason: String, // "main" | "item"
+}
+
 #[tauri::command]
 pub fn check_products_in_active_kits(
     db_state: State<'_, Mutex<Connection>>,
     product_ids: Vec<String>,
     exclude_kit_id: Option<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ProductConflict>, String> {
     if product_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -328,30 +334,80 @@ pub fn check_products_in_active_kits(
         .collect::<Vec<_>>()
         .join(",");
 
-    let mut sql = format!(
-        "SELECT main_product_id FROM product_kit_main WHERE main_product_id IN ({})",
-        placeholders
-    );
+    let mut conflicts: Vec<ProductConflict> = Vec::new();
 
-    let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(product_ids.len() + 1);
+    // Buscar conflictos en product_kit_main (producto ya es main en otro kit)
+    {
+        let mut sql = format!(
+            "SELECT DISTINCT main_product_id FROM product_kit_main WHERE main_product_id IN ({})",
+            placeholders
+        );
 
-    for id in &product_ids {
-        params.push(id);
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(product_ids.len() + 1);
+        for id in &product_ids {
+            params.push(id);
+        }
+
+        if let Some(ref kit_id) = exclude_kit_id {
+            sql.push_str(" AND kit_option_id != ?");
+            params.push(kit_id);
+        }
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let rows: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(params), |row| row.get(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+
+        for pid in rows {
+            conflicts.push(ProductConflict {
+                product_id: pid,
+                reason: "main".to_string(),
+            });
+        }
     }
 
-    if let Some(ref kit_id) = exclude_kit_id {
-        sql.push_str(" AND kit_option_id != ?");
-        params.push(kit_id);
+    // Buscar conflictos en product_kit_items (producto ya es item/complemento en otro kit)
+    {
+        let mut sql = format!(
+            "SELECT DISTINCT pki.included_product_id 
+             FROM product_kit_items pki
+             JOIN product_kit_options pko ON pki.kit_option_id = pko.id
+             WHERE pki.included_product_id IN ({})
+             AND pko.is_active = 1 AND pko.deleted_at IS NULL",
+            placeholders
+        );
+
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(product_ids.len() + 1);
+        for id in &product_ids {
+            params.push(id);
+        }
+
+        if let Some(ref kit_id) = exclude_kit_id {
+            sql.push_str(" AND pki.kit_option_id != ?");
+            params.push(kit_id);
+        }
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let rows: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(params), |row| row.get(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+
+        for pid in rows {
+            // Evitar duplicar si ya tiene conflicto como main
+            if !conflicts.iter().any(|c| c.product_id == pid) {
+                conflicts.push(ProductConflict {
+                    product_id: pid,
+                    reason: "item".to_string(),
+                });
+            }
+        }
     }
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-
-    let existing_ids: Result<Vec<String>, _> = stmt
-        .query_map(rusqlite::params_from_iter(params), |row| row.get(0))
-        .map_err(|e| e.to_string())?
-        .collect();
-
-    existing_ids.map_err(|e| e.to_string())
+    Ok(conflicts)
 }
 
 #[tauri::command]
@@ -380,6 +436,7 @@ pub fn create_kit(
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
     {
+        // Validar que los triggers no sean main en otro kit
         let placeholders: String = payload
             .trigger_product_ids
             .iter()
@@ -403,9 +460,68 @@ pub fn create_kit(
 
         if let Some(name) = conflict_name {
             return Err(format!(
-                "El producto '{}' ya pertenece a otro kit activo. No se puede continuar.",
+                "El producto '{}' ya es Producto Principal en otro kit activo.",
                 name
             ));
+        }
+
+        // Validar que los productos main no sean complemento en otro kit
+        let check_items_sql = format!(
+            "SELECT p.name FROM product_kit_items pki
+       JOIN products p ON pki.included_product_id = p.id
+       JOIN product_kit_options pko ON pki.kit_option_id = pko.id
+       WHERE pki.included_product_id IN ({})
+       AND pko.is_active = 1 AND pko.deleted_at IS NULL
+       LIMIT 1",
+            placeholders
+        );
+
+        let mut check_items_stmt = tx.prepare(&check_items_sql).map_err(|e| e.to_string())?;
+        let params2 = rusqlite::params_from_iter(payload.trigger_product_ids.iter());
+
+        let items_conflict: Option<String> = check_items_stmt
+            .query_row(params2, |row| row.get(0))
+            .optional()
+            .map_err(|e| format!("Error verificando conflictos cruzados: {}", e))?;
+
+        if let Some(name) = items_conflict {
+            return Err(format!(
+                "El producto '{}' ya es Complemento en otro kit activo. No puede ser Producto Principal.",
+                name
+            ));
+        }
+
+        // Validar que los complementos no sean main en otro kit
+        let item_ids: Vec<&String> = payload
+            .included_items
+            .iter()
+            .map(|i| &i.product_id)
+            .collect();
+        if !item_ids.is_empty() {
+            let item_placeholders: String =
+                item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let check_main_sql = format!(
+                "SELECT p.name FROM product_kit_main pkm
+           JOIN products p ON pkm.main_product_id = p.id
+           WHERE pkm.main_product_id IN ({})
+           LIMIT 1",
+                item_placeholders
+            );
+
+            let mut check_main_stmt = tx.prepare(&check_main_sql).map_err(|e| e.to_string())?;
+            let params3 = rusqlite::params_from_iter(item_ids.iter());
+
+            let main_conflict: Option<String> = check_main_stmt
+                .query_row(params3, |row| row.get(0))
+                .optional()
+                .map_err(|e| format!("Error verificando conflictos cruzados: {}", e))?;
+
+            if let Some(name) = main_conflict {
+                return Err(format!(
+                    "El producto '{}' ya es Producto Principal en otro kit activo. No puede ser Complemento.",
+                    name
+                ));
+            }
         }
 
         let kit_id = Uuid::new_v4().to_string();
@@ -631,6 +747,7 @@ pub fn update_kit(
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
 
     {
+        // Validar que los triggers no sean main en otro kit
         let placeholders: String = payload
             .trigger_product_ids
             .iter()
@@ -661,9 +778,80 @@ pub fn update_kit(
 
         if let Some(name) = conflict_name {
             return Err(format!(
-                "El producto '{}' ya pertenece a OTRO kit activo.",
+                "El producto '{}' ya es Producto Principal en OTRO kit activo.",
                 name
             ));
+        }
+
+        // Validar que los triggers no sean complemento en otro kit
+        let check_items_sql = format!(
+            "SELECT p.name FROM product_kit_items pki
+       JOIN products p ON pki.included_product_id = p.id
+       JOIN product_kit_options pko ON pki.kit_option_id = pko.id
+       WHERE pki.included_product_id IN ({})
+       AND pki.kit_option_id != ?
+       AND pko.is_active = 1 AND pko.deleted_at IS NULL
+       LIMIT 1",
+            placeholders
+        );
+
+        let mut params_vec2: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        for id in &payload.trigger_product_ids {
+            params_vec2.push(id);
+        }
+        params_vec2.push(&kit_id);
+
+        let mut check_items_stmt = tx.prepare(&check_items_sql).map_err(|e| e.to_string())?;
+
+        let items_conflict: Option<String> = check_items_stmt
+            .query_row(rusqlite::params_from_iter(params_vec2), |row| row.get(0))
+            .optional()
+            .map_err(|e| format!("Error verificando conflictos cruzados: {}", e))?;
+
+        if let Some(name) = items_conflict {
+            return Err(format!(
+                "El producto '{}' ya es Complemento en otro kit activo. No puede ser Producto Principal.",
+                name
+            ));
+        }
+
+        // Validar que los complementos no sean main en otro kit
+        let item_ids: Vec<&String> = payload
+            .included_items
+            .iter()
+            .map(|i| &i.product_id)
+            .collect();
+        if !item_ids.is_empty() {
+            let item_placeholders: String =
+                item_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let check_main_sql = format!(
+                "SELECT p.name FROM product_kit_main pkm
+           JOIN products p ON pkm.main_product_id = p.id
+           WHERE pkm.main_product_id IN ({})
+           AND pkm.kit_option_id != ?
+           LIMIT 1",
+                item_placeholders
+            );
+
+            let mut params_vec3: Vec<&dyn rusqlite::ToSql> = Vec::new();
+            for id in &item_ids {
+                params_vec3.push(*id);
+            }
+            params_vec3.push(&kit_id);
+
+            let mut check_main_stmt = tx.prepare(&check_main_sql).map_err(|e| e.to_string())?;
+
+            let main_conflict: Option<String> = check_main_stmt
+                .query_row(rusqlite::params_from_iter(params_vec3), |row| row.get(0))
+                .optional()
+                .map_err(|e| format!("Error verificando conflictos cruzados: {}", e))?;
+
+            if let Some(name) = main_conflict {
+                return Err(format!(
+                    "El producto '{}' ya es Producto Principal en otro kit activo. No puede ser Complemento.",
+                    name
+                ));
+            }
         }
 
         tx.execute(

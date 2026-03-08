@@ -1,3 +1,8 @@
+export interface ProductConflict {
+  product_id: string;
+  reason: "main" | "item";
+}
+
 export interface KitListItem {
   id: string;
   name: string;
@@ -60,6 +65,6 @@ export interface KitDetails {
   description?: string;
   is_required: boolean;
   is_active: boolean;
-  triggers: KitProductDetail[]; 
-  items: KitIncludedItem[]; 
+  triggers: KitProductDetail[];
+  items: KitIncludedItem[];
 }
