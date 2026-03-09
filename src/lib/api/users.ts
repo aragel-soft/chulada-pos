@@ -62,3 +62,33 @@ export async function deleteUsers(userIds: string[], currentUserId: string): Pro
     }
   }
 }
+
+export interface UpdateProfilePayload {
+  id: string;
+  full_name: string;
+  avatar_url?: string | null;
+}
+
+export async function updateOwnProfile(payload: UpdateProfilePayload): Promise<User> {
+  try {
+    return await invoke<User>('update_own_profile', { payload });
+  } catch (error) {
+    try {
+      const errorObj = JSON.parse(error as string);
+      throw errorObj;
+    } catch (e) {
+      if ((e as any).code) throw e;
+      throw { code: 'UNKNOWN_ERROR', message: String(error) };
+    }
+  }
+}
+
+export interface ChangePasswordPayload {
+  id: string;
+  current_password: string;
+  new_password: string;
+}
+
+export async function changeOwnPassword(payload: ChangePasswordPayload): Promise<void> {
+  await invoke('change_own_password', { payload });
+}

@@ -36,6 +36,8 @@ fn main() {
             commands::settings::users::get_users_list,
             commands::settings::users::update_user,
             commands::settings::users::delete_users,
+            commands::settings::users::update_own_profile,
+            commands::settings::users::change_own_password,
             // Settings - Permissions
             commands::settings::permissions::get_all_permissions,
             commands::settings::permissions::get_role_permissions,

@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use rusqlite::Connection;
@@ -544,3 +544,146 @@ pub async fn delete_users(
 
     Ok(())
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateProfilePayload {
+    pub id: String,
+    pub full_name: String,
+    pub avatar_url: Option<String>,
+}
+
+#[tauri::command]
+pub async fn update_own_profile(
+    app_handle: tauri::AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    payload: UpdateProfilePayload,
+) -> Result<User, String> {
+    let conn = db.lock().map_err(|e| CreateUserError {
+        code: "DB_LOCK_ERROR".to_string(),
+        message: format!("Error al acceder a la base de datos: {}", e),
+    })?;
+
+    let current_avatar_url: Option<String> = conn
+        .query_row(
+            "SELECT avatar_url FROM users WHERE id = ?",
+            [&payload.id],
+            |row| row.get(0),
+        )
+        .unwrap_or(None);
+
+    let (new_avatar_for_db, should_delete_old) = match &payload.avatar_url {
+        Some(new_url) => {
+            if std::path::Path::new(new_url).is_absolute() {
+                (current_avatar_url.clone(), false)
+            } else {
+                let is_different = match &current_avatar_url {
+                    Some(old) => old != new_url,
+                    None => true,
+                };
+                (Some(new_url.clone()), is_different)
+            }
+        }
+        None => (None, true),
+    };
+
+    if should_delete_old {
+        if let Some(old_relative) = &current_avatar_url {
+            if let Ok(app_dir) = app_handle.path().app_data_dir() {
+                let old_path = app_dir.join(old_relative);
+                let _ = std::fs::remove_file(old_path);
+            }
+        }
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "UPDATE users SET 
+            full_name = ?1, 
+            avatar_url = ?2, 
+            updated_at = ?3 
+         WHERE id = ?4",
+        rusqlite::params![
+            &payload.full_name,
+            &new_avatar_for_db,
+            &now,
+            &payload.id
+        ],
+    )
+    .map_err(|e| CreateUserError {
+        code: "DB_UPDATE_ERROR".to_string(),
+        message: format!("Error al actualizar perfil: {}", e),
+    })?;
+
+    let (username, role_id, is_active, created_at): (String, String, bool, String) = conn
+        .query_row(
+            "SELECT username, role_id, is_active, created_at FROM users WHERE id = ?",
+            [&payload.id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get::<_, i32>(2)? == 1, row.get(3)?)),
+        )
+        .map_err(|e| CreateUserError {
+            code: "DB_QUERY_ERROR".to_string(),
+            message: format!("Error al obtener usuario actualizado: {}", e),
+        })?;
+
+    Ok(User {
+        id: payload.id.clone(),
+        username,
+        full_name: payload.full_name,
+        role_id,
+        is_active,
+        avatar_url: new_avatar_for_db,
+        created_at,
+    })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangePasswordPayload {
+    pub id: String,
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[tauri::command]
+pub async fn change_own_password(
+    db: State<'_, Mutex<Connection>>,
+    payload: ChangePasswordPayload,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("Error al acceder a la BD: {}", e))?;
+
+    let current_hash: String = conn
+        .query_row(
+            "SELECT password_hash FROM users WHERE id = ?",
+            [&payload.id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Usuario no encontrado".to_string())?;
+
+    let parsed_hash = PasswordHash::new(&current_hash).map_err(|_| "Error interno de validación".to_string())?;
+
+    let is_valid = Argon2::default()
+        .verify_password(payload.current_password.as_bytes(), &parsed_hash)
+        .is_ok();
+
+    if !is_valid {
+        return Err("La contraseña actual es incorrecta".to_string());
+    }
+
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let new_password_hash = argon2
+        .hash_password(payload.new_password.as_bytes(), &salt)
+        .map_err(|_| "Error al generar nueva contraseña".to_string())?
+        .to_string();
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![&new_password_hash, &now, &payload.id],
+    )
+    .map_err(|e| format!("Error al actualizar contraseña: {}", e))?;
+
+    Ok(())
+}
+
