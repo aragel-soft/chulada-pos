@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from "@/stores/authStore";
+import { useUiStore } from '@/stores/uiStore';
 import { cn } from "@/lib/utils";
 import CustomersTable from '@/features/customers/components/CustomersTable';
 
@@ -16,12 +17,14 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuthStore();
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   const availableTabs = customersTabs.filter((tab) => can(tab.permission));
   const currentTab =
     location.pathname.split("/")[2] || availableTabs[0]?.value || "";
 
   const onTabChange = (value: string) => {
+    setActiveTab('customers', value);
     navigate(`/customers/${value}`);
   };
 

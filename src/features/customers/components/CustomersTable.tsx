@@ -22,19 +22,25 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getCustomers } from "@/lib/api/customers";
 import { CustomerFormDialog } from "./CustomerFormDialog";
 import { DeleteCustomersDialog } from "./DeleteCustomersDialog";
-import { useUrlPagination } from "@/hooks/use-url-pagination";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function CustomersTable() {
   const navigate = useNavigate(); 
   const [sorting, setSorting] = useState<SortingState>([]);
   const { 
-      page, 
-      setPage, 
-      pageSize, 
-      setPageSize, 
-      search, 
-      setSearch 
-    } = useUrlPagination({ defaultPageSize: 16 });
+    globalFilter: search,
+    pagination: persistedPagination,
+    onGlobalFilterChange: setPersistedSearch, 
+    onPaginationChange: setPersistedPagination
+  } = usePersistedTableState('customers');
+  
+  const page = persistedPagination.pageIndex + 1;
+  const pageSize = persistedPagination.pageSize;
+  
+  const setSearch = (val: string) => setPersistedSearch(val);
+  const setPage = (p: number) => setPersistedPagination({ ...persistedPagination, pageIndex: p - 1 });
+  const setPageSize = (ps: number) => setPersistedPagination({ pageIndex: 0, pageSize: ps });
+  
   const paginationState: PaginationState = useMemo(() => ({
     pageIndex: page - 1,
     pageSize: pageSize,
