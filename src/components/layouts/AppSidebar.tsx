@@ -1,6 +1,7 @@
 import { Home, Package, Users, ClipboardList, Settings, ChartBarBig } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { useUiStore } from '@/stores/uiStore';
 import {
   Sidebar,
   SidebarContent,
@@ -99,11 +100,23 @@ export function AppSidebar() {
     }
 
     const { path, firstTabPath } = item;
+    const moduleKey = path.replace('/', '');
 
-    if (location.pathname === path) return;
-    if (firstTabPath && location.pathname === firstTabPath) return;
+    if (path === '/dashboard') {
+      if (location.pathname === path || location.pathname === firstTabPath) return;
+      navigate(path);
+      return;
+    }
 
-    navigate(path);
+    const rememberedTab = useUiStore.getState().activeTabs[moduleKey];
+    const targetPath = rememberedTab
+      ? `${path}/${rememberedTab}`
+      : path;
+      
+    if (location.pathname === targetPath) return;
+    if (!rememberedTab && firstTabPath && location.pathname === firstTabPath) return;
+
+    navigate(targetPath);
   };
 
   const renderMenuItem = (item: NavItem) => {
