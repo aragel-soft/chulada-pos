@@ -1,15 +1,13 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { DateRange } from "react-day-picker";
 import { startOfMonth } from "date-fns";
-
 import { DateRangeSelector } from "@/components/ui/date-range-selector";
-
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import { cn } from "@/lib/utils";
 import { useUiStore } from '@/stores/uiStore';
 import { ReportsProvider } from "@/features/reports/context/ReportsContext";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 const reportTabs = [
   { value: "finances", label: "Finanzas" },
@@ -23,10 +21,25 @@ export default function ReportsPage() {
   const location = useLocation();
   const setActiveTab = useUiStore((s) => s.setActiveTab);
 
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+  const { getExtraFilter, setExtraFilter } = usePersistedTableState("reports.global");
+
+  const defaultDateRange: DateRange = useMemo(() => ({
     from: startOfMonth(new Date()),
     to: new Date(),
-  });
+  }), []);
+
+  const rawDateRange = getExtraFilter<DateRange | undefined>("dateRange", defaultDateRange);
+  const dateRange = useMemo(() => {
+    if (!rawDateRange) return undefined;
+    return {
+      from: rawDateRange.from ? new Date(rawDateRange.from) : undefined,
+      to: rawDateRange.to ? new Date(rawDateRange.to) : undefined,
+    };
+  }, [rawDateRange]);
+
+  const handleDateChange = (newDate: DateRange | undefined) => {
+    setExtraFilter("dateRange", newDate);
+  };
 
   const currentTab = location.pathname.split("/")[2] || reportTabs[0].value;
 
@@ -43,7 +56,7 @@ export default function ReportsPage() {
           <div className="flex items-center space-x-2">
             <DateRangeSelector
               dateRange={dateRange}
-              onSelect={setDateRange}
+              onSelect={handleDateChange}
               disabled={false}
             />
           </div>
