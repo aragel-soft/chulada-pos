@@ -143,6 +143,7 @@ pub struct ProductFilters {
     pub tag_ids: Option<Vec<String>>,
     pub stock_status: Option<Vec<String>>, // 'out', 'low', 'ok'
     pub active_status: Option<Vec<String>>, // 'active', 'inactive'
+    pub exact_code: Option<String>,
 }
 
 #[tauri::command]
@@ -194,6 +195,12 @@ pub fn get_products(
     }
 
     if let Some(f) = filters {
+        if let Some(code) = f.exact_code {
+            dq.add_condition("(p.code = ? OR p.barcode = ?)");
+            dq.add_param(code.clone());
+            dq.add_param(code.clone());
+        }
+
         if let Some(cats) = f.category_ids {
             if !cats.is_empty() {
                 let placeholders: Vec<String> = cats.iter().map(|_| "?".to_string()).collect();
