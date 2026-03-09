@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   SortingState,
-  ColumnFiltersState,
   OnChangeFn,
 } from "@tanstack/react-table";
 import { PlusCircle } from "lucide-react";
@@ -22,12 +21,17 @@ export default function InventoryMovementsPage() {
   const [data, setData] = useState<InventoryMovement[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { globalFilter, pagination, onGlobalFilterChange: setPersistedGlobalFilter, onPaginationChange: setPersistedPagination } = usePersistedTableState('inventory.movements');
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);  
+  const { 
+    globalFilter, pagination, columnFilters, extraFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+    setExtraFilter,
+  } = usePersistedTableState('inventory.movements');
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true }
   ]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const dateRange = extraFilters.dateRange as DateRange | undefined;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const fetchMovements = async () => {
@@ -91,17 +95,12 @@ export default function InventoryMovementsPage() {
     setPersistedGlobalFilter(newValue);
   };
 
-  const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updaterOrValue) => {
-    setColumnFilters((prev) => {
-      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
-      return next;
-    });
-    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  const handleColumnFiltersChange: OnChangeFn<any> = (updaterOrValue) => {
+    setPersistedColumnFilters(updaterOrValue);
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
-    setDateRange(range);
-    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setExtraFilter('dateRange', range);
   };
 
   const columns = useMemo(() => getColumns(), []);

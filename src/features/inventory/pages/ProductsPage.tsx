@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   RowSelectionState,
   SortingState,
-  ColumnFiltersState,
 } from "@tanstack/react-table";
 import { PlusCircle, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,8 +30,12 @@ export default function ProductsPage() {
   const [selectedProductsForBulk, setSelectedProductsForBulk] = useState<Product[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productsToDelete, setProductsToDelete] = useState<Product[]>([]);
-  const { globalFilter, pagination, onGlobalFilterChange: setPersistedGlobalFilter, onPaginationChange: setPersistedPagination } = usePersistedTableState('inventory.products');
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { 
+    globalFilter, pagination, columnFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+  } = usePersistedTableState('inventory.products');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
@@ -118,11 +121,7 @@ export default function ProductsPage() {
   }
 
   const handleColumnFiltersChange = (updaterOrValue: any) => {
-    setColumnFilters((prev) => {
-      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
-      return next;
-    });
-    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPersistedColumnFilters(updaterOrValue);
   };
 
   const columns = useMemo(() => getColumns(can, categories), [can, categories]);
