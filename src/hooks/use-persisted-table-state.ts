@@ -68,8 +68,11 @@ export function usePersistedTableState(tableKey: string, defaultPageSize = DEFAU
   const setExtraFilter = useCallback(
     (filterKey: string, value: unknown) => {
       setTableExtraFilter(tableKey, filterKey, value);
+      const current = useUiStore.getState().tableStates[tableKey]?.pagination
+        ?? { pageIndex: 0, pageSize: defaultPageSize };
+      setTablePagination(tableKey, { ...current, pageIndex: 0 });
     },
-    [tableKey, setTableExtraFilter],
+    [tableKey, defaultPageSize, setTableExtraFilter, setTablePagination],
   );
 
   const getExtraFilter = useCallback(

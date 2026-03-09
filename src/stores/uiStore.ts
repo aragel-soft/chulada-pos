@@ -94,7 +94,6 @@ export const useUiStore = create<UiState>((set, get) => ({
           [tableKey]: {
             ...prev,
             extraFilters: { ...prev.extraFilters, [filterKey]: value },
-            pagination: { ...prev.pagination, pageIndex: 0 },
           },
         },
       };

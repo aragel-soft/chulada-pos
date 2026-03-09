@@ -24,6 +24,7 @@ const TABLE_KEY = 'dashboard.history';
 
 export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<SalesHistoryFilter> } = {}) => {
   const persistedTableState = useUiStore.getState().tableStates[TABLE_KEY];
+  const persistedExtras = persistedTableState?.extraFilters ?? {};
 
   const [filters, setFilters] = useState<SalesHistoryFilter>({
     ...INITIAL_FILTER,
@@ -32,11 +33,17 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
       search: persistedTableState.globalFilter || INITIAL_FILTER.search,
       page: persistedTableState.pagination.pageIndex + 1,
       page_size: persistedTableState.pagination.pageSize,
+      start_date: (persistedExtras.start_date as string) ?? INITIAL_FILTER.start_date,
+      end_date: (persistedExtras.end_date as string) ?? INITIAL_FILTER.end_date,
+      status: (persistedExtras.status as string[]) ?? INITIAL_FILTER.status,
+      payment_method: (persistedExtras.payment_method as string[]) ?? INITIAL_FILTER.payment_method,
+      user_id: (persistedExtras.user_id as string | null) ?? INITIAL_FILTER.user_id,
     } : {}),
   });
 
   const setTableSearch = useUiStore((s) => s.setTableSearch);
   const setTablePagination = useUiStore((s) => s.setTablePagination);
+  const setTableExtraFilter = useUiStore((s) => s.setTableExtraFilter);
 
   const syncToStore = (newFilters: SalesHistoryFilter) => {
     setTableSearch(TABLE_KEY, newFilters.search || '');
@@ -44,6 +51,11 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
       pageIndex: newFilters.page - 1,
       pageSize: newFilters.page_size,
     });
+    setTableExtraFilter(TABLE_KEY, 'start_date', newFilters.start_date);
+    setTableExtraFilter(TABLE_KEY, 'end_date', newFilters.end_date);
+    setTableExtraFilter(TABLE_KEY, 'status', newFilters.status);
+    setTableExtraFilter(TABLE_KEY, 'payment_method', newFilters.payment_method);
+    setTableExtraFilter(TABLE_KEY, 'user_id', newFilters.user_id);
   };
 
   const historyQuery = useQuery({
