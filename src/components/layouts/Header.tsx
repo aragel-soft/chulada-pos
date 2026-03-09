@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useState, useEffect } from 'react';
+import { Separator } from '../ui/separator';
 
 export function Header() {
   const navigate = useNavigate();
@@ -146,6 +147,7 @@ export function Header() {
                   Mi Perfil
                 </DropdownMenuItem>
               )}
+              <Separator/>
               <DropdownMenuItem
                 onSelect={(e) => {
                   e.preventDefault();
