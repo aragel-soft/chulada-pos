@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { PaginationState, SortingState } from "@tanstack/react-table";
+import { SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getTopSellersColumns } from "@/features/reports/components/columns/top-sellers-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
@@ -8,16 +8,14 @@ import { useReportsContext } from "@/features/reports/context/ReportsContext";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
 import { CategoryListDto } from "@/types/categories";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function TopSellersPage() {
   const { dateRange } = useReportsContext();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
+  const { pagination, onPaginationChange: setPagination } = usePersistedTableState('reports.top-sellers');
   const [sorting, setSorting] = useState<SortingState>([{ id: "total_revenue", desc: true }]);
 
   const categoryIds = useMemo(

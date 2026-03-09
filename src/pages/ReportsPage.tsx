@@ -8,6 +8,7 @@ import { DateRangeSelector } from "@/components/ui/date-range-selector";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { cn } from "@/lib/utils";
+import { useUiStore } from '@/stores/uiStore';
 import { ReportsProvider } from "@/features/reports/context/ReportsContext";
 
 const reportTabs = [
@@ -20,6 +21,7 @@ const reportTabs = [
 export default function ReportsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -29,6 +31,7 @@ export default function ReportsPage() {
   const currentTab = location.pathname.split("/")[2] || reportTabs[0].value;
 
   const onTabChange = (value: string) => {
+    setActiveTab('reports', value);
     navigate(`/reports/${value}`);
   };
 
