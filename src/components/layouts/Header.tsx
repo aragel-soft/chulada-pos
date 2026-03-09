@@ -1,4 +1,4 @@
-import { Menu, Bell, ChevronDown, LogOut, Wallet } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, Wallet, User as UserIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useCashRegisterStore } from '@/stores/cashRegisterStore';
@@ -28,6 +28,7 @@ export function Header() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const can = useAuthStore((state) => state.can);
   const { toggleSidebar } = useSidebar();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -136,6 +137,15 @@ export function Header() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
+              {can('profile:view') && (
+                <DropdownMenuItem
+                  onSelect={() => navigate('/settings/profile')}
+                  className="cursor-pointer"
+                >
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Mi Perfil
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onSelect={(e) => {
                   e.preventDefault();
