@@ -95,7 +95,7 @@ export function KitSelectionModal({ isOpen, kit, triggerQuantity, currentGiftsCo
             <span>Selecciona tus Complementos</span>
           </DialogTitle>
           <DialogDescription>
-            Elige los regalos que complementan a: <strong>{kit.name}</strong>
+            Elige los complementos para el kit: <strong>{kit.name}</strong>
             <br />
             Progreso: <strong>{progressPercentage}%</strong> ({currentSelectedCredits.toFixed(2)} / {totalNeededCredits} créditos de regalo)
           </DialogDescription>
