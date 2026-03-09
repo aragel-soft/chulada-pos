@@ -94,4 +94,5 @@ export interface ProductFilters {
   tag_ids?: string[];
   stock_status?: string[]; // 'out', 'low', 'ok'
   active_status?: string[]; // 'active', 'inactive'
+  exact_code?: string;
 }

@@ -105,11 +105,14 @@ export default function ReceptionPage() {
         {
           page: 1,
           pageSize: 5,
-          search: cleanCode,
+          search: "",
           sortBy: "name",
           sortOrder: "asc",
         },
-        { active_status: [] },
+        { 
+          active_status: [],
+          exact_code: cleanCode
+        },
       );
       const product = result.data.find(
         (p) => p.code === cleanCode || p.barcode === cleanCode,
