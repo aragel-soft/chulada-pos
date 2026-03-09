@@ -37,6 +37,7 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuthStore();
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
+  const [uploadKey, setUploadKey] = useState(0);
 
   // --- Formulario General ---
   const generalForm = useForm<UpdateProfileForm>({
@@ -78,6 +79,7 @@ export default function ProfilePage() {
       toast.success('Perfil actualizado correctamente');
       setAvatarFile(null);
       setAvatarRemoved(false);
+      setUploadKey(prev => prev + 1);
       generalForm.reset({
         full_name: updatedUser.full_name,
         avatar_url: updatedUser.avatar_url || '',
@@ -146,6 +148,9 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
+  const currentFullName = generalForm.watch('full_name');
+  const hasChanges = (currentFullName !== user.full_name) || avatarFile !== null || avatarRemoved;
+
   return (
     <div className="h-[calc(100vh-120px)] overflow-y-auto">
       <div className="space-y-6 max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-sm border mb-8">
@@ -163,6 +168,7 @@ export default function ProfilePage() {
         <Form {...generalForm}>
           <form onSubmit={generalForm.handleSubmit(onGeneralSubmit)} className="space-y-4">
             <AvatarUpload
+              key={`avatar-upload-${uploadKey}`}
               existingPath={
                 avatarRemoved
                   ? null
@@ -192,7 +198,8 @@ export default function ProfilePage() {
             <div className="flex justify-end">
               <Button
                 type="submit"
-                disabled={updateProfileMutation.isPending}
+                className="bg-purple-600 hover:bg-purple-700"
+                disabled={!hasChanges || updateProfileMutation.isPending}
               >
                 {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
               </Button>
