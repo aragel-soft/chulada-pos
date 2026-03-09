@@ -54,7 +54,7 @@ export const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
     label: "CANCELADA",
   },
   partial_return: {
-    className: "bg-yellow-600 hover:bg-yellow-700 text-white border-none flex items-center gap-1",
+    className: "bg-orange-600 hover:bg-orange-700 text-white border-none flex items-center gap-1",
     icon: RotateCcw,
     label: "DEVOLUCIÓN PARCIAL",
   },
