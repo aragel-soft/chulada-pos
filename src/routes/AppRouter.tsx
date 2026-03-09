@@ -35,8 +35,7 @@ import TopSellersPage from '@/features/reports/pages/TopSellersPage';
 import DeadStockPage from '@/features/reports/pages/DeadStockPage';
 import InventoryReportPage from '@/features/reports/pages/InventoryReportPage';
 
-// --- Componente de ejemplo para settings ---
-const ProfilePage = () => <div className="p-4 rounded-lg border"><h2>Configuración de Perfil</h2><p>Aquí iría tu formulario de perfil...</p></div>;
+import ProfilePage from '@/features/settings/pages/ProfilePage';
 
 const router = createBrowserRouter([
   // --- Ruta Pública ---

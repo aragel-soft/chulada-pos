@@ -13,7 +13,7 @@ export const changePasswordSchema = z.object({
   confirm_password: z.string().trim().min(1, { message: "Debes confirmar la contraseña" }),
 }).refine((data) => data.new_password === data.confirm_password, {
   message: "Las contraseñas no coinciden",
-  path: ["confirm_password"], // path of error
+  path: ["confirm_password"],
 });
 
 export type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
