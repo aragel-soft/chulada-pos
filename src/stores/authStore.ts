@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { User } from '@/types/auth'; 
+import { User } from '@/types/auth';
+import { useUiStore } from '@/stores/uiStore';
 
 interface AuthState {
   user: User | null;
@@ -17,9 +18,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: (user: User) => {
     set({ user, isAuthenticated: true });
   },
-  
+
   logout: () => {
     set({ user: null, isAuthenticated: false });
+    useUiStore.getState().resetAll();
   },
 
   updateUser: (data: Partial<User>) => {
@@ -36,7 +38,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     }
     if (!user.permissions) {
-      return false; 
+      return false;
     }
     return user.permissions.includes(permission);
   }
