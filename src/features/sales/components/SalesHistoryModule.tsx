@@ -12,6 +12,7 @@ import { historyColumns } from "@/features/sales/components/history/columns";
 import { SaleDetailPanel } from "@/features/sales/components/history/SaleDetailSheet";
 import { SalesHistoryToolbar } from "@/features/sales/components/history/SalesHistoryToolbar";
 import { SaleMaster, SalesHistoryFilter } from "@/types/sales-history";
+import { useUiStore } from "@/stores/uiStore";
 
 interface SalesHistoryModuleProps {
   initialFilters?: Partial<SalesHistoryFilter>;
@@ -25,7 +26,16 @@ export default function SalesHistoryModule({
   const { data, isLoading, filters, actions } = useSalesHistory({
     initialFilters,
   });
-  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+
+  const TABLE_KEY = 'dashboard.history';
+  const storedSaleId = useUiStore((s) => s.tableStates[TABLE_KEY]?.extraFilters?.selectedSaleId as string | null) ?? null;
+  const setTableExtraFilter = useUiStore((s) => s.setTableExtraFilter);
+
+  const setSelectedSaleId = (id: string | null) => {
+    setTableExtraFilter(TABLE_KEY, 'selectedSaleId', id);
+  };
+  const selectedSaleId = storedSaleId;
+
   const [rowSelection, setRowSelection] = useState({});
 
   const columns = useMemo<ColumnDef<SaleMaster>[]>(

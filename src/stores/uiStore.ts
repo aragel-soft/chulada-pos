@@ -18,9 +18,12 @@ const defaultTableState = (pageSize = 16): TableState => ({
 interface UiState {
   activeTabs: Record<string, string>;
   tableStates: Record<string, TableState>;
+  lastPaths: Record<string, string>;
 
   setActiveTab: (module: string, tab: string) => void;
   getActiveTab: (module: string, fallback: string) => string;
+
+  setLastPath: (module: string, path: string) => void;
 
   setTableSearch: (tableKey: string, search: string) => void;
   setTablePagination: (tableKey: string, pagination: PaginationState) => void;
@@ -34,6 +37,7 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   activeTabs: {},
   tableStates: {},
+  lastPaths: {},
 
   setActiveTab: (module, tab) =>
     set((state) => ({
@@ -43,6 +47,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   getActiveTab: (module, fallback) => {
     return get().activeTabs[module] ?? fallback;
   },
+
+  setLastPath: (module, path) =>
+    set((state) => ({
+      lastPaths: { ...state.lastPaths, [module]: path },
+    })),
 
   setTableSearch: (tableKey, search) =>
     set((state) => {
@@ -103,5 +112,5 @@ export const useUiStore = create<UiState>((set, get) => ({
     return get().tableStates[tableKey] ?? defaultTableState(defaultPageSize);
   },
 
-  resetAll: () => set({ activeTabs: {}, tableStates: {} }),
+  resetAll: () => set({ activeTabs: {}, tableStates: {}, lastPaths: {} }),
 }));

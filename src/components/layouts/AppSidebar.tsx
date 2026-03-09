@@ -108,13 +108,15 @@ export function AppSidebar() {
       return;
     }
 
-    const rememberedTab = useUiStore.getState().activeTabs[moduleKey];
-    const targetPath = rememberedTab
-      ? `${path}/${rememberedTab}`
-      : path;
-      
+    const store = useUiStore.getState();
+    const lastPath = store.lastPaths[moduleKey];
+    const rememberedTab = store.activeTabs[moduleKey];
+
+    const targetPath = lastPath
+      ?? (rememberedTab ? `${path}/${rememberedTab}` : path);
+
     if (location.pathname === targetPath) return;
-    if (!rememberedTab && firstTabPath && location.pathname === firstTabPath) return;
+    if (!lastPath && !rememberedTab && firstTabPath && location.pathname === firstTabPath) return;
 
     navigate(targetPath);
   };
