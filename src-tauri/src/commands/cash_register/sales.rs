@@ -278,7 +278,7 @@ fn apply_kit_rules(
                 ).unwrap_or_else(|_| "Desconocido".to_string());
                 
                 return Err(format!(
-                    "El producto '{}' está marcado como regalo pero no pertenece a ninguna promoción activa.",
+                    "El producto '{}' está marcado como complemento pero no pertenece a ninguna promoción activa.",
                     product_name
                 ));
             }
@@ -362,7 +362,7 @@ fn apply_kit_rules(
 
         if total_discrete_credits_used > credits_available + 0.0001 {
             return Err(format!(
-                "Excediste los regalos de la promoción '{}'. Tienes derecho a {} paquete(s) entero(s), pero seleccionaste productos que intentan armar {} paquete(s). Por favor corrige las cantidades del carrito.", 
+                "Excediste los complementos de la promoción '{}'. Tienes derecho a {} paquete(s) entero(s), pero seleccionaste productos que intentan armar {} paquete(s). Por favor corrige las cantidades del carrito.", 
                 rule.name, credits_available, total_discrete_credits_used
             ));
         }
@@ -376,7 +376,7 @@ fn apply_kit_rules(
         if *remaining > 0.0001 {
             let kit_name = &kit_rules[kit_id].name;
             return Err(format!(
-                "Kit incompleto: Aún tienes derecho a {} paquete(s) de regalo en la promoción '{}' que no has cobrado. Agrégalos al carrito.",
+                "Kit incompleto: Aún tienes derecho a {} paquete(s) de complemento '{}' que no has cobrado. Agrégalos al carrito.",
                 remaining, kit_name
             ));
         }
