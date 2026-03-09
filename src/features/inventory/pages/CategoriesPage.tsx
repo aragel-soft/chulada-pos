@@ -4,7 +4,6 @@ import {
   ColumnDef,
   RowSelectionState,
   SortingState,
-  PaginationState,
 } from "@tanstack/react-table";
 import {
   PlusCircle,
@@ -25,6 +24,7 @@ import { EditCategoryModal } from "@/features/inventory/components/categories/Ed
 import { DeleteCategoryAlert } from "@/features/inventory/components/categories/DeleteCategoryAlert";
 import { DeleteCategoryErrorModal } from "@/features/inventory/components/categories/DeleteCategoryErrorModal";
 import { toast } from "sonner";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 interface DeleteCategoryError {
   code: string;
@@ -47,11 +47,7 @@ export default function CategoriesPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
 
   // Paginación y Filtro
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { globalFilter, pagination, onGlobalFilterChange: setGlobalFilter, onPaginationChange: setPagination } = usePersistedTableState('inventory.categories');
   const [rowCount, setRowCount] = useState(0);
 
   // Estados Borrado

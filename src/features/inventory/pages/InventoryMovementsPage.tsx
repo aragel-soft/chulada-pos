@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  PaginationState,
   SortingState,
   ColumnFiltersState,
   OnChangeFn,
@@ -16,17 +15,14 @@ import { getInventoryMovements } from "@/lib/api/inventory/inventory-movements";
 import { getColumns } from "../components/inventory-movements/columns";
 import { InventoryMovementsTableToolbar } from "../components/inventory-movements/InventoryMovementsTableToolbar";
 import { CreateInventoryMovementDialog } from "../components/inventory-movements/CreateInventoryMovementDialog";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function InventoryMovementsPage() {
   const { can } = useAuthStore();
   const [data, setData] = useState<InventoryMovement[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { globalFilter, pagination, onGlobalFilterChange: setPersistedGlobalFilter, onPaginationChange: setPersistedPagination } = usePersistedTableState('inventory.movements');
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);  
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true }
@@ -76,7 +72,7 @@ export default function InventoryMovementsPage() {
   ]);
 
   const handleMovementSuccess = () => {
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
     const newSorting = [{ id: "created_at", desc: true }];
     setSorting(newSorting);
 
@@ -91,10 +87,8 @@ export default function InventoryMovementsPage() {
   };
 
   const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
-    setGlobalFilter((prev) => 
-      typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue
-    );
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    const newValue = typeof updaterOrValue === 'function' ? updaterOrValue(globalFilter) : updaterOrValue;
+    setPersistedGlobalFilter(newValue);
   };
 
   const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updaterOrValue) => {
@@ -102,12 +96,12 @@ export default function InventoryMovementsPage() {
       const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
       return next;
     });
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setDateRange(range);
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
   const columns = useMemo(() => getColumns(), []);
@@ -132,7 +126,7 @@ export default function InventoryMovementsPage() {
         manualFiltering={true}
         rowCount={totalRows}
         pagination={pagination}
-        onPaginationChange={setPagination}
+        onPaginationChange={setPersistedPagination}
         sorting={sorting}
         onSortingChange={setSorting}
         globalFilter={globalFilter}

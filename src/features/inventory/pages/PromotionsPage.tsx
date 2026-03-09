@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import {
   ColumnDef,
-  PaginationState,
   SortingState,
 } from "@tanstack/react-table";
 import { PlusCircle, Pencil, Trash } from "lucide-react";
@@ -21,15 +20,12 @@ import {
 import { PromotionWizard } from "../components/promotions/PromotionWizard";
 import { DeletePromotionsDialog } from "../components/promotions/DeletePromotionsDialog";
 import { PromotionDetailPanel } from "../components/promotions/PromotionDetailSheet";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function PromotionsPage() {
   const queryClient = useQueryClient();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { globalFilter, pagination, onGlobalFilterChange: setGlobalFilter, onPaginationChange: setPagination } = usePersistedTableState('inventory.promotions');
   const [rowSelection, setRowSelection] = useState({});
   const { can } = useAuthStore();
   const [isWizardOpen, setIsWizardOpen] = useState(false);

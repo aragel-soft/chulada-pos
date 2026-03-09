@@ -1,6 +1,7 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from '@/stores/authStore';
+import { useUiStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 
 const inventoryTabs = [
@@ -35,11 +36,13 @@ export default function InventoryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuthStore();
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   const availableTabs = inventoryTabs.filter(tab => can(tab.permission));
   const currentTab = location.pathname.split('/')[2] || availableTabs[0]?.value || '';
 
   const onTabChange = (value: string) => {
+    setActiveTab('inventory', value);
     navigate(`/inventory/${value}`);
   };
 
