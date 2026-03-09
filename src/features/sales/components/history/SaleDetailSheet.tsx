@@ -42,9 +42,10 @@ const RETURN_REASON_LABELS: Record<string, string> = {
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
+  hideCustomerInfo?: boolean;
 }
 
-export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
+export function SaleDetailPanel({ saleId, onClose, hideCustomerInfo }: SaleDetailPanelProps) {
   const { can } = useAuthStore();
 
   const { data: sale, isLoading } = useSaleDetail(saleId);
@@ -153,6 +154,20 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                 </div>
               </div>
             </div>
+
+            {sale.payment_method === "credit" && !hideCustomerInfo && sale.customer_name && (
+              <div className="flex items-center gap-3 bg-white p-2.5 rounded-md border shadow-sm mt-3">
+                <div className="h-8 w-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                  <span className="text-indigo-600 font-bold text-xs">{sale.customer_name.charAt(0).toUpperCase()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground leading-tight">Cliente</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-sm font-medium leading-tight truncate">{sale.customer_name}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showActionButtons && (
               <div className="flex gap-2 mt-3 w-full">

@@ -64,6 +64,7 @@ pub struct SaleDetailView {
   pub items: Vec<SaleItemView>,
   pub returns: Vec<ReturnSummary>,
   pub voucher: Option<VoucherInfo>,
+  pub customer_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -191,7 +192,7 @@ pub fn get_sales_history(
     "total" => "s.total",
     "status" => "s.status",
     "payment_method" => "s.payment_method",
-    "user_name" => "u.username", 
+    "user_name" => "u.full_name",
     _ => "s.folio", 
   };
 
@@ -206,7 +207,7 @@ pub fn get_sales_history(
   let list_sql = format!(
     "SELECT 
       s.id, s.folio, s.sale_date, s.status, s.payment_method, s.total, 
-      u.username as user_name, s.has_discount
+      u.full_name as user_name, s.has_discount
      FROM sales s
      LEFT JOIN users u ON s.user_id = u.id
      WHERE {}
@@ -267,11 +268,13 @@ pub fn get_sale_details(
       s.id, s.folio, s.sale_date, s.status, s.payment_method, 
       s.subtotal, s.discount_percentage, s.discount_amount, s.total,
       s.cash_amount, s.card_transfer_amount, s.notes,
-      u.username, u.avatar_url,
+      u.full_name as user_name, u.avatar_url,
       s.cancellation_reason, s.cancelled_at,
-      s.cash_register_shift_id
+      s.cash_register_shift_id,
+      c.name as customer_name
     FROM sales s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN customers c ON s.customer_id = c.id
     WHERE s.id = ?
   ";
 
@@ -323,6 +326,7 @@ pub fn get_sale_details(
         cash_register_shift_id: row.get(16).unwrap_or(None),
         user_name: row.get(12).unwrap_or("Desconocido".to_string()),
         user_avatar: resolved_avatar,
+        customer_name: row.get(17).unwrap_or(None),
         items: Vec::new(),
         returns: Vec::new(),
         voucher: None,
