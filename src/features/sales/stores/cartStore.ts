@@ -237,26 +237,40 @@ export const useCartStore = create<CartState>()(
               if (item.priceType === 'kit_item' && item.kitOptionId) {
                    const kitDefs = useKitStore.getState().kitDefs;
                    const kit = Object.values(kitDefs).find(k => k.id === item.kitOptionId);
-                   if (kit) {
+                    if (kit) {
                         const totalCredits = currentTicket.items
                             .filter(i => i.priceType !== 'kit_item' && kitDefs[i.id]?.id === kit.id)
                             .reduce((sum, i) => sum + (i.quantity * kit.max_selections), 0);
 
-                        const totalConsumed = currentTicket.items
+                        let totalConsumedCredits = 0;
+                        currentTicket.items
                             .filter(i => i.kitOptionId === kit.id && i.priceType === 'kit_item')
-                            .reduce((sum, i) => sum + i.quantity, 0);
+                            .forEach(g => {
+                                const kitDefItem = kit.items.find(kItem => kItem.product_id === g.id);
+                                if (kitDefItem && kitDefItem.quantity > 0) {
+                                    totalConsumedCredits += (g.quantity / kitDefItem.quantity);
+                                } else {
+                                    totalConsumedCredits += g.quantity;
+                                }
+                            });
                         
-                        const remaining = totalCredits - totalConsumed;
+                        const remainingCredits = totalCredits - totalConsumedCredits;
+                        
+                        const increaseQty = quantity - oldQty;
+                        
+                        const targetKitDefItem = kit.items.find(kItem => kItem.product_id === item.id);
+                        const ratio = targetKitDefItem && targetKitDefItem.quantity > 0 ? targetKitDefItem.quantity : 1;
+                        
+                        const creditsNeededForIncrease = increaseQty / ratio;
 
-                        const increase = quantity - oldQty;
-                        if (increase > remaining) {
-                            const allowedIncrease = remaining;
-                            const excessQty = increase - remaining;
+                        if (creditsNeededForIncrease > remainingCredits + 0.0001) {
+                            const allowedIncreaseQty = Math.floor(remainingCredits * ratio);
+                            const excessQty = increaseQty - allowedIncreaseQty;
 
-                            if (allowedIncrease > 0) {
+                            if (allowedIncreaseQty > 0) {
                                 newItems = newItems.map(i => {
                                     if (i.uuid === uuid) {
-                                        return { ...i, quantity: oldQty + allowedIncrease };
+                                        return { ...i, quantity: oldQty + allowedIncreaseQty };
                                     }
                                     return i;
                                 });
