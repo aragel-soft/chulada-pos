@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   SortingState,
-  ColumnFiltersState,
   OnChangeFn,
 } from "@tanstack/react-table";
 import { DateRange } from "react-day-picker";
@@ -15,14 +14,18 @@ import { useQuery } from "@tanstack/react-query";
 import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function ShiftHistoryPage() {
-  const { globalFilter, pagination, onGlobalFilterChange: setPersistedGlobalFilter, onPaginationChange: setPersistedPagination } = usePersistedTableState('cash-register.history');
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { 
+    globalFilter, pagination, columnFilters, extraFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+    setExtraFilter,
+  } = usePersistedTableState('cash-register.history');
   const [sorting, setSorting] = useState<SortingState>([
     { id: "opening_date", desc: true }
   ]);
   
-  // Custom Filters State
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const dateRange = extraFilters.dateRange as DateRange | undefined;
 
   const { data: response, isLoading } = useQuery({
     queryKey: [
@@ -55,17 +58,12 @@ export default function ShiftHistoryPage() {
     setPersistedGlobalFilter(newValue);
   };
 
-  const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updaterOrValue) => {
-    setColumnFilters((prev) => {
-      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
-      return next;
-    });
-    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  const handleColumnFiltersChange: OnChangeFn<any> = (updaterOrValue) => {
+    setPersistedColumnFilters(updaterOrValue);
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
-    setDateRange(range);
-    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setExtraFilter('dateRange', range);
   };
 
   const columns = useMemo(() => shiftColumns, []);
