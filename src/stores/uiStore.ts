@@ -1,14 +1,18 @@
 import { create } from 'zustand';
-import { PaginationState } from '@tanstack/react-table';
+import { PaginationState, ColumnFiltersState } from '@tanstack/react-table';
 
 export interface TableState {
   globalFilter: string;
   pagination: PaginationState;
+  columnFilters: ColumnFiltersState;
+  extraFilters: Record<string, unknown>;
 }
 
 const defaultTableState = (pageSize = 16): TableState => ({
   globalFilter: '',
   pagination: { pageIndex: 0, pageSize },
+  columnFilters: [],
+  extraFilters: {},
 });
 
 interface UiState {
@@ -20,6 +24,8 @@ interface UiState {
 
   setTableSearch: (tableKey: string, search: string) => void;
   setTablePagination: (tableKey: string, pagination: PaginationState) => void;
+  setTableColumnFilters: (tableKey: string, columnFilters: ColumnFiltersState) => void;
+  setTableExtraFilter: (tableKey: string, filterKey: string, value: unknown) => void;
   getTableState: (tableKey: string, defaultPageSize?: number) => TableState;
 
   resetAll: () => void;
@@ -60,6 +66,36 @@ export const useUiStore = create<UiState>((set, get) => ({
         tableStates: {
           ...state.tableStates,
           [tableKey]: { ...prev, pagination },
+        },
+      };
+    }),
+
+  setTableColumnFilters: (tableKey, columnFilters) =>
+    set((state) => {
+      const prev = state.tableStates[tableKey] ?? defaultTableState();
+      return {
+        tableStates: {
+          ...state.tableStates,
+          [tableKey]: {
+            ...prev,
+            columnFilters,
+            pagination: { ...prev.pagination, pageIndex: 0 },
+          },
+        },
+      };
+    }),
+
+  setTableExtraFilter: (tableKey, filterKey, value) =>
+    set((state) => {
+      const prev = state.tableStates[tableKey] ?? defaultTableState();
+      return {
+        tableStates: {
+          ...state.tableStates,
+          [tableKey]: {
+            ...prev,
+            extraFilters: { ...prev.extraFilters, [filterKey]: value },
+            pagination: { ...prev.pagination, pageIndex: 0 },
+          },
         },
       };
     }),

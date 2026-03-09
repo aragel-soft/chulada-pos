@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { PaginationState, OnChangeFn } from '@tanstack/react-table';
+import { PaginationState, ColumnFiltersState, OnChangeFn } from '@tanstack/react-table';
 import { useUiStore, TableState } from '@/stores/uiStore';
 
 const DEFAULT_PAGE_SIZE = 16;
@@ -14,9 +14,19 @@ export function usePersistedTableState(tableKey: string, defaultPageSize = DEFAU
     () => tableState?.pagination ?? { pageIndex: 0, pageSize: defaultPageSize },
     [tableState?.pagination, defaultPageSize],
   );
+  const columnFilters: ColumnFiltersState = useMemo(
+    () => tableState?.columnFilters ?? [],
+    [tableState?.columnFilters],
+  );
+  const extraFilters: Record<string, unknown> = useMemo(
+    () => tableState?.extraFilters ?? {},
+    [tableState?.extraFilters],
+  );
 
   const setTableSearch = useUiStore((s) => s.setTableSearch);
   const setTablePagination = useUiStore((s) => s.setTablePagination);
+  const setTableColumnFilters = useUiStore((s) => s.setTableColumnFilters);
+  const setTableExtraFilter = useUiStore((s) => s.setTableExtraFilter);
 
   const onGlobalFilterChange: OnChangeFn<string> = useCallback(
     (updaterOrValue) => {
@@ -43,10 +53,41 @@ export function usePersistedTableState(tableKey: string, defaultPageSize = DEFAU
     [tableKey, defaultPageSize, setTablePagination],
   );
 
+  const onColumnFiltersChange: OnChangeFn<ColumnFiltersState> = useCallback(
+    (updaterOrValue) => {
+      const current = useUiStore.getState().tableStates[tableKey]?.columnFilters ?? [];
+      const newFilters =
+        typeof updaterOrValue === 'function'
+          ? updaterOrValue(current)
+          : updaterOrValue;
+      setTableColumnFilters(tableKey, newFilters);
+    },
+    [tableKey, setTableColumnFilters],
+  );
+
+  const setExtraFilter = useCallback(
+    (filterKey: string, value: unknown) => {
+      setTableExtraFilter(tableKey, filterKey, value);
+    },
+    [tableKey, setTableExtraFilter],
+  );
+
+  const getExtraFilter = useCallback(
+    <T>(filterKey: string, defaultValue: T): T => {
+      return (extraFilters[filterKey] as T) ?? defaultValue;
+    },
+    [extraFilters],
+  );
+
   return {
     globalFilter,
     pagination,
+    columnFilters,
+    extraFilters,
     onGlobalFilterChange,
     onPaginationChange,
+    onColumnFiltersChange,
+    setExtraFilter,
+    getExtraFilter,
   };
 }
