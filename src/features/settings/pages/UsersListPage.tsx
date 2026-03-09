@@ -22,6 +22,7 @@ import { EditUserDialog } from "../components/EditUserDialog";
 import { format } from "date-fns";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 // Funcion para convertir la fecha
 const processUsers = (users: User[]): User[] => {
@@ -54,6 +55,7 @@ export function UsersListPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [usersToDelete, setUsersToDelete] = useState<User[]>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const { globalFilter, pagination, onGlobalFilterChange, onPaginationChange } = usePersistedTableState('settings.users');
 
   // Columnas de la tabla
   const columns = useMemo<ColumnDef<User>[]>(
@@ -178,6 +180,10 @@ export function UsersListPage() {
         }}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        globalFilter={globalFilter}
+        onGlobalFilterChange={onGlobalFilterChange}
+        pagination={pagination}
+        onPaginationChange={onPaginationChange}
         actions={(table) => (
           <div className="flex items-center gap-2 w-full md:w-auto">
             {can('users:create') && (
