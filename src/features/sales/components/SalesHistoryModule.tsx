@@ -15,10 +15,12 @@ import { SaleMaster, SalesHistoryFilter } from "@/types/sales-history";
 
 interface SalesHistoryModuleProps {
   initialFilters?: Partial<SalesHistoryFilter>;
+  hideCustomerInfo?: boolean;
 }
 
 export default function SalesHistoryModule({
   initialFilters = {},
+  hideCustomerInfo = false,
 }: SalesHistoryModuleProps) {
   const { data, isLoading, filters, actions } = useSalesHistory({
     initialFilters,
@@ -155,6 +157,7 @@ export default function SalesHistoryModule({
             <SaleDetailPanel
               saleId={selectedSaleId}
               onClose={() => setSelectedSaleId(null)}
+              hideCustomerInfo={hideCustomerInfo}
             />
           </div>
         )}

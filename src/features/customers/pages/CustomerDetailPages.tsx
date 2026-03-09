@@ -339,6 +339,7 @@ export default function CustomerDetailPage() {
         <TabsContent value="history" className="flex-1 mt-4 min-h-0 overflow-hidden">
           <SalesHistoryModule
             initialFilters={{ ...customerHistoryFilters }}
+            hideCustomerInfo={true}
           />
         </TabsContent>
       </Tabs>
