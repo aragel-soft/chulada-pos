@@ -13,11 +13,25 @@ import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
 import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function InventoryReportPage() {
-  const { pagination, onPaginationChange: setPagination } = usePersistedTableState('reports.inventory');
+  const { 
+    pagination, 
+    onPaginationChange: setPagination,
+    globalFilter,
+    onGlobalFilterChange: setPersistedGlobalFilter,
+    getExtraFilter,
+    setExtraFilter
+  } = usePersistedTableState('reports.inventory');
+  
   const [sorting, setSorting] = useState<SortingState>([{ id: "category_name", desc: false }]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  const savedCategories = getExtraFilter<string[]>("categoryIds", []);
+  const selectedCategories = useMemo(() => new Set(savedCategories), [savedCategories]);
+
+  const handleCategoryChange = (newValues: Set<string>) => {
+    setExtraFilter("categoryIds", Array.from(newValues));
+  };
 
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
   const sortOrder = sorting.length > 0 && sorting[0].desc ? "desc" : undefined;
@@ -96,6 +110,8 @@ export default function InventoryReportPage() {
           manualSorting={true}
           pagination={pagination}
           onPaginationChange={setPagination}
+          globalFilter={globalFilter}
+          onGlobalFilterChange={(val) => setPersistedGlobalFilter(String(val))}
           sorting={sorting}
           onSortingChange={setSorting}
           rowCount={lowStockProducts?.total || 0}
@@ -113,7 +129,7 @@ export default function InventoryReportPage() {
               table={table}
               categoryOptions={categoryOptions}
               selectedCategories={selectedCategories}
-              onCategoryChange={setSelectedCategories}
+              onCategoryChange={handleCategoryChange}
               searchPlaceholder="Buscar producto bajo de stock..."
             />
           )}
