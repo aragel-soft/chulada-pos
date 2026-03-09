@@ -143,7 +143,7 @@ struct KitRule {
     name: String,
     max_selections: i64,
     triggers: HashSet<String>,
-    items: HashSet<String>,
+    items: HashMap<String, f64>,
 }
 
 fn get_relevant_kit_rules(
@@ -215,7 +215,7 @@ fn get_relevant_kit_rules(
                 name,
                 max_selections,
                 triggers: HashSet::new(),
-                items: HashSet::new(),
+                items: HashMap::new(),
             },
         );
     }
@@ -241,20 +241,20 @@ fn get_relevant_kit_rules(
 
     // Fetch Kit Items
     let sql_kit_items = format!(
-        "SELECT kit_option_id, included_product_id FROM product_kit_items WHERE kit_option_id IN ({})",
+        "SELECT kit_option_id, included_product_id, quantity FROM product_kit_items WHERE kit_option_id IN ({})",
         kits_placeholder
     );
     let mut stmt_kit_items = conn.prepare(&sql_kit_items).map_err(|e| e.to_string())?;
     let kit_items_iter = stmt_kit_items
         .query_map(rusqlite::params_from_iter(kit_ids_vec.iter()), |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, f64>(2)?))
         })
         .map_err(|e| e.to_string())?;
 
     for r in kit_items_iter {
-        let (kit_id, prod_id) = r.map_err(|e| e.to_string())?;
+        let (kit_id, prod_id, qty) = r.map_err(|e| e.to_string())?;
         if let Some(rule) = kit_rules.get_mut(&kit_id) {
-            rule.items.insert(prod_id);
+            rule.items.insert(prod_id, qty);
         }
     }
 
@@ -271,9 +271,15 @@ fn apply_kit_rules(
     if kit_rules.is_empty() {
         for item in items {
             if item.kit_option_id.is_some() {
+                let product_name: String = conn.query_row(
+                    "SELECT name FROM products WHERE id = ?",
+                    rusqlite::params![&item.product_id],
+                    |row| row.get(0)
+                ).unwrap_or_else(|_| "Desconocido".to_string());
+                
                 return Err(format!(
-                    "El producto '{}' está marcado como kit pero no se encontraron reglas válidas.",
-                    item.product_id
+                    "El producto '{}' está marcado como complemento pero no pertenece a ninguna promoción activa.",
+                    product_name
                 ));
             }
         }
@@ -293,51 +299,85 @@ fn apply_kit_rules(
     }
 
     // Validate Claims (Consuming Credits)
+    let mut kit_claims: HashMap<String, HashMap<String, f64>> = HashMap::new();
+    
     for item in items {
         if let Some(target_kit_id) = &item.kit_option_id {
-            // Verify this item actually belongs to the kit definition
-            if let Some(rule) = kit_rules.get(target_kit_id) {
-                if rule.triggers.contains(&item.product_id) {
-                    continue;
-                }
-
-                if !rule.items.contains(&item.product_id) {
-                    return Err(format!(
-                        "Integridad de Kit: El producto '{}' no pertenece oficialmente al kit '{}'.", 
-                        item.product_id, rule.name
-                    ));
-                }
-
-                // Consume Credit
-                if let Some(credits) = kit_credits.get_mut(target_kit_id) {
-                    if *credits >= item.quantity - 0.0001 {
-                        *credits -= item.quantity;
-                    } else {
-                        return Err(format!(
-                            "Créditos insuficientes para el kit '{}'. Producto: '{}' (Cant: {}). Créditos disponibles: {}", 
-                            rule.name, item.product_id, item.quantity, credits
-                        ));
-                    }
-                } else {
-                    return Err(format!(
-                        "Se intenta agregar item al kit '{}' pero no hay detonantes (productos principales) en el carrito.", 
-                        rule.name
-                    ));
-                }
-            } else {
-                return Err(format!("Kit ID inválido o inactivo: {}", target_kit_id));
-            }
+            let claims_for_kit = kit_claims.entry(target_kit_id.clone()).or_insert_with(HashMap::new);
+            let qty = claims_for_kit.entry(item.product_id.clone()).or_insert(0.0);
+            *qty += item.quantity;
         }
     }
+    
+    // Evaluate claims using discrete logic
+    for (target_kit_id, product_claims) in kit_claims {
+        let rule = kit_rules.get(&target_kit_id).ok_or_else(|| {
+            format!("Kit ID inválido o inactivo: {}", target_kit_id)
+        })?;
 
-    // Validate Completeness (Optional: You might want to allow partial kits, but user usually wants full)
-    // For now we warn or strict check? Code was strict: "Kit incompleto".
+        let mut total_discrete_credits_used = 0.0;
+
+        for (product_id, qty) in product_claims {
+            if rule.triggers.contains(&product_id) {
+                continue;
+            }
+
+            let config_qty = match rule.items.get(&product_id) {
+                Some(q) => *q,
+                None => {
+                    let product_name: String = conn.query_row(
+                        "SELECT name FROM products WHERE id = ?",
+                        rusqlite::params![&product_id],
+                        |row| row.get(0)
+                    ).unwrap_or_else(|_| "Desconocido".to_string());
+                    return Err(format!(
+                        "El producto '{}' no pertenece a las opciones del kit '{}'.", 
+                        product_name, rule.name
+                    ));
+                }
+            };
+
+            let ratio = if config_qty > 0.0 { config_qty } else { 1.0 };
+            
+            let remainder = qty % ratio;
+            if remainder > 0.0001 && (ratio - remainder) > 0.0001 {
+                let product_name: String = conn.query_row(
+                    "SELECT name FROM products WHERE id = ?",
+                    rusqlite::params![&product_id],
+                    |row| row.get(0)
+                ).unwrap_or_else(|_| "Desconocido".to_string());
+                
+                let missing = ratio - remainder;
+                return Err(format!(
+                    "Kit incompleto: Te falta cobrar {} unidad(es) de '{}' para cerrar un paquete exacto en la promoción '{}'.",
+                    missing, product_name, rule.name
+                ));
+            }
+
+            let discrete_credits_used = (qty / ratio).ceil();
+            total_discrete_credits_used += discrete_credits_used;
+        }
+        
+        let credits_available = kit_credits.get_mut(&target_kit_id).map(|v| *v).unwrap_or(0.0);
+
+        if total_discrete_credits_used > credits_available + 0.0001 {
+            return Err(format!(
+                "Excediste los complementos de la promoción '{}'. Tienes derecho a {} paquete(s) entero(s), pero seleccionaste productos que intentan armar {} paquete(s). Por favor corrige las cantidades del carrito.", 
+                rule.name, credits_available, total_discrete_credits_used
+            ));
+        }
+
+        if let Some(c) = kit_credits.get_mut(&target_kit_id) {
+            *c -= total_discrete_credits_used;
+        }
+    }
+    
     for (kit_id, remaining) in &kit_credits {
         if *remaining > 0.0001 {
             let kit_name = &kit_rules[kit_id].name;
             return Err(format!(
-                "Kit incompleto: '{}'. Faltan seleccionar {} complementos.",
-                kit_name, remaining
+                "Kit incompleto: Aún tienes derecho a {} paquete(s) de complemento '{}' que no has cobrado. Agrégalos al carrito.",
+                remaining, kit_name
             ));
         }
     }
