@@ -830,6 +830,7 @@ pub async fn update_product(
             payload.wholesale_price,
             payload.purchase_price.unwrap_or(0.0),
             new_db_path,
+            payload.is_active,
             now_local,
             payload.id
         ])
@@ -1262,7 +1263,7 @@ pub fn delete_products(
 
         // 1. Desactivar promociones activas que contienen estos productos
         let deactivate_promos_sql = format!(
-            "UPDATE promotions SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+            "UPDATE promotions SET is_active = 0, updated_at = '{}'
              WHERE id IN (
                SELECT DISTINCT pr.id FROM promotions pr
                INNER JOIN promotion_combos pc ON pr.id = pc.promotion_id
@@ -1270,7 +1271,7 @@ pub fn delete_products(
                  AND pr.is_active = 1
                  AND pr.deleted_at IS NULL
              )",
-            placeholders
+            now_local, placeholders
         );
         let mut promo_stmt = tx
             .prepare(&deactivate_promos_sql)
