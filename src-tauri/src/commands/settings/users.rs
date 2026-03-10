@@ -20,27 +20,78 @@ pub struct UserView {
     is_active: bool,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UserListOptions {
-    pub include_deleted: Option<bool>,
+#[derive(Serialize)]
+pub struct PaginatedResponse<T> {
+    data: Vec<T>,
+    total: i64,
+    page: i64,
+    page_size: i64,
+    total_pages: i64,
 }
 
 #[tauri::command]
 pub fn get_users_list(
     db_state: State<'_, Mutex<Connection>>,
-    options: Option<UserListOptions>,
-) -> Result<Vec<UserView>, String> {
-    let conn = db_state.lock().unwrap();
+    page: i64,
+    page_size: i64,
+    search: Option<String>,
+    sort_by: Option<String>,
+    sort_order: Option<String>,
+    include_deleted: Option<bool>,
+) -> Result<PaginatedResponse<UserView>, String> {
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
 
-    let show_deleted = options.map(|opt| opt.include_deleted.unwrap_or(false)).unwrap_or(false);
-    let where_clause = if show_deleted {
-        "" 
+    let show_deleted = include_deleted.unwrap_or(false);
+
+    let search_term = search.as_ref().map(|s| format!("%{}%", s));
+    let has_search = search.is_some() && !search.as_ref().unwrap().is_empty();
+
+    let deleted_clause = if show_deleted {
+        "1=1"
     } else {
-        "WHERE u.deleted_at IS NULL" 
+        "u.deleted_at IS NULL"
     };
 
-    let sql = format!("
-        SELECT 
+    let search_clause = if has_search {
+        " AND (u.full_name LIKE :search OR u.username LIKE :search OR r.display_name LIKE :search)"
+    } else {
+        ""
+    };
+
+    // Count total
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM users u JOIN roles r ON u.role_id = r.id WHERE {}{}",
+        deleted_clause, search_clause
+    );
+
+    let total: i64 = if has_search {
+        conn.query_row(
+            &count_sql,
+            rusqlite::named_params! { ":search": search_term },
+            |row| row.get(0),
+        )
+    } else {
+        conn.query_row(&count_sql, [], |row| row.get(0))
+    }
+    .map_err(|e| format!("Error contando usuarios: {}", e))?;
+
+    // Sorting
+    let order_column = match sort_by.as_deref() {
+        Some("full_name") => "u.full_name",
+        Some("username") => "u.username",
+        Some("role_name") => "r.display_name",
+        Some("is_active") => "u.is_active",
+        _ => "u.created_at",
+    };
+
+    let order_direction = match sort_order.as_deref() {
+        Some("asc") => "ASC",
+        _ => "DESC",
+    };
+
+    // Main query
+    let base_sql = format!(
+        "SELECT 
             u.id, 
             u.username, 
             u.full_name, 
@@ -51,33 +102,64 @@ pub fn get_users_list(
             u.is_active
         FROM users u
         JOIN roles r ON u.role_id = r.id
+        WHERE {}
         {}
-        ORDER BY u.full_name ASC;
-    ", where_clause);
+        ORDER BY {} {}
+        LIMIT :limit OFFSET :offset",
+        deleted_clause, search_clause, order_column, order_direction
+    );
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let limit = page_size;
+    let offset = (page - 1) * page_size;
 
-    let user_iter = stmt
-        .query_map([], |row| {
+    let mut stmt = conn.prepare(&base_sql).map_err(|e| e.to_string())?;
 
-            Ok(UserView {
-                id: row.get(0)?,
-                username: row.get(1)?,
-                full_name: row.get(2)?,
-                avatar_url: row.get(3)?,
-                created_at: row.get(4)?,
-                role_name: row.get(5)?,
-                role_id: row.get(6)?,
-                is_active: row.get(7)?,
-            })
-        })
-        .map_err(|e| e.to_string())?;
+    let user_iter = if has_search {
+        stmt.query_map(
+            rusqlite::named_params! {
+                ":search": search_term,
+                ":limit": limit,
+                ":offset": offset
+            },
+            map_user_row,
+        )
+    } else {
+        stmt.query_map(
+            rusqlite::named_params! {
+                ":limit": limit,
+                ":offset": offset
+            },
+            map_user_row,
+        )
+    }
+    .map_err(|e| e.to_string())?;
 
     let users = user_iter
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    Ok(users)
+    let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+
+    Ok(PaginatedResponse {
+        data: users,
+        total,
+        page,
+        page_size,
+        total_pages,
+    })
+}
+
+fn map_user_row(row: &rusqlite::Row) -> rusqlite::Result<UserView> {
+    Ok(UserView {
+        id: row.get(0)?,
+        username: row.get(1)?,
+        full_name: row.get(2)?,
+        avatar_url: row.get(3)?,
+        created_at: row.get(4)?,
+        role_name: row.get(5)?,
+        role_id: row.get(6)?,
+        is_active: row.get(7)?,
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -415,8 +497,8 @@ pub async fn update_user(
         full_name: payload.full_name,
         role_id: payload.role_id,
         is_active: payload.is_active,
-        avatar_url: new_avatar_for_db, 
-        created_at: now, 
+        avatar_url: new_avatar_for_db,
+        created_at: now,
     })
 }
 
@@ -497,7 +579,10 @@ pub async fn delete_users(
             message: format!("Error al contar administradores: {}", e),
         })?;
 
-    let placeholders = std::iter::repeat("?").take(user_ids.len()).collect::<Vec<_>>().join(",");
+    let placeholders = std::iter::repeat("?")
+        .take(user_ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
     let sql_admins_in_list = format!(
         "SELECT COUNT(*) 
          FROM users u 
@@ -512,7 +597,11 @@ pub async fn delete_users(
     }
 
     let admins_to_delete: i64 = tx
-        .query_row(&sql_admins_in_list, rusqlite::params_from_iter(params.iter()), |row| row.get(0))
+        .query_row(
+            &sql_admins_in_list,
+            rusqlite::params_from_iter(params.iter()),
+            |row| row.get(0),
+        )
         .map_err(|e| DeleteUserError {
             code: "DB_QUERY_ERROR".to_string(),
             message: format!("Error al verificar admins seleccionados: {}", e),

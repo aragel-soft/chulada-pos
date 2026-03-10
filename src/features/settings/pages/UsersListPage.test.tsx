@@ -67,6 +67,14 @@ const mockUsers: User[] = [
   },
 ];
 
+const mockPaginatedResponse = {
+  data: mockUsers,
+  total: mockUsers.length,
+  page: 1,
+  page_size: 16,
+  total_pages: 1,
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -87,7 +95,7 @@ describe("UsersListPage Sorting", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (getUsersList as any).mockResolvedValue(mockUsers);
+    (getUsersList as any).mockResolvedValue(mockPaginatedResponse);
 
     (useAuthStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       user: { id: "1", permissions: [] }, 
@@ -157,7 +165,7 @@ describe("UsersListPage Sorting", () => {
 describe("UsersListPage Integration (Delete)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (getUsersList as any).mockResolvedValue(mockUsers);
+    (getUsersList as any).mockResolvedValue(mockPaginatedResponse);
     
     (useAuthStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       user: { id: "1", permissions: ["users:read", "users:delete"] },
