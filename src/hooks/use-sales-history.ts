@@ -20,10 +20,8 @@ const INITIAL_FILTER: SalesHistoryFilter = {
   sort_order: 'desc'
 };
 
-const TABLE_KEY = 'dashboard.history';
-
-export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<SalesHistoryFilter> } = {}) => {
-  const persistedTableState = useUiStore.getState().tableStates[TABLE_KEY];
+export const useSalesHistory = ({ initialFilters, storeKey = 'dashboard.history' }: { initialFilters?: Partial<SalesHistoryFilter>; storeKey?: string } = {}) => {
+  const persistedTableState = useUiStore.getState().tableStates[storeKey];
   const persistedExtras = persistedTableState?.extraFilters ?? {};
 
   const [filters, setFilters] = useState<SalesHistoryFilter>({
@@ -46,16 +44,16 @@ export const useSalesHistory = ({ initialFilters }: { initialFilters?: Partial<S
   const setTableExtraFilter = useUiStore((s) => s.setTableExtraFilter);
 
   const syncToStore = (newFilters: SalesHistoryFilter) => {
-    setTableSearch(TABLE_KEY, newFilters.search || '');
-    setTablePagination(TABLE_KEY, {
+    setTableSearch(storeKey, newFilters.search || '');
+    setTablePagination(storeKey, {
       pageIndex: newFilters.page - 1,
       pageSize: newFilters.page_size,
     });
-    setTableExtraFilter(TABLE_KEY, 'start_date', newFilters.start_date);
-    setTableExtraFilter(TABLE_KEY, 'end_date', newFilters.end_date);
-    setTableExtraFilter(TABLE_KEY, 'status', newFilters.status);
-    setTableExtraFilter(TABLE_KEY, 'payment_method', newFilters.payment_method);
-    setTableExtraFilter(TABLE_KEY, 'user_id', newFilters.user_id);
+    setTableExtraFilter(storeKey, 'start_date', newFilters.start_date);
+    setTableExtraFilter(storeKey, 'end_date', newFilters.end_date);
+    setTableExtraFilter(storeKey, 'status', newFilters.status);
+    setTableExtraFilter(storeKey, 'payment_method', newFilters.payment_method);
+    setTableExtraFilter(storeKey, 'user_id', newFilters.user_id);
   };
 
   const historyQuery = useQuery({
