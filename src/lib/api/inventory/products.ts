@@ -1,12 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PaginationParams } from "@/types/pagination";
-import { 
-  Product, 
-  PaginatedResponse, 
-  CreateProductPayload, 
-  ProductDetail, 
+import {
+  Product,
+  PaginatedResponse,
+  CreateProductPayload,
+  ProductDetail,
   UpdateProductPayload,
-  ProductFilters
+  ProductFilters,
+  ProductDependencies
 } from "@/types/inventory";
 import { BulkUpdateProductsPayload } from "@/types/inventory";
 
@@ -64,6 +65,14 @@ export const getAllTags = async (): Promise<string[]> => {
     return await invoke("get_all_tags");
   } catch (error) {
     return [];
+  }
+};
+
+export const checkProductDependencies = async (productIds: string[]): Promise<ProductDependencies> => {
+  try {
+    return await invoke("check_product_dependencies", { ids: productIds });
+  } catch (error) {
+    throw error;
   }
 };
 
