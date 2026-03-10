@@ -48,6 +48,7 @@ export interface SaleDetail extends SaleMaster {
   items: SaleHistoryItem[];
   returns: ReturnSummary[];
   voucher?: VoucherInfo;
+  customer_name?: string;
 }
 
 export interface ReturnSummary {

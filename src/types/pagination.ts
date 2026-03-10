@@ -12,4 +12,5 @@ export interface PaginationParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  includeDeleted?: boolean;
 }

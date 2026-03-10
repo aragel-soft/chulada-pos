@@ -42,9 +42,10 @@ const RETURN_REASON_LABELS: Record<string, string> = {
 interface SaleDetailPanelProps {
   saleId: string | null;
   onClose: () => void;
+  hideCustomerInfo?: boolean;
 }
 
-export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
+export function SaleDetailPanel({ saleId, onClose, hideCustomerInfo }: SaleDetailPanelProps) {
   const { can } = useAuthStore();
 
   const { data: sale, isLoading } = useSaleDetail(saleId);
@@ -114,8 +115,18 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
                   {BADGE_CONFIGS.credit.label}
                 </Badge>
               )}
-              {(sale?.has_discount ||
-                (sale?.discount_global_percent ?? 0) > 0) && (
+              {sale?.payment_method === "credit" && !sale?.is_credit && (
+                <Badge className="bg-purple-600 border-none text-white hover:bg-purple-700">A CRÉDITO</Badge>
+              )}
+              {sale?.has_discount && (
+                <Badge
+                  variant="secondary"
+                  className="text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100"
+                >
+                  DESCUENTO
+                </Badge>
+              )}
+              {(sale?.discount_global_percent ?? 0) > 0 && !sale?.has_discount && (
                 <Badge className={BADGE_CONFIGS.discount_global.className}>
                   {BADGE_CONFIGS.discount_global.icon && <BADGE_CONFIGS.discount_global.icon className="w-3 h-3 text-white" />}
                   {BADGE_CONFIGS.discount_global.label}
@@ -127,31 +138,52 @@ export function SaleDetailPanel({ saleId, onClose }: SaleDetailPanelProps) {
 
         {sale && (
           <>
-            <div className="flex items-center gap-3 bg-white p-2.5 rounded-md border shadow-sm">
+            <div className="flex items-stretch gap-2 w-full">
+              {/* Vendedor */}
+              <div className="flex-1 flex items-center gap-2 bg-white p-2 rounded-md border shadow-sm min-w-0">
                 <AppAvatar
                   name={sale?.user_name || 'Usuario'}
                   path={sale?.user_avatar || null}
-                  className="h-8 w-8"
+                  className="h-7 w-7 shrink-0"
                 />
-              <div className="flex-1 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground leading-tight">Vendedor</p>
-                  <p className="text-sm font-medium leading-tight">{sale.user_name}</p>
-                </div>
-                <div className="flex gap-1.5">
-                  {sale.payment_method === "credit" && (
-                    <Badge className="bg-purple-600 text-[10px] px-1.5 py-0 h-5">A CRÉDITO</Badge>
-                  )}
-                  {sale.has_discount && (
-                    <Badge
-                      variant="secondary"
-                      className="text-orange-600 border-orange-200 bg-orange-50 text-[10px] px-1.5 py-0 h-5"
-                    >
-                      DESCUENTO
-                    </Badge>
-                  )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground leading-tight uppercase font-semibold">Vendedor</p>
+                  <TooltipProvider>
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs font-medium leading-tight truncate cursor-default">{sale.user_name}</p>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{sale.user_name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
+
+              {/* Cliente (Opcional) */}
+              {sale.payment_method === "credit" && !hideCustomerInfo && sale.customer_name && (
+                <div className="flex-1 flex items-center gap-2 bg-white p-2 rounded-md border shadow-sm min-w-0">
+                  <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                    <span className="text-indigo-600 font-bold text-[10px]">{sale.customer_name.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground leading-tight uppercase font-semibold">Cliente</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <p className="text-xs font-medium leading-tight truncate cursor-default">{sale.customer_name}</p>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{sale.customer_name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {showActionButtons && (
