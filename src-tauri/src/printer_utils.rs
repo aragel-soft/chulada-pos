@@ -578,7 +578,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
                     row.get::<_, f64>(5)?,    // cash
                     row.get::<_, f64>(6)?,    // card
                     row.get::<_, f64>(7)?,    // discount_percentage
-                    row.get::<_, String>(8)?, // customer_id
+                    row.get::<_, Option<String>>(8)?, // customer_id
                     row.get::<_, String>(9)?, // payment_method
                 ))
             }
@@ -659,19 +659,23 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         sale_payment_method,
     ) = sale_info;
 
-    let (cust_name, cust_code) = if sale_payment_method == "credit" {
-        // Fetch customer info for credit sales
-        let result: Option<(String, Option<String>)> = conn
-            .query_row(
-                "SELECT c.name, c.code FROM customers c 
-                 WHERE c.id = ?1",
-                [&customer_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .ok();
-        match result {
-            Some((name, code)) => (Some(name), code),
-            None => (None, None),
+    let (cust_name, cust_code) = if sale_payment_method == "credit" || customer_id.is_some() {
+        if let Some(cid) = customer_id {
+            // Fetch customer info
+            let result: Option<(String, Option<String>)> = conn
+                .query_row(
+                    "SELECT c.name, c.code FROM customers c 
+                     WHERE c.id = ?1",
+                    rusqlite::params![cid],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .ok();
+            match result {
+                Some((name, code)) => (Some(name), code),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
         }
     } else {
         (None, None)
