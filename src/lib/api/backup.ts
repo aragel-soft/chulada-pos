@@ -62,3 +62,51 @@ export async function backupDatabase(): Promise<string | null> {
   }
   return fileName;
 }
+
+/**
+ * Busca el último respaldo en la nube, lo descarga, lo descomprime y 
+ * le pide a Rust que reemplace la base de datos local de manera segura.
+ */
+export async function downloadAndApplyLatestBackup(): Promise<void> {
+  const licenseType = localStorage.getItem("license_type") || "dev";
+
+  if (licenseType !== "admin") {
+    throw new Error("Solo las cuentas de administrador pueden descargar respaldos.");
+  }
+
+  const { data: files, error: listError } = await supabase.storage.from("backups").list();
+  if (listError) throw new Error("Error al listar respaldos en Supabase");
+
+  if (!files || files.length === 0) {
+    throw new Error("No hay respaldos disponibles en la nube");
+  }
+
+  const latestFile = files
+    .filter(f => f.name.endsWith('.gz'))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+  if (!latestFile) {
+    throw new Error("No se encontró ningún respaldo con formato .gz válido");
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from("backups")
+    .download(latestFile.name);
+
+  if (downloadError || !blob) throw new Error("Error al descargar el archivo de la nube");
+
+  try {
+    const decompressedStream = blob.stream().pipeThrough(new DecompressionStream("gzip"));
+    const decompressedBuffer = await new Response(decompressedStream).arrayBuffer();
+    const bytesArray = Array.from(new Uint8Array(decompressedBuffer));
+
+    await invoke("apply_downloaded_backup", { 
+      licenseType, 
+      newDbBytes: bytesArray 
+    });
+
+  } catch (err) {
+    console.error("Error durante la descompresión o reemplazo:", err);
+    throw new Error("Hubo un problema al aplicar el respaldo. Los datos originales están intactos.");
+  }
+}
