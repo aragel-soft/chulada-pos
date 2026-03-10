@@ -81,8 +81,8 @@ pub fn validate_voucher(
                 let expiry_date =
                     chrono::NaiveDateTime::parse_from_str(expiry, "%Y-%m-%d %H:%M:%S")
                         .map_err(|_| "Error formateando fecha de expiración".to_string())?;
-                let now = chrono::Local::now().naive_local();
-                if now > expiry_date {
+                let now_local = chrono::Local::now().naive_local();
+                if now_local > expiry_date {
                     return Err("El vale ha expirado.".to_string());
                 }
             }
@@ -628,10 +628,12 @@ fn validate_credit_sale(
             ));
         }
 
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
         // Update Customer Balance
         tx.execute(
-            "UPDATE customers SET current_balance = ?1 WHERE id = ?2",
-            params![new_balance, cid],
+            "UPDATE customers SET current_balance = ?1, updated_at = ?2 WHERE id = ?3",
+            params![new_balance, now_local, cid],
         )
         .map_err(|e| format!("Error actualizando saldo cliente: {}", e))?;
 
@@ -898,7 +900,6 @@ pub fn process_sale(
         }
     }
 
-    // Use local system time instead of SQLite's CURRENT_TIMESTAMP (which is UTC)
     let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Calculate Items & Totals
@@ -1026,8 +1027,8 @@ pub fn process_sale(
 
         // Decrease stock
         let rows_mod = tx.execute(
-            "UPDATE store_inventory SET stock = stock - ?1 WHERE product_id = ?2 AND store_id = ?3",
-            params![item.quantity, item.product_id, store_id],
+            "UPDATE store_inventory SET stock = stock - ?1, updated_at = ?2 WHERE product_id = ?3 AND store_id = ?4",
+            params![item.quantity, now_local, item.product_id, store_id],
         ).map_err(|e| format!("Error actualizando inventario para {}: {}", data.db_name, e))?;
 
         if rows_mod == 0 {
@@ -1099,14 +1100,14 @@ pub fn process_sale(
             ).map_err(|e| format!("Error actualizando saldo del vale: {}", e))?;
 
             tx.execute(
-                "UPDATE store_vouchers SET is_active = 0, used_at = ?1 WHERE id = ?2 AND current_balance <= 0",
-                params![now_local, v_id]
+                "UPDATE store_vouchers SET is_active = 0, used_at = ?1, updated_at = ?2 WHERE id = ?3 AND current_balance <= 0",
+                params![now_local, now_local, v_id]
             ).map_err(|e| format!("Error marcando vale como redimido: {}", e))?;
 
             let sv_id = Uuid::new_v4().to_string();
             tx.execute(
-                "INSERT INTO sale_vouchers (id, sale_id, voucher_id, amount) VALUES (?1, ?2, ?3, ?4)",
-                params![sv_id, sale_id, v_id, voucher_amount_used]
+                "INSERT INTO sale_vouchers (id, sale_id, voucher_id, amount, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![sv_id, sale_id, v_id, voucher_amount_used, now_local]
             ).map_err(|e| format!("Error registrando uso de vale: {}", e))?;
         }
     }

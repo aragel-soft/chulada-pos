@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 use machine_uid;
-use chrono::{Utc, DateTime};
+use chrono::{Utc,Local, DateTime};
 
 #[derive(Debug,  Serialize, Deserialize)]
 pub struct User {
@@ -222,11 +222,12 @@ pub fn update_license_validation(
 ) -> Result<(), String> {
     let conn = state.lock().map_err(|e| e.to_string())?;
     let now_timestamp = Utc::now().timestamp();
+    let now_local = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     
     conn.execute(
-        "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
+        "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, ?3)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-        ["last_license_validation", &now_timestamp.to_string()],
+        rusqlite::params!["last_license_validation", &now_timestamp.to_string(), &now_local],
     ).map_err(|e| e.to_string())?;
     Ok(())
 }

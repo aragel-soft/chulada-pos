@@ -238,8 +238,8 @@ pub fn open_shift(
     let code = format!("{}-{}-{:03}", store_id, date_part, sequence);
 
     conn.execute(
-        "INSERT INTO cash_register_shifts (initial_cash, opening_date, opening_user_id, status, code)
-         VALUES (?1, ?2, ?3, 'open', ?4)",
+        "INSERT INTO cash_register_shifts (initial_cash, opening_date, opening_user_id, status, code, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'open', ?4, ?2, ?2)",
         params![initial_cash, now_str, user_id, code],
     )
     .map_err(|e| e.to_string())?;
@@ -300,7 +300,7 @@ pub fn close_shift(
         return Err("El turno ya está cerrado.".to_string());
     }
 
-    let now = chrono::Local::now()
+    let now_local = chrono::Local::now()
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
 
@@ -323,7 +323,7 @@ pub fn close_shift(
              updated_at = ?1
          WHERE id = ?7 AND status = 'open'",
             params![
-                now,
+                now_local,
                 user_id,
                 expected_cash,
                 cash_withdrawal,

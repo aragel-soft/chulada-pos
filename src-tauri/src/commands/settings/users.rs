@@ -160,7 +160,7 @@ pub async fn create_user(
         .to_string();
 
     let user_id = Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "INSERT INTO users (id, username, password_hash, full_name, role_id, is_active, avatar_url, created_at, updated_at)
@@ -173,7 +173,7 @@ pub async fn create_user(
             &payload.role_id,
             if payload.is_active { 1 } else { 0 },
             &payload.avatar_url,
-            &now,
+            &now_local,
         ],
     )
     .map_err(|e| {
@@ -190,7 +190,7 @@ pub async fn create_user(
         role_id: payload.role_id,
         is_active: payload.is_active,
         avatar_url: payload.avatar_url,
-        created_at: now,
+        created_at: now_local,
     })
 }
 
@@ -376,7 +376,7 @@ pub async fn update_user(
         }
     }
 
-    let now = chrono::Utc::now().to_rfc3339();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "UPDATE users SET 
@@ -391,7 +391,7 @@ pub async fn update_user(
             &payload.role_id,
             if payload.is_active { 1 } else { 0 },
             &new_avatar_for_db,
-            &now,
+            &now_local,
             &payload.id
         ],
     )
@@ -416,7 +416,7 @@ pub async fn update_user(
         role_id: payload.role_id,
         is_active: payload.is_active,
         avatar_url: new_avatar_for_db, 
-        created_at: now, 
+        created_at: now_local, 
     })
 }
 
@@ -438,7 +438,7 @@ pub async fn save_avatar(
     fs::create_dir_all(&avatars_dir)
         .map_err(|e| format!("Error al crear directorio de avatares: {}", e))?;
 
-    let timestamp = chrono::Utc::now().timestamp();
+    let timestamp = chrono::Local::now().timestamp();
     let file_name = format!("{}_{}.jpg", username, timestamp);
     let file_path = avatars_dir.join(&file_name);
 
@@ -526,9 +526,10 @@ pub async fn delete_users(
         .into());
     }
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let sql_delete = format!(
-        "UPDATE users SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})",
-        placeholders
+        "UPDATE users SET deleted_at = '{}', is_active = 0 WHERE id IN ({})",
+        now_local, placeholders
     );
 
     tx.execute(&sql_delete, rusqlite::params_from_iter(params.iter()))
@@ -595,7 +596,7 @@ pub async fn update_own_profile(
         }
     }
 
-    let now = chrono::Utc::now().to_rfc3339();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "UPDATE users SET 
@@ -606,7 +607,7 @@ pub async fn update_own_profile(
         rusqlite::params![
             &payload.full_name,
             &new_avatar_for_db,
-            &now,
+            &now_local,
             &payload.id
         ],
     )
@@ -676,11 +677,11 @@ pub async fn change_own_password(
         .map_err(|_| "Error al generar nueva contraseña".to_string())?
         .to_string();
 
-    let now = chrono::Utc::now().to_rfc3339();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3",
-        rusqlite::params![&new_password_hash, &now, &payload.id],
+        rusqlite::params![&new_password_hash, &now_local, &payload.id],
     )
     .map_err(|e| format!("Error al actualizar contraseña: {}", e))?;
 

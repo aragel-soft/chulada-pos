@@ -124,7 +124,7 @@ pub fn cancel_sale(
 
     let mut stmt_update = tx
         .prepare(
-            "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3 RETURNING stock",
+            "UPDATE store_inventory SET stock = stock + ?1, updated_at = ?2 WHERE product_id = ?3 AND store_id = ?4 RETURNING stock",
         )
         .map_err(|e| e.to_string())?;
 
@@ -142,7 +142,7 @@ pub fn cancel_sale(
 
         // Update inventory
         let new_stock: i64 = stmt_update
-            .query_row(params![quantity, product_id, store_id], |row| row.get(0))
+            .query_row(params![quantity, now_local, product_id, store_id], |row| row.get(0))
             .map_err(|e| format!("Error reingresando inventario para {}: {}", product_name, e))?;
 
         let previous_stock = new_stock - qty_i64;
@@ -171,10 +171,11 @@ pub fn cancel_sale(
     // Revert credit balance if credit sale
     if payment_method == "credit" {
         if let Some(cid) = &customer_id {
+            let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
             let rows = tx
                 .execute(
-                    "UPDATE customers SET current_balance = current_balance - ?1 WHERE id = ?2",
-                    params![total, cid],
+                    "UPDATE customers SET current_balance = current_balance - ?1, updated_at = ?2 WHERE id = ?3",
+                    params![total, now_local, cid],
                 )
                 .map_err(|e| format!("Error revirtiendo saldo de cliente: {}", e))?;
 

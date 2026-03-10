@@ -308,15 +308,17 @@ pub fn create_category(
 
     // Insertar
     let id = uuid::Uuid::new_v4().to_string();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     tx.execute(
-        "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, DATETIME('now'), DATETIME('now'))",
+        "INSERT INTO categories (id, name, parent_category_id, color, sequence, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
         rusqlite::params![
             id,
             name,
             data.parent_id,
             data.color,
             data.sequence,
-            data.description
+            data.description,
+            now_local
         ],
     ).map_err(|e| format!("Error al insertar categoría: {}", e))?;
 
@@ -547,9 +549,10 @@ pub async fn delete_categories(
         .take(ids.len())
         .collect::<Vec<_>>()
         .join(",");
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let sql_delete = format!(
-        "UPDATE categories SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})",
-        placeholders
+        "UPDATE categories SET deleted_at = '{}', is_active = 0 WHERE id IN ({})",
+        now_local, placeholders
     );
 
     let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();

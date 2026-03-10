@@ -339,17 +339,19 @@ pub fn create_promotion(
 
   {
     let promo_id = Uuid::new_v4().to_string();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
       
     tx.execute(
-      "INSERT INTO promotions (id, name, description, type, combo_price, start_date, end_date, is_active) 
-       VALUES (?1, ?2, ?3, 'combo', ?4, ?5, ?6, 1)",
+      "INSERT INTO promotions (id, name, description, type, combo_price, start_date, end_date, is_active, created_at, updated_at) 
+       VALUES (?1, ?2, ?3, 'combo', ?4, ?5, ?6, 1, ?7, ?7)",
       rusqlite::params![
         promo_id,
         promotion.name,
         promotion.description,
         promotion.combo_price,
         promotion.start_date,
-        promotion.end_date
+        promotion.end_date,
+        now_local
       ],
     ).map_err(|e| format!("Error al insertar promoción: {}", e))?;
 
@@ -495,10 +497,11 @@ pub fn update_promotion(
   let tx = conn.transaction().map_err(|e| e.to_string())?;
 
   {
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let affected = tx.execute(
       "UPDATE promotions 
-       SET name = ?1, description = ?2, combo_price = ?3, start_date = ?4, end_date = ?5, is_active = ?6
-       WHERE id = ?7 AND deleted_at IS NULL",
+       SET name = ?1, description = ?2, combo_price = ?3, start_date = ?4, end_date = ?5, is_active = ?6, updated_at = ?7
+       WHERE id = ?8 AND deleted_at IS NULL",
       rusqlite::params![
         promotion.name,
         promotion.description,
@@ -506,6 +509,7 @@ pub fn update_promotion(
         promotion.start_date,
         promotion.end_date,
         promotion.is_active,
+        now_local,
         id
       ],
     ).map_err(|e| format!("Error al actualizar promoción: {}", e))?;
@@ -554,9 +558,10 @@ pub fn delete_promotions(
       "DELETE FROM promotion_combos WHERE promotion_id = ?1"
     ).map_err(|e| e.to_string())?;
 
-    let mut soft_delete_parent_stmt = tx.prepare(
-      "UPDATE promotions SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    let query = format!("UPDATE promotions SET deleted_at = '{}', is_active = 0 WHERE id = ?1", now_local);
+    let mut soft_delete_parent_stmt = tx.prepare(&query).map_err(|e| e.to_string())?;
 
     for id in ids {
       delete_children_stmt.execute([&id])

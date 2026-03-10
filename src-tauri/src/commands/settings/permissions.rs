@@ -239,11 +239,12 @@ fn delete_permissions(tx: &Transaction, to_delete: &[&RolePermission]) -> SqlRes
 }
 
 fn insert_permissions(tx: &Transaction, to_insert: &[&RolePermission]) -> SqlResult<()> {
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut stmt =
-        tx.prepare("INSERT INTO role_permissions (id, role_id, permission_id) VALUES (?, ?, ?)")?;
+        tx.prepare("INSERT INTO role_permissions (id, role_id, permission_id, created_at) VALUES (?, ?, ?, ?)")?;
     for rp in to_insert {
         let id = Uuid::new_v4().to_string();
-        stmt.execute(params![id, rp.role_id, rp.permission_id])?;
+        stmt.execute(params![id, rp.role_id, rp.permission_id, &now_local])?;
     }
     Ok(())
 }

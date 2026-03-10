@@ -110,11 +110,13 @@ pub fn upsert_customer(
         None
     };
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     if is_new {
         let code_val = code.as_ref().unwrap();
         tx.execute(
-            "INSERT INTO customers (id, code, name, phone, email, address, credit_limit, is_active) 
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)",
+            "INSERT INTO customers (id, code, name, phone, email, address, credit_limit, is_active, created_at, updated_at) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8)",
             rusqlite::params![
                 customer_id,
                 code_val,
@@ -122,7 +124,8 @@ pub fn upsert_customer(
                 customer.phone.trim(),
                 customer.email,
                 customer.address,
-                customer.credit_limit
+                customer.credit_limit,
+                now_local
             ]
         ).map_err(|e| e.to_string())?;
     } else {
@@ -134,8 +137,8 @@ pub fn upsert_customer(
                 address = ?4, 
                 credit_limit = ?5, 
                 is_active = ?6,
-                updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?7",
+                updated_at = ?7
+             WHERE id = ?8",
             rusqlite::params![
                 customer.name.trim(),
                 customer.phone.trim(),
@@ -143,6 +146,7 @@ pub fn upsert_customer(
                 customer.address,
                 customer.credit_limit,
                 customer.is_active.unwrap_or(true), 
+                now_local,
                 customer_id
             ]
         ).map_err(|e| e.to_string())?;
@@ -178,6 +182,8 @@ pub fn restore_customer(
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     let rows_affected = tx.execute(
         "UPDATE customers SET 
             deleted_at = NULL,
@@ -187,14 +193,15 @@ pub fn restore_customer(
             address = ?4,
             credit_limit = ?5,
             is_active = 1,
-            updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?6",
+            updated_at = ?6
+         WHERE id = ?7",
         rusqlite::params![
             customer.name.trim(),
             customer.phone.trim(),
             customer.email,
             customer.address,
             customer.credit_limit,
+            now_local,
             id
         ]
     ).map_err(|e| e.to_string())?;
@@ -408,11 +415,12 @@ pub fn delete_customers(
         return Err(error_msg);
     }
     
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let delete_sql = format!(
         "UPDATE customers 
-         SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 
+         SET deleted_at = '{}', is_active = 0 
          WHERE id IN ({})", 
-        placeholders
+        now_local, placeholders
     );
 
     tx.execute(&delete_sql, rusqlite::params_from_iter(ids.iter()))
