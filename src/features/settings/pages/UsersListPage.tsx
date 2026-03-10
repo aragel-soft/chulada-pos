@@ -1,10 +1,11 @@
 // Importaciones
-import {useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
+import { PaginationParams } from "@/types/pagination";
 import { useAuthStore } from "@/stores/authStore";
-import { ColumnDef, RowSelectionState } from "@tanstack/react-table"
+import { ColumnDef, PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table"
 import {
   Pencil,
   PlusCircle,
@@ -24,31 +25,39 @@ import { DataTable } from "@/components/ui/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
 import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
-// Funcion para convertir la fecha
-const processUsers = (users: User[]): User[] => {
-  return users.map(user => ({
-    ...user,
-    created_at: format(new Date(user.created_at), 'yyyy-MM-dd HH:mm'),
-  }));
-};
-
 // Componente principal
 export function UsersListPage() {
+  // Estado de paginación, ordenamiento y búsqueda (server-side)
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 16,
+  });
+  const [globalFilter, setGlobalFilter] = useState("");
+
+  // Parámetros de consulta para el servidor
+  const queryParams: PaginationParams = useMemo(
+    () => ({
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      search: globalFilter,
+      sortBy: sorting.length > 0 ? sorting[0].id : undefined,
+      sortOrder:
+        sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined,
+    }),
+    [pagination, globalFilter, sorting],
+  );
+
   // Hooks de React Query
-  const { data: users = [], isLoading: loading, error, refetch } = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => {
-      const data = await getUsersList();
-      return processUsers(data);
-    },
+  const { data, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['users', queryParams],
+    queryFn: () => getUsersList(queryParams),
   });
   
   // Hooks de Zustand
   const { user: currentUser, can } = useAuthStore();
 
   // Hooks de React
-  const data = useMemo(() => users, [users]);
-
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -120,7 +129,7 @@ export function UsersListPage() {
           <DataTableColumnHeader column={column} title="Fecha de Creación" />
         ),
         cell: ({ row }) => (
-          <div>{(row.getValue("created_at") as string)}</div>
+          <div>{format(new Date(row.getValue("created_at")), 'yyyy-MM-dd HH:mm')}</div>
         ),
       },
       {
@@ -167,7 +176,7 @@ export function UsersListPage() {
     <>
       <DataTable
         columns={columns}
-        data={data}
+        data={data?.data || []}
         isLoading={loading}
         initialSorting={[{ id: "created_at", desc: true }]}
         initialColumnVisibility={{ created_at: false }}
@@ -177,6 +186,19 @@ export function UsersListPage() {
           role_name: "Rol",
           created_at: "Fecha de Creación",
           is_active: "Estado"
+        }}
+        manualPagination={true}
+        manualFiltering={true}
+        manualSorting={true}
+        sorting={sorting}
+        onSortingChange={setSorting}
+        rowCount={data?.total || 0}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        globalFilter={globalFilter}
+        onGlobalFilterChange={(val) => {
+          setGlobalFilter(String(val));
+          setPagination(prev => ({ ...prev, pageIndex: 0 }));
         }}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}

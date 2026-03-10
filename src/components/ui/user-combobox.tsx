@@ -39,7 +39,10 @@ export function UserCombobox({
   // Fetch users list specifically for the custom combobox
   const { data: users = [] } = useQuery({
     queryKey: ["users-list-filter"],
-    queryFn: () => getUsersList({ include_deleted: true }),
+    queryFn: async () => {
+      const res = await getUsersList({ page: 1, pageSize: 1000, includeDeleted: true });
+      return res.data;
+    },
     staleTime: 1000 * 60 * 10,
   });
 
