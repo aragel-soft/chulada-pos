@@ -15,7 +15,9 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   );
   const [machineId, setMachineId] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [loadingMessage, setLoadingMessage] = useState<string>("Verificando licencia...");
+  const [loadingMessage, setLoadingMessage] = useState<string>(
+    "Verificando licencia...",
+  );
 
   useEffect(() => {
     const verifyLicense = async () => {
@@ -34,21 +36,21 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
         localStorage.setItem("license_type", license.type);
 
         if (license.type === "admin") {
-const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
+          const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
 
           if (!hasSyncedThisSession) {
             setLoadingMessage("Sincronizando base de datos de la tienda...");
             try {
               await downloadAndApplyLatestBackup();
               sessionStorage.setItem("sync_completed", "true");
-              
+
               toast.success("Sincronización exitosa", {
-                description: "Viendo los datos más recientes de la tienda.",
+                description: "Se han descargado los datos más recientes de la tienda.",
               });
             } catch (syncErr) {
-              console.error("Error sincronizando:", syncErr);
               toast.error("Error de Sincronización", {
-                description: "No se pudo descargar la última versión. Se usarán datos locales.",
+                description:
+                  "No se pudo descargar la última versión. Se usarán datos locales.",
               });
             }
           }
@@ -61,13 +63,18 @@ const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
           const offlineStatus = await checkOfflineLicense();
 
           if (offlineStatus.valid) {
-            toast.warning(`Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`, {
-              duration: 6000,
-            });
+            toast.warning(
+              `Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`,
+              {
+                duration: 6000,
+              },
+            );
             setStatus("authorized");
           } else {
             setStatus("rejected");
-            setErrorMessage("Se requiere conexión a internet para validar la licencia");
+            setErrorMessage(
+              "Se requiere conexión a internet para validar la licencia",
+            );
           }
         } catch (offlineErr) {
           setStatus("rejected");
@@ -103,7 +110,8 @@ const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
         </h1>
         <p className="text-muted-foreground mb-8 max-w-md">
           Comunícate con soporte técnico y proporciona el siguiente
-          identificador para registrar tu equipo, o verifica tu conexión a internet.
+          identificador para registrar tu equipo, o verifica tu conexión a
+          internet.
         </p>
         <div className="p-4 rounded-lg border-2 border-dashed border-destructive/50 select-all">
           <p className="font-mono text-lg font-semibold tracking-wider text-foreground">
