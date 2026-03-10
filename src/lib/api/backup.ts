@@ -105,8 +105,7 @@ export async function downloadAndApplyLatestBackup(): Promise<void> {
       newDbBytes: bytesArray 
     });
 
-  } catch (err) {
-    console.error("Error durante la descompresión o reemplazo:", err);
+  } catch (err) { 
     throw new Error("Hubo un problema al aplicar el respaldo. Los datos originales están intactos.");
   }
 }
