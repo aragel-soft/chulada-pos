@@ -45,8 +45,7 @@ export function DeleteProductsDialog({
         .then((deps) => {
           setDependencies(deps);
         })
-        .catch((err) => {
-          console.error("Error verificando dependencias:", err);
+        .catch(() => {
           setDependencies(null);
         })
         .finally(() => {
