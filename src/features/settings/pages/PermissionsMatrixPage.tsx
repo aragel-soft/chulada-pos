@@ -54,6 +54,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionsChangesModal } from "../components/PermissionsChangesModal";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 // Constantes de nombre de módulos
 const MODULE_NAMES: Record<string, string> = {
@@ -97,13 +98,27 @@ export function PermissionsMatrixPage() {
   // Auth
   const { user: currentUser, can } = useAuthStore();
 
-  // Estados
-  const [globalFilter, setGlobalFilter] = useState("");
+  // Estados para filtros y tabla
+  const { 
+    globalFilter, 
+    onGlobalFilterChange: setPersistedGlobalFilter,
+    getExtraFilter,
+    setExtraFilter
+  } = usePersistedTableState('settings.permissions');
+
+  // Módulos seleccionados guardados en Zustand
+  const moduleFilters = getExtraFilter<string[]>("moduleFilters", []);
+  
+  // Wrapper para mantener compatibilidad con el resto del código
+  const setModuleFilters = (newFilters: string[]) => {
+    setExtraFilter("moduleFilters", newFilters);
+  };
+
+  // Estados locales
   const [localRolePermissions, setLocalRolePermissions] = useState<
     RolePermission[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [moduleFilters, setModuleFilters] = useState<string[]>([]);
 
   // Consultas
   const { data: roles = [], isLoading: loadingRoles } = useQuery({
@@ -197,7 +212,6 @@ export function PermissionsMatrixPage() {
   }, [localRolePermissions]);
 
   // Filtro de permisos
-
   const filteredPermissions = useMemo(() => {
     let result = permissions;
 
@@ -395,7 +409,7 @@ export function PermissionsMatrixPage() {
             <DebouncedInput
               placeholder="Buscar permisos..."
               value={globalFilter}
-              onChange={(value) => setGlobalFilter(String(value))}
+              onChange={(value) => setPersistedGlobalFilter(String(value))}
               className="pl-10 h-10 w-full text-base"
             />
           </div>

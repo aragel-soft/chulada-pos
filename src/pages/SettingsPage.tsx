@@ -1,6 +1,7 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from '@/stores/authStore';
+import { useUiStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 
 const settingTabs = [
@@ -45,12 +46,14 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuthStore();
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   const availableTabs = settingTabs.filter(tab => can(tab.permission));
   // Fix: Ensure currentTab has a fallback to avoid uncontrolled/controlled warning
   const currentTab = location.pathname.split('/')[2] || availableTabs[0]?.value || '';
 
   const onTabChange = (value: string) => {
+    setActiveTab('settings', value);
     navigate(`/settings/${value}`);
   };
 

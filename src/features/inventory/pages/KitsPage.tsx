@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ColumnDef,
-  PaginationState,
   SortingState,
 } from "@tanstack/react-table";
 import { Gift, PlusCircle, Pencil, Trash } from "lucide-react";
@@ -19,15 +18,12 @@ import { format } from "date-fns";
 import { KitWizard } from "../components/KitWizard";
 import { DeleteKitsDialog } from "../components/DeleteKitsDialog";
 import { KitDetailPanel } from "../components/KitDetailPanel";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function KitsPage() {
   const queryClient = useQueryClient();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { globalFilter, pagination, onGlobalFilterChange: setGlobalFilter, onPaginationChange: setPagination } = usePersistedTableState('inventory.kits');
   const [rowSelection, setRowSelection] = useState({});
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingKitId, setEditingKitId] = useState<string | null>(null);
