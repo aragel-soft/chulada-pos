@@ -13,14 +13,14 @@ export const getMachineId = async (): Promise<string> => {
 export const checkLicenseOnline = async (machineId: string): Promise<LicenseCheckResult> => {
   const { data, error } = await supabase
     .from("licenses")
-    .select("is_active")
+    .select("is_active, type")
     .eq("machine_id", machineId)
     .single();
 
   if (error) {
     throw new Error("Error de conexión a Supabase");
   }
-  return data;
+  return data as LicenseCheckResult;
 };
 
 export const updateLicenseValidation = async (): Promise<void> => {

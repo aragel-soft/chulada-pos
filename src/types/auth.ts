@@ -1,3 +1,5 @@
+export type LicenseType = 'dev' | 'store' | 'admin';
+
 export interface User {
   id: string;
   username: string;
@@ -27,4 +29,5 @@ export interface OfflineLicenseStatus {
 
 export interface LicenseCheckResult {
   is_active: boolean;
+  type: LicenseType;
 }

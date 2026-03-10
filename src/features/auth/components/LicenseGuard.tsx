@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
-import { toast } from "sonner"; 
+import { toast } from "sonner";
 import {
   getMachineId,
   checkLicenseOnline,
   updateLicenseValidation,
   checkOfflineLicense,
 } from "@/lib/api/auth";
+import { downloadAndApplyLatestBackup } from "@/lib/api/backup";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -14,6 +15,9 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   );
   const [machineId, setMachineId] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [loadingMessage, setLoadingMessage] = useState<string>(
+    "Verificando licencia...",
+  );
 
   useEffect(() => {
     const verifyLicense = async () => {
@@ -29,21 +33,48 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
+        localStorage.setItem("license_type", license.type);
+
+        if (license.type === "admin") {
+          const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
+
+          if (!hasSyncedThisSession) {
+            setLoadingMessage("Sincronizando base de datos de la tienda...");
+            try {
+              await downloadAndApplyLatestBackup();
+              sessionStorage.setItem("sync_completed", "true");
+
+              toast.success("Sincronización exitosa", {
+                description: "Se han descargado los datos más recientes de la tienda.",
+              });
+            } catch (syncErr) {
+              toast.error("Error de Sincronización", {
+                description:
+                  "No se pudo descargar la última versión. Se usarán datos locales.",
+              });
+            }
+          }
+        }
+
         await updateLicenseValidation();
         setStatus("authorized");
-
       } catch (err) {
         try {
           const offlineStatus = await checkOfflineLicense();
-          
+
           if (offlineStatus.valid) {
-            toast.warning(`Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`, {
-              duration: 6000,
-            });
+            toast.warning(
+              `Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`,
+              {
+                duration: 6000,
+              },
+            );
             setStatus("authorized");
           } else {
             setStatus("rejected");
-            setErrorMessage("Se requiere conexión a internet para validar la licencia");
+            setErrorMessage(
+              "Se requiere conexión a internet para validar la licencia",
+            );
           }
         } catch (offlineErr) {
           setStatus("rejected");
@@ -55,7 +86,6 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
     verifyLicense();
   }, []);
 
-
   if (status === "loading") {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -63,8 +93,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           <div className="h-16 w-16 animate-pulse rounded-full bg-primary/20 flex items-center justify-center">
             <img src="/logo-icon.svg" alt="Cargando" className="h-10 w-10" />
           </div>
-          <p className="text-muted-foreground animate-pulse">
-            Verificando licencia...
+          <p className="text-muted-foreground animate-pulse text-center">
+            {loadingMessage}
           </p>
         </div>
       </div>
@@ -80,7 +110,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
         </h1>
         <p className="text-muted-foreground mb-8 max-w-md">
           Comunícate con soporte técnico y proporciona el siguiente
-          identificador para registrar tu equipo, o verifica tu conexión a internet.
+          identificador para registrar tu equipo, o verifica tu conexión a
+          internet.
         </p>
         <div className="p-4 rounded-lg border-2 border-dashed border-destructive/50 select-all">
           <p className="font-mono text-lg font-semibold tracking-wider text-foreground">
