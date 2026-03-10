@@ -319,9 +319,15 @@ export default function HardwarePage() {
                           setIsBackingUp(true);
                           try {
                             const fileName = await backupDatabase();
-                            toast.success("Respaldo completado", {
-                              description: `Archivo: ${fileName}`,
-                            });
+                            if (fileName) {
+                              toast.success("Respaldo completado", {
+                                description: `Archivo: ${fileName}`,
+                              });
+                            } else {
+                              toast.info("Respaldo Omitido", {
+                                description: "Tu licencia no tiene permitido sobrescribir la nube.",
+                              });
+                            }
                           } catch (err) {
                             toast.error("Error al crear respaldo", {
                               description: String(err),

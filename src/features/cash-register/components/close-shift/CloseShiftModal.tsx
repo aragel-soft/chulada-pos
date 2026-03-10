@@ -101,9 +101,11 @@ export function CloseShiftModal({
 
       backupDatabase()
         .then((fileName) => {
-          toast.success("Respaldo en la nube completado", {
-            description: fileName,
-          });
+          if (fileName) {
+            toast.success("Respaldo en la nube completado", {
+              description: fileName,
+            });
+          }
         })
         .catch((err) => {
           console.error("Error en respaldo automático:", err);

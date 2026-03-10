@@ -2,7 +2,14 @@ use std::fs;
 use tauri::Manager;
 
 #[tauri::command]
-pub fn get_database_bytes(app_handle: tauri::AppHandle) -> Result<Vec<u8>, String> {
+pub fn get_database_bytes(app_handle: tauri::AppHandle, license_type: String) -> Result<Vec<u8>, String> {
+    if license_type != "store" {
+        return Err(format!(
+            "Operación denegada: El tipo de licencia '{}' tiene estrictamente prohibido extraer datos para respaldos.",
+            license_type
+        ));
+    }
+
     let app_dir = app_handle
         .path()
         .app_data_dir()

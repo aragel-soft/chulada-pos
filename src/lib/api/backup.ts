@@ -33,12 +33,17 @@ function generateBackupFileName(): string {
  * @returns The name of the uploaded file.
  * @throws Error if any step of the backup process fails.
  */
-export async function backupDatabase(): Promise<string> {
-  const rawBytes: number[] = await invoke("get_database_bytes");
+export async function backupDatabase(): Promise<string | null> {
+  const licenseType = localStorage.getItem("license_type") || "dev";
+
+  if (licenseType !== "store") {
+    return null;
+  }
+
+  const rawBytes: number[] = await invoke("get_database_bytes", { licenseType });
   const uint8 = new Uint8Array(rawBytes);
 
   const compressedBlob = await compressBytes(uint8);
-
   const fileName = generateBackupFileName();
 
   const { error } = await supabase.storage
