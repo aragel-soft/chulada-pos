@@ -387,6 +387,8 @@ export default function HardwarePage() {
                             setIsDownloading(true);
                             try {
                               await downloadAndApplyLatestBackup();
+                              sessionStorage.setItem("sync_completed", "true");
+
                               toast.success("Base de datos actualizada", {
                                 description: "La información de la tienda se ha sincronizado exitosamente."
                               });

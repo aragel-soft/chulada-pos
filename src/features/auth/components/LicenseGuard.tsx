@@ -34,17 +34,23 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
         localStorage.setItem("license_type", license.type);
 
         if (license.type === "admin") {
-          setLoadingMessage("Sincronizando base de datos de la tienda...");
-          try {
-            await downloadAndApplyLatestBackup();
-            toast.success("Sincronización exitosa", {
-              description: "Se han descargado los datos más recientes de la tienda.",
-            });
-          } catch (syncErr) {
-            console.error("Error sincronizando:", syncErr);
-            toast.error("Error de Sincronización", {
-              description: "No se pudo descargar la última versión. Se usarán datos locales.",
-            });
+const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
+
+          if (!hasSyncedThisSession) {
+            setLoadingMessage("Sincronizando base de datos de la tienda...");
+            try {
+              await downloadAndApplyLatestBackup();
+              sessionStorage.setItem("sync_completed", "true");
+              
+              toast.success("Sincronización exitosa", {
+                description: "Viendo los datos más recientes de la tienda.",
+              });
+            } catch (syncErr) {
+              console.error("Error sincronizando:", syncErr);
+              toast.error("Error de Sincronización", {
+                description: "No se pudo descargar la última versión. Se usarán datos locales.",
+              });
+            }
           }
         }
 
