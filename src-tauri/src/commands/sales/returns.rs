@@ -473,16 +473,16 @@ fn create_return_records(
         .unwrap_or(1);
 
     tx.execute(
-        "INSERT INTO returns (id, folio, sale_id, total, reason, notes, refund_method, user_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'store_voucher', ?7, ?8)",
+        "INSERT INTO returns (id, folio, sale_id, return_date, total, reason, notes, refund_method, user_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'store_voucher', ?8, ?4)",
         params![
             return_id,
             folio,
             payload.sale_id,
+            now_local,
             return_total,
             payload.reason.trim(),
             payload.notes.trim(),
             payload.user_id,
-            now_local
         ]
     ).map_err(|e| format!("Error creando registro de devolución: {}", e))?;
 
