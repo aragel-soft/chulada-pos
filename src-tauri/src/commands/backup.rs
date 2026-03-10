@@ -36,7 +36,7 @@ pub fn apply_downloaded_backup(
     license_type: String,
     new_db_bytes: Vec<u8>
 ) -> Result<(), String> {
-    if license_type != "admin" {
+    if license_type != "admin" && license_type != "dev" {
         return Err("Operación denegada: Tu licencia no permite sobreescribir la BD local.".into());
     }
 
@@ -53,7 +53,7 @@ pub fn apply_downloaded_backup(
 
     let new_conn = crate::database::init_database(&app_handle)
         .map_err(|e| format!("Error reconectando BD: {}", e))?;
-    
+
     *db_guard = new_conn;
     Ok(())
 }

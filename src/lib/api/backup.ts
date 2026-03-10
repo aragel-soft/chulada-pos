@@ -70,8 +70,8 @@ export async function backupDatabase(): Promise<string | null> {
 export async function downloadAndApplyLatestBackup(): Promise<void> {
   const licenseType = localStorage.getItem("license_type") || "dev";
 
-  if (licenseType !== "admin") {
-    throw new Error("Solo las cuentas de administrador pueden descargar respaldos.");
+  if (licenseType !== "admin" && licenseType !== "dev") {
+    throw new Error("Solo las cuentas de administrador y desarrollador pueden descargar respaldos.");
   }
 
   const { data: files, error: listError } = await supabase.storage.from("backups").list();

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
-import { toast } from "sonner"; 
+import { toast } from "sonner";
 import {
   getMachineId,
   checkLicenseOnline,
   updateLicenseValidation,
   checkOfflineLicense,
 } from "@/lib/api/auth";
+import { downloadAndApplyLatestBackup } from "@/lib/api/backup";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -14,6 +15,7 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   );
   const [machineId, setMachineId] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [loadingMessage, setLoadingMessage] = useState<string>("Verificando licencia...");
 
   useEffect(() => {
     const verifyLicense = async () => {
@@ -31,13 +33,27 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
 
         localStorage.setItem("license_type", license.type);
 
+        if (license.type === "admin") {
+          setLoadingMessage("Sincronizando base de datos de la tienda...");
+          try {
+            await downloadAndApplyLatestBackup();
+            toast.success("Sincronización exitosa", {
+              description: "Se han descargado los datos más recientes de la tienda.",
+            });
+          } catch (syncErr) {
+            console.error("Error sincronizando:", syncErr);
+            toast.error("Error de Sincronización", {
+              description: "No se pudo descargar la última versión. Se usarán datos locales.",
+            });
+          }
+        }
+
         await updateLicenseValidation();
         setStatus("authorized");
-
       } catch (err) {
         try {
           const offlineStatus = await checkOfflineLicense();
-          
+
           if (offlineStatus.valid) {
             toast.warning(`Modo offline: Te quedan ${offlineStatus.days_left} días para operar sin conexión.`, {
               duration: 6000,
@@ -64,8 +80,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           <div className="h-16 w-16 animate-pulse rounded-full bg-primary/20 flex items-center justify-center">
             <img src="/logo-icon.svg" alt="Cargando" className="h-10 w-10" />
           </div>
-          <p className="text-muted-foreground animate-pulse">
-            Verificando licencia...
+          <p className="text-muted-foreground animate-pulse text-center">
+            {loadingMessage}
           </p>
         </div>
       </div>
