@@ -25,6 +25,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { PaymentDetailPanel } from "@/features/customers/components/PaymentDetailSheet";
 import { printPaymentReceipt } from "@/lib/api/printers";
+import { useUiStore } from "@/stores/uiStore";
+
+const DETAIL_STORE_KEY = 'customers.detail';
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +38,13 @@ export default function CustomerDetailPage() {
   const shift = useCashRegisterStore((state) => state.shift);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+
+  const setTableExtraFilter = useUiStore((s) => s.setTableExtraFilter);
+  const selectedPaymentId = useUiStore((s) => s.tableStates[DETAIL_STORE_KEY]?.extraFilters?.selectedPaymentId as string | null) ?? null;
+  const setSelectedPaymentId = (paymentId: string | null) => setTableExtraFilter(DETAIL_STORE_KEY, 'selectedPaymentId', paymentId);
+
+  const activeDetailTab = useUiStore((s) => s.tableStates[DETAIL_STORE_KEY]?.extraFilters?.activeTab as string) ?? 'ledger';
+  const setActiveDetailTab = (tab: string) => setTableExtraFilter(DETAIL_STORE_KEY, 'activeTab', tab);
 
   const initialCustomer = location.state?.customer;
 
@@ -258,7 +267,7 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="ledger" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="w-full justify-start rounded-none bg-transparent p-0 border-b h-auto">
           <TabsTrigger
             value="ledger"
