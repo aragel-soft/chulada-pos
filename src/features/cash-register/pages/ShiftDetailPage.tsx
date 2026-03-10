@@ -122,7 +122,7 @@ export default function ShiftDetailPage() {
         <p className="text-sm">
           {error ? String(error) : "Turno no encontrado."}
         </p>
-        <Button onClick={() => navigate(-1)} variant="outline">
+        <Button onClick={() => navigate('/cash-register/history')} variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
         </Button>
       </div>
@@ -141,7 +141,7 @@ export default function ShiftDetailPage() {
             variant="ghost"
             size="icon"
             className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/cash-register/history')}
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>

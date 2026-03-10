@@ -1,9 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  PaginationState,
   SortingState,
-  ColumnFiltersState,
   OnChangeFn,
 } from "@tanstack/react-table";
 import { DateRange } from "react-day-picker";
@@ -13,20 +11,21 @@ import { getShiftsHistory } from "@/lib/api/cash-register/details";
 import { columns as shiftColumns } from "../components/history/columns";
 import { ShiftHistoryToolbar } from "../components/history/ShiftHistoryToolbar";
 import { useQuery } from "@tanstack/react-query";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function ShiftHistoryPage() {
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { 
+    globalFilter, pagination, columnFilters, extraFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+    setExtraFilter,
+  } = usePersistedTableState('cash-register.history');
   const [sorting, setSorting] = useState<SortingState>([
     { id: "opening_date", desc: true }
   ]);
   
-  // Custom Filters State
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const dateRange = extraFilters.dateRange as DateRange | undefined;
 
   const { data: response, isLoading } = useQuery({
     queryKey: [
@@ -55,23 +54,16 @@ export default function ShiftHistoryPage() {
   const totalRows = response?.total ?? 0;
 
   const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
-    setGlobalFilter((prev) => 
-      typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue
-    );
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    const newValue = typeof updaterOrValue === 'function' ? updaterOrValue(globalFilter) : updaterOrValue;
+    setPersistedGlobalFilter(newValue);
   };
 
-  const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updaterOrValue) => {
-    setColumnFilters((prev) => {
-      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
-      return next;
-    });
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  const handleColumnFiltersChange: OnChangeFn<any> = (updaterOrValue) => {
+    setPersistedColumnFilters(updaterOrValue);
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
-    setDateRange(range);
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setExtraFilter('dateRange', range);
   };
 
   const columns = useMemo(() => shiftColumns, []);
@@ -106,7 +98,7 @@ export default function ShiftHistoryPage() {
           manualFiltering={true}
           rowCount={totalRows}
           pagination={pagination}
-          onPaginationChange={setPagination}
+          onPaginationChange={setPersistedPagination}
           sorting={sorting}
           onSortingChange={setSorting}
           globalFilter={globalFilter}

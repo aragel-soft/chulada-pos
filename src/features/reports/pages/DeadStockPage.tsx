@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { PaginationState, SortingState } from "@tanstack/react-table";
+import { SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table/data-table";
 import { getDeadStockColumns } from "@/features/reports/components/columns/dead-stock-columns";
 import { ReportToolbar } from "@/features/reports/components/ReportToolbar";
@@ -8,17 +8,30 @@ import { useReportsContext } from "@/features/reports/context/ReportsContext";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
 import { CategoryListDto } from "@/types/categories";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function DeadStockPage() {
   const { dateRange } = useReportsContext();
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
+  
+  const { 
+    pagination, 
+    onPaginationChange: setPagination,
+    globalFilter,
+    onGlobalFilterChange: setPersistedGlobalFilter,
+    getExtraFilter,
+    setExtraFilter
+  } = usePersistedTableState('reports.dead-stock');
+  
   const [sorting, setSorting] = useState<SortingState>([{ id: "stagnant_value", desc: true }]);
+
+  const savedCategories = getExtraFilter<string[]>("categoryIds", []);
+  const selectedCategories = useMemo(() => new Set(savedCategories), [savedCategories]);
+
+  const handleCategoryChange = (newValues: Set<string>) => {
+    setExtraFilter("categoryIds", Array.from(newValues));
+  };
 
   const categoryIds = useMemo(
     () => selectedCategories.size > 0 
@@ -66,6 +79,8 @@ export default function DeadStockPage() {
         manualSorting={true}
         pagination={pagination}
         onPaginationChange={setPagination}
+        globalFilter={globalFilter}
+        onGlobalFilterChange={(val) => setPersistedGlobalFilter(String(val))}
         sorting={sorting}
         onSortingChange={setSorting}
         rowCount={data?.total || 0}
@@ -82,7 +97,7 @@ export default function DeadStockPage() {
             table={table}
             categoryOptions={categoryOptions}
             selectedCategories={selectedCategories}
-            onCategoryChange={setSelectedCategories}
+            onCategoryChange={handleCategoryChange}
             searchPlaceholder="Buscar producto sin movimiento..."
           />
         )}

@@ -1,5 +1,6 @@
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUiStore } from '@/stores/uiStore';
 import { cn } from "@/lib/utils";
 
 const cashRegisterTabs = [
@@ -16,11 +17,13 @@ const cashRegisterTabs = [
 export default function CashRegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
 
   const currentTab = location.pathname.split("/").pop() || "current";
   const isDetailView = currentTab !== "current" && currentTab !== "history";
 
   const onTabChange = (value: string) => {
+    setActiveTab('cash-register', value);
     navigate(value);
   };
 

@@ -1,9 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   RowSelectionState,
-  PaginationState,
   SortingState,
-  ColumnFiltersState,
 } from "@tanstack/react-table";
 import { PlusCircle, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +17,7 @@ import { BulkEditProductDialog } from "../components/products/BulkEditProductDia
 import { DeleteProductsDialog } from "../components/products/DeleteProductsDialog";
 import { getColumns } from "../components/products/columns";
 import { ProductsDataTableToolbar } from "../components/products/ProductsDataTableToolbar";
+import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
@@ -31,12 +30,12 @@ export default function ProductsPage() {
   const [selectedProductsForBulk, setSelectedProductsForBulk] = useState<Product[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productsToDelete, setProductsToDelete] = useState<Product[]>([]);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState(""); 
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const { 
+    globalFilter, pagination, columnFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+  } = usePersistedTableState('inventory.products');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
@@ -118,16 +117,11 @@ export default function ProductsPage() {
   ]);
 
   const handleGlobalFilterChange = (value: string) => {
-    setGlobalFilter(value);
-    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+    setPersistedGlobalFilter(value);
   }
 
   const handleColumnFiltersChange = (updaterOrValue: any) => {
-    setColumnFilters((prev) => {
-      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
-      return next;
-    });
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    setPersistedColumnFilters(updaterOrValue);
   };
 
   const columns = useMemo(() => getColumns(can, categories), [can, categories]);
@@ -158,7 +152,7 @@ export default function ProductsPage() {
         manualSorting={true}
         rowCount={totalRows}
         pagination={pagination}
-        onPaginationChange={setPagination}
+        onPaginationChange={setPersistedPagination}
         sorting={sorting}
         onSortingChange={setSorting}
         globalFilter={globalFilter}

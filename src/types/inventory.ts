@@ -96,3 +96,22 @@ export interface ProductFilters {
   active_status?: string[]; // 'active', 'inactive'
   exact_code?: string;
 }
+
+export interface PromotionDependency {
+  id: string;
+  name: string;
+}
+
+export interface KitDependency {
+  id: string;
+  name: string;
+  role: "main" | "item";
+  remaining_mains: number;
+  remaining_items: number;
+  will_deactivate: boolean;
+}
+
+export interface ProductDependencies {
+  promotions: PromotionDependency[];
+  kits: KitDependency[];
+}

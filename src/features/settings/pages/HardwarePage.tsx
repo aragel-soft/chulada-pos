@@ -4,8 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2 } from "lucide-react"
-import { backupDatabase } from "@/lib/api/backup"
+import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2, Download } from "lucide-react"
+import { backupDatabase, downloadAndApplyLatestBackup } from "@/lib/api/backup"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -30,7 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
 import { useHardwareStore } from "@/stores/hardwareStore"
 import { hardwareFormSchema } from "@/features/settings/schemas/hardwareSchema"
-import { HardwareConfig } from "@/lib/api/hardware";
+import { HardwareConfig } from "@/lib/api/hardware"
 import { useAuthStore } from "@/stores/authStore"
 
 type HardwareFormValues = z.infer<typeof hardwareFormSchema>
@@ -48,10 +48,15 @@ export default function HardwarePage() {
     config: fullConfig,
     isLoading: isStoreLoading,
     updateSettings
-  } = useHardwareStore()
+  } = useHardwareStore();
+
   // Hooks de Zustand
   const { can } = useAuthStore();
   const [isBackingUp, setIsBackingUp] = useState(false);
+  
+  // Estado de descarga y lectura del tipo de licencia
+  const [isDownloading, setIsDownloading] = useState(false);
+  const licenseType = localStorage.getItem("license_type") || "dev";
 
   // Initialize form
   const form = useForm<HardwareFormValues>({
@@ -309,19 +314,26 @@ export default function HardwarePage() {
                         en cualquier momento.
                       </p>
                     </div>
-                    <div className="flex justify-start">
+                    
+                    <div className="flex flex-col justify-start">
                       <Button
                         type="button"
                         size="sm"
                         className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                        disabled={isBackingUp}
+                        disabled={isBackingUp || isDownloading}
                         onClick={async () => {
                           setIsBackingUp(true);
                           try {
                             const fileName = await backupDatabase();
-                            toast.success("Respaldo completado", {
-                              description: `Archivo: ${fileName}`,
-                            });
+                            if (fileName) {
+                              toast.success("Respaldo completado", {
+                                description: `Archivo: ${fileName}`,
+                              });
+                            } else {
+                              toast.info("Respaldo Omitido", {
+                                description: "Tu licencia no tiene permitido sobrescribir la nube.",
+                              });
+                            }
                           } catch (err) {
                             toast.error("Error al crear respaldo", {
                               description: String(err),
@@ -347,6 +359,66 @@ export default function HardwarePage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Sincronización con la Tienda */}
+              {(licenseType === "admin" || licenseType === "dev") && (
+                <div className="space-y-6">
+                  <Card className="h-full">
+                    <CardHeader className="pb-3 border-b bg-muted/20">
+                      <CardTitle className="text-base font-medium flex items-center gap-2">
+                        <Download className="h-4 w-4 text-primary" />
+                        Sincronización de Tienda
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
+                        <p>
+                          Descarga e instala la última versión de la base de datos generada por la tienda principal. Esta acción sobrescribirá todos los datos locales actuales.
+                        </p>
+                      </div>
+                      
+                      <div className="flex flex-col justify-start">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                          disabled={isDownloading || isBackingUp}
+                          onClick={async () => {
+                            setIsDownloading(true);
+                            try {
+                              await downloadAndApplyLatestBackup();
+                              sessionStorage.setItem("sync_completed", "true");
+
+                              toast.success("Base de datos actualizada", {
+                                description: "La información de la tienda se ha sincronizado exitosamente."
+                              });
+                              setTimeout(() => window.location.reload(), 1500);
+                            } catch (err) {
+                              toast.error("Error al sincronizar", {
+                                description: String(err),
+                              });
+                            } finally {
+                              setIsDownloading(false);
+                            }
+                          }}
+                        >
+                          {isDownloading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sincronizando datos...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="mr-2 h-4 w-4" />
+                              Forzar Sincronización
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
 
             </div>
 

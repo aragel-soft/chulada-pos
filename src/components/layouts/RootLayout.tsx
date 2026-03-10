@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useLayoutStore } from '@/stores/layoutStore';
 import { useHardwareStore } from '@/stores/hardwareStore';
 import { useBusinessStore } from '@/stores/businessStore';
+import { useTrackLastPath } from '@/hooks/use-track-last-path';
 import { useEffect } from 'react';
 
 export function RootLayout() {
@@ -13,6 +14,8 @@ export function RootLayout() {
 
   const initHardware = useHardwareStore((state) => state.init);
   const initBusiness = useBusinessStore((state) => state.init);
+
+  useTrackLastPath();
 
   useEffect(() => {
     initHardware();
