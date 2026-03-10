@@ -21,6 +21,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   path: string;
   permission?: string; // Si no tiene permission, siempre es visible
+  firstTabPath?: string;
 }
 
 const mainNavItems: NavItem[] = [
@@ -28,17 +29,20 @@ const mainNavItems: NavItem[] = [
     title: 'Ventas',
     icon: Home,
     path: '/dashboard',
+    firstTabPath: '/dashboard/sales',
   },
   {
     title: 'Corte de Caja',
     icon: ClipboardList,
     path: '/cash-register',
+    firstTabPath: '/cash-register/current',
     permission: 'cash_register:view',
   },
   {
     title: 'Inventario',
     icon: Package,
     path: '/inventory',
+    firstTabPath: '/inventory/products',
     permission: 'inventory:view',
   },
   {
@@ -51,6 +55,7 @@ const mainNavItems: NavItem[] = [
     title: 'Reportes',
     icon: ChartBarBig,
     path: '/reports',
+    firstTabPath: '/reports/finances',
     permission: 'reports:view',
   },
 ];
@@ -60,6 +65,7 @@ const footerNavItems: NavItem[] = [
     title: 'Configuración',
     icon: Settings,
     path: '/settings',
+    firstTabPath: '/settings/profile',
     permission: 'settings:view',
   },
 ];
@@ -82,16 +88,21 @@ export function AppSidebar() {
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
+      return location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/');
     }
     return location.pathname.startsWith(path);
   };
 
-  const handleNavigation = (path: string) => {
+  const handleNavigation = (item: NavItem) => {
     if (isMobile) {
       setOpenMobile(false);
     }
+
+    const { path, firstTabPath } = item;
+
     if (location.pathname === path) return;
+    if (firstTabPath && location.pathname === firstTabPath) return;
+
     navigate(path);
   };
 
@@ -103,7 +114,7 @@ export function AppSidebar() {
 
     return (
       <SidebarMenuButton
-        onClick={() => handleNavigation(item.path)}
+        onClick={() => handleNavigation(item)}
         isActive={active}
         tooltip={item.title}
         className={`w-full h-12 transition-colors duration-200 hover:bg-zinc-100 data-[active=true]:bg-zinc-200 data-[active=true]:text-zinc-900 data-[active=true]:font-semibold`}
