@@ -222,7 +222,7 @@ export default function CustomerDetailPage() {
             variant="ghost"
             size="icon"
             className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/customers')}
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
@@ -340,6 +340,7 @@ export default function CustomerDetailPage() {
           <SalesHistoryModule
             initialFilters={{ ...customerHistoryFilters }}
             hideCustomerInfo={true}
+            storeKey="customers.history"
           />
         </TabsContent>
       </Tabs>
