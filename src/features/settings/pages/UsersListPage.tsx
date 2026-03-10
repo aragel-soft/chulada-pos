@@ -5,7 +5,7 @@ import { getUsersList } from "@/lib/api/users";
 import type { User } from "@/types/users";
 import { PaginationParams } from "@/types/pagination";
 import { useAuthStore } from "@/stores/authStore";
-import { ColumnDef, PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table"
+import { ColumnDef, RowSelectionState, SortingState, OnChangeFn } from "@tanstack/react-table"
 import {
   Pencil,
   PlusCircle,
@@ -29,12 +29,22 @@ import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 export function UsersListPage() {
   // Estado de paginación, ordenamiento y búsqueda (server-side)
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 16,
-  });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const { 
+    globalFilter, pagination, columnFilters,
+    onGlobalFilterChange: setPersistedGlobalFilter, 
+    onPaginationChange: setPersistedPagination,
+    onColumnFiltersChange: setPersistedColumnFilters,
+  } = usePersistedTableState('settings.users');
+  
+  const handleColumnFiltersChange: OnChangeFn<any> = (updaterOrValue) => {
+    setPersistedColumnFilters(updaterOrValue);
+  };
 
+  const handleGlobalFilterChange: OnChangeFn<string> = (updaterOrValue) => {
+    const newValue = typeof updaterOrValue === 'function' ? updaterOrValue(globalFilter) : updaterOrValue;
+    setPersistedGlobalFilter(newValue);
+    setPersistedPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
   // Parámetros de consulta para el servidor
   const queryParams: PaginationParams = useMemo(
     () => ({
@@ -64,7 +74,6 @@ export function UsersListPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [usersToDelete, setUsersToDelete] = useState<User[]>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const { globalFilter, pagination, onGlobalFilterChange, onPaginationChange } = usePersistedTableState('settings.users');
 
   // Columnas de la tabla
   const columns = useMemo<ColumnDef<User>[]>(
@@ -193,19 +202,14 @@ export function UsersListPage() {
         sorting={sorting}
         onSortingChange={setSorting}
         rowCount={data?.total || 0}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        globalFilter={globalFilter}
-        onGlobalFilterChange={(val) => {
-          setGlobalFilter(String(val));
-          setPagination(prev => ({ ...prev, pageIndex: 0 }));
-        }}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={handleColumnFiltersChange}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         globalFilter={globalFilter}
-        onGlobalFilterChange={onGlobalFilterChange}
+        onGlobalFilterChange={handleGlobalFilterChange}
         pagination={pagination}
-        onPaginationChange={onPaginationChange}
+        onPaginationChange={setPersistedPagination}
         actions={(table) => (
           <div className="flex items-center gap-2 w-full md:w-auto">
             {can('users:create') && (
