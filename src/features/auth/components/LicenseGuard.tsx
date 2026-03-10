@@ -29,6 +29,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
+        localStorage.setItem("license_type", license.type);
+
         await updateLicenseValidation();
         setStatus("authorized");
 
@@ -54,7 +56,6 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
 
     verifyLicense();
   }, []);
-
 
   if (status === "loading") {
     return (
