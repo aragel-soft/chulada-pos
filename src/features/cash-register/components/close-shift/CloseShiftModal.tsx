@@ -100,10 +100,16 @@ export function CloseShiftModal({
       printShiftTicket(closed.id).catch(() => {});
 
       backupDatabase()
-        .then((fileName) => {
-          toast.success("Respaldo en la nube completado", {
-            description: fileName,
-          });
+        .then((result) => {
+          if (result.synced) {
+            toast.success("Respaldo completado y sincronizado", {
+              description: result.filename,
+            });
+          } else {
+            toast.info("Respaldo local guardado", {
+              description: `${result.filename} — se sincronizará cuando haya internet.`,
+            });
+          }
         })
         .catch((err) => {
           console.error("Error en respaldo automático:", err);

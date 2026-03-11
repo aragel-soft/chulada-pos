@@ -356,10 +356,16 @@ export default function HardwarePage() {
                           onClick={async () => {
                             setIsBackingUp(true);
                             try {
-                              const fileName = await backupDatabase();
-                              toast.success("Respaldo completado", {
-                                description: `Archivo: ${fileName}`,
-                              });
+                              const result = await backupDatabase();
+                              if (result.synced) {
+                                toast.success("Respaldo completado y sincronizado", {
+                                  description: `Archivo: ${result.filename}`,
+                                });
+                              } else {
+                                toast.info("Respaldo local guardado", {
+                                  description: `${result.filename} — se sincronizará cuando haya internet.`,
+                                });
+                              }
                             } catch (err) {
                               toast.error("Error al crear respaldo", {
                                 description: String(err),
