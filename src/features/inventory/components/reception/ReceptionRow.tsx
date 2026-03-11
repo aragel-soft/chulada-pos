@@ -124,11 +124,11 @@ export const ReceptionRow = memo(
         <TableRow
           className={cn(
             "cursor-pointer",
-            isSelected ? "bg-purple-50 border-l-4 border-l-[#480489] hover:bg-purple-50" : "hover:bg-zinc-50 border-l-4 border-l-transparent"
+            isSelected ? "bg-purple-50 hover:bg-purple-50" : "hover:bg-zinc-50"
           )}
           onClick={handleRowClick}
         >
-          <TableCell className="w-[40px] px-2">
+          <TableCell className={cn("w-[40px] px-2", isSelected ? "border-l-4 border-l-[#480489]" : "border-l-4 border-l-transparent")}>
             <Checkbox
               checked={isSelected}
               onCheckedChange={() => toggleItemSelection(item.product_id)}
