@@ -219,6 +219,7 @@ pub fn get_machine_id() -> Result<String, String> {
 #[tauri::command]
 pub fn update_license_validation(
     state: State<'_, Mutex<rusqlite::Connection>>,
+    license_type: String,
 ) -> Result<(), String> {
     let conn = state.lock().map_err(|e| e.to_string())?;
     let now_timestamp = Utc::now().timestamp();
@@ -228,6 +229,13 @@ pub fn update_license_validation(
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         ["last_license_validation", &now_timestamp.to_string()],
     ).map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        ["license_type", &license_type],
+    ).map_err(|e| e.to_string())?;
+
     Ok(())
 }
 

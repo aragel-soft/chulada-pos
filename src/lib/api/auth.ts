@@ -23,9 +23,9 @@ export const checkLicenseOnline = async (machineId: string): Promise<LicenseChec
   return data as LicenseCheckResult;
 };
 
-export const updateLicenseValidation = async (): Promise<void> => {
+export const updateLicenseValidation = async (licenseType: string): Promise<void> => {
   try {
-    await invoke("update_license_validation");
+    await invoke("update_license_validation", { licenseType });
   } catch (error) {
     throw error;
   }

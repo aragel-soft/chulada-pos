@@ -33,6 +33,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
+        // Guardar tipo de licencia en SQLite (para Rust) y localStorage (para UI)
+        await updateLicenseValidation(license.type);
         localStorage.setItem("license_type", license.type);
 
         if (license.type === "admin") {
@@ -56,7 +58,6 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           }
         }
 
-        await updateLicenseValidation();
         setStatus("authorized");
       } catch (err) {
         try {
