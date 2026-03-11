@@ -139,9 +139,7 @@ export const useReceptionStore = create<ReceptionState>()(
         set((state) => {
           const isSelected = state.selectedIds.includes(productId);
           return {
-            selectedIds: isSelected
-              ? state.selectedIds.filter(id => id !== productId)
-              : [...state.selectedIds, productId]
+            selectedIds: isSelected ? [] : [productId]
           };
         });
       },

@@ -107,12 +107,28 @@ export const ReceptionRow = memo(
       updateItemWholesalePrice(item.product_id, val);
     };
 
+    const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
+      
+      const interactive = target.closest(
+        "button, a, input, select, textarea, [role='checkbox'], [role='button'], [role='menuitem']"
+      );
+      if (interactive) return;
+
+      toggleItemSelection(item.product_id);
+    };
+
     return (
       <>
         <TableRow
-          className={cn("hover:bg-muted/5", isSelected && "bg-muted/10")}
+          className={cn(
+            "cursor-pointer",
+            isSelected ? "bg-purple-50 hover:bg-purple-50" : "hover:bg-zinc-50"
+          )}
+          onClick={handleRowClick}
         >
-          <TableCell className="w-[40px] px-2">
+          <TableCell className={cn("w-[40px] px-2", isSelected ? "border-l-4 border-l-[#480489]" : "border-l-4 border-l-transparent")}>
             <Checkbox
               checked={isSelected}
               onCheckedChange={() => toggleItemSelection(item.product_id)}
@@ -126,7 +142,10 @@ export const ReceptionRow = memo(
           <TableCell>
             <div
               className="flex flex-col cursor-pointer group"
-              onClick={() => setIsEditDialogOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditDialogOpen(true);
+              }}
             >
               <span className="font-medium group-hover:text-primary transition-colors flex items-center gap-2">
                 {item.name}
