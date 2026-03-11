@@ -7,6 +7,7 @@ import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
 import { ShieldAlert, Wallet } from "lucide-react";
+import { useBusinessStore } from "@/stores/businessStore";
 
 // UI Components
 import {
@@ -31,26 +32,33 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { CASH_REGISTER_CONFIG } from "@/config/constants";
 
-const formSchema = z.object({
+const baseSchema = z.object({
   initialCash: z.coerce.number()
-    .min(0, "El fondo no puede ser negativo")
-    .max(CASH_REGISTER_CONFIG.MAX_INITIAL_CASH, `El monto es demasiado alto (máx $${CASH_REGISTER_CONFIG.MAX_INITIAL_CASH})`),
+    .min(0, "El fondo no puede ser negativo"),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof baseSchema>;
 
 export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
   const { openShift, isLoading } = useCashRegisterStore();
   const { user } = useAuthStore();
+  const { settings } = useBusinessStore();
   const [isOpen, setIsOpen] = useState(false);
 
   const [showZeroAlert, setShowZeroAlert] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
 
+  const maxLimit = settings?.maxCashLimit ?? CASH_REGISTER_CONFIG.MAX_INITIAL_CASH;
+  const dynamicSchema = baseSchema.extend({
+    initialCash: z.coerce.number()
+      .min(0, "El fondo no puede ser negativo")
+      .max(maxLimit, `El monto es demasiado alto (máx $${maxLimit})`),
+  });
+
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as any,
+    resolver: zodResolver(dynamicSchema) as any,
     defaultValues: {
-      initialCash: CASH_REGISTER_CONFIG.DEFAULT_INITIAL_CASH,
+      initialCash: settings?.defaultCashFund ?? CASH_REGISTER_CONFIG.DEFAULT_INITIAL_CASH,
     },
   });
 
