@@ -1,5 +1,5 @@
 // importaciones
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,18 +22,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/text-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { CirclePlus, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, CirclePlus, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CATEGORY_COLORS } from "@/lib/constants";
-import { categorySchema, CategoryFormValues } from "@/features/inventory/schemas/categorySchema";
-import { createCategory, getAllCategories } from "@/lib/api/inventory/categories";
+import {
+  categorySchema,
+  CategoryFormValues,
+} from "@/features/inventory/schemas/categorySchema";
+import {
+  createCategory,
+  getAllCategories,
+} from "@/lib/api/inventory/categories";
 import { toast } from "sonner";
 
 // interfaces
@@ -50,14 +63,17 @@ export function CreateCategoryModal({
   onSuccess,
 }: CreateCategoryModalProps) {
   const queryClient = useQueryClient();
+  const [openParentBox, setOpenParentBox] = useState(false);
 
   // Query para obtener categorías padre
-  const { data: parentCategories = [], isLoading: isLoadingParents } = useQuery({
-    queryKey: ['categories', 'all'],
-    queryFn: getAllCategories,
-    enabled: open,
-    select: (data) => data.filter((c) => !c.parent_id),
-  });
+  const { data: parentCategories = [], isLoading: isLoadingParents } = useQuery(
+    {
+      queryKey: ["categories", "all"],
+      queryFn: getAllCategories,
+      enabled: open,
+      select: (data) => data.filter((c) => !c.parent_id),
+    },
+  );
 
   // Formulario
   const form = useForm<CategoryFormValues>({
@@ -76,13 +92,15 @@ export function CreateCategoryModal({
     mutationFn: createCategory,
     onSuccess: () => {
       toast.success("Categoría creada correctamente");
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       if (onSuccess) onSuccess();
       handleClose();
     },
     onError: (error) => {
       console.error(error);
-      toast.error(typeof error === 'string' ? error : "Error al crear la categoría");
+      toast.error(
+        typeof error === "string" ? error : "Error al crear la categoría",
+      );
     },
   });
 
@@ -102,7 +120,10 @@ export function CreateCategoryModal({
   const onSubmit = (values: CategoryFormValues) => {
     createMutation.mutate({
       name: values.name,
-      parent_id: values.parent_id === "null" || !values.parent_id ? null : values.parent_id,
+      parent_id:
+        values.parent_id === "null" || !values.parent_id
+          ? null
+          : values.parent_id,
       color: values.color,
       sequence: Number(values.sequence),
       description: values.description || undefined,
@@ -142,7 +163,7 @@ export function CreateCategoryModal({
                         placeholder="Ej. Tintes"
                         {...field}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/  /g, ' ');
+                          const val = e.target.value.replace(/  /g, " ");
                           field.onChange(val);
                         }}
                       />
@@ -160,9 +181,7 @@ export function CreateCategoryModal({
                     name="sequence"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="!text-current">
-                          Orden
-                        </FormLabel>
+                        <FormLabel className="!text-current">Orden</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -198,37 +217,124 @@ export function CreateCategoryModal({
                     name="parent_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="!text-current">
+                        <FormLabel className="!text-current mt-2 block">
                           Categoría Padre
                         </FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "null" ? null : val)}
-                          value={field.value || "null"}
-                          disabled={isLoadingParents}
+                        <Popover
+                          open={openParentBox}
+                          onOpenChange={setOpenParentBox}
                         >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={isLoadingParents ? "Cargando..." : "Raíz (Principal)"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="null">Raíz (Principal)</SelectItem>
-                            {parentCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <Badge
-                                  variant="outline"
-                                  className="font-normal border-0 px-2 text-sm"
-                                  style={{
-                                    backgroundColor: (cat.color || '#64748b') + '33',
-                                    color: cat.color || '#64748b',
-                                  }}
-                                >
-                                  {cat.name}
-                                </Badge>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openParentBox}
+                                disabled={isLoadingParents}
+                                className={cn(
+                                  "w-full justify-between mt-0",
+                                  (!field.value || field.value === "null") &&
+                                    "text-muted-foreground",
+                                )}
+                              >
+                                {field.value && field.value !== "null" ? (
+                                  <div className="flex items-center gap-2">
+                                    {(() => {
+                                      const cat = parentCategories.find(
+                                        (c) => c.id === field.value,
+                                      );
+                                      return cat ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="font-normal border-0 px-2 text-sm"
+                                          style={{
+                                            backgroundColor:
+                                              (cat.color || "#64748b") + "33",
+                                            color: cat.color || "#64748b",
+                                          }}
+                                        >
+                                          {cat.name}
+                                        </Badge>
+                                      ) : (
+                                        "Raíz (Principal)"
+                                      );
+                                    })()}
+                                  </div>
+                                ) : (
+                                  "Raíz (Principal)"
+                                )}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-[300px] p-0"
+                            align="start"
+                            onWheel={(e) => {
+                              // Esto evita que el Dialog padre intercepte la ruedita del ratón
+                              e.stopPropagation();
+                            }}
+                          >
+                            <Command>
+                              <CommandInput placeholder="Buscar categoría..." />
+                              <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+                                <CommandEmpty>
+                                  No se encontraron categorías.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem
+                                    value="raiz principal vacio ninguna sin padre"
+                                    onSelect={() => {
+                                      field.onChange(null);
+                                      setOpenParentBox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === null ||
+                                          field.value === "null"
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    Raíz (Principal)
+                                  </CommandItem>
+                                  {parentCategories.map((cat) => (
+                                    <CommandItem
+                                      value={cat.name}
+                                      key={cat.id}
+                                      onSelect={() => {
+                                        field.onChange(cat.id);
+                                        setOpenParentBox(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          cat.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      <Badge
+                                        variant="outline"
+                                        className="font-normal border-0 px-2 text-sm"
+                                        style={{
+                                          backgroundColor:
+                                            (cat.color || "#64748b") + "33",
+                                          color: cat.color || "#64748b",
+                                        }}
+                                      >
+                                        {cat.name}
+                                      </Badge>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -242,9 +348,7 @@ export function CreateCategoryModal({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="!text-current">
-                    Descripción
-                  </FormLabel>
+                  <FormLabel className="!text-current">Descripción</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Descripción opcional..."
@@ -289,7 +393,7 @@ export function CreateCategoryModal({
                             className={`
                               flex h-8 w-8 cursor-pointer items-center justify-center rounded-full ring-offset-2 transition-all hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-ring peer-data-[state=checked]:scale-110
                             `}
-                            style={{ backgroundColor: color.value + 'B9' }}
+                            style={{ backgroundColor: color.value + "B9" }}
                             title={color.name}
                           >
                             {field.value === color.value && (
@@ -301,7 +405,9 @@ export function CreateCategoryModal({
                     </RadioGroup>
                   </FormControl>
                   <div className="text-sm text-muted-foreground mt-2">
-                    Seleccionado: {CATEGORY_COLORS.find(c => c.value === field.value)?.name || "Ninguno"}
+                    Seleccionado:{" "}
+                    {CATEGORY_COLORS.find((c) => c.value === field.value)
+                      ?.name || "Ninguno"}
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -309,11 +415,22 @@ export function CreateCategoryModal({
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleClose} disabled={createMutation.isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={createMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending} className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap">
-                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              >
+                {createMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Guardar Categoría
               </Button>
             </DialogFooter>
