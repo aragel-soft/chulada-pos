@@ -212,22 +212,41 @@ export function DataTable<TData, TValue>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-                onClick={() => onRowClick && onRowClick(row)}
-                className={`
-                  ${onRowClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-                `}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="px-4 py-2">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            table.getRowModel().rows.map((row) => {
+              const hasSelection = columns.some(
+                (col) => "id" in col && col.id === "select",
+              );
+
+              const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+                const target = e.target as HTMLElement;
+                const interactive = target.closest(
+                  "button, a, input, select, textarea, [role='checkbox'], [role='button'], [role='menuitem']",
+                );
+                if (interactive) return;
+
+                if (hasSelection) row.toggleSelected();
+                onRowClick?.(row);
+              };
+
+              return (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={handleRowClick}
+                  className={
+                    hasSelection || onRowClick
+                      ? "cursor-pointer hover:bg-muted/50 transition-colors"
+                      : ""
+                  }
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="px-4 py-2">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-24 text-center">
