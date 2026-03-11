@@ -216,6 +216,15 @@ pub fn debug_database(db: State<'_, Mutex<Connection>>) -> Result<String, AuthEr
 pub fn get_machine_id() -> Result<String, String> {
     machine_uid::get().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn get_license_type(
+    state: State<'_, Mutex<rusqlite::Connection>>,
+) -> Result<String, String> {
+    let conn = state.lock().map_err(|e| e.to_string())?;
+    crate::database::get_db_license_type(&conn)
+}
+
 #[tauri::command]
 pub fn update_license_validation(
     state: State<'_, Mutex<rusqlite::Connection>>,

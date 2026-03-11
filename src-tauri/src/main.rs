@@ -26,6 +26,7 @@ fn main() {
             commands::auth::authenticate_user,
             commands::auth::debug_database,
             commands::auth::get_machine_id,
+            commands::auth::get_license_type,
             commands::auth::update_license_validation,
             commands::auth::check_offline_license,
             // Settings - Users

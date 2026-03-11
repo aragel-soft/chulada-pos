@@ -10,6 +10,14 @@ export const getMachineId = async (): Promise<string> => {
   }
 };
 
+export const getLicenseType = async (): Promise<string> => {
+  try {
+    return await invoke<string>("get_license_type");
+  } catch (error) {
+    return "unknown";
+  }
+};
+
 export const checkLicenseOnline = async (machineId: string): Promise<LicenseCheckResult> => {
   const { data, error } = await supabase
     .from("licenses")

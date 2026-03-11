@@ -6,6 +6,7 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2, Download } from "lucide-react"
 import { backupDatabase, restoreLatestBackup } from "@/lib/api/backup"
+import { getLicenseType } from "@/lib/api/auth"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -54,9 +55,12 @@ export default function HardwarePage() {
   const { can } = useAuthStore();
   const [isBackingUp, setIsBackingUp] = useState(false);
   
-  // Estado de descarga y lectura del tipo de licencia
   const [isDownloading, setIsDownloading] = useState(false);
-  const licenseType = localStorage.getItem("license_type") || "dev";
+  const [licenseType, setLicenseType] = useState<string>("");
+
+  useEffect(() => {
+    getLicenseType().then(setLicenseType);
+  }, []);
 
   // Initialize form
   const form = useForm<HardwareFormValues>({
