@@ -224,6 +224,12 @@ pub async fn restore_latest_backup(
         let new_conn = crate::database::init_database(&app_handle)
             .map_err(|e| format!("Error reconectando BD: {}", e))?;
 
+        new_conn.execute(
+            "INSERT INTO system_settings (key, value, updated_at) VALUES ('license_type', ?1, datetime('now'))
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            [&license_type],
+        ).map_err(|e| format!("Error re-estampando license_type: {}", e))?;
+
         *db_guard = new_conn;
     }
 
