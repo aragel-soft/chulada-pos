@@ -350,9 +350,10 @@ fn manage_store_voucher(
 
     if let Some((existing_id, existing_code, current_balance)) = voucher_result {
         let new_balance = current_balance + return_total;
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         tx.execute(
-            "UPDATE store_vouchers SET current_balance = ?1, initial_balance = initial_balance + ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?3",
-            params![new_balance, return_total, existing_id]
+            "UPDATE store_vouchers SET current_balance = ?1, initial_balance = initial_balance + ?2, updated_at = ?3 WHERE id = ?4",
+            params![new_balance, return_total, now_local, existing_id]
         ).map_err(|e| format!("Error actualizando vale: {}", e))?;
 
         Ok(existing_code)
@@ -366,10 +367,11 @@ fn manage_store_voucher(
 
         let new_voucher_id = Uuid::new_v4().to_string();
         let new_voucher_code = generate_voucher_code(&sale_folio);
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         tx.execute(
-            "INSERT INTO store_vouchers (id, sale_id, code, initial_balance, current_balance, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",
-            params![new_voucher_id, sale_id, new_voucher_code, return_total, return_total]
+            "INSERT INTO store_vouchers (id, sale_id, code, initial_balance, current_balance, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?6)",
+            params![new_voucher_id, sale_id, new_voucher_code, return_total, return_total, now_local]
         ).map_err(|e| format!("Error creando vale: {}", e))?;
 
         Ok(new_voucher_code)
@@ -391,7 +393,7 @@ fn ensure_products_and_update_inventory(
     let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut stmt_update = tx
         .prepare(
-            "UPDATE store_inventory SET stock = stock + ?1 WHERE product_id = ?2 AND store_id = ?3",
+            "UPDATE store_inventory SET stock = stock + ?1, updated_at = ?2 WHERE product_id = ?3 AND store_id = ?4",
         )
         .map_err(|e| e.to_string())?;
 
@@ -425,7 +427,7 @@ fn ensure_products_and_update_inventory(
 
         // Actualizar inventario
         stmt_update
-            .execute(params![item.quantity, actual_product_id, store_id])
+            .execute(params![item.quantity, now_local, actual_product_id, store_id])
             .map_err(|e| format!("Error actualizando inventario para {}: {}", product_name, e))?;
 
         // Registrar movimiento de entrada por devolución en el Kardex
@@ -460,6 +462,8 @@ fn create_return_records(
     validated_items: &[(ReturnItemRequest, String, String, String)],
     return_id: &str,
 ) -> Result<(), String> {
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     let folio: i64 = tx
         .query_row(
             "SELECT COALESCE(MAX(folio), 0) + 1 FROM returns",
@@ -469,15 +473,16 @@ fn create_return_records(
         .unwrap_or(1);
 
     tx.execute(
-        "INSERT INTO returns (id, folio, sale_id, total, reason, notes, refund_method, user_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'store_voucher', ?7)",
+        "INSERT INTO returns (id, folio, sale_id, return_date, total, reason, notes, refund_method, user_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'store_voucher', ?8, ?4)",
         params![
             return_id,
             folio,
             payload.sale_id,
+            now_local,
             return_total,
             payload.reason.trim(),
             payload.notes.trim(),
-            payload.user_id
+            payload.user_id,
         ]
     ).map_err(|e| format!("Error creando registro de devolución: {}", e))?;
 
@@ -568,9 +573,11 @@ fn update_sale_status(tx: &Connection, sale_id: &str) -> Result<(), String> {
         "completed"
     };
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     tx.execute(
-        "UPDATE sales SET status = ?1 WHERE id = ?2",
-        params![new_status, sale_id],
+        "UPDATE sales SET status = ?1, updated_at = ?2 WHERE id = ?3",
+        params![new_status, now_local, sale_id],
     )
     .map_err(|e| format!("Error actualizando status de venta: {}", e))?;
 

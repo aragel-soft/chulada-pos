@@ -196,7 +196,7 @@ pub fn update_business_settings(
 
     let mut stmt = conn
         .prepare(
-            "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, datetime('now')) 
+            "INSERT INTO system_settings (key, value, updated_at) VALUES (?1, ?2, ?3) 
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         )
         .map_err(|e| e.to_string())?;
@@ -268,8 +268,9 @@ pub fn update_business_settings(
         None
     };
 
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     for (key, value) in &params {
-        stmt.execute([*key, value]).map_err(|e| e.to_string())?;
+        stmt.execute(params![*key, value, &now_local]).map_err(|e| e.to_string())?;
     }
 
     // Identify if migration is needed
@@ -277,8 +278,8 @@ pub fn update_business_settings(
         let current_id = old_store_id.unwrap_or_else(|| "store-main".to_string());
         if current_id != *new_store_id {
             conn.execute(
-                "UPDATE store_inventory SET store_id = ?1 WHERE store_id = ?2",
-                [new_store_id, &current_id],
+                "UPDATE store_inventory SET store_id = ?1, updated_at = ?2 WHERE store_id = ?3",
+                [new_store_id, &now_local, &current_id],
             )
             .map_err(|e| format!("Error migrando inventario: {}", e))?;
 
@@ -288,11 +289,12 @@ pub fn update_business_settings(
 
             conn.execute(
                 "UPDATE cash_register_shifts 
-                 SET code = ?1 || SUBSTR(code, ?2) 
-                 WHERE code LIKE ?3",
+                 SET code = ?1 || SUBSTR(code, ?2), updated_at = ?3
+                 WHERE code LIKE ?4",
                 params![
                     format!("{}-", new_store_id),
                     length_to_cut + 1, // SQLite SUBSTR is 1-indexed
+                    &now_local,
                     old_pattern
                 ],
             )

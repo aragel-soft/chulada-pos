@@ -268,11 +268,13 @@ pub fn create_inventory_movement(
   }
 
   let movement_id = Uuid::new_v4().to_string();
+  
+  let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
   tx.execute(
     "INSERT INTO inventory_movements (
       id, product_id, store_id, user_id, type, reason, 
-      quantity, previous_stock, new_stock, notes
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+      quantity, previous_stock, new_stock, notes, created_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
     rusqlite::params![
       movement_id,
       payload.product_id,
@@ -283,20 +285,21 @@ pub fn create_inventory_movement(
       payload.quantity,
       current_stock,
       new_stock,
-      payload.notes
+      payload.notes,
+      now_local
     ],
   ).map_err(|e| format!("Error registrando movimiento: {}", e))?;
 
   let affected = tx.execute(
-    "UPDATE store_inventory SET stock = ? WHERE product_id = ? AND store_id = ?",
-    rusqlite::params![new_stock, payload.product_id, store_id],
+    "UPDATE store_inventory SET stock = ?1, updated_at = ?2 WHERE product_id = ?3 AND store_id = ?4",
+    rusqlite::params![new_stock, now_local, payload.product_id, store_id],
   ).map_err(|e| format!("Error actualizando inventario: {}", e))?;
 
   if affected == 0 {
     tx.execute(
-      "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock) 
-       VALUES (?, ?, ?, ?, ?)",
-      rusqlite::params![Uuid::new_v4().to_string(), store_id, payload.product_id, new_stock, min_stock],
+      "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?)",
+      rusqlite::params![Uuid::new_v4().to_string(), store_id, payload.product_id, new_stock, min_stock, now_local],
     ).map_err(|e| format!("Error creando registro de inventario: {}", e))?;
   }
 
@@ -352,12 +355,13 @@ pub fn process_bulk_reception(
 
     let new_stock = current_stock + item.quantity;
     let movement_id = Uuid::new_v4().to_string();
+    let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     tx.execute(
       "INSERT INTO inventory_movements (
         id, product_id, store_id, user_id, type, reason, 
         quantity, previous_stock, new_stock, cost, created_at
-      ) VALUES (?1, ?2, ?3, ?4, 'IN', 'PURCHASE', ?5, ?6, ?7, ?8, CURRENT_TIMESTAMP)",
+      ) VALUES (?1, ?2, ?3, ?4, 'IN', 'PURCHASE', ?5, ?6, ?7, ?8, ?9)",
       rusqlite::params![
         movement_id,
         item.product_id,
@@ -366,20 +370,21 @@ pub fn process_bulk_reception(
         item.quantity,
         current_stock,
         new_stock,
-        item.new_cost
+        item.new_cost,
+        now_local
       ],
     ).map_err(|e| format!("Error creando movimiento para {}: {}", item.product_id, e))?;
 
     let affected = tx.execute(
-      "UPDATE store_inventory SET stock = ?1 WHERE product_id = ?2 AND store_id = ?3",
-      rusqlite::params![new_stock, item.product_id, store_id],
+      "UPDATE store_inventory SET stock = ?1, updated_at = ?2 WHERE product_id = ?3 AND store_id = ?4",
+      rusqlite::params![new_stock, now_local, item.product_id, store_id],
     ).map_err(|e| format!("Error actualizando stock para {}: {}", item.product_id, e))?;
 
     if affected == 0 {
       tx.execute(
-        "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![Uuid::new_v4().to_string(), store_id, item.product_id, new_stock, min_stock],
+        "INSERT INTO store_inventory (id, store_id, product_id, stock, minimum_stock, updated_at) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![Uuid::new_v4().to_string(), store_id, item.product_id, new_stock, min_stock, now_local],
       ).map_err(|e| format!("Error inicializando inventario para {}: {}", item.product_id, e))?;
     }
   }

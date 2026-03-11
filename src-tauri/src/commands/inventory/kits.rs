@@ -525,30 +525,34 @@ pub fn create_kit(
         }
 
         let kit_id = Uuid::new_v4().to_string();
+        
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
         tx.execute(
-      "INSERT INTO product_kit_options (id, name, description, is_required, is_active) VALUES (?1, ?2, ?3, ?4, 1)",
+      "INSERT INTO product_kit_options (id, name, description, is_required, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5)",
       rusqlite::params![
         kit_id,
         payload.name,
         payload.description,
-        payload.is_required
+        payload.is_required,
+        now_local
       ],
     ).map_err(|e| format!("Error creando cabecera del kit: {}", e))?;
 
         let mut stmt_trigger = tx
             .prepare(
-                "INSERT INTO product_kit_main (kit_option_id, main_product_id) VALUES (?1, ?2)",
+                "INSERT INTO product_kit_main (kit_option_id, main_product_id, created_at) VALUES (?1, ?2, ?3)",
             )
             .map_err(|e| e.to_string())?;
 
         for trigger_id in &payload.trigger_product_ids {
             stmt_trigger
-                .execute(rusqlite::params![kit_id, trigger_id])
+                .execute(rusqlite::params![kit_id, trigger_id, now_local])
                 .map_err(|e| format!("Error insertando trigger {}: {}", trigger_id, e))?;
         }
 
         let mut stmt_items = tx.prepare(
-      "INSERT INTO product_kit_items (id, kit_option_id, included_product_id, quantity) VALUES (?1, ?2, ?3, ?4)"
+      "INSERT INTO product_kit_items (id, kit_option_id, included_product_id, quantity, created_at) VALUES (?1, ?2, ?3, ?4, ?5)"
     ).map_err(|e| e.to_string())?;
 
         for item in &payload.included_items {
@@ -557,7 +561,8 @@ pub fn create_kit(
                     Uuid::new_v4().to_string(),
                     kit_id,
                     item.product_id,
-                    item.quantity
+                    item.quantity,
+                    now_local
                 ])
                 .map_err(|e| format!("Error insertando complemento: {}", e))?;
         }
@@ -854,15 +859,17 @@ pub fn update_kit(
             }
         }
 
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         tx.execute(
       "UPDATE product_kit_options 
-       SET name = ?1, description = ?2, is_required = ?3, is_active = ?4, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?5",
+       SET name = ?1, description = ?2, is_required = ?3, is_active = ?4, updated_at = ?5 
+       WHERE id = ?6",
       rusqlite::params![
         payload.name,
         payload.description,
         payload.is_required,
         payload.is_active,
+        now_local,
         kit_id
       ],
     ).map_err(|e| format!("Error actualizando cabecera: {}", e))?;
@@ -881,13 +888,13 @@ pub fn update_kit(
 
         let mut stmt_trigger = tx
             .prepare(
-                "INSERT INTO product_kit_main (kit_option_id, main_product_id) VALUES (?1, ?2)",
+                "INSERT INTO product_kit_main (kit_option_id, main_product_id, created_at) VALUES (?1, ?2, ?3)",
             )
             .map_err(|e| e.to_string())?;
 
         for trigger_id in &payload.trigger_product_ids {
             stmt_trigger
-                .execute(rusqlite::params![kit_id, trigger_id])
+                .execute(rusqlite::params![kit_id, trigger_id, now_local])
                 .map_err(|e| format!("Error insertando trigger {}: {}", trigger_id, e))?;
         }
 
@@ -932,9 +939,11 @@ pub fn delete_kits(
             .prepare("DELETE FROM product_kit_items WHERE kit_option_id = ?")
             .map_err(|e| e.to_string())?;
 
-        let mut soft_delete_header_stmt = tx.prepare(
-      "UPDATE product_kit_options SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id = ?"
-    ).map_err(|e| e.to_string())?;
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        let query = format!("UPDATE product_kit_options SET deleted_at = '{}', is_active = 0 WHERE id = ?", now_local);
+        
+        let mut soft_delete_header_stmt = tx.prepare(&query).map_err(|e| e.to_string())?;
 
         for id in &kit_ids {
             delete_main_stmt

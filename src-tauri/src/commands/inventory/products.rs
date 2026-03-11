@@ -462,7 +462,7 @@ pub async fn save_product_image(
             .map_err(|e| format!("Error al crear directorio de imágenes: {}", e))?;
     }
 
-    let timestamp = chrono::Utc::now().timestamp();
+    let timestamp = chrono::Local::now().timestamp();
     let safe_name = file_name.replace(|c: char| !c.is_alphanumeric(), "_");
     let final_name = format!("{}_{}.jpg", safe_name, timestamp);
     let file_path = images_dir.join(&final_name);
@@ -554,8 +554,8 @@ pub async fn create_product(
                 "INSERT INTO products (
         id, code, barcode, name, description, category_id, 
         retail_price, wholesale_price, purchase_price, unit_of_measure, 
-        image_url, is_active
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        image_url, is_active, created_at, updated_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
             )
             .map_err(|e| InventoryError {
                 code: "DB_PREPARE_ERROR".to_string(),
@@ -575,8 +575,9 @@ pub async fn create_product(
                 &payload.purchase_price.unwrap_or(0.0),
                 &payload.unit_of_measure.unwrap_or("piece".to_string()),
                 &payload.image_url,
-                &payload.is_active,
-            ])
+              &payload.is_active,
+              &now_local,
+    ])
             .map_err(|e| InventoryError {
                 code: "DB_INSERT_PRODUCT_ERROR".to_string(),
                 message: format!("Error al insertar producto: {}", e),
@@ -585,8 +586,8 @@ pub async fn create_product(
         let mut stmt_inv = tx
             .prepare(
                 "INSERT INTO store_inventory (
-        id, store_id, product_id, stock, minimum_stock
-      ) VALUES (?1, ?2, ?3, ?4, ?5)",
+        id, store_id, product_id, stock, minimum_stock, updated_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )
             .map_err(|e| InventoryError {
                 code: "DB_PREPARE_INV_ERROR".to_string(),
@@ -599,7 +600,8 @@ pub async fn create_product(
                 store_id,
                 &product_id,
                 initial_stock,
-                min_stock
+                min_stock,
+                now_local
             ])
             .map_err(|e| InventoryError {
                 code: "DB_INSERT_INVENTORY_ERROR".to_string(),
@@ -633,52 +635,41 @@ pub async fn create_product(
             }
         }
 
-        if !payload.tags.is_empty() {
-            let mut tag_ids = Vec::new();
-            let mut stmt_get_tag = tx.prepare("SELECT id FROM tags WHERE name = ?").unwrap();
-            let mut stmt_ins_tag = tx
-                .prepare("INSERT INTO tags (id, name) VALUES (?, ?)")
-                .unwrap();
+    if !payload.tags.is_empty() {
+      let mut tag_ids = Vec::new();
+      let mut stmt_get_tag = tx.prepare("SELECT id FROM tags WHERE name = ?").unwrap();
+      let mut stmt_ins_tag = tx.prepare("INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)").unwrap();
 
-            for tag_name in &payload.tags {
-                let existing_id: Option<String> =
-                    stmt_get_tag.query_row([tag_name], |row| row.get(0)).ok();
+      for tag_name in &payload.tags {
+        let existing_id: Option<String> = stmt_get_tag.query_row([tag_name], |row| row.get(0)).ok();
+          
+        let final_id = match existing_id {
+          Some(id) => id,
+          None => {
+            let new_id = Uuid::new_v4().to_string();
+            stmt_ins_tag.execute(rusqlite::params![&new_id, tag_name, now_local])
+              .map_err(|e| InventoryError {
+                  code: "DB_INSERT_TAG_ERROR".to_string(),
+                  message: format!("Error creando tag '{}': {}", tag_name, e),
+              })?;
+            new_id
+          }
+        };
+        tag_ids.push(final_id);
+      }
 
-                let final_id = match existing_id {
-                    Some(id) => id,
-                    None => {
-                        let new_id = Uuid::new_v4().to_string();
-                        stmt_ins_tag
-                            .execute(rusqlite::params![&new_id, tag_name])
-                            .map_err(|e| InventoryError {
-                                code: "DB_INSERT_TAG_ERROR".to_string(),
-                                message: format!("Error creando tag '{}': {}", tag_name, e),
-                            })?;
-                        new_id
-                    }
-                };
-                tag_ids.push(final_id);
-            }
-
-            let mut stmt_link = tx
-                .prepare("INSERT INTO product_tags (id, product_id, tag_id) VALUES (?, ?, ?)")
-                .unwrap();
-            let unique_tag_ids: HashSet<_> = tag_ids.into_iter().collect();
-
-            for tag_id in unique_tag_ids {
-                stmt_link
-                    .execute(rusqlite::params![
-                        Uuid::new_v4().to_string(),
-                        &product_id,
-                        tag_id
-                    ])
-                    .map_err(|e| InventoryError {
-                        code: "DB_LINK_TAG_ERROR".to_string(),
-                        message: format!("Error vinculando tag: {}", e),
-                    })?;
-            }
-        }
+      let mut stmt_link = tx.prepare("INSERT INTO product_tags (id, product_id, tag_id, assigned_at) VALUES (?, ?, ?, ?)").unwrap();
+      let unique_tag_ids: HashSet<_> = tag_ids.into_iter().collect();
+          
+      for tag_id in unique_tag_ids {
+        stmt_link.execute(rusqlite::params![Uuid::new_v4().to_string(), &product_id, tag_id, now_local])
+          .map_err(|e| InventoryError {
+              code: "DB_LINK_TAG_ERROR".to_string(),
+              message: format!("Error vinculando tag: {}", e),
+          })?;
+      }
     }
+  }
 
     tx.commit().map_err(|e| InventoryError {
         code: "DB_COMMIT_ERROR".to_string(),
@@ -818,13 +809,14 @@ pub async fn update_product(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     {
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let mut stmt = tx
             .prepare(
                 "UPDATE products SET 
         code = ?1, barcode = ?2, name = ?3, description = ?4, 
         category_id = ?5, retail_price = ?6, wholesale_price = ?7, 
-        purchase_price = ?8, image_url = ?9, is_active = ?10
-      WHERE id = ?11",
+        purchase_price = ?8, image_url = ?9, is_active = ?10, updated_at = ?11
+      WHERE id = ?12",
             )
             .map_err(|e| e.to_string())?;
 
@@ -839,14 +831,15 @@ pub async fn update_product(
             payload.purchase_price.unwrap_or(0.0),
             new_db_path,
             payload.is_active,
+            now_local,
             payload.id
         ])
         .map_err(|e| format!("Error actualizando producto: {}", e))?;
 
         if let Some(min_stock) = payload.min_stock {
             tx.execute(
-                "UPDATE store_inventory SET minimum_stock = ?1 WHERE product_id = ?2",
-                rusqlite::params![min_stock, payload.id],
+                "UPDATE store_inventory SET minimum_stock = ?1, updated_at = ?2 WHERE product_id = ?3",
+                rusqlite::params![min_stock, now_local, payload.id],
             )
             .map_err(|e| format!("Error actualizando inventario: {}", e))?;
         }
@@ -854,7 +847,7 @@ pub async fn update_product(
         let mut tag_ids = Vec::new();
         let mut stmt_get_tag = tx.prepare("SELECT id FROM tags WHERE name = ?").unwrap();
         let mut stmt_ins_tag = tx
-            .prepare("INSERT INTO tags (id, name) VALUES (?, ?)")
+            .prepare("INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)")
             .unwrap();
 
         for tag_name in payload.tags {
@@ -866,7 +859,7 @@ pub async fn update_product(
                 None => {
                     let new_id = Uuid::new_v4().to_string();
                     stmt_ins_tag
-                        .execute(rusqlite::params![&new_id, &tag_name])
+                        .execute(rusqlite::params![&new_id, &tag_name, now_local])
                         .map_err(|e| format!("Error creando tag '{}': {}", tag_name, e))?;
                     new_id
                 }
@@ -881,7 +874,7 @@ pub async fn update_product(
         .map_err(|e| format!("Error limpiando tags anteriores: {}", e))?;
 
         let mut stmt_link = tx
-            .prepare("INSERT INTO product_tags (id, product_id, tag_id) VALUES (?, ?, ?)")
+            .prepare("INSERT INTO product_tags (id, product_id, tag_id, assigned_at) VALUES (?, ?, ?, ?)")
             .unwrap();
         let unique_tag_ids: HashSet<_> = tag_ids.into_iter().collect();
 
@@ -890,7 +883,8 @@ pub async fn update_product(
                 .execute(rusqlite::params![
                     Uuid::new_v4().to_string(),
                     payload.id,
-                    tag_id
+                    tag_id,
+                    now_local
                 ])
                 .map_err(|e| format!("Error vinculando tag: {}", e))?;
         }
@@ -1265,10 +1259,11 @@ pub fn delete_products(
 
     {
         let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         // 1. Desactivar promociones activas que contienen estos productos
         let deactivate_promos_sql = format!(
-            "UPDATE promotions SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+            "UPDATE promotions SET is_active = 0, updated_at = '{}'
              WHERE id IN (
                SELECT DISTINCT pr.id FROM promotions pr
                INNER JOIN promotion_combos pc ON pr.id = pc.promotion_id
@@ -1276,7 +1271,7 @@ pub fn delete_products(
                  AND pr.is_active = 1
                  AND pr.deleted_at IS NULL
              )",
-            placeholders
+            now_local, placeholders
         );
         let mut promo_stmt = tx
             .prepare(&deactivate_promos_sql)
@@ -1370,8 +1365,8 @@ pub fn delete_products(
 
         // 6. Soft delete de los productos
         let sql = format!(
-            "UPDATE products SET deleted_at = CURRENT_TIMESTAMP, is_active = 0 WHERE id IN ({})",
-            placeholders
+            "UPDATE products SET deleted_at = '{}', is_active = 0 WHERE id IN ({})",
+            now_local, placeholders
         );
         let mut stmt = tx.prepare(&sql).map_err(|e| e.to_string())?;
         let params = rusqlite::params_from_iter(ids.iter());
@@ -1418,18 +1413,21 @@ pub fn bulk_update_products(
       }.into());
         }
 
+        let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         tx.execute(
             "UPDATE products SET 
         category_id = COALESCE(?1, category_id),
         is_active = COALESCE(?2, is_active),
         retail_price = ?3,
-        wholesale_price = ?4
-       WHERE id = ?5",
+        wholesale_price = ?4,
+        updated_at = ?5
+       WHERE id = ?6",
             rusqlite::params![
                 payload.category_id,
                 payload.is_active,
                 new_retail,
                 new_wholesale,
+                now_local,
                 id
             ],
         )
@@ -1450,8 +1448,8 @@ pub fn bulk_update_products(
                             None => {
                                 let new_tid = Uuid::new_v4().to_string();
                                 tx.execute(
-                                    "INSERT INTO tags (id, name) VALUES (?1, ?2)",
-                                    [&new_tid, tag_name],
+                                    "INSERT INTO tags (id, name, created_at) VALUES (?1, ?2, ?3)",
+                                    [&new_tid, tag_name, &now_local],
                                 )
                                 .map_err(|e| format!("Error creando tag '{}': {}", tag_name, e))?;
                                 new_tid
@@ -1460,8 +1458,8 @@ pub fn bulk_update_products(
                     };
 
                     tx.execute(
-            "INSERT OR IGNORE INTO product_tags (id, product_id, tag_id) VALUES (?1, ?2, ?3)",
-            [Uuid::new_v4().to_string(), id.clone(), tag_id]
+            "INSERT OR IGNORE INTO product_tags (id, product_id, tag_id, assigned_at) VALUES (?1, ?2, ?3, ?4)",
+            [Uuid::new_v4().to_string(), id.clone(), tag_id, now_local.clone()]
           ).map_err(|e| format!("Error vinculando tag '{}': {}", tag_name, e))?;
                 }
             }
