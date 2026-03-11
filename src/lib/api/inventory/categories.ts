@@ -16,7 +16,7 @@ export async function getCategories(params: PaginationParams): Promise<Paginated
   });
 }
 
-export async function createCategory(data: CreateCategoryDto): Promise<void> {
+export async function createCategory(data: CreateCategoryDto): Promise<string> {
   return await invoke("create_category", { data });
 }
 

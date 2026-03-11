@@ -57,6 +57,8 @@ import { CreateProductPayload, UpdateProductPayload, ImageAction, Product } from
 import { useAppImage } from "@/hooks/use-app-image";
 import { cn } from "@/lib/utils";
 import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
+import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
+import { CirclePlus } from "lucide-react";
 
 interface ProductDialogProps {
   open: boolean;
@@ -94,6 +96,7 @@ export function ProductDialog({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>("Keep");
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
+  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
@@ -526,6 +529,20 @@ export function ProductDialog({
                               <Command>
                                 <CommandInput placeholder="Buscar categoría..." />
                                 <CommandList>
+                                  {can('categories:create') && (
+                                    <CommandGroup className="border-b pb-1">
+                                      <CommandItem
+                                        onSelect={() => {
+                                          setOpenCategoryPopover(false);
+                                          setIsCreateCategoryModalOpen(true);
+                                        }}
+                                        className="text-primary font-medium"
+                                      >
+                                        <CirclePlus className="mr-2 h-4 w-4" />
+                                        Crear nueva categoría
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  )}
                                   <CommandEmpty>No se encontraron resultados.</CommandEmpty>
                                   <CommandGroup>
                                     {categories.map((cat) => (
@@ -720,6 +737,13 @@ export function ProductDialog({
           </form>
         </Form>
       </DialogContent>
+      <CreateCategoryModal 
+         open={isCreateCategoryModalOpen}
+         onOpenChange={setIsCreateCategoryModalOpen}
+         onSuccess={(newId) => {
+             form.setValue('category_id', newId, { shouldValidate: true, shouldDirty: true });
+         }}
+      />
     </Dialog>
   );
 }

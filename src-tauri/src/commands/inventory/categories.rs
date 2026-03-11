@@ -263,7 +263,7 @@ pub struct UpdateCategoryDto {
 pub fn create_category(
     data: CreateCategoryDto,
     db: State<'_, Mutex<Connection>>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut conn = db.lock().map_err(|e| format!("Error de conexión: {}", e))?;
     let tx = conn
         .transaction()
@@ -325,7 +325,7 @@ pub fn create_category(
     tx.commit()
         .map_err(|e| format!("Error confirmando transacción: {}", e))?;
 
-    Ok(())
+    Ok(id)
 }
 
 #[tauri::command]

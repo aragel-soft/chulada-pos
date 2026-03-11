@@ -61,6 +61,9 @@ import {
 } from "@/features/inventory/utils/bulk-actions";
 import { cn } from "@/lib/utils";
 import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
+import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
+import { CirclePlus } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 
 interface BulkEditProductDialogProps {
   open: boolean;
@@ -75,9 +78,11 @@ export function BulkEditProductDialog({
   selectedProducts,
   onSuccess,
 }: BulkEditProductDialogProps) {
+  const { can } = useAuthStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingValues, setPendingValues] = useState<BulkEditFormValues | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
+  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
@@ -250,6 +255,20 @@ export function BulkEditProductDialog({
                               <Command>
                                 <CommandInput placeholder="Buscar categoría..." />
                                 <CommandList>
+                                  {can('categories:create') && (
+                                    <CommandGroup className="border-b pb-1">
+                                      <CommandItem
+                                        onSelect={() => {
+                                          setOpenCategoryPopover(false);
+                                          setIsCreateCategoryModalOpen(true);
+                                        }}
+                                        className="text-primary font-medium"
+                                      >
+                                        <CirclePlus className="mr-2 h-4 w-4" />
+                                        Crear nueva categoría
+                                      </CommandItem>
+                                    </CommandGroup>
+                                  )}
                                   <CommandEmpty>No se encontraron resultados.</CommandEmpty>
                                   <CommandGroup>
                                     {categories.map((cat) => (
@@ -471,6 +490,13 @@ export function BulkEditProductDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <CreateCategoryModal 
+         open={isCreateCategoryModalOpen}
+         onOpenChange={setIsCreateCategoryModalOpen}
+         onSuccess={(newId) => {
+             form.setValue('category_id', newId, { shouldValidate: true, shouldDirty: true });
+         }}
+      />
     </>
   );
 }
