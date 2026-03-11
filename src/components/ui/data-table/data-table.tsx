@@ -114,8 +114,16 @@ export function DataTable<TData, TValue>({
   const onSortingChange = externalOnSortingChange ?? setInternalSorting;
   const onGlobalFilterChange =
     externalOnGlobalFilterChange ?? setInternalGlobalFilter;
-  const onPaginationChange =
+
+  // Limpiar selección al cambiar de página
+  const basePaginationChange =
     externalOnPaginationChange ?? setInternalPagination;
+  const onPaginationChange: OnChangeFn<PaginationState> = (updater) => {
+    setInternalRowSelection({});
+    externalOnRowSelectionChange?.({});
+    basePaginationChange(updater);
+  };
+
   const onRowSelectionChange =
     externalOnRowSelectionChange ?? setInternalRowSelection;
   const columnFilters = externalColumnFilters ?? internalColumnFilters
