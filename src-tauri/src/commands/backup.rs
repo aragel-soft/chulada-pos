@@ -147,7 +147,7 @@ pub async fn restore_latest_backup(
         .header(AUTHORIZATION, format!("Bearer {}", SUPABASE_KEY))
         .header("apikey", SUPABASE_KEY)
         .header(CONTENT_TYPE, "application/json")
-        .body("{}")
+        .body(r#"{"prefix":""}"#)
         .send()
         .await
         .map_err(|e| format!("Error de red al listar respaldos: {}", e))?;
