@@ -3,6 +3,31 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
+    // ── Leer variables de entorno desde .env.local (o .env) ──
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let project_root = Path::new(&manifest_dir).parent().unwrap();
+
+    let env_local = project_root.join(".env.local");
+    let env_default = project_root.join(".env");
+
+    if env_local.exists() {
+        dotenvy::from_path(&env_local).ok();
+    } else if env_default.exists() {
+        dotenvy::from_path(&env_default).ok();
+    }
+
+    // Inyectar las variables de Supabase como vars de compilación para Rust
+    let vars_to_inject = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"];
+    for var in &vars_to_inject {
+        if let Ok(val) = std::env::var(var) {
+            let clean = val.trim_matches('"').to_string();
+            println!("cargo:rustc-env={}={}", var, clean);
+        }
+    }
+
+    println!("cargo:rerun-if-changed=../.env.local");
+    println!("cargo:rerun-if-changed=../.env");
+
     // ── Generar migraciones embebidas ──
     let migrations_dir = Path::new("src/migrations");
     let out_dir = std::env::var("OUT_DIR").unwrap();
