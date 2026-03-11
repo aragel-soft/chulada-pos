@@ -4,6 +4,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use chrono::Local;
 use uuid::Uuid;
+use super::db_utils::validate_products_are_active;
 
 //TODO: Colocar PaginatedResponse en un módulo común e importarlo donde se necesite
 #[derive(Debug, Serialize, Deserialize)]
@@ -335,6 +336,10 @@ pub fn create_promotion(
     return Err("La fecha de inicio no puede ser mayor a la fecha de fin.".to_string());
   }
 
+  // Validar que todos los productos estén activos
+  let product_ids: Vec<&str> = promotion.items.iter().map(|i| i.product_id.as_str()).collect();
+  validate_products_are_active(&conn, &product_ids)?;
+
   let tx = conn.transaction().map_err(|e| e.to_string())?;
 
   {
@@ -493,6 +498,10 @@ pub fn update_promotion(
   if start > end {
     return Err("La fecha de inicio no puede ser mayor a la fecha de fin.".to_string());
   }
+
+  // Validar que todos los productos estén activos
+  let product_ids_upd: Vec<&str> = promotion.items.iter().map(|i| i.product_id.as_str()).collect();
+  validate_products_are_active(&conn, &product_ids_upd)?;
 
   let tx = conn.transaction().map_err(|e| e.to_string())?;
 

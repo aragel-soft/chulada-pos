@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
 use uuid::Uuid;
+use super::db_utils::validate_products_are_active;
 
 #[derive(Serialize)]
 pub struct KitListItem {
@@ -432,6 +433,14 @@ pub fn create_kit(
         }
     }
 
+    // Validar que todos los productos esten activos
+    let all_ids: Vec<&str> = payload
+        .trigger_product_ids.iter()
+        .chain(payload.included_items.iter().map(|i| &i.product_id))
+        .map(|s| s.as_str())
+        .collect();
+    validate_products_are_active(&conn, &all_ids)?;
+
     let tx = conn
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
@@ -746,6 +755,15 @@ pub fn update_kit(
             );
         }
     }
+
+
+    // Validar que todos los productos esten activos
+    let all_ids_upd: Vec<&str> = payload
+        .trigger_product_ids.iter()
+        .chain(payload.included_items.iter().map(|i| &i.product_id))
+        .map(|s| s.as_str())
+        .collect();
+    validate_products_are_active(&conn, &all_ids_upd)?;
 
     let tx = conn
         .transaction()
