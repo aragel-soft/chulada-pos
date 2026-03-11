@@ -18,6 +18,9 @@ fn main() {
             // Gestionar state de la conexión
             app.manage(Mutex::new(conn));
 
+            // Iniciar scheduler de respaldos en background
+            commands::backup::start_backup_scheduler(app.handle().clone());
+
             Ok(())
         })
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -129,7 +132,9 @@ fn main() {
             commands::reports::get_low_stock_products,
             // Backup
             commands::backup::backup_database,
-            commands::backup::restore_latest_backup
+            commands::backup::restore_latest_backup,
+            commands::backup::sync_pending_backups,
+            commands::backup::get_pending_backups_count
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

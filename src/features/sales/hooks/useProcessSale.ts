@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { CartItem } from '@/types/sales';
 import { SaleItemRequest, SaleRequest, SaleResponse } from '@/types/sale';
 import { processSale as processSaleApi } from '@/lib/api/cash-register/sales';
+import { backupDatabase } from '@/lib/api/backup';
+
+const SALES_BACKUP_THRESHOLD = 50;
 
 export function useProcessSale() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const saleCounter = useRef(0);
 
   const processSale = async (
     items: CartItem[],
@@ -36,7 +40,7 @@ export function useProcessSale() {
         customer_id: customerId || null,
         user_id: userId,
         cash_register_shift_id: shiftId,
-        payment_method: paymentMethod, // 'cash', 'card_transfer', 'credit', 'mixed'
+        payment_method: paymentMethod,
         cash_amount: cashAmount,
         card_transfer_amount: cardAmount,
         notes: notes?.trim() || null,
@@ -46,6 +50,14 @@ export function useProcessSale() {
       };
 
       const response = await processSaleApi(payload);
+
+      // Trigger de backup cada 50 ventas
+      saleCounter.current += 1;
+      if (saleCounter.current >= SALES_BACKUP_THRESHOLD) {
+        saleCounter.current = 0;
+        backupDatabase().catch(() => {});
+      }
+
       return response;
     } catch (error) {
       toast.error('Error al procesar venta', {
@@ -59,3 +71,4 @@ export function useProcessSale() {
 
   return { processSale, isProcessing };
 }
+
