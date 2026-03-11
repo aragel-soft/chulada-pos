@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -7,11 +7,16 @@ import {
   PackageOpen,
   Loader2,
   CheckCheck,
+  X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Product, SelectorItem } from "@/types/inventory";
 import { getProducts } from "@/lib/api/inventory/products";
 import { checkProductsInActiveKits } from "@/lib/api/inventory/kits";
+import { getAllCategories } from "@/lib/api/inventory/categories";
+import { CategoryListDto } from "@/types/categories";
+import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
+import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
 import { ProductConflict } from "@/types/kits";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -40,7 +45,7 @@ interface ProductSearchSelectorProps {
   excludeProductIds?: string[];
   customTitle?: string;
   enableQuantity?: boolean;
-  currentKitId?: string | null; 
+  currentKitId?: string | null;
 }
 
 export function ProductSearchSelector({
@@ -50,10 +55,32 @@ export function ProductSearchSelector({
   excludeProductIds = [],
   customTitle,
   enableQuantity,
-  currentKitId
+  currentKitId,
 }: ProductSearchSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [categories, setCategories] = useState<CategoryListDto[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  const categoryOptions = useMemo(() => buildCategoryOptions(categories), [categories]);
+  const categoryIds = useMemo(
+    () =>
+      selectedCategories.size > 0
+        ? expandCategoryIdsWithChildren(Array.from(selectedCategories), categories)
+        : undefined,
+    [selectedCategories, categories]
+  );
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const cats = await getAllCategories();
+      setCategories(cats);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 500);
@@ -61,15 +88,18 @@ export function ProductSearchSelector({
   }, [searchTerm]);
 
   const { data: searchResults, isLoading: isSearching } = useQuery({
-    queryKey: ["products", "search", debouncedSearch],
+    queryKey: ["products", "search", debouncedSearch, categoryIds],
     queryFn: () =>
-      getProducts({
-        page: 1,
-        pageSize: 5,
-        search: debouncedSearch,
-      }),
-    enabled: debouncedSearch.length > 2,
-    staleTime: 1000 * 60,
+      getProducts(
+        {
+          page: 1,
+          pageSize: 200,
+          search: debouncedSearch || undefined,
+        },
+        { active_status: ["active"], category_ids: categoryIds },
+      ),
+    enabled: debouncedSearch.length >= 1 || selectedCategories.size > 0,
+    staleTime: 1000 * 30,
   });
 
   const productIdsToCheck = searchResults?.data.map((p) => p.id) || [];
@@ -77,22 +107,27 @@ export function ProductSearchSelector({
   // Busca conflictos con productos principales y complementos en kits activos
   const { data: productConflicts } = useQuery({
     queryKey: ["kits", "check-conflicts", mode, productIdsToCheck],
-    queryFn: () => checkProductsInActiveKits(productIdsToCheck, currentKitId || undefined),
-    enabled: (mode === "triggers" || mode === "rewards") && productIdsToCheck.length > 0,
+    queryFn: () =>
+      checkProductsInActiveKits(productIdsToCheck, currentKitId || undefined),
+    enabled:
+      (mode === "triggers" || mode === "rewards") &&
+      productIdsToCheck.length > 0,
     staleTime: 0,
   });
 
   const getBlockedReason = (productId: string): string | null => {
     if (excludeProductIds.includes(productId)) return "excluded";
-    
+
     if ((mode === "triggers" || mode === "rewards") && productConflicts) {
-      const conflict = productConflicts.find((c: ProductConflict) => c.product_id === productId);
+      const conflict = productConflicts.find(
+        (c: ProductConflict) => c.product_id === productId,
+      );
       if (conflict) {
         if (mode === "rewards" && conflict.reason === "item") return null;
         return conflict.reason;
       }
     }
-    
+
     return null;
   };
 
@@ -167,13 +202,34 @@ export function ProductSearchSelector({
     <div className="flex flex-col h-full min-h-[500px] gap-4">
       {/* --- SECCIÓN SUPERIOR: BUSCADOR --- */}
       <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Input
-            placeholder="Buscar por nombre, código o categoría..."
-            className="bg-background focus-visible:ring-[#480489]"
+            placeholder="Buscar por nombre o código..."
+            className="bg-background focus-visible:ring-[#480489] min-w-[180px] flex-1"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+
+          {categoryOptions.length > 0 && (
+            <DataTableFacetedFilter
+              title="Categoría"
+              options={categoryOptions}
+              selectedValues={selectedCategories}
+              onSelect={setSelectedCategories}
+            />
+          )}
+
+          {selectedCategories.size > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedCategories(new Set())}
+              className="h-8 px-2 text-muted-foreground"
+              title="Quitar filtro de categoría"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
 
           {searchResults?.data && searchResults.data.length > 0 && (
             <Button
@@ -188,8 +244,8 @@ export function ProductSearchSelector({
           )}
         </div>
 
-        <div className="min-h-[100px] max-h-[180px] overflow-y-auto rounded-md border bg-background">
-          {debouncedSearch.length <= 2 ? (
+        <div className="min-h-[80px] max-h-[320px] overflow-y-auto rounded-md border bg-background">
+          {debouncedSearch.length === 0 && selectedCategories.size === 0 ? (
             <div className="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground">
               <Search className="h-8 w-8 mb-2 opacity-20" />
               Escribe para buscar productos...
@@ -225,7 +281,8 @@ export function ProductSearchSelector({
                           <span>{product.name}</span>
                           {blockedReason && (
                             <span className="text-[10px] text-destructive flex items-center gap-1 font-semibold">
-                              <AlertCircle className="h-3 w-3" /> {getBlockedMessage(blockedReason)}
+                              <AlertCircle className="h-3 w-3" />{" "}
+                              {getBlockedMessage(blockedReason)}
                             </span>
                           )}
                         </div>
@@ -264,7 +321,7 @@ export function ProductSearchSelector({
       </div>
 
       {/* --- SECCIÓN INFERIOR: LISTA ACUMULADA --- */}
-      <div className="flex-1 flex flex-col min-h-[250px] border rounded-md shadow-sm">
+      <div className="flex flex-col min-h-[320px] max-h-[320px] border rounded-md shadow-sm">
         <div className="flex items-center justify-between p-3 border-b bg-muted/40">
           <h4 className="text-sm font-semibold flex items-center gap-2 text-[#480489]">
             {title}
