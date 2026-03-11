@@ -20,23 +20,17 @@ struct BucketObject {
 }
 
 /// Genera un nombre de archivo con timestamp para el backup.
-/// Formato: backup_store_YYYY-MM-DD_HH-mm.db.gz
 fn generate_backup_filename() -> String {
     let now = chrono::Local::now();
     format!("backup_store_{}.db.gz", now.format("%Y-%m-%d_%H-%M"))
 }
 
-/// Ejecuta el flujo completo de backup:
-/// 1. Valida licencia desde SQLite
-/// 2. Ejecuta WAL checkpoint
-/// 3. Lee y comprime la DB
-/// 4. Sube a Supabase Storage
 #[tauri::command]
 pub async fn backup_database(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Mutex<Connection>>,
 ) -> Result<String, String> {
-    // 1. Validar licencia desde la BD
+    // Validar licencia desde la BD
     let (license_type, db_path) = {
         let conn = state.inner().lock().map_err(|e| e.to_string())?;
         let lt = crate::database::get_db_license_type(&conn)?;
@@ -54,14 +48,14 @@ pub async fn backup_database(
         ));
     }
 
-    // 2. WAL checkpoint para consistencia
+    // WAL checkpoint para consistencia
     {
         let conn = state.inner().lock().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
             .map_err(|e| format!("Error en WAL checkpoint: {}", e))?;
     }
 
-    // 3. Leer archivo de la BD
+    // Leer archivo de la BD
     if !db_path.exists() {
         return Err(format!(
             "No se encontró el archivo de base de datos en: {:?}",
@@ -72,7 +66,7 @@ pub async fn backup_database(
     let raw_bytes =
         fs::read(&db_path).map_err(|e| format!("Error al leer la BD: {}", e))?;
 
-    // 4. Comprimir en memoria con gzip
+    // Comprimir en memoria con gzip
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder
         .write_all(&raw_bytes)
@@ -81,7 +75,7 @@ pub async fn backup_database(
         .finish()
         .map_err(|e| format!("Error al finalizar compresión: {}", e))?;
 
-    // 5. Generar nombre y subir a Supabase Storage
+    // Generar nombre y subir a Supabase Storage
     let file_name = generate_backup_filename();
     let upload_url = format!(
         "{}/storage/v1/object/backups/{}",
@@ -122,18 +116,12 @@ pub async fn backup_database(
     Ok(file_name)
 }
 
-/// Ejecuta el flujo completo de restore:
-/// 1. Valida licencia desde SQLite
-/// 2. Lista archivos del bucket
-/// 3. Descarga el más reciente
-/// 4. Descomprime y reemplaza la DB local
-/// 5. Reconecta la base de datos
 #[tauri::command]
 pub async fn restore_latest_backup(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Mutex<Connection>>,
 ) -> Result<String, String> {
-    // 1. Validar licencia
+    // Validar licencia
     let (license_type, db_path) = {
         let conn = state.inner().lock().map_err(|e| e.to_string())?;
         let lt = crate::database::get_db_license_type(&conn)?;
@@ -150,7 +138,7 @@ pub async fn restore_latest_backup(
         );
     }
 
-    // 2. Listar archivos del bucket
+    // Listar archivos del bucket
     let list_url = format!("{}/storage/v1/object/list/backups", SUPABASE_URL);
 
     let client = reqwest::Client::new();
@@ -177,7 +165,7 @@ pub async fn restore_latest_backup(
         .await
         .map_err(|e| format!("Error al parsear lista de archivos: {}", e))?;
 
-    // 3. Filtrar .gz, ordenar por created_at desc, tomar el primero
+    // Filtrar .gz, ordenar por created_at desc, tomar el primero
     let latest = files
         .iter()
         .filter(|f| f.name.ends_with(".gz"))
@@ -186,7 +174,7 @@ pub async fn restore_latest_backup(
 
     let latest_name = latest.name.clone();
 
-    // 4. Descargar el archivo
+    // Descargar el archivo
     let download_url = format!(
         "{}/storage/v1/object/backups/{}",
         SUPABASE_URL, latest_name
@@ -213,14 +201,14 @@ pub async fn restore_latest_backup(
         .await
         .map_err(|e| format!("Error al leer bytes del respaldo: {}", e))?;
 
-    // 5. Descomprimir en memoria
+    // Descomprimir en memoria
     let mut decoder = GzDecoder::new(&compressed_bytes[..]);
     let mut decompressed = Vec::new();
     decoder
         .read_to_end(&mut decompressed)
         .map_err(|e| format!("Error al descomprimir respaldo: {}", e))?;
 
-    // 6. Liberar conexión y escribir nueva DB
+    // Liberar conexión y escribir nueva DB
     {
         let mut db_guard = state.inner().lock().map_err(|e| e.to_string())?;
 
@@ -232,7 +220,7 @@ pub async fn restore_latest_backup(
         fs::write(&db_path, &decompressed)
             .map_err(|e| format!("Error escribiendo nueva BD: {}", e))?;
 
-        // 7. Reconectar
+        // Reconectar
         let new_conn = crate::database::init_database(&app_handle)
             .map_err(|e| format!("Error reconectando BD: {}", e))?;
 
