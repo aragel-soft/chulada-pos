@@ -133,9 +133,6 @@ export function PermissionsMatrixPage() {
     RolePermission[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [resetConfirmInput, setResetConfirmInput] = useState("");
-
   // Consultas
   const { data: roles = [], isLoading: loadingRoles } = useQuery({
     queryKey: ["roles"],
@@ -209,8 +206,8 @@ export function PermissionsMatrixPage() {
     onSuccess: () => {
       toast.success("Permisos restablecidos correctamente");
       queryClient.invalidateQueries({ queryKey: ["rolePermissions"] });
-      setIsResetDialogOpen(false);
-      setResetConfirmInput("");
+      // The dialog closing state is handled by the Dialog component props now if we need to close it from parent, 
+      // but since ResetPermissionsDialog controls open state, we'll pass onSuccess callback instead.
     },
     onError: (error: any) => {
       toast.error(
@@ -568,17 +565,7 @@ export function PermissionsMatrixPage() {
       actions={
         <div className="flex gap-2">
           {can("permissions:reset_defaults") && (
-            <Button
-              variant="outline"
-              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground whitespace-nowrap"
-              onClick={() => {
-                setResetConfirmInput("");
-                setIsResetDialogOpen(true);
-              }}
-            >
-              <RotateCcw className="h-4 w-4" />
-              Restablecer Fábrica
-            </Button>
+            <ResetPermissionsDialog resetMutation={resetMutation} />
           )}
           {can("permissions:edit") && (
             <Button
@@ -675,22 +662,48 @@ export function PermissionsMatrixPage() {
         isSaving={updateMutation.isPending}
       />
 
-      {/* --- Dialog: Restablecer Permisos --- */}
-      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+    </DataTableLayout>
+  );
+}
+
+function ResetPermissionsDialog({
+  resetMutation,
+}: {
+  resetMutation: any;
+}) {
+  const [open, setOpen] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState("");
+
+  useEffect(() => {
+    if (open) setResetConfirmInput("");
+  }, [open]);
+
+  return (
+    <>
+      <Button
+        variant="destructive"
+        className="border-destructive text-white hover:bg-destructive whitespace-nowrap"
+        onClick={() => setOpen(true)}
+      >
+        <RotateCcw className="h-4 w-4 mr-2" />
+        Restablecer Fábrica
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+            <AlertDialogTitle className="flex items-center gap-2">
               <RotateCcw className="h-5 w-5" />
               Restablecer Valores de Fábrica
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
+            <AlertDialogDescription className="text-foreground space-y-3">
               <p>
                 Esta acción eliminará{" "}
                 <strong>todas las personalizaciones actuales</strong> de
                 permisos. Los tres roles (Administrador, Gerente y Cajero)
                 volverán a su configuración inicial.
               </p>
-              <p className="text-destructive font-medium">
+              <p className="font-medium">
                 Esta operación no se puede deshacer.
               </p>
               <div className="pt-1">
@@ -715,7 +728,9 @@ export function PermissionsMatrixPage() {
               }
               onClick={(e) => {
                 e.preventDefault();
-                resetMutation.mutate();
+                resetMutation.mutate(undefined, {
+                  onSuccess: () => setOpen(false),
+                });
               }}
               className="bg-destructive hover:bg-destructive/90"
             >
@@ -731,6 +746,6 @@ export function PermissionsMatrixPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DataTableLayout>
+    </>
   );
 }
