@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { toast } from "sonner"
 import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2, Download } from "lucide-react"
-import { backupDatabase, downloadAndApplyLatestBackup } from "@/lib/api/backup"
+import { backupDatabase, restoreLatestBackup } from "@/lib/api/backup"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -325,15 +325,9 @@ export default function HardwarePage() {
                           setIsBackingUp(true);
                           try {
                             const fileName = await backupDatabase();
-                            if (fileName) {
-                              toast.success("Respaldo completado", {
-                                description: `Archivo: ${fileName}`,
-                              });
-                            } else {
-                              toast.info("Respaldo Omitido", {
-                                description: "Tu licencia no tiene permitido sobrescribir la nube.",
-                              });
-                            }
+                            toast.success("Respaldo completado", {
+                              description: `Archivo: ${fileName}`,
+                            });
                           } catch (err) {
                             toast.error("Error al crear respaldo", {
                               description: String(err),
@@ -386,9 +380,7 @@ export default function HardwarePage() {
                           onClick={async () => {
                             setIsDownloading(true);
                             try {
-                              await downloadAndApplyLatestBackup();
-                              sessionStorage.setItem("sync_completed", "true");
-
+                              await restoreLatestBackup();
                               toast.success("Base de datos actualizada", {
                                 description: "La información de la tienda se ha sincronizado exitosamente."
                               });

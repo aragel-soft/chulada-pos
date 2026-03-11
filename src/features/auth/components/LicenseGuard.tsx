@@ -7,7 +7,7 @@ import {
   updateLicenseValidation,
   checkOfflineLicense,
 } from "@/lib/api/auth";
-import { downloadAndApplyLatestBackup } from "@/lib/api/backup";
+import { restoreLatestBackup } from "@/lib/api/backup";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -41,7 +41,7 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           if (!hasSyncedThisSession) {
             setLoadingMessage("Sincronizando base de datos de la tienda...");
             try {
-              await downloadAndApplyLatestBackup();
+              await restoreLatestBackup();
               sessionStorage.setItem("sync_completed", "true");
 
               toast.success("Sincronización exitosa", {
