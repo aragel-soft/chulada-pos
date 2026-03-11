@@ -9,7 +9,7 @@ use flate2::Compression;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
 const SUPABASE_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
@@ -23,7 +23,6 @@ pub fn is_backup_in_progress() -> bool {
 #[derive(Deserialize)]
 struct BucketObject {
     name: String,
-    created_at: String,
 }
 
 #[derive(Serialize)]
@@ -219,6 +218,11 @@ async fn backup_database_inner(
     let synced = match try_upload_file(&file_path, &file_name).await {
         Ok(()) => {
             let _ = mark_as_synced(state, &file_name);
+            if let Ok(result) = sync_pending_inner(state).await {
+                if result.synced > 0 {
+                    let _ = app_handle.emit("backups-synced", result.synced);
+                }
+            }
             true
         }
         Err(_) => false,
@@ -364,7 +368,11 @@ pub fn start_backup_scheduler(app_handle: tauri::AppHandle) {
             }
 
             // Sincroniza respaldos pendientes
-            let _ = sync_pending_inner(state.inner()).await;
+            if let Ok(result) = sync_pending_inner(state.inner()).await {
+                if result.synced > 0 {
+                    let _ = handle.emit("backups-synced", result.synced);
+                }
+            }
 
             // Limpia respaldos viejos
             let _ = cleanup_old_backups(state.inner());
@@ -421,11 +429,11 @@ pub async fn restore_latest_backup(
         .await
         .map_err(|e| format!("Error al parsear lista de archivos: {}", e))?;
 
-    // Filtrar .gz, ordenar por created_at desc, tomar el primero
+    // Filtrar .gz y tomar el más reciente por nombre (contiene timestamp YYYY-MM-DD_HH-MM)
     let latest = files
         .iter()
         .filter(|f| f.name.ends_with(".gz"))
-        .max_by(|a, b| a.created_at.cmp(&b.created_at))
+        .max_by(|a, b| a.name.cmp(&b.name))
         .ok_or_else(|| "No hay respaldos .gz disponibles en la nube.".to_string())?;
 
     let latest_name = latest.name.clone();
