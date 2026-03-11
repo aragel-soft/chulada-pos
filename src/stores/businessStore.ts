@@ -34,7 +34,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
     set({ isLoading: true });
     try {
       await updateBusinessSettings(patch);
-      // Optimistic update
+      toast.success("Configuración guardada exitosamente");
       const current = get().settings;
       if (current) {
         set({ settings: { ...current, ...patch }, isLoading: false });
@@ -44,6 +44,7 @@ export const useBusinessStore = create<BusinessState>((set, get) => ({
       }
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
+      toast.error("Error al guardar la configuración");
       throw err;
     }
   },
