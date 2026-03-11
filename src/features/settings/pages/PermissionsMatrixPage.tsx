@@ -5,9 +5,21 @@ import {
   getPermissions,
   getRolePermissions,
   updateRolePermissions,
+  resetPermissionsToDefault,
 } from "@/lib/api/permissions";
 import { Permission, RolePermission } from "@/types/permission";
 import { DataTableLayout } from "@/components/layouts/DataTableLayout";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,7 +30,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useEffect } from "react";
 import {
   Loader2,
-  Search, Save,
+  Search,
+  Save,
   Package,
   Home,
   CreditCard,
@@ -29,7 +42,8 @@ import {
   Users,
   Shield,
   Check,
-  PlusCircle
+  PlusCircle,
+  RotateCcw,
 } from "lucide-react";
 
 import { DebouncedInput } from "@/components/ui/debounced-input";
@@ -99,16 +113,16 @@ export function PermissionsMatrixPage() {
   const { user: currentUser, can } = useAuthStore();
 
   // Estados para filtros y tabla
-  const { 
-    globalFilter, 
+  const {
+    globalFilter,
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
-    setExtraFilter
-  } = usePersistedTableState('settings.permissions');
+    setExtraFilter,
+  } = usePersistedTableState("settings.permissions");
 
   // Módulos seleccionados guardados en Zustand
   const moduleFilters = getExtraFilter<string[]>("moduleFilters", []);
-  
+
   // Wrapper para mantener compatibilidad con el resto del código
   const setModuleFilters = (newFilters: string[]) => {
     setExtraFilter("moduleFilters", newFilters);
@@ -119,7 +133,6 @@ export function PermissionsMatrixPage() {
     RolePermission[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   // Consultas
   const { data: roles = [], isLoading: loadingRoles } = useQuery({
     queryKey: ["roles"],
@@ -182,10 +195,24 @@ export function PermissionsMatrixPage() {
             return;
           }
         }
-      } catch (e) {
-      }
-
+      } catch (e) {}
       toast.error(`Error al actualizar permisos: ${errorMessage}`);
+    },
+  });
+
+  // Mutación para restablecer permisos
+  const resetMutation = useMutation({
+    mutationFn: resetPermissionsToDefault,
+    onSuccess: () => {
+      toast.success("Permisos restablecidos correctamente");
+      queryClient.invalidateQueries({ queryKey: ["rolePermissions"] });
+      // The dialog closing state is handled by the Dialog component props now if we need to close it from parent, 
+      // but since ResetPermissionsDialog controls open state, we'll pass onSuccess callback instead.
+    },
+    onError: (error: any) => {
+      toast.error(
+        `Error al restablecer permisos: ${error.message || String(error)}`,
+      );
     },
   });
 
@@ -217,15 +244,18 @@ export function PermissionsMatrixPage() {
 
     // Filtrar por módulo (Multi-Select)
     if (moduleFilters.length > 0) {
-      result = result.filter(p => moduleFilters.includes(p.module));
+      result = result.filter((p) => moduleFilters.includes(p.module));
     }
 
     // Filtrar por texto (Search)
     if (globalFilter) {
       const lowerFilter = globalFilter.toLowerCase();
-      result = result.filter(p => {
-        const displayNameMatch = p.display_name.toLowerCase().includes(lowerFilter);
-        const descriptionMatch = p.description && p.description.toLowerCase().includes(lowerFilter);
+      result = result.filter((p) => {
+        const displayNameMatch = p.display_name
+          .toLowerCase()
+          .includes(lowerFilter);
+        const descriptionMatch =
+          p.description && p.description.toLowerCase().includes(lowerFilter);
 
         // Buscar por nombre de módulo (localizado)
         const moduleName = MODULE_NAMES[p.module] || p.module;
@@ -257,12 +287,12 @@ export function PermissionsMatrixPage() {
   const handleCheckboxChange = (roleId: string, permissionId: string) => {
     setLocalRolePermissions((prev) => {
       const exists = prev.some(
-        (rp) => rp.role_id === roleId && rp.permission_id === permissionId
+        (rp) => rp.role_id === roleId && rp.permission_id === permissionId,
       );
 
       if (exists) {
         return prev.filter(
-          (rp) => !(rp.role_id === roleId && rp.permission_id === permissionId)
+          (rp) => !(rp.role_id === roleId && rp.permission_id === permissionId),
         );
       } else {
         return [...prev, { role_id: roleId, permission_id: permissionId }];
@@ -283,7 +313,7 @@ export function PermissionsMatrixPage() {
       const existsInOriginal = rolePermissions.some(
         (rp) =>
           rp.role_id === localRp.role_id &&
-          rp.permission_id === localRp.permission_id
+          rp.permission_id === localRp.permission_id,
       );
       if (!existsInOriginal) {
         changesList.push({
@@ -299,7 +329,7 @@ export function PermissionsMatrixPage() {
       const existsInLocal = localRolePermissions.some(
         (localRp) =>
           localRp.role_id === rp.role_id &&
-          localRp.permission_id === rp.permission_id
+          localRp.permission_id === rp.permission_id,
       );
       if (!existsInLocal) {
         changesList.push({
@@ -352,8 +382,16 @@ export function PermissionsMatrixPage() {
             ?.has(permissionId);
 
           // Revisar por cambios pendientes
-          const isAdded = !rolePermissions.some(rp => rp.role_id === role.id && rp.permission_id === permissionId) && hasPermission;
-          const isRemoved = rolePermissions.some(rp => rp.role_id === role.id && rp.permission_id === permissionId) && !hasPermission;
+          const isAdded =
+            !rolePermissions.some(
+              (rp) =>
+                rp.role_id === role.id && rp.permission_id === permissionId,
+            ) && hasPermission;
+          const isRemoved =
+            rolePermissions.some(
+              (rp) =>
+                rp.role_id === role.id && rp.permission_id === permissionId,
+            ) && !hasPermission;
 
           // Lógica para deshabilitar checkboxes
           const isAdmin = role.id === ADMIN_ROLE_ID;
@@ -370,18 +408,26 @@ export function PermissionsMatrixPage() {
                 }
                 disabled={isDisabled}
                 className={cn(
-                  isAdded && "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600",
-                  isRemoved && "border-red-500 bg-red-50"
+                  isAdded &&
+                    "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600",
+                  isRemoved && "border-red-500 bg-red-50",
                 )}
               />
             </div>
           );
         },
-      })
+      }),
     );
 
     return [...baseColumns, ...roleColumns];
-  }, [sortedRoles, rolePermissionsMap, columnHelper, currentUser, rolePermissions, can]);
+  }, [
+    sortedRoles,
+    rolePermissionsMap,
+    columnHelper,
+    currentUser,
+    rolePermissions,
+    can,
+  ]);
 
   // Tabla
   const table = useReactTable({
@@ -471,7 +517,9 @@ export function PermissionsMatrixPage() {
                           key={key}
                           onSelect={() => {
                             if (isSelected) {
-                              setModuleFilters(moduleFilters.filter((f) => f !== key));
+                              setModuleFilters(
+                                moduleFilters.filter((f) => f !== key),
+                              );
                             } else {
                               setModuleFilters([...moduleFilters, key]);
                             }
@@ -482,7 +530,7 @@ export function PermissionsMatrixPage() {
                               "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
                               isSelected
                                 ? "bg-primary text-primary-foreground"
-                                : "opacity-50 [&_svg]:invisible"
+                                : "opacity-50 [&_svg]:invisible",
                             )}
                           >
                             <Check className={cn("h-4 w-4")} />
@@ -514,16 +562,23 @@ export function PermissionsMatrixPage() {
           </Popover>
         </div>
       }
-      actions={can('permissions:edit') && (
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-          disabled={!isDirty}
-        >
-          <Save className="h-4 w-4" />
-          Guardar Cambios
-        </Button>
-      )}
+      actions={
+        <div className="flex gap-2">
+          {can("permissions:reset_defaults") && (
+            <ResetPermissionsDialog resetMutation={resetMutation} />
+          )}
+          {can("permissions:edit") && (
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              disabled={!isDirty}
+            >
+              <Save className="h-4 w-4" />
+              Guardar Cambios
+            </Button>
+          )}
+        </div>
+      }
     >
       <table className="w-full caption-bottom text-sm text-left">
         <thead className="sticky top-0 z-20 bg-background shadow-sm">
@@ -535,17 +590,18 @@ export function PermissionsMatrixPage() {
               {headerGroup.headers.map((header, index) => (
                 <th
                   key={header.id}
-                  className={`h-12 px-4 align-middle font-medium text-muted-foreground bg-background [&:has([role=checkbox])]:pr-0 ${index === 0
-                    ? "sticky left-0 z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]"
-                    : ""
-                    }`}
+                  className={`h-12 px-4 align-middle font-medium text-muted-foreground bg-background [&:has([role=checkbox])]:pr-0 ${
+                    index === 0
+                      ? "sticky left-0 z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]"
+                      : ""
+                  }`}
                 >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                 </th>
               ))}
             </tr>
@@ -561,7 +617,10 @@ export function PermissionsMatrixPage() {
               <>
                 {showModuleHeader && (
                   <tr className="bg-muted/30">
-                    <td colSpan={columns.length} className="p-2 font-semibold text-primary sticky left-0 z-10 bg-muted/30">
+                    <td
+                      colSpan={columns.length}
+                      className="p-2 font-semibold text-primary sticky left-0 z-10 bg-muted/30"
+                    >
                       <div className="flex items-center gap-2 pl-2">
                         {MODULE_NAMES[currentModule] || currentModule}
                       </div>
@@ -575,12 +634,15 @@ export function PermissionsMatrixPage() {
                   {row.getVisibleCells().map((cell, index) => (
                     <td
                       key={cell.id}
-                      className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${index === 0 ? "sticky left-0 bg-background z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]" : ""
-                        }`}
+                      className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${
+                        index === 0
+                          ? "sticky left-0 bg-background z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]"
+                          : ""
+                      }`}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </td>
                   ))}
@@ -599,6 +661,91 @@ export function PermissionsMatrixPage() {
         onConfirm={() => updateMutation.mutate()}
         isSaving={updateMutation.isPending}
       />
+
     </DataTableLayout>
+  );
+}
+
+function ResetPermissionsDialog({
+  resetMutation,
+}: {
+  resetMutation: any;
+}) {
+  const [open, setOpen] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState("");
+
+  useEffect(() => {
+    if (open) setResetConfirmInput("");
+  }, [open]);
+
+  return (
+    <>
+      <Button
+        variant="destructive"
+        className="border-destructive text-white hover:bg-destructive whitespace-nowrap"
+        onClick={() => setOpen(true)}
+      >
+        <RotateCcw className="h-4 w-4 mr-2" />
+        Restablecer Fábrica
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Restablecer Valores de Fábrica
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground space-y-3">
+              <p>
+                Esta acción eliminará{" "}
+                <strong>todas las personalizaciones actuales</strong> de
+                permisos. Los tres roles (Administrador, Gerente y Cajero)
+                volverán a su configuración inicial.
+              </p>
+              <p className="font-medium">
+                Esta operación no se puede deshacer.
+              </p>
+              <div className="pt-1">
+                <p className="text-sm mb-1">
+                  Escribe <strong>RESTABLECER</strong> para confirmar:
+                </p>
+                <Input
+                  value={resetConfirmInput}
+                  onChange={(e) => setResetConfirmInput(e.target.value)}
+                  placeholder="RESTABLECER"
+                  className="font-mono"
+                  autoComplete="off"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                resetConfirmInput !== "RESTABLECER" || resetMutation.isPending
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                resetMutation.mutate(undefined, {
+                  onSuccess: () => setOpen(false),
+                });
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {resetMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Restableciendo...
+                </>
+              ) : (
+                "Sí, restablecer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
