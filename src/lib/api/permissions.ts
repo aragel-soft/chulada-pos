@@ -50,3 +50,7 @@ export const updateRolePermissions = async ({
     throw new Error(errorMessage);
   }
 };
+
+export const resetPermissionsToDefault = async (): Promise<void> => {
+    return await invoke("reset_permissions_to_default");
+};
