@@ -7,7 +7,7 @@ import {
   updateLicenseValidation,
   checkOfflineLicense,
 } from "@/lib/api/auth";
-import { downloadAndApplyLatestBackup } from "@/lib/api/backup";
+import { restoreLatestBackup } from "@/lib/api/backup";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -33,7 +33,8 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        localStorage.setItem("license_type", license.type);
+        // Guardar tipo de licencia y timestamp de validación en SQLite
+        await updateLicenseValidation(license.type);
 
         if (license.type === "admin") {
           const hasSyncedThisSession = sessionStorage.getItem("sync_completed");
@@ -41,11 +42,12 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           if (!hasSyncedThisSession) {
             setLoadingMessage("Sincronizando base de datos de la tienda...");
             try {
-              await downloadAndApplyLatestBackup();
+              await restoreLatestBackup();
               sessionStorage.setItem("sync_completed", "true");
 
               toast.success("Sincronización exitosa", {
-                description: "Se han descargado los datos más recientes de la tienda.",
+                description:
+                  "Se han descargado los datos más recientes de la tienda.",
               });
             } catch (syncErr) {
               toast.error("Error de Sincronización", {
@@ -56,7 +58,6 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
           }
         }
 
-        await updateLicenseValidation();
         setStatus("authorized");
       } catch (err) {
         try {

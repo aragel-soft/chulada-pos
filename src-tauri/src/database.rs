@@ -175,3 +175,10 @@ pub fn get_current_store_id(conn: &Connection) -> Result<String, String> {
         .unwrap_or_else(|_| "store-main".to_string());
     Ok(store_id)
 }
+
+pub fn get_db_license_type(conn: &Connection) -> Result<String, String> {
+    conn.prepare("SELECT value FROM system_settings WHERE key = 'license_type'")
+        .map_err(|e| format!("Error preparando consulta de licencia: {}", e))?
+        .query_row([], |row| row.get::<_, String>(0))
+        .map_err(|_| "No se encontró el tipo de licencia en la base de datos.".to_string())
+}
