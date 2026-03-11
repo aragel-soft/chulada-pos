@@ -4,7 +4,7 @@
 mod commands;
 mod database;
 mod printer_utils;
-
+use tauri::Emitter;
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -130,6 +130,14 @@ fn main() {
             commands::backup::backup_database,
             commands::backup::restore_latest_backup
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if commands::backup::is_backup_in_progress() {
+                    api.prevent_close();
+                    let _ = window.emit("backup-preventing-close", ());
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");
 }

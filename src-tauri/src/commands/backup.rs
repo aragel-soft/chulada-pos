@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -11,6 +12,12 @@ use tauri::Manager;
 
 const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
 const SUPABASE_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
+
+static BACKUP_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+pub fn is_backup_in_progress() -> bool {
+    BACKUP_IN_PROGRESS.load(Ordering::SeqCst)
+}
 
 /// Estructura para deserializar la lista de objetos del bucket de Supabase.
 #[derive(Deserialize)]
@@ -30,9 +37,19 @@ pub async fn backup_database(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Mutex<Connection>>,
 ) -> Result<String, String> {
+    BACKUP_IN_PROGRESS.store(true, Ordering::SeqCst);
+    let result = backup_database_inner(&app_handle, state.inner()).await;
+    BACKUP_IN_PROGRESS.store(false, Ordering::SeqCst);
+    result
+}
+
+async fn backup_database_inner(
+    app_handle: &tauri::AppHandle,
+    state: &Mutex<Connection>,
+) -> Result<String, String> {
     // Validar licencia desde la BD
     let (license_type, db_path) = {
-        let conn = state.inner().lock().map_err(|e| e.to_string())?;
+        let conn = state.lock().map_err(|e| e.to_string())?;
         let lt = crate::database::get_db_license_type(&conn)?;
         let app_dir = app_handle
             .path()
@@ -50,7 +67,7 @@ pub async fn backup_database(
 
     // WAL checkpoint para consistencia
     {
-        let conn = state.inner().lock().map_err(|e| e.to_string())?;
+        let conn = state.lock().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
             .map_err(|e| format!("Error en WAL checkpoint: {}", e))?;
     }
