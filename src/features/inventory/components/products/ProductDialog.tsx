@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Upload, X, Loader2, PackagePlus, Pencil, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Upload,
+  X,
+  Loader2,
+  PackagePlus,
+  Pencil,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
@@ -27,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
-import { MoneyInput } from "@/components/ui/money-input"; 
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Command,
   CommandEmpty,
@@ -53,7 +61,12 @@ import {
   getAllTags,
 } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
-import { CreateProductPayload, UpdateProductPayload, ImageAction, Product } from "@/types/inventory";
+import {
+  CreateProductPayload,
+  UpdateProductPayload,
+  ImageAction,
+  Product,
+} from "@/types/inventory";
 import { useAppImage } from "@/hooks/use-app-image";
 import { cn } from "@/lib/utils";
 import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
@@ -96,7 +109,8 @@ export function ProductDialog({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAction, setImageAction] = useState<ImageAction>("Keep");
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
-  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
+  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] =
+    useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
@@ -177,7 +191,7 @@ export function ProductDialog({
         description: values.description || undefined,
         barcode: values.barcode || undefined,
         purchase_price: values.purchase_price || 0,
-        is_active: values.is_active, 
+        is_active: values.is_active,
         tags: values.tags || [],
         user_id: user?.id,
       };
@@ -247,11 +261,21 @@ export function ProductDialog({
       }
 
       if (errCode === "CODE_EXISTS") {
-        form.setError("code", { message: "Este código interno ya está en uso" });
+        form.setError("code", {
+          message: "Este código interno ya está en uso",
+        });
       } else if (errCode === "BARCODE_EXISTS") {
-        form.setError("barcode", { message: "Este código de barras ya está en uso" });
-      } else if (errCode === "BLOCKED_BY_HISTORY" || errMsg.includes("BLOCKED_BY_HISTORY")) {
-        form.setError("code", { message: "No se puede editar: Código bloqueado por historial de ventas" });
+        form.setError("barcode", {
+          message: "Este código de barras ya está en uso",
+        });
+      } else if (
+        errCode === "BLOCKED_BY_HISTORY" ||
+        errMsg.includes("BLOCKED_BY_HISTORY")
+      ) {
+        form.setError("code", {
+          message:
+            "No se puede editar: Código bloqueado por historial de ventas",
+        });
       } else {
         toast.error(errMsg);
       }
@@ -297,7 +321,9 @@ export function ProductDialog({
     }
   };
 
-  const isPending = isEditing ? updateMutation.isPending : createMutation.isPending;
+  const isPending = isEditing
+    ? updateMutation.isPending
+    : createMutation.isPending;
 
   const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-", "."].includes(e.key)) {
@@ -334,10 +360,14 @@ export function ProductDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="!text-foreground">
-                      Nombre del Producto <span className="text-destructive">*</span>
+                      Nombre del Producto{" "}
+                      <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="Nombre descriptivo del producto" {...field} />
+                      <Input
+                        placeholder="Nombre descriptivo del producto"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -351,8 +381,12 @@ export function ProductDialog({
                     {!imagePreview ? (
                       <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5">
                         <Upload className="w-10 h-10 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground font-medium">Clic para subir imagen</span>
-                        <span className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, WEBP (Máx 5MB)</span>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          Clic para subir imagen
+                        </span>
+                        <span className="text-xs text-muted-foreground/70 mt-1">
+                          JPG, PNG, WEBP (Máx 5MB)
+                        </span>
                         <input
                           type="file"
                           accept="image/*"
@@ -407,22 +441,25 @@ export function ProductDialog({
                 </div>
 
                 <div className="md:col-span-3 space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="code"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="col-span-2">
                           <FormLabel className="!text-foreground">
-                            Código Interno <span className="text-destructive">*</span>
+                            Código Interno{" "}
+                            <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Ej: TINT-001"
-                              maxLength={16}
+                              maxLength={32}
                               {...field}
                               onChange={(e) => {
-                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_\/#]/g, "");
+                                const cleanValue = e.target.value.replace(
+                                  /[^a-zA-Z0-9\-_\/#]/g,
+                                  "",
+                                );
                                 field.onChange(cleanValue);
                               }}
                             />
@@ -431,8 +468,34 @@ export function ProductDialog({
                         </FormItem>
                       )}
                     />
-
                     <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="!text-foreground">
+                            Código de Barras
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Escanea el código..."
+                              maxLength={32}
+                              {...field}
+                              onChange={(e) => {
+                                const cleanValue = e.target.value.replace(
+                                  /[^a-zA-Z0-9\-\/#]/g,
+                                  "",
+                                );
+                                field.onChange(cleanValue);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                  <FormField
                       control={form.control}
                       name="is_active"
                       render={({ field }) => (
@@ -452,42 +515,25 @@ export function ProductDialog({
                         </FormItem>
                       )}
                     />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="barcode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-foreground">Código de Barras</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Escanea el código..."
-                            maxLength={32}
-                            {...field}
-                            onChange={(e) => {
-                              const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-\/#]/g, "");
-                              field.onChange(cleanValue);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
                   <FormField
                     control={form.control}
                     name="category_id"
                     render={({ field }) => {
-                      const selectedCategory = categories.find((cat) => cat.id === field.value);
-                      
+                      const selectedCategory = categories.find(
+                        (cat) => cat.id === field.value,
+                      );
+
                       return (
                         <FormItem className="flex flex-col pt-2">
                           <FormLabel className="!text-foreground">
-                            Categoría <span className="text-destructive">*</span>
+                            Categoría{" "}
+                            <span className="text-destructive">*</span>
                           </FormLabel>
-                          <Popover open={openCategoryPopover} onOpenChange={setOpenCategoryPopover}>
+                          <Popover
+                            open={openCategoryPopover}
+                            onOpenChange={setOpenCategoryPopover}
+                          >
                             <PopoverTrigger asChild>
                               <FormControl>
                                 <Button
@@ -497,7 +543,7 @@ export function ProductDialog({
                                   disabled={loadingCategories}
                                   className={cn(
                                     "w-full justify-between font-normal bg-background hover:bg-background h-10",
-                                    !field.value && "text-muted-foreground"
+                                    !field.value && "text-muted-foreground",
                                   )}
                                 >
                                   {selectedCategory ? (
@@ -505,11 +551,17 @@ export function ProductDialog({
                                       variant="outline"
                                       className="font-normal border-0 px-2"
                                       style={{
-                                        backgroundColor: (selectedCategory.color || '#64748b') + '20',
-                                        color: selectedCategory.color || '#64748b',
+                                        backgroundColor:
+                                          (selectedCategory.color ||
+                                            "#64748b") + "20",
+                                        color:
+                                          selectedCategory.color || "#64748b",
                                       }}
                                     >
-                                      {getCategoryFullPath(selectedCategory.id, categories)}
+                                      {getCategoryFullPath(
+                                        selectedCategory.id,
+                                        categories,
+                                      )}
                                     </Badge>
                                   ) : loadingCategories ? (
                                     "Cargando..."
@@ -529,7 +581,7 @@ export function ProductDialog({
                               <Command>
                                 <CommandInput placeholder="Buscar categoría..." />
                                 <CommandList>
-                                  {can('categories:create') && (
+                                  {can("categories:create") && (
                                     <CommandGroup className="border-b pb-1">
                                       <CommandItem
                                         onSelect={() => {
@@ -543,16 +595,18 @@ export function ProductDialog({
                                       </CommandItem>
                                     </CommandGroup>
                                   )}
-                                  <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+                                  <CommandEmpty>
+                                    No se encontraron resultados.
+                                  </CommandEmpty>
                                   <CommandGroup>
                                     {categories.map((cat) => (
                                       <CommandItem
                                         key={cat.id}
                                         value={`${getCategoryFullPath(cat.id, categories)} ${cat.id}`}
                                         onSelect={() => {
-                                          form.setValue("category_id", cat.id, { 
+                                          form.setValue("category_id", cat.id, {
                                             shouldValidate: true,
-                                            shouldDirty: true 
+                                            shouldDirty: true,
                                           });
                                           setOpenCategoryPopover(false);
                                         }}
@@ -560,18 +614,24 @@ export function ProductDialog({
                                         <Check
                                           className={cn(
                                             "mr-2 h-4 w-4",
-                                            cat.id === field.value ? "opacity-100" : "opacity-0"
+                                            cat.id === field.value
+                                              ? "opacity-100"
+                                              : "opacity-0",
                                           )}
                                         />
                                         <Badge
                                           variant="outline"
                                           className="font-normal border-0 px-2"
                                           style={{
-                                            backgroundColor: (cat.color || '#64748b') + '20',
-                                            color: cat.color || '#64748b',
+                                            backgroundColor:
+                                              (cat.color || "#64748b") + "20",
+                                            color: cat.color || "#64748b",
                                           }}
                                         >
-                                          {getCategoryFullPath(cat.id, categories)}
+                                          {getCategoryFullPath(
+                                            cat.id,
+                                            categories,
+                                          )}
                                         </Badge>
                                       </CommandItem>
                                     ))}
@@ -615,13 +675,11 @@ export function ProductDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="!text-foreground">
-                        Precio Menudeo <span className="text-destructive">*</span>
+                        Precio Menudeo{" "}
+                        <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <MoneyInput 
-                          className="font-semibold h-10" 
-                          {...field} 
-                        />
+                        <MoneyInput className="font-semibold h-10" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -633,19 +691,18 @@ export function ProductDialog({
                   name="wholesale_price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="!text-foreground">Precio Mayoreo</FormLabel>
+                      <FormLabel className="!text-foreground">
+                        Precio Mayoreo
+                      </FormLabel>
                       <FormControl>
-                        <MoneyInput 
-                          className="h-10" 
-                          {...field} 
-                        />
+                        <MoneyInput className="h-10" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {can('products:purchase_price') && (
+                {can("products:purchase_price") && (
                   <FormField
                     control={form.control}
                     name="purchase_price"
@@ -653,10 +710,7 @@ export function ProductDialog({
                       <FormItem>
                         <FormLabel>Costo de Compra</FormLabel>
                         <FormControl>
-                          <MoneyInput 
-                            className="bg-muted/20 h-10" 
-                            {...field} 
-                          />
+                          <MoneyInput className="bg-muted/20 h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -678,13 +732,19 @@ export function ProductDialog({
                   name="stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="!text-foreground">Existencias</FormLabel>
+                      <FormLabel className="!text-foreground">
+                        Existencias
+                      </FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          className={isEditing ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"} 
+                        <Input
+                          type="number"
+                          className={
+                            isEditing
+                              ? "bg-muted text-muted-foreground cursor-not-allowed"
+                              : "bg-background"
+                          }
                           disabled={isEditing}
-                          {...field} 
+                          {...field}
                           onWheel={(e) => e.currentTarget.blur()}
                           onKeyDown={handleQuantityKeyDown}
                         />
@@ -699,12 +759,14 @@ export function ProductDialog({
                   name="min_stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="!text-foreground">Stock Mínimo</FormLabel>
+                      <FormLabel className="!text-foreground">
+                        Stock Mínimo
+                      </FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          className="bg-background" 
-                          {...field} 
+                        <Input
+                          type="number"
+                          className="bg-background"
+                          {...field}
                           onWheel={(e) => e.currentTarget.blur()}
                           onKeyDown={handleQuantityKeyDown}
                         />
@@ -717,17 +779,19 @@ export function ProductDialog({
             </div>
 
             <div className="p-6 pt-4 bg-background flex justify-end gap-3 shrink-0">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleClose} 
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
                 disabled={isPending}
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isPending || (isEditing && !isDirty && imageAction === "Keep")} 
+              <Button
+                type="submit"
+                disabled={
+                  isPending || (isEditing && !isDirty && imageAction === "Keep")
+                }
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
               >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -737,12 +801,15 @@ export function ProductDialog({
           </form>
         </Form>
       </DialogContent>
-      <CreateCategoryModal 
-         open={isCreateCategoryModalOpen}
-         onOpenChange={setIsCreateCategoryModalOpen}
-         onSuccess={(newId) => {
-             form.setValue('category_id', newId, { shouldValidate: true, shouldDirty: true });
-         }}
+      <CreateCategoryModal
+        open={isCreateCategoryModalOpen}
+        onOpenChange={setIsCreateCategoryModalOpen}
+        onSuccess={(newId) => {
+          form.setValue("category_id", newId, {
+            shouldValidate: true,
+            shouldDirty: true,
+          });
+        }}
       />
     </Dialog>
   );
