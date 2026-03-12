@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   PieChart,
   Pie,
@@ -96,6 +97,38 @@ const CustomTooltip = ({
 };
 
 export function CategoryDistribution({ data }: CategoryDistributionProps) {
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+
+    const THRESHOLD = 1.0; 
+    
+    let othersSales = 0;
+    let othersPercentage = 0;
+    const mainCategories: CategoryDataPoint[] = [];
+
+    const sortedData = [...data].sort((a, b) => b.total_sales - a.total_sales);
+
+    sortedData.forEach((item) => {
+      if (item.percentage < THRESHOLD) {
+        othersSales += item.total_sales;
+        othersPercentage += item.percentage;
+      } else {
+        mainCategories.push(item);
+      }
+    });
+
+    if (othersSales > 0) {
+      mainCategories.push({
+        category_name: "Otras",
+        total_sales: othersSales,
+        percentage: Number(othersPercentage.toFixed(2)),
+        color: "#94a3b8",
+      });
+    }
+
+    return mainCategories;
+  }, [data]);
+
   return (
     <Card className="col-span-3">
       <CardHeader>
@@ -103,7 +136,7 @@ export function CategoryDistribution({ data }: CategoryDistributionProps) {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          {data.length === 0 ? (
+          {chartData.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               No hay datos de categorías para este periodo.
             </div>
@@ -111,7 +144,7 @@ export function CategoryDistribution({ data }: CategoryDistributionProps) {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data}
+                  data={chartData}
                   dataKey="total_sales"
                   nameKey="category_name"
                   cx="50%"
@@ -122,7 +155,7 @@ export function CategoryDistribution({ data }: CategoryDistributionProps) {
                   strokeWidth={2}
                   stroke="hsl(var(--card))"
                 >
-                  {data.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
