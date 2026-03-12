@@ -419,7 +419,7 @@ export function ProductDialog({
                               maxLength={16}
                               {...field}
                               onChange={(e) => {
-                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+                                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_\/#]/g, "");
                                 field.onChange(cleanValue);
                               }}
                             />
