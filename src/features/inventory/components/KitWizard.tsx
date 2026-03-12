@@ -319,8 +319,8 @@ export function KitWizard({
             stepper.switch({
               // PASO 1: INFO
               info: () => (
-                <div className="space-y-6 max-w-lg mx-auto py-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                  <div className="grid gap-5">
+                <div className="space-y-6 w-full max-w-2xl mx-auto py-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="grid gap-6">
                     <div className="grid gap-2">
                       <Label
                         htmlFor="name"
@@ -351,11 +351,11 @@ export function KitWizard({
                         id="desc"
                         placeholder="Notas internas..."
                         {...register("description")}
-                        className="focus-visible:ring-[#480489] min-h-[100px] resize-none"
+                        className="focus-visible:ring-[#480489] min-h-[160px] resize-none"
                       />
                     </div>
-                    <Separator className="my-2" />
-                    <div className="grid gap-2">
+                    <Separator className="hidden my-2" />
+                    <div className="hidden grid gap-2">
                       {" "}
                       <Label>Selección Obligatoria</Label>
                       <div className="flex h-auto min-h-[2.5rem] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-3 text-sm">
@@ -471,13 +471,13 @@ export function KitWizard({
                         </p>
                       </div>
                       <Badge
-                        variant={formData.isActive ? "default" : "secondary"}
+                        className={formData.isActive ? "bg-green-600 hover:bg-green-600/90 text-white" : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"}
                       >
                         {formData.isActive ? "Activo" : "Inactivo"}
                       </Badge>
                     </div>
 
-                    <div className="mt-2 flex gap-2">
+                    <div className="hidden mt-2 flex gap-2">
                       <Badge
                         variant="outline"
                         className="border-[#480489] text-[#480489]"
