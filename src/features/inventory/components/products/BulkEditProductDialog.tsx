@@ -65,6 +65,7 @@ import { CreateCategoryModal } from "@/features/inventory/components/categories/
 import { CirclePlus, Search, Plus } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { saveProductImage } from "@/lib/api/inventory/products";
+import { useAppImage } from "@/hooks/use-app-image";
 
 interface BulkEditProductDialogProps {
   open: boolean;
@@ -76,16 +77,20 @@ interface BulkEditProductDialogProps {
 export function BulkEditProductDialog({
   open,
   onOpenChange,
-  selectedProducts,
+  selectedProducts: initialSelectedProducts,
   onSuccess,
 }: BulkEditProductDialogProps) {
   const { can } = useAuthStore();
+  const [localSelectedProducts, setLocalSelectedProducts] = useState<Product[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingValues, setPendingValues] = useState<BulkEditFormValues | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const sharedImageUrlRaw = getCommonValue(localSelectedProducts, "image_url") as string | undefined;
+  const resolvedSharedImage = useAppImage(sharedImageUrlRaw);
 
   const queryClient = useQueryClient();
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
@@ -106,22 +111,25 @@ export function BulkEditProductDialog({
   });
 
   useEffect(() => {
-    if (open && selectedProducts.length > 0) {
-      const commonCategory = getCommonValue(selectedProducts, "category_id");
-      const commonActive = getCommonValue(selectedProducts, "is_active");
-      const commonRetail = getCommonValue(selectedProducts, "retail_price");
-      const commonWholesale = getCommonValue(selectedProducts, "wholesale_price");
+    if (open && initialSelectedProducts.length > 0) {
+      setLocalSelectedProducts(initialSelectedProducts);
+      const commonCategory = getCommonValue(initialSelectedProducts, "category_id");
+      const commonActive = getCommonValue(initialSelectedProducts, "is_active");
+      const commonRetail = getCommonValue(initialSelectedProducts, "retail_price");
+      const commonWholesale = getCommonValue(initialSelectedProducts, "wholesale_price");
+      const commonPurchase = getCommonValue(initialSelectedProducts, "purchase_price");
 
       form.reset({
         category_id: commonCategory, 
         is_active: commonActive,
         retail_price: commonRetail,
         wholesale_price: commonWholesale,
+        purchase_price: commonPurchase,
         tags: [],
       });
       setImagePreview(null);
     }
-  }, [open, selectedProducts, form]);
+  }, [open, initialSelectedProducts, form]);
 
   const mutation = useMutation({
     mutationFn: bulkUpdateProducts,
@@ -160,8 +168,8 @@ export function BulkEditProductDialog({
   const handleConfirm = async () => {
     if (!pendingValues) return;
 
-    const commonRetail = getCommonValue(selectedProducts, "retail_price");
-    const commonWholesale = getCommonValue(selectedProducts, "wholesale_price");
+    const commonRetail = getCommonValue(localSelectedProducts, "retail_price");
+    const commonWholesale = getCommonValue(localSelectedProducts, "wholesale_price");
 
     const finalRetail = pendingValues.retail_price ?? commonRetail;
     const finalWholesale = pendingValues.wholesale_price ?? commonWholesale;
@@ -205,11 +213,12 @@ export function BulkEditProductDialog({
     }
 
     mutation.mutate({
-      ids: selectedProducts.map((p) => p.id),
+      ids: localSelectedProducts.map((p) => p.id),
       category_id: pendingValues.category_id,
       is_active: pendingValues.is_active,
       retail_price: pendingValues.retail_price,
       wholesale_price: pendingValues.wholesale_price,
+      purchase_price: pendingValues.purchase_price,
       tags_to_add: tagsToAdd,
       tags_to_remove: tagsToRemove,
       image_action: pendingValues.image_action !== "Keep" ? pendingValues.image_action : undefined,
@@ -247,7 +256,7 @@ export function BulkEditProductDialog({
   };
 
   const isMixed = (key: keyof Product) =>
-    getCommonValue(selectedProducts, key) === undefined;
+    getCommonValue(localSelectedProducts, key) === undefined;
 
   return (
     <>
@@ -404,7 +413,7 @@ export function BulkEditProductDialog({
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="retail_price"
@@ -438,11 +447,33 @@ export function BulkEditProductDialog({
                         </FormItem>
                       )}
                     />
+
+                    {can('products:purchase_price') && (
+                      <FormField
+                        control={form.control}
+                        name="purchase_price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="!text-foreground">Costo Compra</FormLabel>
+                            <FormControl>
+                              <MoneyInput
+                                placeholder={isMixed("purchase_price") ? "Varios..." : "0.00"}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-4 relative mt-2 border rounded-xl p-4 pt-5 bg-muted/5 shadow-sm">
+                    <span className="absolute -top-3 left-4 bg-background px-2 text-sm font-semibold text-foreground border x-border rounded-md">
+                      Etiquetas
+                    </span>
                     <div className="grid grid-cols-2 gap-4">
                       <IndependentTagEditor
-                        title="Agregar Etiquetas"
+                        title="Agregar"
                         placeholder="+ Etiqueta"
                         availableTags={availableTags}
                         selectedTags={tagsToAdd}
@@ -452,7 +483,7 @@ export function BulkEditProductDialog({
                       />
 
                       <IndependentTagEditor
-                        title="Quitar Etiquetas"
+                        title="Quitar"
                         titleClassName="text-foreground font-medium"
                         placeholder="- Etiqueta"
                         availableTags={availableTags}
@@ -472,89 +503,115 @@ export function BulkEditProductDialog({
                         <FormLabel>Imagen</FormLabel>
                         <FormControl>
                           <div className="flex flex-col gap-3">
-                            {!imagePreview && field.value !== "Keep" ? (
-                              <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5 w-full">
-                                <Upload className="w-10 h-10 text-muted-foreground mb-2" />
-                                <span className="text-sm text-muted-foreground font-medium">Clic para subir imagen</span>
-                                <span className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, WEBP (Máx 5MB)</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      if (file.size > 5 * 1024 * 1024) {
-                                        toast.error("La imagen es muy pesada (máx 5MB)");
-                                        return;
-                                      }
-                                      form.setValue("image_action", "Replace", { shouldDirty: true });
-                                      form.setValue("image_file", file, { shouldDirty: true });
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => setImagePreview(reader.result as string);
-                                      reader.readAsDataURL(file);
-                                    }
-                                  }}
-                                />
-                              </label>
-                            ) : imagePreview ? (
-                              <div className="relative h-56 rounded-lg overflow-hidden border border-border group w-full">
-                                <img
-                                  src={imagePreview}
-                                  alt="Preview"
-                                  className="w-full h-full object-contain bg-muted/20"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      setImagePreview(null);
-                                      form.setValue("image_action", "Remove", { shouldDirty: true });
-                                      form.setValue("image_file", undefined, { shouldDirty: true });
-                                    }}
-                                  >
-                                    <X className="w-4 h-4 mr-2" /> Quitar Imagen
-                                  </Button>
+                            {(() => {
+                              if (field.value === "Replace" && imagePreview) {
+                                return (
+                                  <div className="relative h-56 rounded-lg overflow-hidden border border-border group w-full">
+                                    <img
+                                      src={imagePreview}
+                                      alt="Preview"
+                                      className="w-full h-full object-contain bg-muted/20"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => {
+                                          setImagePreview(null);
+                                          form.setValue("image_action", "Keep", { shouldDirty: true });
+                                          form.setValue("image_file", undefined, { shouldDirty: true });
+                                        }}
+                                      >
+                                        <X className="w-4 h-4 mr-2" /> Deshacer: mantendrá imágenes originales
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (field.value === "Remove") {
+                                return (
+                                  <div className="relative h-56 rounded-lg border border-destructive/50 bg-destructive/10 flex flex-col items-center justify-center p-6 text-center">
+                                    <X className="w-10 h-10 text-destructive mb-2" />
+                                    <p className="font-medium text-destructive">Eliminación Confirmada</p>
+                                    <p className="text-sm text-destructive/80 mt-1 mb-4">Se borrarán las imágenes de todos los productos seleccionados.</p>
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      className="border-destructive/30 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                      onClick={() => form.setValue("image_action", "Keep", { shouldDirty: true })}
+                                    >
+                                      Deshacer y mantener originales
+                                    </Button>
+                                  </div>
+                                );
+                              }
+
+                              const mixedImage = isMixed("image_url");
+
+                              return (
+                                <div className="flex flex-col gap-3">
+                                  {mixedImage ? (
+                                    <div className="relative h-32 rounded-lg border border-border bg-muted/20 flex flex-col items-center justify-center p-4 text-center">
+                                      <p className="font-medium text-foreground">Imágenes Mixtas</p>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Los productos seleccionados tienen distintas imágenes.
+                                      </p>
+                                    </div>
+                                  ) : resolvedSharedImage ? (
+                                    <div className="relative h-32 rounded-lg overflow-hidden border border-border w-full flex items-center justify-center group bg-muted/10">
+                                      <img src={resolvedSharedImage} alt="Shared" className="h-full object-contain opacity-50 group-hover:opacity-30 transition-opacity" />
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/20 backdrop-blur-[2px]">
+                                        <p className="font-medium">Imagen compartida actual</p>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="relative h-32 rounded-lg border border-border bg-muted/10 flex flex-col items-center justify-center p-4 text-center">
+                                      <p className="font-medium text-muted-foreground">Sin Imagen</p>
+                                      <p className="text-sm text-muted-foreground/70 mt-1">Los productos seleccionados no tienen imagen.</p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex gap-2 w-full">
+                                    <label className="flex-1 border border-border hover:border-primary/50 hover:bg-muted/30 rounded-md py-2 flex items-center justify-center cursor-pointer transition-colors text-sm font-medium">
+                                      <Upload className="w-4 h-4 mr-2 text-muted-foreground" />
+                                      Subir imagen para todos
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            if (file.size > 5 * 1024 * 1024) {
+                                              toast.error("La imagen es muy pesada (máx 5MB)");
+                                              return;
+                                            }
+                                            form.setValue("image_action", "Replace", { shouldDirty: true });
+                                            form.setValue("image_file", file, { shouldDirty: true });
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => setImagePreview(reader.result as string);
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                    {(!mixedImage && !sharedImageUrlRaw) ? null : (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-colors"
+                                        onClick={() => form.setValue("image_action", "Remove", { shouldDirty: true })}
+                                      >
+                                        <X className="w-4 h-4 mr-2" />
+                                        Quitar de todos
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="relative h-56 rounded-lg overflow-hidden border border-border group w-full bg-muted/10 flex flex-col items-center justify-center">
-                                <span className="text-muted-foreground">Manteniendo imágenes actuales...</span>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="mt-4"
-                                  onClick={() => {
-                                    form.setValue("image_action", "Remove", { shouldDirty: true });
-                                  }}
-                                >
-                                  Quitar imágenes a seleccionados
-                                </Button>
-                                <label className="mt-2 text-sm text-primary hover:underline cursor-pointer">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        if (file.size > 5 * 1024 * 1024) {
-                                          toast.error("La imagen es muy pesada (máx 5MB)");
-                                          return;
-                                        }
-                                        form.setValue("image_action", "Replace", { shouldDirty: true });
-                                        form.setValue("image_file", file, { shouldDirty: true });
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => setImagePreview(reader.result as string);
-                                        reader.readAsDataURL(file);
-                                      }
-                                    }}
-                                  />
-                                </label>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         </FormControl>
                         {field.value === "Keep" ? (
@@ -581,16 +638,16 @@ export function BulkEditProductDialog({
             <div className="border rounded-md flex flex-col bg-muted/20 h-full overflow-hidden">
               <div className="p-3 border-b bg-muted/40 font-medium text-sm flex justify-between items-center shrink-0">
                 <span>Productos Afectados</span>
-                <span className="pr-1">{selectedProducts.length}</span>
+                <span className="pr-1">{localSelectedProducts.length}</span>
               </div>
               <ScrollArea className="flex-1">
                 <div className="p-0">
-                  {selectedProducts.map((product) => (
+                  {localSelectedProducts.map((product) => (
                     <div
                       key={product.id}
-                      className={"flex items-center justify-between p-3 text-sm border-b last:border-0 bg-background"}
+                      className={"flex items-center justify-between p-3 text-sm border-b last:border-0 bg-background group"}
                     >
-                      <div className="flex flex-col gap-1 overflow-hidden min-w-0 flex-1 pr-3 max-w-[300px]">
+                      <div className="flex flex-col gap-1 overflow-hidden min-w-0 flex-1 pr-3 max-w-[280px]">
                         <span className="font-medium truncate" title={product.name}>
                           {product.name}
                         </span>
@@ -598,18 +655,33 @@ export function BulkEditProductDialog({
                           <span>{product.code}</span>
                         </span>
                       </div>
-                      <div className="text-right text-xs">
-                        <div className="font-medium">
-                          ${product.retail_price.toFixed(2)}
+                      <div className="flex items-center gap-2">
+                        <div className="text-right text-xs">
+                          <div className="font-medium">
+                            ${product.retail_price.toFixed(2)}
+                          </div>
+                          <Badge
+                            className={`text-[10px] h-5 px-1 ${product.is_active
+                              ? "bg-green-600 text-white hover:bg-green-600/80"
+                              : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
+                              }`}
+                          >
+                            {product.is_active ? "Activo" : "Inactivo"}
+                          </Badge>
                         </div>
-                        <Badge
-                          className={`text-[10px] h-5 px-1 ${product.is_active
-                            ? "bg-green-600 text-white hover:bg-green-600/80"
-                            : "bg-destructive text-destructive-foreground hover:bg-destructive/80"
-                            }`}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white"
+                          title="Descartar de esta edición"
+                          onClick={() => {
+                            const nextList = localSelectedProducts.filter(p => p.id !== product.id);
+                            setLocalSelectedProducts(nextList);
+                            if (nextList.length === 0) onOpenChange(false);
+                          }}
                         >
-                          {product.is_active ? "Activo" : "Inactivo"}
-                        </Badge>
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -649,7 +721,7 @@ export function BulkEditProductDialog({
               Confirmar Edición de Productos
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de modificar <b>{selectedProducts.length} productos</b>.
+              Estás a punto de modificar <b>{localSelectedProducts.length} productos</b>.
               <br />
               Esta acción actualizará todos los campos que hayas modificado. 
               <br/>
@@ -659,7 +731,7 @@ export function BulkEditProductDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>Revisar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm} className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap">
-              Sí, actualizar {selectedProducts.length} items
+              Sí, actualizar {localSelectedProducts.length} items
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

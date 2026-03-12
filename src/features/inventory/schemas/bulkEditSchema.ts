@@ -15,8 +15,13 @@ export const bulkEditSchema = z.object({
     .number()
     .nonnegative("El costo no puede ser negativo")
     .multipleOf(0.01, "El precio debe ser en incrementos de $0.01")
-    .optional()
-    .default(0),
+    .optional(),
+
+  purchase_price: z.coerce
+    .number()
+    .nonnegative("El costo no puede ser negativo")
+    .multipleOf(0.01, "El precio debe ser en incrementos de $0.01")
+    .optional(),
 
   tags: z.array(z.string()).optional(), 
   tags_to_remove: z.array(z.string()).optional(),

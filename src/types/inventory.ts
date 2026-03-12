@@ -81,6 +81,7 @@ export interface BulkUpdateProductsPayload {
   is_active?: boolean;
   retail_price?: number;
   wholesale_price?: number;
+  purchase_price?: number;
   image_action?: "Keep" | "Remove" | "Replace";
   image_url?: string;
   tags_to_add?: string[];
