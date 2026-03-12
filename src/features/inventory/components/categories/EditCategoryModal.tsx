@@ -1,5 +1,5 @@
 // Importaciones
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,19 +22,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/text-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Loader2, AlertCircle } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Pencil,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { CATEGORY_COLORS } from "@/lib/constants";
-import { categorySchema, CategoryFormValues } from "@/features/inventory/schemas/categorySchema";
-import { updateCategory, getAllCategories } from "@/lib/api/inventory/categories";
+import {
+  categorySchema,
+  CategoryFormValues,
+} from "@/features/inventory/schemas/categorySchema";
+import {
+  updateCategory,
+  getAllCategories,
+} from "@/lib/api/inventory/categories";
 import { CategoryListDto } from "@/types/categories";
 import { toast } from "sonner";
 
@@ -53,20 +72,21 @@ export function EditCategoryModal({
   onSuccess,
 }: EditCategoryModalProps) {
   const queryClient = useQueryClient();
+  const [openParentBox, setOpenParentBox] = useState(false);
 
   // Validacion de interacciones
   const hasChildren = (category?.children_count ?? 0) > 0;
 
   // Query para obtener las categorias raices
-  const { data: parentCategories = [], isLoading: isLoadingParents } = useQuery({
-    queryKey: ['categories', 'roots'],
-    queryFn: getAllCategories,
-    enabled: open && !!category,
-    select: (data) => data.filter((c) =>
-      !c.parent_id &&
-      c.id !== category?.id
-    ),
-  });
+  const { data: parentCategories = [], isLoading: isLoadingParents } = useQuery(
+    {
+      queryKey: ["categories", "roots"],
+      queryFn: getAllCategories,
+      enabled: open && !!category,
+      select: (data) =>
+        data.filter((c) => !c.parent_id && c.id !== category?.id),
+    },
+  );
 
   // Formulario
   const form = useForm<CategoryFormValues>({
@@ -99,7 +119,7 @@ export function EditCategoryModal({
     mutationFn: updateCategory,
     onSuccess: () => {
       toast.success("Categoría actualizada correctamente");
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       if (onSuccess) onSuccess();
       handleClose();
     },
@@ -112,7 +132,7 @@ export function EditCategoryModal({
           errorMessage = parsed.message;
         }
       } catch (e) {
-        if (typeof error === 'string') errorMessage = error;
+        if (typeof error === "string") errorMessage = error;
       }
       toast.error(errorMessage);
     },
@@ -125,7 +145,10 @@ export function EditCategoryModal({
     updateMutation.mutate({
       id: category.id,
       name: values.name,
-      parent_id: values.parent_id === "null" || !values.parent_id ? null : values.parent_id,
+      parent_id:
+        values.parent_id === "null" || !values.parent_id
+          ? null
+          : values.parent_id,
       color: values.color,
       sequence: Number(values.sequence),
       description: values.description || undefined,
@@ -153,7 +176,6 @@ export function EditCategoryModal({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-
             <div className="grid gap-4 py-4">
               {/* Fila 1 */}
               <FormField
@@ -170,7 +192,7 @@ export function EditCategoryModal({
                         placeholder="Ej. Tintes"
                         {...field}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/  /g, ' ');
+                          const val = e.target.value.replace(/  /g, " ");
                           field.onChange(val);
                         }}
                       />
@@ -188,9 +210,7 @@ export function EditCategoryModal({
                     name="sequence"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Orden
-                        </FormLabel>
+                        <FormLabel>Orden</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -226,41 +246,125 @@ export function EditCategoryModal({
                     name="parent_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Categoría Padre
-                        </FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "null" ? null : val)}
-                          value={field.value || "null"}
-                          disabled={isLoadingParents || hasChildren}
+                        <FormLabel>Categoría Padre</FormLabel>
+                        <Popover
+                          open={openParentBox}
+                          onOpenChange={setOpenParentBox}
                         >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={
-                                isLoadingParents ? "Cargando..." :
-                                  hasChildren ? "Bloqueado (Tiene Subcategorías)" :
-                                    "Raíz (Principal)"
-                              } />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="null">Raíz (Principal)</SelectItem>
-                            {parentCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <Badge
-                                  variant="outline"
-                                  className="font-normal border-0 px-2 text-sm"
-                                  style={{
-                                    backgroundColor: (cat.color || '#64748b') + '33',
-                                    color: cat.color || '#64748b',
-                                  }}
-                                >
-                                  {cat.name}
-                                </Badge>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openParentBox}
+                                disabled={isLoadingParents || hasChildren}
+                                className={cn(
+                                  "w-full justify-between",
+                                  (!field.value || field.value === "null") &&
+                                    "text-muted-foreground",
+                                )}
+                              >
+                                {field.value && field.value !== "null" ? (
+                                  <div className="flex items-center gap-2">
+                                    {(() => {
+                                      const cat = parentCategories.find(
+                                        (c) => c.id === field.value,
+                                      );
+                                      return cat ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="font-normal border-0 px-2 text-sm"
+                                          style={{
+                                            backgroundColor:
+                                              (cat.color || "#64748b") + "33",
+                                            color: cat.color || "#64748b",
+                                          }}
+                                        >
+                                          {cat.name}
+                                        </Badge>
+                                      ) : (
+                                        "Raíz (Principal)"
+                                      );
+                                    })()}
+                                  </div>
+                                ) : isLoadingParents ? (
+                                  "Cargando..."
+                                ) : hasChildren ? (
+                                  "Bloqueado (Tiene Subcategorías)"
+                                ) : (
+                                  "Raíz (Principal)"
+                                )}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-[300px] p-0"
+                            align="start"
+                            onWheel={(e) => {
+                              e.stopPropagation();
+                            }}
+                          >
+                            <Command>
+                              <CommandInput placeholder="Buscar categoría..." />
+                              <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+                                <CommandEmpty>
+                                  No se encontraron categorías.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem
+                                    value="raiz principal vacio ninguna sin padre"
+                                    onSelect={() => {
+                                      field.onChange(null);
+                                      setOpenParentBox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === null ||
+                                          field.value === "null"
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    Raíz (Principal)
+                                  </CommandItem>
+                                  {parentCategories.map((cat) => (
+                                    <CommandItem
+                                      value={cat.name}
+                                      key={cat.id}
+                                      onSelect={() => {
+                                        field.onChange(cat.id);
+                                        setOpenParentBox(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          cat.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      <Badge
+                                        variant="outline"
+                                        className="font-normal border-0 px-2 text-sm"
+                                        style={{
+                                          backgroundColor:
+                                            (cat.color || "#64748b") + "33",
+                                          color: cat.color || "#64748b",
+                                        }}
+                                      >
+                                        {cat.name}
+                                      </Badge>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -273,8 +377,10 @@ export function EditCategoryModal({
               <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                 <div className="text-amber-800 text-xs leading-relaxed">
-                  Esta categoría contiene <strong>{category.children_count} subcategorías</strong>.
-                  Por reglas de integridad, debe permanecer como <strong>Categoría Raíz</strong>.
+                  Esta categoría contiene{" "}
+                  <strong>{category.children_count} subcategorías</strong>. Por
+                  reglas de integridad, debe permanecer como{" "}
+                  <strong>Categoría Raíz</strong>.
                 </div>
               </div>
             )}
@@ -302,9 +408,7 @@ export function EditCategoryModal({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Descripción
-                  </FormLabel>
+                  <FormLabel>Descripción</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Descripción opcional..."
@@ -349,7 +453,7 @@ export function EditCategoryModal({
                             className={`
                               flex h-8 w-8 cursor-pointer items-center justify-center rounded-full ring-offset-2 transition-all hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-ring peer-data-[state=checked]:scale-110
                             `}
-                            style={{ backgroundColor: color.value + 'B9' }}
+                            style={{ backgroundColor: color.value + "B9" }}
                             title={color.name}
                           >
                             {field.value === color.value && (
@@ -361,7 +465,9 @@ export function EditCategoryModal({
                     </RadioGroup>
                   </FormControl>
                   <div className="text-sm text-muted-foreground mt-2">
-                    Seleccionado: {CATEGORY_COLORS.find(c => c.value === field.value)?.name || "Ninguno"}
+                    Seleccionado:{" "}
+                    {CATEGORY_COLORS.find((c) => c.value === field.value)
+                      ?.name || "Ninguno"}
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -369,11 +475,22 @@ export function EditCategoryModal({
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleClose} disabled={updateMutation.isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={updateMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={updateMutation.isPending || !form.formState.isDirty} className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap">
-                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending || !form.formState.isDirty}
+                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+              >
+                {updateMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Guardar Cambios
               </Button>
             </DialogFooter>

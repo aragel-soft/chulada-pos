@@ -1,14 +1,22 @@
 // Imports
-import { useEffect, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { toast } from "sonner"
-import { Printer, Save, Monitor, CreditCard, Settings2, CloudUpload, Loader2, Download } from "lucide-react"
-import { backupDatabase, restoreLatestBackup } from "@/lib/api/backup"
-import { getLicenseType } from "@/lib/api/auth"
-
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import {
+  Printer,
+  Save,
+  Monitor,
+  CreditCard,
+  Settings2,
+  CloudUpload,
+  Loader2,
+  Download,
+} from "lucide-react";
+import { backupDatabase, restoreLatestBackup } from "@/lib/api/backup";
+import { getLicenseType } from "@/lib/api/auth";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -16,45 +24,45 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { testPrinterConnection, testCashDrawer } from "@/lib/api/hardware"
-import { useHardwareStore } from "@/stores/hardwareStore"
-import { hardwareFormSchema } from "@/features/settings/schemas/hardwareSchema"
-import { HardwareConfig } from "@/lib/api/hardware"
-import { useAuthStore } from "@/stores/authStore"
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { testPrinterConnection, testCashDrawer } from "@/lib/api/hardware";
+import { useHardwareStore } from "@/stores/hardwareStore";
+import { hardwareFormSchema } from "@/features/settings/schemas/hardwareSchema";
+import { HardwareConfig } from "@/lib/api/hardware";
+import { useAuthStore } from "@/stores/authStore";
 
-type HardwareFormValues = z.infer<typeof hardwareFormSchema>
+type HardwareFormValues = z.infer<typeof hardwareFormSchema>;
 
 const defaultValues: HardwareFormValues = {
   terminalId: "",
   printerName: "",
   cashDrawerCommand: "1B 70 00 19 FA",
   cashDrawerPort: "COM1",
-}
+};
 
 export default function HardwarePage() {
   const {
     printers: storePrinters,
     config: fullConfig,
     isLoading: isStoreLoading,
-    updateSettings
+    updateSettings,
   } = useHardwareStore();
 
   // Hooks de Zustand
   const { can } = useAuthStore();
   const [isBackingUp, setIsBackingUp] = useState(false);
-  
+
   const [isDownloading, setIsDownloading] = useState(false);
   const [licenseType, setLicenseType] = useState<string>("");
 
@@ -67,7 +75,7 @@ export default function HardwarePage() {
     resolver: zodResolver(hardwareFormSchema),
     defaultValues,
     mode: "onChange",
-  })
+  });
 
   // Sync form with store data
   useEffect(() => {
@@ -75,11 +83,13 @@ export default function HardwarePage() {
       form.reset({
         terminalId: (fullConfig.terminalId || "CAJA-01").trim(),
         printerName: (fullConfig.printerName || "").trim(),
-        cashDrawerCommand: (fullConfig.cashDrawerCommand || "1B 70 00 19 FA").trim(),
+        cashDrawerCommand: (
+          fullConfig.cashDrawerCommand || "1B 70 00 19 FA"
+        ).trim(),
         cashDrawerPort: (fullConfig.cashDrawerPort || "COM1").trim(),
-      })
+      });
     }
-  }, [fullConfig, form])
+  }, [fullConfig, form]);
 
   // Handle form submission
   async function onSubmit(data: HardwareFormValues) {
@@ -92,25 +102,25 @@ export default function HardwarePage() {
         printerName: data.printerName,
         cashDrawerCommand: data.cashDrawerCommand,
         cashDrawerPort: data.cashDrawerPort,
-      }
+      };
 
-      await updateSettings(configToSave)
-      form.reset(data) // Reset dirty state
+      await updateSettings(configToSave);
+      form.reset(data); // Reset dirty state
     } catch (error) {
-      console.error("Error saving:", error)
+      console.error("Error saving:", error);
     }
   }
 
   const handleTestPrinter = async () => {
-    const printerName = form.getValues("printerName")
-    if (!printerName) return toast.error("Seleccione una impresora")
+    const printerName = form.getValues("printerName");
+    if (!printerName) return toast.error("Seleccione una impresora");
 
     toast.promise(testPrinterConnection(printerName), {
       loading: "Enviando prueba...",
       success: "Prueba enviada correctamente",
       error: (err) => `Error: ${err}`,
-    })
-  }
+    });
+  };
 
   return (
     <ScrollArea className="h-full w-full bg-slate-50/50 dark:bg-transparent">
@@ -119,7 +129,8 @@ export default function HardwarePage() {
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold tracking-tight">Hardware Local</h2>
           <p className="text-muted-foreground">
-            Administra los dispositivos conectados a esta terminal de punto de venta.
+            Administra los dispositivos conectados a esta terminal de punto de
+            venta.
           </p>
         </div>
 
@@ -127,9 +138,7 @@ export default function HardwarePage() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
               {/* Printer and Terminal */}
               <div className="space-y-6">
                 <Card className="h-full">
@@ -185,17 +194,17 @@ export default function HardwarePage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            {can('hardware_settings:view') && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="w-full mt-2 rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                              onClick={handleTestPrinter}
-                              disabled={!field.value}
-                            >
-                              <Printer className="mr-2 h-4 w-4" />
-                              Probar conexión
-                            </Button>
+                            {can("hardware_settings:view") && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="w-full mt-2 rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                                onClick={handleTestPrinter}
+                                disabled={!field.value}
+                              >
+                                <Printer className="mr-2 h-4 w-4" />
+                                Probar conexión
+                              </Button>
                             )}
                           </div>
                           <FormMessage />
@@ -262,11 +271,19 @@ export default function HardwarePage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="1B 70 00 19 FA">Epson Estándar (Pin 2)</SelectItem>
-                              <SelectItem value="1B 70 01 19 FA">Epson Alternativo (Pin 5)</SelectItem>
-                              <SelectItem value="1B 70 00 32 32">Epson Pulso Largo</SelectItem>
+                              <SelectItem value="1B 70 00 19 FA">
+                                Epson Estándar (Pin 2)
+                              </SelectItem>
+                              <SelectItem value="1B 70 01 19 FA">
+                                Epson Alternativo (Pin 5)
+                              </SelectItem>
+                              <SelectItem value="1B 70 00 32 32">
+                                Epson Pulso Largo
+                              </SelectItem>
                               <SelectItem value="07">Star Micronics</SelectItem>
-                              <SelectItem value="1B 37">IBM / POS Genérico</SelectItem>
+                              <SelectItem value="1B 37">
+                                IBM / POS Genérico
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -275,138 +292,98 @@ export default function HardwarePage() {
                     />
 
                     <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200 mt-2">
-                      <p>Si el cajón no abre automáticamente al imprimir, verifique la conexión RJ11 a la impresora y pruebe distintos protocolos.</p>
+                      <p>
+                        Si el cajón no abre automáticamente al imprimir,
+                        verifique la conexión RJ11 a la impresora y pruebe
+                        distintos protocolos.
+                      </p>
                     </div>
 
-                    {can("hardware_settings:view") && (<Button
-                      type="button"
-                      size="sm"
-                      className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                      onClick={() => {
-                        const cmd = form.getValues("cashDrawerCommand");
-                        const printer = form.getValues("printerName");
-                        if (!printer) return toast.error("Seleccione una impresora primero");
+                    {can("hardware_settings:view") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                        onClick={() => {
+                          const cmd = form.getValues("cashDrawerCommand");
+                          const printer = form.getValues("printerName");
+                          if (!printer)
+                            return toast.error(
+                              "Seleccione una impresora primero",
+                            );
 
-                        toast.promise(testCashDrawer(printer, cmd), {
-                          loading: `Probando apertura...`,
-                          success: "Comando enviado",
-                          error: "Error de comunicación"
-                        });
-                      }}
-                    >
-                      <Settings2 className="mr-2 h-3 w-3" />
-                      Probar Apertura
-                    </Button>)}
+                          toast.promise(testCashDrawer(printer, cmd), {
+                            loading: `Probando apertura...`,
+                            success: "Comando enviado",
+                            error: "Error de comunicación",
+                          });
+                        }}
+                      >
+                        <Settings2 className="mr-2 h-3 w-3" />
+                        Probar Apertura
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </div>
 
               {/* Respaldo en la Nube */}
-              <div className="space-y-6">
-                <Card className="h-full">
-                  <CardHeader className="pb-3 border-b bg-muted/20">
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <CloudUpload className="h-4 w-4 text-primary" />
-                      Respaldo en la Nube
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
-                      <p>
-                        El sistema genera un respaldo comprimido (.gz) de la base de datos 
-                        automáticamente al cerrar un turno. Usa este botón para forzar un respaldo manual 
-                        en cualquier momento.
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col justify-start">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                        disabled={isBackingUp || isDownloading}
-                        onClick={async () => {
-                          setIsBackingUp(true);
-                          try {
-                            const fileName = await backupDatabase();
-                            toast.success("Respaldo completado", {
-                              description: `Archivo: ${fileName}`,
-                            });
-                          } catch (err) {
-                            toast.error("Error al crear respaldo", {
-                              description: String(err),
-                            });
-                          } finally {
-                            setIsBackingUp(false);
-                          }
-                        }}
-                      >
-                        {isBackingUp ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Respaldando...
-                          </>
-                        ) : (
-                          <>
-                            <CloudUpload className="mr-2 h-4 w-4" />
-                            Forzar Respaldo en la Nube
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Sincronización con la Tienda */}
-              {(licenseType === "admin" || licenseType === "dev") && (
+              {can("hardware_settings:upload_backups") && (
                 <div className="space-y-6">
                   <Card className="h-full">
                     <CardHeader className="pb-3 border-b bg-muted/20">
                       <CardTitle className="text-base font-medium flex items-center gap-2">
-                        <Download className="h-4 w-4 text-primary" />
-                        Sincronización de Tienda
+                        <CloudUpload className="h-4 w-4 text-primary" />
+                        Respaldo en la Nube
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-4">
                       <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
                         <p>
-                          Descarga e instala la última versión de la base de datos generada por la tienda principal. Esta acción sobrescribirá todos los datos locales actuales.
+                          El sistema genera un respaldo comprimido (.gz) de la
+                          base de datos automáticamente al cerrar un turno. Usa
+                          este botón para forzar un respaldo manual en cualquier
+                          momento.
                         </p>
                       </div>
-                      
+
                       <div className="flex flex-col justify-start">
                         <Button
                           type="button"
                           size="sm"
                           className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                          disabled={isDownloading || isBackingUp}
+                          disabled={isBackingUp || isDownloading}
                           onClick={async () => {
-                            setIsDownloading(true);
+                            setIsBackingUp(true);
                             try {
-                              await restoreLatestBackup();
-                              toast.success("Base de datos actualizada", {
-                                description: "La información de la tienda se ha sincronizado exitosamente."
-                              });
-                              setTimeout(() => window.location.reload(), 1500);
+                              const result = await backupDatabase();
+                              if (result.synced) {
+                                toast.success("Respaldo completado y sincronizado", {
+                                  description: `Archivo: ${result.filename}`,
+                                });
+                              } else {
+                                toast.info("Respaldo local guardado", {
+                                  description: `${result.filename} — se sincronizará cuando haya internet.`,
+                                });
+                              }
                             } catch (err) {
-                              toast.error("Error al sincronizar", {
+                              toast.error("Error al crear respaldo", {
                                 description: String(err),
                               });
                             } finally {
-                              setIsDownloading(false);
+                              setIsBackingUp(false);
                             }
                           }}
                         >
-                          {isDownloading ? (
+                          {isBackingUp ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Sincronizando datos...
+                              Respaldando...
                             </>
                           ) : (
                             <>
-                              <Download className="mr-2 h-4 w-4" />
-                              Forzar Sincronización
+                              <CloudUpload className="mr-2 h-4 w-4" />
+                              Forzar Respaldo en la Nube
                             </>
                           )}
                         </Button>
@@ -416,24 +393,89 @@ export default function HardwarePage() {
                 </div>
               )}
 
+              {/* Sincronización con la Tienda */}
+              {can("hardware_settings:download_backups") &&
+                (licenseType === "admin" || licenseType === "dev") && (
+                  <div className="space-y-6">
+                    <Card className="h-full">
+                      <CardHeader className="pb-3 border-b bg-muted/20">
+                        <CardTitle className="text-base font-medium flex items-center gap-2">
+                          <Download className="h-4 w-4 text-primary" />
+                          Sincronización de Tienda
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-6 space-y-4">
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200">
+                          <p>
+                            Descarga e instala la última versión de la base de
+                            datos generada por la tienda principal. Esta acción
+                            sobrescribirá todos los datos locales actuales.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col justify-start">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                            disabled={isDownloading || isBackingUp}
+                            onClick={async () => {
+                              setIsDownloading(true);
+                              try {
+                                await restoreLatestBackup();
+                                toast.success("Base de datos actualizada", {
+                                  description:
+                                    "La información de la tienda se ha sincronizado exitosamente.",
+                                });
+                                setTimeout(
+                                  () => window.location.reload(),
+                                  1500,
+                                );
+                              } catch (err) {
+                                toast.error("Error al sincronizar", {
+                                  description: String(err),
+                                });
+                              } finally {
+                                setIsDownloading(false);
+                              }
+                            }}
+                          >
+                            {isDownloading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sincronizando datos...
+                              </>
+                            ) : (
+                              <>
+                                <Download className="mr-2 h-4 w-4" />
+                                Forzar Sincronización
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
             </div>
 
             {/* Barra de Guardado Flotante o Estática al final */}
             <div className="flex items-center justify-end gap-4 pt-4 sticky bottom-4">
-              {can("hardware_settings:edit") && (<Button
-                type="submit"
-                size="lg"
-                className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                disabled={!form.formState.isDirty || isStoreLoading}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Guardar Cambios
-              </Button>)}
+              {can("hardware_settings:edit") && (
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                  disabled={!form.formState.isDirty || isStoreLoading}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar Cambios
+                </Button>
+              )}
             </div>
-
           </form>
         </Form>
       </div>
     </ScrollArea>
-  )
+  );
 }
