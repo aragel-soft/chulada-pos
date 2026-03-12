@@ -6,7 +6,7 @@ export const productSchema = z.object({
     .pipe(
       z.string()
       .min(1, "El código es requerido")
-      .max(16, "El código no debe exceder 16 caracteres")
+      .max(32, "El código no debe exceder 32 caracteres")
     ),
   barcode: z.string()
     .transform(val => val.trim())

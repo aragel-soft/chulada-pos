@@ -6,6 +6,7 @@ import glob
 import shutil
 import random
 from datetime import datetime
+import re
 
 try:
     from argon2 import PasswordHasher
@@ -105,7 +106,7 @@ def migrate_customers(conn):
     print(f"✅ Customers migration completed: {inserted_records} records inserted.")
 
 # ==========================================
-# PHASE 1.1: USERS
+# PHASE 2: USERS
 # ==========================================
 def migrate_users(conn):
     print("\n--- Migrating Users ---")
@@ -315,15 +316,18 @@ def migrate_products(conn):
             if "(Eliminado" in name:
                 name = name.split("(Eliminado")[0].strip()
                 is_active = 0
-                
+
+            cleaned_code = re.sub(r'[^a-zA-Z0-9\-_\/#]', '', old_code)
+            cleaned_barcode = re.sub(r'[^a-zA-Z0-9\-\/#]', '', old_code)
+
             # Ensure code is never completely empty
-            code = old_code
+            code = cleaned_code
             if not code:
                 # Generate a safe temporary code
                 code = f"PROD-NO-CODE-{uuid.uuid4().hex[:6].upper()}"
                 
-            # If code is strictly numeric, assume it's a barcode
-            barcode = old_code if old_code.isdigit() else None
+            # Assign barcode using the allowed characters.
+            barcode = cleaned_barcode if cleaned_barcode else None
             
             # --- RELATIONSHIP MAPPING ---
             category_id = category_map.get(dept_id, default_category_id)
