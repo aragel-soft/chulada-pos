@@ -55,18 +55,23 @@ pub async fn get_all_categories(
             c.sequence, 
             c.created_at,
             COALESCE(c.is_active, 1) as is_active,
-            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
+            (SELECT COUNT(*) FROM products p WHERE (p.category_id = c.id OR p.category_id IN (SELECT id FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL)) AND p.deleted_at IS NULL) as product_count,
             (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
         WHERE c.deleted_at IS NULL
         ORDER BY 
-            CASE WHEN c.parent_category_id IS NULL THEN c.sequence ELSE 
-                (SELECT sequence FROM categories parent WHERE parent.id = c.parent_category_id) 
-            END,
-            CASE WHEN c.parent_category_id IS NULL THEN c.created_at ELSE 
-                (SELECT created_at FROM categories parent WHERE parent.id = c.parent_category_id) 
-            END,
+            -- Ordenar primero los padres por la suma de productos (propios + hijos)
+            CASE WHEN c.parent_category_id IS NULL THEN 
+                (SELECT COUNT(*) FROM products p WHERE (p.category_id = c.id OR p.category_id IN (SELECT id FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL)) AND p.deleted_at IS NULL)
+            ELSE 
+                (SELECT COUNT(*) FROM products p WHERE (p.category_id = c.parent_category_id OR p.category_id IN (SELECT id FROM categories sub WHERE sub.parent_category_id = c.parent_category_id AND sub.deleted_at IS NULL)) AND p.deleted_at IS NULL)
+            END DESC,
+            -- Luego, si hay empates o para agrupar padre con hijos correctamente, usamos ID
+            COALESCE(c.parent_category_id, c.id),
+            -- Los padres van primero (c.parent_category_id IS NOT NULL devuelve 0 para el padre, 1 para hijos)
             c.parent_category_id IS NOT NULL,
+            -- Entre los hijos o dentro del mismo padre (por si es padre), ordenamos por los productos
+            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) DESC,
             c.sequence,
             c.created_at
     "#;
@@ -165,6 +170,11 @@ pub async fn get_categories(
         Some("description") => ("c.description", "parent.description"),
         Some("created_at") => ("c.created_at", "parent.created_at"),
         Some("sequence") => ("c.sequence", "parent.sequence"),
+        Some("is_active") => ("COALESCE(c.is_active, 1)", "parent.is_active"),
+        Some("product_count") => (
+            "product_count",
+            "CASE WHEN parent.id IS NOT NULL THEN (SELECT COUNT(*) FROM products p WHERE (p.category_id = parent.id OR p.category_id IN (SELECT id FROM categories sub WHERE sub.parent_category_id = parent.id AND sub.deleted_at IS NULL)) AND p.deleted_at IS NULL) ELSE NULL END",
+        ),
         _ => ("c.created_at", "parent.created_at"),
     };
 
@@ -205,7 +215,7 @@ pub async fn get_categories(
             c.sequence, 
             c.created_at,
             COALESCE(c.is_active, 1) as is_active,
-            (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL) as product_count,
+            (SELECT COUNT(*) FROM products p WHERE (p.category_id = c.id OR p.category_id IN (SELECT id FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL)) AND p.deleted_at IS NULL) as product_count,
             (SELECT COUNT(*) FROM categories sub WHERE sub.parent_category_id = c.id AND sub.deleted_at IS NULL) as children_count
         FROM categories c
         LEFT JOIN categories parent ON c.parent_category_id = parent.id

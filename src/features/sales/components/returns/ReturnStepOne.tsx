@@ -162,7 +162,7 @@ export function ReturnStepOne({
       )}
 
       {validationMessages.length > 0 && (
-        <div className="absolute top-4 left-6 right-6 z-20 animate-in fade-in slide-in-from-top-2">
+        <div className="mx-6 mt-4 mb-2 z-20 animate-in fade-in slide-in-from-top-2">
              <Alert variant="destructive" className="shadow-lg bg-red-50/95 border-red-200">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Validación de devolución</AlertTitle>

@@ -7,7 +7,7 @@ import {
   updateLicenseValidation,
   checkOfflineLicense,
 } from "@/lib/api/auth";
-import { restoreLatestBackup } from "@/lib/api/backup";
+import { restoreLatestBackup, syncPendingBackups, getPendingBackupsCount } from "@/lib/api/backup";
 
 export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authorized" | "rejected">(
@@ -59,6 +59,20 @@ export const LicenseGuard = ({ children }: { children: React.ReactNode }) => {
         }
 
         setStatus("authorized");
+
+        // Sincronizar respaldos pendientes en background (no bloquea)
+        if (license.type === "store") {
+          getPendingBackupsCount().then((count) => {
+            if (count > 0) {
+              toast.info(`Sincronizando ${count} respaldo${count > 1 ? "s" : ""} pendiente${count > 1 ? "s" : ""}...`, { duration: 3000 });
+              syncPendingBackups().then((result) => {
+                if (result.synced > 0) {
+                  toast.success(`${result.synced} respaldo${result.synced > 1 ? "s" : ""} sincronizado${result.synced > 1 ? "s" : ""}`);
+                }
+              }).catch(() => {});
+            }
+          });
+        }
       } catch (err) {
         try {
           const offlineStatus = await checkOfflineLicense();
