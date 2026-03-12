@@ -5,6 +5,7 @@ import {
   Loader2,
   X,
   Tag,
+  Barcode,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -168,8 +169,8 @@ export function PromotionDetailPanel({
                       <span className="font-medium text-foreground">
                         {item.product.name}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.product.code}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Barcode className="h-3 w-3" />{item.product.barcode || item.product.code}
                       </span>
                     </div>
                     <Badge

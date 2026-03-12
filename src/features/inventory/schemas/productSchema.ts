@@ -5,16 +5,17 @@ export const productSchema = z.object({
     .transform(val => val.trim())
     .pipe(
       z.string()
-      .min(1, "El código es requerido")
       .max(32, "El código no debe exceder 32 caracteres")
-    ),
+    )
+    .optional()
+    .default(""),
   barcode: z.string()
     .transform(val => val.trim())
     .pipe(
       z.string()
+      .min(1, "El código de barras es requerido")
       .max(32, "El código de barras no debe exceder 32 caracteres")
-    )
-    .optional(),
+    ),
   name: z.string()
     .transform(val => val.trim().replace(/\s+/g, ' ')) 
     .pipe(z.string().min(3, "El nombre debe tener al menos 3 caracteres")),

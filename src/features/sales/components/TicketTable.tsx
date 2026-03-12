@@ -260,14 +260,9 @@ export const TicketTable = ({
                     )}
                   </div>
                   <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1.5">
-                    <span className="text-sm  bg-muted px-1 rounded">
-                      {item.code}
+                    <span className="text-sm bg-muted px-1 rounded flex items-center gap-1">
+                      <Barcode className="h-3 w-3" /> {item.barcode || item.code}
                     </span>
-                    {item.barcode && (
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Barcode className="h-3 w-3" /> {item.barcode}
-                      </span>
-                    )}
                   </div>
                 </div>
 

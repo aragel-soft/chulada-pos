@@ -67,18 +67,10 @@ export function ProductDetailPanel({
             <div className="flex justify-center gap-2">
               <Badge
                 variant="secondary"
-                className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded-md"
+                className="text-xs text-muted-foreground font-mono bg-zinc-100 px-2 py-1 rounded-md flex items-center gap-1"
               >
-                Código: {selectedItem.code}
+                <Barcode className="w-3 h-3" /> {selectedItem.barcode || selectedItem.code}
               </Badge>
-              {selectedItem.barcode && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs font-mono bg-zinc-100/80 text-zinc-500 border border-zinc-200"
-                >
-                  <Barcode className="w-3 h-3 mr-1" /> {selectedItem.barcode}
-                </Badge>
-              )}
 
               <Badge
                 variant="secondary"

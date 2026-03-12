@@ -73,15 +73,12 @@ export function ProductCard({ product, onClick, forceAllowSelect }: ProductCardP
           </h3>
           
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono bg-muted px-1 rounded">{product.code}</span>
+            <span className="font-mono bg-muted px-1 rounded flex items-center gap-1">
+              <Barcode className="h-3 w-3" /> {product.barcode || product.code}
+            </span>
             <span className="flex items-center gap-1">
               <Package className="h-3 w-3" /> {product.stock}
             </span>
-            { product.barcode && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Barcode className="h-3 w-3" /> {product.barcode}
-              </span> 
-            ) }
           </div>
 
           <div className="pt-2 mt-2 border-t flex flex-col items-end">

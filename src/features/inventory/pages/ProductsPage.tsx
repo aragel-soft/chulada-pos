@@ -138,7 +138,7 @@ export default function ProductsPage() {
         }}
         columnTitles={{
           image_url: "Imagen",
-          code: "Código",
+          barcode: "Código",
           name: "Producto",
           purchase_price: "Costo Compra",
           retail_price: "P. Menudeo",

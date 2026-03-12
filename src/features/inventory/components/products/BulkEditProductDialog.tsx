@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pencil, Check, ChevronsUpDown } from "lucide-react";
+import { Loader2, Pencil, Check, ChevronsUpDown, Barcode } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -421,7 +421,7 @@ export function BulkEditProductDialog({
                           {product.name}
                         </span>
                         <span className="text-xs text-muted-foreground flex gap-2">
-                          <span>{product.code}</span>
+                          <span className="flex items-center gap-1"><Barcode className="h-3 w-3" />{product.barcode || product.code}</span>
                         </span>
                       </div>
                       <div className="text-right text-xs">
