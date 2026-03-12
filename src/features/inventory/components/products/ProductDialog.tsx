@@ -419,7 +419,7 @@ export function ProductDialog({
                           <FormControl>
                             <Input
                               placeholder="Ej: TINT-001"
-                              maxLength={16}
+                              maxLength={32}
                               {...field}
                               onChange={(e) => {
                                 const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\-_\/#]/g, "");
