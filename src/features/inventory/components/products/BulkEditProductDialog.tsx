@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,13 +32,13 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PopoverAnchor,
 } from "@/components/ui/popover";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { TagInput } from "@/components/ui/tag-input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,7 +62,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
-import { CirclePlus } from "lucide-react";
+import { CirclePlus, Search, Plus } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { saveProductImage } from "@/lib/api/inventory/products";
 
@@ -133,9 +133,9 @@ export function BulkEditProductDialog({
       onOpenChange(false);
       setConfirmOpen(false);
     },
-    onError: (error) => {
-      let userMessage = error.message;
-      if (userMessage.includes("PRICE_INCONSISTENCY") || userMessage.includes("constraint failed")) {
+    onError: (error: any) => {
+      let userMessage = error?.message || "Ocurrió un error inesperado al actualizar.";
+      if (typeof userMessage === "string" && (userMessage.includes("PRICE_INCONSISTENCY") || userMessage.includes("constraint failed"))) {
         userMessage = "No se pueden guardar los cambios porque generarían una inconsistencia (Mayoreo > Menudeo) en uno o más productos.";
       }
       toast.error("Error en la actualización", { description: userMessage });
@@ -215,6 +215,35 @@ export function BulkEditProductDialog({
       image_action: pendingValues.image_action !== "Keep" ? pendingValues.image_action : undefined,
       image_url: finalImageUrl,
     });
+  };
+
+  const tagsToAdd = form.watch("tags") || [];
+  const tagsToRemove = form.watch("tags_to_remove") || [];
+
+  const addTagToAdd = (tag: string) => {
+    if (tagsToRemove.includes(tag)) {
+      form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag));
+    }
+    if (!tagsToAdd.includes(tag)) {
+      form.setValue("tags", [...tagsToAdd, tag]);
+    }
+  };
+
+  const removeTagFromAdd = (tag: string) => {
+    form.setValue("tags", tagsToAdd.filter(t => t !== tag));
+  };
+
+  const addTagToRemove = (tag: string) => {
+    if (tagsToAdd.includes(tag)) {
+      form.setValue("tags", tagsToAdd.filter(t => t !== tag));
+    }
+    if (!tagsToRemove.includes(tag)) {
+      form.setValue("tags_to_remove", [...tagsToRemove, tag]);
+    }
+  };
+
+  const removeTagFromRemove = (tag: string) => {
+    form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag));
   };
 
   const isMixed = (key: keyof Product) =>
@@ -410,44 +439,29 @@ export function BulkEditProductDialog({
                       )}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="tags"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Agregar Etiquetas</FormLabel>
-                          <FormControl>
-                            <TagInput
-                              availableTags={availableTags}
-                              selectedTags={field.value || []}
-                              onTagsChange={field.onChange}
-                              placeholder="+ Etiqueta"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <IndependentTagEditor
+                        title="Agregar Etiquetas"
+                        placeholder="+ Etiqueta"
+                        availableTags={availableTags}
+                        selectedTags={tagsToAdd}
+                        onAddTag={addTagToAdd}
+                        onRemoveTag={removeTagFromAdd}
+                        allowCreate={true}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="tags_to_remove"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-destructive">Quitar Etiquetas</FormLabel>
-                          <FormControl>
-                            <TagInput
-                              availableTags={availableTags}
-                              selectedTags={field.value || []}
-                              onTagsChange={field.onChange}
-                              placeholder="- Etiqueta"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <IndependentTagEditor
+                        title="Quitar Etiquetas"
+                        titleClassName="text-foreground font-medium"
+                        placeholder="- Etiqueta"
+                        availableTags={availableTags}
+                        selectedTags={tagsToRemove}
+                        onAddTag={addTagToRemove}
+                        onRemoveTag={removeTagFromRemove}
+                        allowCreate={false}
+                      />
+                    </div>
                   </div>
 
                   <FormField
@@ -658,5 +672,149 @@ export function BulkEditProductDialog({
          }}
       />
     </>
+  );
+}
+
+function IndependentTagEditor({
+  title,
+  titleClassName,
+  placeholder,
+  availableTags,
+  selectedTags,
+  onAddTag,
+  onRemoveTag,
+  allowCreate = false
+}: {
+  title: string;
+  titleClassName?: string;
+  placeholder: string;
+  availableTags: string[];
+  selectedTags: string[];
+  onAddTag: (tag: string) => void;
+  onRemoveTag: (tag: string) => void;
+  allowCreate?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [menuWidth, setMenuWidth] = useState(0);
+
+  useEffect(() => {
+    if (open && containerRef.current) {
+      setMenuWidth(containerRef.current.offsetWidth);
+    }
+  }, [open]);
+
+  const cleanTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed) return "";
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  };
+
+  const suggestions = availableTags.filter((t) => !selectedTags.includes(t));
+
+  const handleSelect = (tag: string) => {
+    const cleaned = cleanTag(tag);
+    if (cleaned && !selectedTags.includes(cleaned)) {
+      onAddTag(cleaned);
+    }
+    setInputValue("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-2" ref={containerRef}>
+      <label className={cn("text-sm font-medium leading-none", titleClassName)}>{title}</label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverAnchor asChild>
+          <div className="relative group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-1 bg-background">
+            <Command className="overflow-visible bg-transparent">
+              <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
+                {selectedTags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="font-normal gap-1 pr-1.5 h-6">
+                    {tag}
+                    <button
+                      type="button"
+                      className="ml-1 -mr-0.5 rounded-full outline-none hover:bg-destructive/20 hover:text-destructive transition-colors focus:ring-1 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveTag(tag);
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                
+                <div className="flex items-center flex-1 min-w-[120px]">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onFocus={() => setOpen(true)}
+                    placeholder={selectedTags.length > 0 ? "" : placeholder}
+                    className="bg-transparent outline-none placeholder:text-muted-foreground flex-1 min-w-0"
+                    onKeyDown={(e) => {
+                      if (e.key === "Delete" || e.key === "Backspace") {
+                        if (inputValue === "" && selectedTags.length > 0) {
+                          onRemoveTag(selectedTags[selectedTags.length - 1]);
+                        }
+                      }
+                      if (e.key === "Enter" && inputValue) {
+                        e.preventDefault();
+                        if (allowCreate || suggestions.includes(inputValue)) {
+                          handleSelect(inputValue);
+                        }
+                      }
+                      if (e.key === "Escape") setOpen(false);
+                    }}
+                  />
+                </div>
+              </div>
+            </Command>
+          </div>
+        </PopoverAnchor>
+        <PopoverContent 
+          className="p-0" 
+          style={{ width: menuWidth > 0 ? menuWidth : "auto" }}
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => {
+            if (containerRef.current?.contains(e.target as Node)) e.preventDefault();
+          }}
+        >
+          <Command>
+            <CommandList>
+              {allowCreate && inputValue.length > 0 && !suggestions.includes(inputValue) && !selectedTags.includes(inputValue) && (
+                <CommandGroup heading="Crear nueva">
+                  <CommandItem onSelect={() => handleSelect(inputValue)} className="cursor-pointer">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear etiqueta "{inputValue}"
+                  </CommandItem>
+                </CommandGroup>
+              )}
+              {suggestions.length > 0 && (
+                <CommandGroup heading="Sugerencias">
+                  {suggestions.map((tag) => (
+                    <CommandItem key={tag} value={tag} onSelect={() => handleSelect(tag)} className="cursor-pointer">
+                      {tag}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {suggestions.length === 0 && (!allowCreate || inputValue.length === 0) && (
+                <CommandEmpty>No se encontraron etiquetas.</CommandEmpty>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
