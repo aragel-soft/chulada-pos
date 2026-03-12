@@ -134,7 +134,10 @@ pub struct BulkUpdateProductsPayload {
     pub is_active: Option<bool>,
     pub retail_price: Option<f64>,
     pub wholesale_price: Option<f64>,
+    pub image_action: Option<ImageAction>,
+    pub image_url: Option<String>,
     pub tags_to_add: Option<Vec<String>>,
+    pub tags_to_remove: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1381,6 +1384,7 @@ pub fn delete_products(
 
 #[tauri::command]
 pub fn bulk_update_products(
+    app_handle: tauri::AppHandle,
     db: State<'_, Mutex<Connection>>,
     payload: BulkUpdateProductsPayload,
 ) -> Result<String, String> {
@@ -1390,6 +1394,9 @@ pub fn bulk_update_products(
         .transaction()
         .map_err(|e| format!("Error iniciando transacción: {}", e))?;
     let mut updated_count = 0;
+    
+    // Preparar lista de imágenes a verificar para eliminación física
+    let mut old_image_urls_to_check: HashSet<String> = HashSet::new();
 
     for id in &payload.ids {
         let (current_retail, current_wholesale): (f64, f64) = tx
@@ -1414,24 +1421,82 @@ pub fn bulk_update_products(
         }
 
         let now_local = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        tx.execute(
+        
+        let mut final_image_query_part = "".to_string();
+        let mut image_param_value: Option<String> = None;
+        let mut bind_image = false;
+
+        if let Some(action) = &payload.image_action {
+            match action {
+                ImageAction::Remove => {
+                    final_image_query_part = "image_url = NULL,".to_string();
+                }
+                ImageAction::Replace => {
+                    if let Some(url) = &payload.image_url {
+                        final_image_query_part = "image_url = ?7,".to_string();
+                        image_param_value = Some(url.clone());
+                        bind_image = true;
+                    } else {
+                        return Err(InventoryError {
+                            code: "IMAGE_MISSING".to_string(),
+                            message: "Se solicitó reemplazo de imagen pero no se proporcionó la URL".to_string(),
+                        }.into());
+                    }
+                }
+                ImageAction::Keep => {}
+            }
+
+            if matches!(action, ImageAction::Remove | ImageAction::Replace) {
+                // Registrar la imagen actual para posible borrado
+                let current_img: Option<String> = tx
+                    .query_row("SELECT image_url FROM products WHERE id = ?", [id], |row| row.get(0))
+                    .ok()
+                    .flatten();
+                    
+                if let Some(path) = current_img {
+                    old_image_urls_to_check.insert(path);
+                }
+            }
+        }
+
+        let update_sql = format!(
             "UPDATE products SET 
-        category_id = COALESCE(?1, category_id),
-        is_active = COALESCE(?2, is_active),
-        retail_price = ?3,
-        wholesale_price = ?4,
-        updated_at = ?5
-       WHERE id = ?6",
-            rusqlite::params![
-                payload.category_id,
-                payload.is_active,
-                new_retail,
-                new_wholesale,
-                now_local,
-                id
-            ],
-        )
-        .map_err(|e| format!("Error actualizando producto {}: {}", id, e))?;
+            category_id = COALESCE(?1, category_id),
+            is_active = COALESCE(?2, is_active),
+            retail_price = ?3,
+            wholesale_price = ?4,
+            {}
+            updated_at = ?5
+           WHERE id = ?6",
+            final_image_query_part
+        );
+
+        if bind_image {
+            tx.execute(
+                &update_sql,
+                rusqlite::params![
+                    payload.category_id,
+                    payload.is_active,
+                    new_retail,
+                    new_wholesale,
+                    now_local,
+                    id,
+                    image_param_value
+                ],
+            ).map_err(|e| format!("Error actualizando producto {} con imagen: {}", id, e))?;
+        } else {
+            tx.execute(
+                &update_sql,
+                rusqlite::params![
+                    payload.category_id,
+                    payload.is_active,
+                    new_retail,
+                    new_wholesale,
+                    now_local,
+                    id
+                ],
+            ).map_err(|e| format!("Error actualizando producto {}: {}", id, e))?;
+        }
 
         if let Some(tags) = &payload.tags_to_add {
             if !tags.is_empty() {
@@ -1465,11 +1530,52 @@ pub fn bulk_update_products(
             }
         }
 
+        if let Some(tags) = &payload.tags_to_remove {
+            if !tags.is_empty() {
+                for tag_name in tags {
+                    let tag_id_opt: Option<String> = tx
+                        .query_row("SELECT id FROM tags WHERE name = ?", [tag_name], |row| row.get(0))
+                        .ok();
+                        
+                    if let Some(tag_id) = tag_id_opt {
+                        tx.execute(
+                            "DELETE FROM product_tags WHERE product_id = ? AND tag_id = ?",
+                            [id.clone(), tag_id]
+                        ).map_err(|e| format!("Error eliminando tag '{}': {}", tag_name, e))?;
+                    }
+                }
+            }
+        }
+
         updated_count += 1;
     }
 
     tx.commit()
         .map_err(|e| format!("Error al confirmar la transacción masiva: {}", e))?;
+        
+    // Limpieza de imágenes físicas seguras
+    if !old_image_urls_to_check.is_empty() {
+        let app_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?;
+
+        for path in old_image_urls_to_check {
+            let still_in_use: i64 = conn
+                .query_row(
+                    "SELECT COUNT(DISTINCT id) FROM products WHERE image_url = ?",
+                    [&path],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
+
+            if still_in_use == 0 && !path.starts_with("http") {
+                let full_path = app_dir.join(&path);
+                let _ = fs::remove_file(full_path); // Ignorar errores si el archivo ya no existe
+            }
+        }
+    }
+    
     Ok(format!(
         "Se actualizaron {} productos correctamente.",
         updated_count

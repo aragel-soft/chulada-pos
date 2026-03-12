@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pencil, Check, ChevronsUpDown } from "lucide-react";
+import { Loader2, Pencil, Check, ChevronsUpDown, Upload, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +64,7 @@ import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
 import { CreateCategoryModal } from "@/features/inventory/components/categories/CreateCategoryModal";
 import { CirclePlus } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { saveProductImage } from "@/lib/api/inventory/products";
 
 interface BulkEditProductDialogProps {
   open: boolean;
@@ -83,6 +84,8 @@ export function BulkEditProductDialog({
   const [pendingValues, setPendingValues] = useState<BulkEditFormValues | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
@@ -116,6 +119,7 @@ export function BulkEditProductDialog({
         wholesale_price: commonWholesale,
         tags: [],
       });
+      setImagePreview(null);
     }
   }, [open, selectedProducts, form]);
 
@@ -125,6 +129,7 @@ export function BulkEditProductDialog({
       toast.success("Actualización completada", { description: message });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onSuccess();
+      setImagePreview(null);
       onOpenChange(false);
       setConfirmOpen(false);
     },
@@ -152,7 +157,7 @@ export function BulkEditProductDialog({
     setConfirmOpen(true);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!pendingValues) return;
 
     const commonRetail = getCommonValue(selectedProducts, "retail_price");
@@ -174,6 +179,30 @@ export function BulkEditProductDialog({
     const tagsToAdd = pendingValues.tags && pendingValues.tags.length > 0 
       ? pendingValues.tags 
       : undefined;
+      
+    const tagsToRemove = pendingValues.tags_to_remove && pendingValues.tags_to_remove.length > 0
+      ? pendingValues.tags_to_remove
+      : undefined;
+
+    let finalImageUrl: string | undefined = undefined;
+
+    // Subir imagen masiva si es necesario
+    if (pendingValues.image_action === "Replace" && pendingValues.image_file) {
+      setIsUploadingImage(true);
+      try {
+        const file = pendingValues.image_file;
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = Array.from(new Uint8Array(arrayBuffer));
+        finalImageUrl = await saveProductImage(bytes, file.name);
+      } catch (error) {
+        toast.error("Error al procesar la imagen", {
+          description: "La estructura de la imagen no es válida o hubo un error al guardarla."
+        });
+        setIsUploadingImage(false);
+        return; // Detenemos la mutación si la imagen falla
+      }
+      setIsUploadingImage(false);
+    }
 
     mutation.mutate({
       ids: selectedProducts.map((p) => p.id),
@@ -181,7 +210,10 @@ export function BulkEditProductDialog({
       is_active: pendingValues.is_active,
       retail_price: pendingValues.retail_price,
       wholesale_price: pendingValues.wholesale_price,
-      tags_to_add: tagsToAdd && tagsToAdd.length > 0 ? tagsToAdd : undefined,
+      tags_to_add: tagsToAdd,
+      tags_to_remove: tagsToRemove,
+      image_action: pendingValues.image_action !== "Keep" ? pendingValues.image_action : undefined,
+      image_url: finalImageUrl,
     });
   };
 
@@ -378,24 +410,152 @@ export function BulkEditProductDialog({
                       )}
                     />
                   </div>
-                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="tags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Agregar Etiquetas</FormLabel>
+                          <FormControl>
+                            <TagInput
+                              availableTags={availableTags}
+                              selectedTags={field.value || []}
+                              onTagsChange={field.onChange}
+                              placeholder="+ Etiqueta"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tags_to_remove"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-destructive">Quitar Etiquetas</FormLabel>
+                          <FormControl>
+                            <TagInput
+                              availableTags={availableTags}
+                              selectedTags={field.value || []}
+                              onTagsChange={field.onChange}
+                              placeholder="- Etiqueta"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="tags"
+                    name="image_action"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Agregar Etiquetas</FormLabel>
+                      <FormItem className="pt-2 border-t">
+                        <FormLabel>Imagen</FormLabel>
                         <FormControl>
-                          <TagInput
-                            availableTags={availableTags}
-                            selectedTags={field.value || []}
-                            onTagsChange={field.onChange}
-                            placeholder="+ Etiqueta"
-                          />
+                          <div className="flex flex-col gap-3">
+                            {!imagePreview && field.value !== "Keep" ? (
+                              <label className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/5 w-full">
+                                <Upload className="w-10 h-10 text-muted-foreground mb-2" />
+                                <span className="text-sm text-muted-foreground font-medium">Clic para subir imagen</span>
+                                <span className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, WEBP (Máx 5MB)</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (file.size > 5 * 1024 * 1024) {
+                                        toast.error("La imagen es muy pesada (máx 5MB)");
+                                        return;
+                                      }
+                                      form.setValue("image_action", "Replace", { shouldDirty: true });
+                                      form.setValue("image_file", file, { shouldDirty: true });
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => setImagePreview(reader.result as string);
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            ) : imagePreview ? (
+                              <div className="relative h-56 rounded-lg overflow-hidden border border-border group w-full">
+                                <img
+                                  src={imagePreview}
+                                  alt="Preview"
+                                  className="w-full h-full object-contain bg-muted/20"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      setImagePreview(null);
+                                      form.setValue("image_action", "Remove", { shouldDirty: true });
+                                      form.setValue("image_file", undefined, { shouldDirty: true });
+                                    }}
+                                  >
+                                    <X className="w-4 h-4 mr-2" /> Quitar Imagen
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="relative h-56 rounded-lg overflow-hidden border border-border group w-full bg-muted/10 flex flex-col items-center justify-center">
+                                <span className="text-muted-foreground">Manteniendo imágenes actuales...</span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="mt-4"
+                                  onClick={() => {
+                                    form.setValue("image_action", "Remove", { shouldDirty: true });
+                                  }}
+                                >
+                                  Quitar imágenes a seleccionados
+                                </Button>
+                                <label className="mt-2 text-sm text-primary hover:underline cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        if (file.size > 5 * 1024 * 1024) {
+                                          toast.error("La imagen es muy pesada (máx 5MB)");
+                                          return;
+                                        }
+                                        form.setValue("image_action", "Replace", { shouldDirty: true });
+                                        form.setValue("image_file", file, { shouldDirty: true });
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => setImagePreview(reader.result as string);
+                                        reader.readAsDataURL(file);
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
-                        <FormDescription>
-                          Estas etiquetas se <b>agregarán</b> a las que ya tengan los productos seleccionados.
-                        </FormDescription>
+                        {field.value === "Keep" ? (
+                          <FormDescription>
+                            La imagen actual se mantendrá en cada producto respectivo.
+                          </FormDescription>
+                        ) : field.value === "Remove" ? (
+                          <FormDescription className="text-destructive font-medium">
+                            Se eliminará la imagen de TODOS los productos seleccionados.
+                          </FormDescription>
+                        ) : (
+                          <FormDescription className="text-primary font-medium">
+                            Se establecerá esta nueva imagen para TODOS los productos seleccionados.
+                          </FormDescription>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -456,12 +616,12 @@ export function BulkEditProductDialog({
               className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
               type="submit" 
               form="bulk-edit-form"
-              disabled={mutation.isPending || !form.formState.isDirty}
+              disabled={mutation.isPending || isUploadingImage || !form.formState.isDirty}
             >
-              {mutation.isPending && (
+              {(mutation.isPending || isUploadingImage) && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Guardar Cambios
+              {isUploadingImage ? "Cargando Imagen..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </DialogContent>
