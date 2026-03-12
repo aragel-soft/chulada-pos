@@ -134,6 +134,7 @@ pub struct BulkUpdateProductsPayload {
     pub is_active: Option<bool>,
     pub retail_price: Option<f64>,
     pub wholesale_price: Option<f64>,
+    pub purchase_price: Option<f64>,
     pub image_action: Option<ImageAction>,
     pub image_url: Option<String>,
     pub tags_to_add: Option<Vec<String>>,
@@ -910,8 +911,18 @@ pub async fn update_product(
     ) {
         if let Some(old_path_str) = current_image_path {
             if !old_path_str.starts_with("http") {
-                let full_old_path = app_dir.join(old_path_str);
-                let _ = fs::remove_file(full_old_path);
+                let still_in_use: i64 = conn
+                    .query_row(
+                        "SELECT COUNT(DISTINCT id) FROM products WHERE image_url = ?",
+                        [&old_path_str],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+
+                if still_in_use == 0 {
+                    let full_old_path = app_dir.join(old_path_str);
+                    let _ = fs::remove_file(full_old_path);
+                }
             }
         }
     }
@@ -1433,7 +1444,7 @@ pub fn bulk_update_products(
                 }
                 ImageAction::Replace => {
                     if let Some(url) = &payload.image_url {
-                        final_image_query_part = "image_url = ?7,".to_string();
+                        final_image_query_part = "image_url = ?8,".to_string();
                         image_param_value = Some(url.clone());
                         bind_image = true;
                     } else {
@@ -1466,6 +1477,7 @@ pub fn bulk_update_products(
             retail_price = ?3,
             wholesale_price = ?4,
             {}
+            purchase_price = COALESCE(?7, purchase_price),
             updated_at = ?5
            WHERE id = ?6",
             final_image_query_part
@@ -1481,6 +1493,7 @@ pub fn bulk_update_products(
                     new_wholesale,
                     now_local,
                     id,
+                    payload.purchase_price,
                     image_param_value
                 ],
             ).map_err(|e| format!("Error actualizando producto {} con imagen: {}", id, e))?;
@@ -1493,7 +1506,8 @@ pub fn bulk_update_products(
                     new_retail,
                     new_wholesale,
                     now_local,
-                    id
+                    id,
+                    payload.purchase_price
                 ],
             ).map_err(|e| format!("Error actualizando producto {}: {}", id, e))?;
         }
