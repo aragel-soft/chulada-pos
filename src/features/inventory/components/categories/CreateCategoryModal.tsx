@@ -53,7 +53,7 @@ import { toast } from "sonner";
 interface CreateCategoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess?: (newCategoryId: string) => void;
 }
 
 // componentes
@@ -90,10 +90,10 @@ export function CreateCategoryModal({
   // Mutation para crear categoría
   const createMutation = useMutation({
     mutationFn: createCategory,
-    onSuccess: () => {
+    onSuccess: (newId) => {
       toast.success("Categoría creada correctamente");
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      if (onSuccess) onSuccess();
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      if (onSuccess) onSuccess(newId);
       handleClose();
     },
     onError: (error) => {
