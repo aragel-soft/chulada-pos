@@ -32,7 +32,6 @@ fn main() {
             commands::auth::get_license_type,
             commands::auth::update_license_validation,
             commands::auth::check_offline_license,
-            commands::auth::get_active_usernames,
             // Settings - Users
             commands::settings::users::check_username_available,
             commands::settings::users::create_user,

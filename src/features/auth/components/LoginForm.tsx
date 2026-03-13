@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { invoke } from '@tauri-apps/api/core';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginSchema, type LoginFormData } from '../schemas/loginSchema';
-import { LoginUserCombobox } from './LoginUserCombobox';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -22,17 +21,16 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
   const {
     register,
     handleSubmit,
-    setValue,
-    formState: { errors },
+    formState: { errors, isValid },
     watch,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
   });
 
-  const passwordInputRef = useRef<HTMLInputElement>(null);
-
   const username = watch('username');
+  const password = watch('password');
+  const isFormFilled = username?.length > 0 && password?.length > 0;
 
   const onSubmit = async (data: LoginFormData) => {
     setError(null);
@@ -59,11 +57,12 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && isValid && isFormFilled) {
       handleSubmit(onSubmit)();
     }
   };
 
+  const { onChange: onUsernameChange, ...usernameRegister } = register('username');
   const { onChange: onPasswordChange, ...passwordRegister } = register('password');
 
   const handleInputChange = (
@@ -73,12 +72,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     const cleanValue = e.target.value.replace(/\s/g, '');
     e.target.value = cleanValue;
     rhfChange(e);
-  };
-
-  const handleUsernameNext = () => {
-    if (passwordInputRef.current) {
-        passwordInputRef.current.focus();
-    }
   };
 
   return (
@@ -95,10 +88,13 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-base">Usuario</Label>
-              <LoginUserCombobox
-                value={username || ''}
-                onChange={(val) => setValue('username', val, { shouldValidate: true })}
-                onEnterPress={handleUsernameNext}
+              <Input
+                id="username"
+                type="text"
+                autoComplete="username"
+                autoFocus
+                {...usernameRegister}
+                onChange={(e) => handleInputChange(e, onUsernameChange)}
                 className={`rounded-xl ${
                   errors.username ? 'border-red-500' : ''
                 }`}
@@ -114,12 +110,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                ref={(e) => {
-                  passwordRegister.ref(e);
-                  passwordInputRef.current = e;
-                }}
-                name={passwordRegister.name}
-                onBlur={passwordRegister.onBlur}
+                {...passwordRegister}
                 onChange={(e) => handleInputChange(e, onPasswordChange)}
                 onKeyDown={handleKeyDown}
                 className={`rounded-xl ${
@@ -141,7 +132,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           <Button
             type="button"
             onClick={handleSubmit(onSubmit)}
-            disabled={isLoading}
+            disabled={!isValid || !isFormFilled || isLoading}
             className="w-full rounded-xl bg-[#480489] hover:bg-[#480489]/90 text-base"
           >
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}

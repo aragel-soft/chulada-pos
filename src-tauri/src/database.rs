@@ -1,10 +1,10 @@
-use deunicode::deunicode;
 use rusqlite::types::ToSql;
-use rusqlite::{functions::FunctionFlags, Connection};
+use rusqlite::{Connection, functions::FunctionFlags};
+use strsim::levenshtein;
+use deunicode::deunicode;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
-use strsim::levenshtein;
 use tauri::Manager;
 
 include!(concat!(env!("OUT_DIR"), "/embedded_migrations.rs"));
@@ -128,15 +128,13 @@ fn run_migrations(conn: &mut Connection) -> std::result::Result<(), Box<dyn Erro
 
         println!("-> Aplicando nueva migración: {}", file_name);
 
-        // Para migraciones que reconstruyen tablas, el PRAGMA va FUERA
-        conn.execute_batch("PRAGMA foreign_keys = OFF;")?;
-
+        // Ejecuta la migración dentro de una transacción.
         let tx = conn.transaction()?;
+
         tx.execute_batch(sql_content)?;
         tx.execute("INSERT INTO __migrations (name) VALUES (?)", [file_name])?;
-        tx.commit()?;
 
-        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        tx.commit()?;
 
         new_migrations_run += 1;
     }
