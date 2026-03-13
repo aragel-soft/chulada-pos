@@ -9,6 +9,7 @@ import {
   Pencil,
   Check,
   ChevronsUpDown,
+  ScanBarcode,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -187,6 +188,7 @@ export function ProductDialog({
 
       const payload: CreateProductPayload = {
         ...values,
+        code: values.barcode,
         image_url: imageUrl,
         description: values.description || undefined,
         barcode: values.barcode || undefined,
@@ -221,6 +223,7 @@ export function ProductDialog({
       const payload: UpdateProductPayload = {
         id: productId,
         ...values,
+        code: values.barcode,
         description: values.description || undefined,
         barcode: values.barcode || undefined,
         purchase_price: values.purchase_price || 0,
@@ -260,11 +263,7 @@ export function ProductDialog({
         errMsg = error.message || "Error desconocido";
       }
 
-      if (errCode === "CODE_EXISTS") {
-        form.setError("code", {
-          message: "Este código interno ya está en uso",
-        });
-      } else if (errCode === "BARCODE_EXISTS") {
+      if (errCode === "CODE_EXISTS" || errCode === "BARCODE_EXISTS") {
         form.setError("barcode", {
           message: "Este código de barras ya está en uso",
         });
@@ -272,7 +271,7 @@ export function ProductDialog({
         errCode === "BLOCKED_BY_HISTORY" ||
         errMsg.includes("BLOCKED_BY_HISTORY")
       ) {
-        form.setError("code", {
+        form.setError("barcode", {
           message:
             "No se puede editar: Código bloqueado por historial de ventas",
         });
@@ -443,42 +442,17 @@ export function ProductDialog({
                 <div className="md:col-span-3 space-y-5">
                     <FormField
                       control={form.control}
-                      name="code"
+                      name="barcode"
                       render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel className="!text-foreground">
-                            Código Interno{" "}
+                        <FormItem>
+                          <FormLabel className="!text-foreground flex items-center gap-1.5">
+                            <ScanBarcode className="h-4 w-4" />
+                            Código de Barras{" "}
                             <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Ej: TINT-001"
-                              maxLength={32}
-                              {...field}
-                              onChange={(e) => {
-                                const cleanValue = e.target.value.replace(
-                                  /[^a-zA-Z0-9\-_\/#]/g,
-                                  "",
-                                );
-                                field.onChange(cleanValue);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="barcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="!text-foreground">
-                            Código de Barras
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Escanea el código..."
+                              placeholder="Escanea o escribe el código..."
                               maxLength={32}
                               {...field}
                               onChange={(e) => {

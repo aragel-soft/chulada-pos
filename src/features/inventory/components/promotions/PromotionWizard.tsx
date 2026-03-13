@@ -31,6 +31,7 @@ import {
   Calendar,
   DollarSign,
   AlertCircle,
+  Barcode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductSearchSelector } from "@/components/common/ProductSearchSelector";
@@ -558,8 +559,8 @@ export function PromotionWizard({
                             <span className="font-medium text-foreground">
                               {item.product.name}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              {item.product.code}
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Barcode className="h-3 w-3" />{item.product.barcode || item.product.code}
                             </span>
                           </div>
                           <div className="flex items-center gap-4">

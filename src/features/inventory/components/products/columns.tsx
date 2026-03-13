@@ -43,20 +43,16 @@ export const getColumns = (
     enableHiding: false,
   },
   {
-    accessorKey: "code",
+    accessorKey: "barcode",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Código" />
     ),
     cell: ({ row }) => (
-      <div className="flex flex-col">
-        <span className="font-bold flex items-center gap-1">
-          {row.original.code}
+      <div className="flex items-center gap-1.5">
+        <Barcode className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className="font-bold">
+          {row.original.barcode || row.original.code}
         </span>
-        {row.original.barcode && (
-          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-            <Barcode className="h-3 w-3" /> {row.original.barcode}
-          </span>
-        )}
       </div>
     ),
   },
