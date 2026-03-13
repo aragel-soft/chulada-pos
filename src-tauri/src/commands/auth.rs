@@ -284,22 +284,3 @@ pub fn check_offline_license(
         days_left: 0,
     })
 }
-
-#[tauri::command]
-pub fn get_active_usernames(
-    state: State<'_, Mutex<rusqlite::Connection>>,
-) -> Result<Vec<String>, String> {
-    let conn = state.lock().map_err(|e| e.to_string())?;
-    
-    let mut stmt = conn
-        .prepare("SELECT username FROM users WHERE deleted_at IS NULL AND is_active = 1 ORDER BY username ASC")
-        .map_err(|e| e.to_string())?;
-
-    let usernames = stmt
-        .query_map([], |row| row.get(0))
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    Ok(usernames)
-}
