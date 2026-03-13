@@ -78,7 +78,7 @@ export function ProductsDataTableToolbar<TData>({
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-col lg:flex-row gap-2 w-full lg:w-auto items-start lg:items-center">
           <DebouncedInput
-            placeholder="Buscar por nombre, código o categoría..."
+            placeholder="Buscar por nombre o código..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
             className="h-9 w-full lg:w-[300px]"

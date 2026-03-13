@@ -165,12 +165,12 @@ export function DataTable<TData, TValue>({
 
     return (
       <div className="flex flex-col sm:flex-row gap-4 w-full print:hidden">
-        <div className="relative flex-1 min-w-[300px]">
+        <div className="flex-1 min-w-[300px]">
           <DebouncedInput
             placeholder={searchPlaceholder}
             value={globalFilter ?? ""}
             onChange={(value) => onGlobalFilterChange(String(value))}
-            className="pl-10 h-9 w-full"
+            className="h-9 w-full"
           />
         </div>
       </div>
