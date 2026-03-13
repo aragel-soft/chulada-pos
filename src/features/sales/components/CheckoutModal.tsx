@@ -115,6 +115,8 @@ export function CheckoutModal({
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
   const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
 
+  const [isReadyForEnter, setIsReadyForEnter] = useState(false);
+
   const isShiftOpen = shift && shift.status === "open";
 
   useEffect(() => {
@@ -129,9 +131,15 @@ export function CheckoutModal({
       setVoucherData(null);
       setIsVoucherOpen(false);
       setIsNotesOpen(false);
+      setIsReadyForEnter(false);
+
       if (isShiftOpen) {
         setTimeout(() => cashInputRef.current?.focus(), 100);
       }
+
+      // Wait a bit before allowing Enter to confirm, to avoid capturing the event that opened the modal
+      const timer = setTimeout(() => setIsReadyForEnter(true), 350);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, isShiftOpen]);
 
@@ -278,6 +286,20 @@ export function CheckoutModal({
     numericCash,
     numericCard,
   ]);
+  useHotkeys(
+    "Enter",
+    () => {
+      if (!isOpen || !isShiftOpen || !isReadyForEnter) return;
+      const hasOpenDialog =
+        document.querySelectorAll('[role="dialog"]').length > 1;
+      const isNotesFocused = document.activeElement?.tagName === "TEXTAREA";
+
+      if (hasOpenDialog || isNotesFocused) return;
+
+      handleConfirm(true);
+    },
+    [isOpen, isShiftOpen, isReadyForEnter, method, numericCash, numericCard],
+  );
   useHotkeys(
     "Escape",
     () => {
