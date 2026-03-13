@@ -973,14 +973,6 @@ pub async fn update_product(
     })
 }
 
-fn check_product_has_sales(conn: &Connection, product_id: &str) -> Result<bool, rusqlite::Error> {
-    conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sale_items WHERE product_id = ?)",
-        [product_id],
-        |row| row.get(0),
-    )
-}
-
 #[tauri::command]
 pub fn get_product_by_id(
     app_handle: AppHandle,
