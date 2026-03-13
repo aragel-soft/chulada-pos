@@ -1,12 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from 'path';
+import pack from "./package.json";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(pack.version),
+  },
 
   resolve: {
     alias: {
