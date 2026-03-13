@@ -380,10 +380,6 @@ export function ProductDialog({
       }
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        // Don't move if typing in a number input
-        if (isInput && (target as HTMLInputElement).type === "number") return;
-        
-        // Don't move if navigation is happening inside a combobox/popover list
         if (openCategoryPopover) return;
 
         const elements = getFocusableElements();
