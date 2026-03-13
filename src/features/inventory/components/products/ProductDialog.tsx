@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/popover";
 import {
   productSchema,
+  productEditSchema,
   ProductFormValues,
 } from "@/features/inventory/schemas/productSchema";
 import {
@@ -114,7 +115,7 @@ export function ProductDialog({
     useState(false);
 
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema) as any,
+    resolver: zodResolver(isEditing ? productEditSchema : productSchema) as any,
     mode: "onChange",
     defaultValues: defaultFormValues,
   });
@@ -267,14 +268,6 @@ export function ProductDialog({
         form.setError("barcode", {
           message: "Este código de barras ya está en uso",
         });
-      } else if (
-        errCode === "BLOCKED_BY_HISTORY" ||
-        errMsg.includes("BLOCKED_BY_HISTORY")
-      ) {
-        form.setError("barcode", {
-          message:
-            "No se puede editar: Código bloqueado por historial de ventas",
-        });
       } else {
         toast.error(errMsg);
       }
@@ -325,10 +318,96 @@ export function ProductDialog({
     : createMutation.isPending;
 
   const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["e", "E", "+", "-", "."].includes(e.key)) {
+    if (["e", "E", "+", "."].includes(e.key)) {
       e.preventDefault();
     }
   };
+
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handleFormKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLFormElement>) => {
+      const target = e.target as HTMLElement;
+      const tag = target.tagName.toLowerCase();
+      const isInput = tag === "input";
+      const isTextarea = tag === "textarea";
+
+      if (target.closest("[data-radix-popper-content-wrapper]")) return;
+
+      const getFocusableElements = () => {
+        if (!formRef.current) return [];
+        return Array.from(
+          formRef.current.querySelectorAll<HTMLElement>(
+            'input:not([disabled]):not([type="hidden"]):not([type="file"]), textarea:not([disabled]), button[role="combobox"]:not([disabled]), button[role="switch"]:not([disabled])'
+          )
+        );
+      };
+
+      if (e.key === "Enter") {
+        // TagInput special: if typing a tag, don't move next.
+        if (isInput && (target as HTMLInputElement).value !== "" && target.closest(".flex-wrap.gap-1")) {
+          // TagInput's own onKeyDown will handle adding the tag
+          return;
+        }
+
+        // Special case for textarea: Enter moves next, Shift+Enter adds new line
+        if (isTextarea) {
+          if (e.shiftKey) return; // Let browser handle Shift+Enter (new line)
+        }
+
+        e.preventDefault();
+        const elements = getFocusableElements();
+        const currentIndex = elements.indexOf(target);
+        if (currentIndex >= 0 && currentIndex < elements.length - 1) {
+          const nextElement = elements[currentIndex + 1];
+          nextElement.focus();
+          
+          // Auto-open category popover if it's the category trigger
+          if (nextElement.id === "category-trigger") {
+            setOpenCategoryPopover(true);
+          }
+
+          if (nextElement instanceof HTMLInputElement || nextElement instanceof HTMLTextAreaElement) {
+            nextElement.select();
+          }
+          return;
+        }
+
+        // Last element -> submit
+        if (currentIndex === elements.length - 1 || isInput) {
+           form.handleSubmit(onSubmit)();
+        }
+      }
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        // Don't move if typing in a number input
+        if (isInput && (target as HTMLInputElement).type === "number") return;
+        
+        // Don't move if navigation is happening inside a combobox/popover list
+        if (openCategoryPopover) return;
+
+        const elements = getFocusableElements();
+        const currentIndex = elements.indexOf(target);
+        const nextIndex = e.key === "ArrowDown" ? currentIndex + 1 : currentIndex - 1;
+
+        if (nextIndex >= 0 && nextIndex < elements.length) {
+          e.preventDefault();
+          const nextElement = elements[nextIndex];
+          nextElement.focus();
+
+          // Auto-open category popover if it's the category trigger
+          if (nextElement.id === "category-trigger") {
+            setOpenCategoryPopover(true);
+          }
+
+          if (nextElement instanceof HTMLInputElement || nextElement instanceof HTMLTextAreaElement) {
+            nextElement.select();
+          }
+        }
+      }
+    },
+    [form, onSubmit, openCategoryPopover]
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -349,7 +428,9 @@ export function ProductDialog({
 
         <Form {...form}>
           <form
+            ref={formRef}
             onSubmit={form.handleSubmit(onSubmit)}
+            onKeyDown={handleFormKeyDown}
             className="flex flex-col flex-1 overflow-hidden"
           >
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -513,6 +594,7 @@ export function ProductDialog({
                                 <Button
                                   variant="outline"
                                   role="combobox"
+                                  id="category-trigger"
                                   aria-expanded={openCategoryPopover}
                                   disabled={loadingCategories}
                                   className={cn(

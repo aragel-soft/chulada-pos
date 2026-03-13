@@ -34,6 +34,10 @@ const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
           ref={ref}
           {...props}
           onChange={handleChange}
+          onFocus={(e) => {
+            e.target.select();
+            props.onFocus?.(e);
+          }}
           onWheel={(e) => {
             e.currentTarget.blur();
             props.onWheel?.(e);

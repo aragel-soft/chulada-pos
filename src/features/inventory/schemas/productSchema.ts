@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-export const productSchema = z.object({
+const productBaseShape = {
   code: z.string()
     .transform(val => val.trim())
     .pipe(
@@ -40,12 +40,6 @@ export const productSchema = z.object({
     .optional()
     .default(0),
     
-  stock: z.coerce
-    .number()
-    .int("El stock debe ser un número entero")
-    .min(0, "El stock no puede ser negativo")
-    .default(0),
-    
   min_stock: z.coerce
     .number()
     .int("El stock mínimo debe ser un número entero")
@@ -56,9 +50,31 @@ export const productSchema = z.object({
   
   is_active: z.boolean().default(true),
   tags: z.array(z.string()).default([]),
-}).refine((data) => data.wholesale_price <= data.retail_price, {
+};
+
+const wholesaleRefinement = (data: any) => data.wholesale_price <= data.retail_price;
+const wholesaleRefinementParams = {
   message: "El precio de mayoreo no puede ser mayor al precio de menudeo",
   path: ["wholesale_price"], 
-});
+};
+
+/** Schema para creación: stock >= 0 */
+export const productSchema = z.object({
+  ...productBaseShape,
+  stock: z.coerce
+    .number()
+    .int("El stock debe ser un número entero")
+    .min(0, "El stock no puede ser negativo")
+    .default(0),
+}).refine(wholesaleRefinement, wholesaleRefinementParams);
+
+/** Schema para edición: acepta stock negativo */
+export const productEditSchema = z.object({
+  ...productBaseShape,
+  stock: z.coerce
+    .number()
+    .int("El stock debe ser un número entero")
+    .default(0),
+}).refine(wholesaleRefinement, wholesaleRefinementParams);
 
 export type ProductFormValues = z.output<typeof productSchema>;

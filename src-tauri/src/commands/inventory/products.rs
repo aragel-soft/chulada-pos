@@ -730,15 +730,6 @@ pub async fn update_product(
         .map_err(|_| "Producto no encontrado".to_string())?;
 
     if current_code != payload.code {
-        let has_sales = check_product_has_sales(&conn, &payload.id).map_err(|e| e.to_string())?;
-
-        if has_sales {
-            return Err(InventoryError {
-        code: "BLOCKED_BY_HISTORY".to_string(),
-        message: "No se puede modificar el código interno porque el producto tiene ventas registradas.".to_string(),
-      }.into());
-        }
-
         let exists: bool = conn.query_row(
       "SELECT EXISTS(SELECT 1 FROM products WHERE code = ? AND id != ? AND deleted_at IS NULL)",
       [&payload.code, &payload.id],
