@@ -26,6 +26,7 @@ pub struct ProductView {
     min_stock: i64,
     image_url: Option<String>,
     is_active: bool,
+    tags: Vec<String>,
     created_at: String,
 }
 
@@ -395,13 +396,42 @@ pub fn get_products(
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
 
-    let products = stmt
+    let mut products = stmt
         .query_map(rusqlite::params_from_iter(sql_params.iter()), |row| {
             map_product_row(row, &app_dir)
         })
         .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
+        .collect::<Result<Vec<ProductView>, _>>()
         .map_err(|e| e.to_string())?;
+
+    // Fetch tags for these products
+    if !products.is_empty() {
+        let product_ids: Vec<String> = products.iter().map(|p| p.id.clone()).collect();
+        let placeholders: Vec<String> = product_ids.iter().map(|_| "?".to_string()).collect();
+
+        let tags_sql = format!(
+            "SELECT pt.product_id, t.name 
+             FROM product_tags pt 
+             JOIN tags t ON pt.tag_id = t.id 
+             WHERE pt.product_id IN ({})",
+            placeholders.join(",")
+        );
+
+        let mut stmt_tags = conn.prepare(&tags_sql).map_err(|e| e.to_string())?;
+        let tag_rows = stmt_tags
+            .query_map(rusqlite::params_from_iter(product_ids.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+
+        for tag_res in tag_rows {
+            if let Ok((product_id, tag_name)) = tag_res {
+                if let Some(product) = products.iter_mut().find(|p| p.id == product_id) {
+                    product.tags.push(tag_name);
+                }
+            }
+        }
+    }
 
     let total_pages = (total as f64 / page_size as f64).ceil() as i64;
 
@@ -444,6 +474,7 @@ fn map_product_row(
         min_stock: row.get(13)?,
         image_url: resolved_image,
         is_active: row.get(15)?,
+        tags: Vec::new(),
         created_at: row.get(16)?,
     })
 }

@@ -13,3 +13,14 @@ export function getCommonValue<K extends keyof Product>(
 
   return allSame ? firstValue : undefined;
 }
+
+export function getCommonTags(products: Product[]): string[] {
+  if (products.length === 0) return [];
+  
+  const firstProductTags = products[0].tags || [];
+  if (firstProductTags.length === 0) return [];
+
+  return firstProductTags.filter(tag => 
+    products.every(p => p.tags?.includes(tag))
+  );
+}

@@ -14,6 +14,7 @@ export interface Product {
   min_stock: number;
   image_url?: string;
   is_active: boolean;
+  tags?: string[];
   created_at: string;
 }
 
