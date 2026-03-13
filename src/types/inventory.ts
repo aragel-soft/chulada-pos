@@ -14,6 +14,7 @@ export interface Product {
   min_stock: number;
   image_url?: string;
   is_active: boolean;
+  tags?: string[];
   created_at: string;
 }
 
@@ -81,7 +82,11 @@ export interface BulkUpdateProductsPayload {
   is_active?: boolean;
   retail_price?: number;
   wholesale_price?: number;
+  purchase_price?: number;
+  image_action?: "Keep" | "Remove" | "Replace";
+  image_url?: string;
   tags_to_add?: string[];
+  tags_to_remove?: string[];
 }
 
 export interface SelectorItem {

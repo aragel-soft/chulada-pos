@@ -4,7 +4,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, Barcode } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -136,7 +136,7 @@ export const ReceptionRow = memo(
           </TableCell>
 
           <TableCell className="font-mono text-xs text-muted-foreground">
-            {item.code}
+            <span className="flex items-center gap-1"><Barcode className="h-3 w-3" />{item.code}</span>
           </TableCell>
 
           <TableCell>

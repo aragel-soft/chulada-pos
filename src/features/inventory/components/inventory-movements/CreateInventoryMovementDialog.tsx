@@ -8,7 +8,8 @@ import {
   ChevronsUpDown, 
   ArrowUpCircle, 
   ArrowDownCircle,
-  ArrowRightLeft 
+  ArrowRightLeft,
+  Barcode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -240,7 +241,7 @@ export function CreateInventoryMovementDialog({
                               />
                               <div className="flex flex-col">
                                 <span className="font-medium">{product.name}</span>
-                                <span className="text-xs text-muted-foreground">Código: {product.code} | Existencia: {product.stock}</span>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1"><Barcode className="h-3 w-3" />{product.barcode || product.code} | Existencia: {product.stock}</span>
                               </div>
                             </CommandItem>
                           ))}

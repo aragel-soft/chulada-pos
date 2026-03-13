@@ -1,5 +1,5 @@
 // Importaciones
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,12 +29,11 @@ import {
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
+import { openCashDrawer } from "@/lib/api/hardware";
 import { CASH_REGISTER_CONFIG } from "@/config/constants";
 
 const baseSchema = z.object({
-  initialCash: z.coerce.number()
-    .min(0, "El fondo no puede ser negativo"),
+  initialCash: z.coerce.number().min(0, "El fondo no puede ser negativo"),
 });
 
 type FormValues = z.infer<typeof baseSchema>;
@@ -45,12 +44,20 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
   const { settings } = useBusinessStore();
   const [isOpen, setIsOpen] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      openCashDrawer();
+    }
+  }, [isOpen]);
+
   const [showZeroAlert, setShowZeroAlert] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
 
-  const maxLimit = settings?.maxCashLimit ?? CASH_REGISTER_CONFIG.MAX_INITIAL_CASH;
+  const maxLimit =
+    settings?.maxCashLimit ?? CASH_REGISTER_CONFIG.MAX_INITIAL_CASH;
   const dynamicSchema = baseSchema.extend({
-    initialCash: z.coerce.number()
+    initialCash: z.coerce
+      .number()
       .min(0, "El fondo no puede ser negativo")
       .max(maxLimit, `El monto es demasiado alto (máx $${maxLimit})`),
   });
@@ -58,7 +65,8 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(dynamicSchema) as any,
     defaultValues: {
-      initialCash: settings?.defaultCashFund ?? CASH_REGISTER_CONFIG.DEFAULT_INITIAL_CASH,
+      initialCash:
+        settings?.defaultCashFund ?? CASH_REGISTER_CONFIG.DEFAULT_INITIAL_CASH,
     },
   });
 
@@ -90,27 +98,30 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
     try {
       await openShift(amount, userId);
       toast.success(`Caja Abierta - Turno iniciado`, {
-        description: `Fondo inicial: $${amount.toFixed(2)}`
+        description: `Fondo inicial: $${amount.toFixed(2)}`,
       });
       setIsOpen(false);
     } catch (error) {
       toast.error("Error al abrir la caja", {
-        description: String(error)
+        description: String(error),
       });
     }
   };
 
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-
-    if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+    if (
+      [46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
       (e.keyCode === 65 && e.ctrlKey === true) ||
       (e.keyCode === 67 && e.ctrlKey === true) ||
       (e.keyCode === 88 && e.ctrlKey === true) ||
-      (e.keyCode >= 35 && e.keyCode <= 39)) {
+      (e.keyCode >= 35 && e.keyCode <= 39)
+    ) {
       return;
     }
-    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+    if (
+      (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+      (e.keyCode < 96 || e.keyCode > 105)
+    ) {
       e.preventDefault();
     }
     if (["e", "E", "+", "-"].includes(e.key)) {
@@ -126,7 +137,10 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
         <Button onClick={() => setIsOpen(true)}>Abrir Caja</Button>
       )}
 
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="sm:max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-zinc-900" />
@@ -178,14 +192,19 @@ export function OpenShiftModal({ trigger }: { trigger?: React.ReactNode }) {
               </AlertDescription>
             </Alert>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowZeroAlert(false)}>Corregir</Button>
-              <Button variant="destructive" onClick={confirmZeroOpen} disabled={isLoading}>
+              <Button variant="outline" onClick={() => setShowZeroAlert(false)}>
+                Corregir
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmZeroOpen}
+                disabled={isLoading}
+              >
                 {isLoading ? "Abriendo..." : "Sí, abrir en ceros"}
               </Button>
             </div>
           </div>
         )}
-
       </DialogContent>
     </Dialog>
   );

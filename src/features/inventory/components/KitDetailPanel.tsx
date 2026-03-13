@@ -4,6 +4,7 @@ import {
   Loader2,
   X,
   ShoppingCart,
+  Barcode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -107,8 +108,8 @@ export function KitDetailPanel({
                       <span className="font-medium text-foreground">
                         {trigger.name}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {trigger.code}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Barcode className="h-3 w-3" />{trigger.code}
                       </span>
                     </div>
                   </li>
@@ -138,8 +139,8 @@ export function KitDetailPanel({
                       <span className="font-medium text-foreground">
                         {item.product.name}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.product.code}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Barcode className="h-3 w-3" />{item.product.code}
                       </span>
                     </div>
                     <Badge

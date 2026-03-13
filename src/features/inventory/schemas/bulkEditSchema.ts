@@ -15,10 +15,19 @@ export const bulkEditSchema = z.object({
     .number()
     .nonnegative("El costo no puede ser negativo")
     .multipleOf(0.01, "El precio debe ser en incrementos de $0.01")
-    .optional()
-    .default(0),
+    .optional(),
 
-tags: z.array(z.string()).optional(), 
+  purchase_price: z.coerce
+    .number()
+    .nonnegative("El costo no puede ser negativo")
+    .multipleOf(0.01, "El precio debe ser en incrementos de $0.01")
+    .optional(),
+
+  tags: z.array(z.string()).optional(), 
+  tags_to_remove: z.array(z.string()).optional(),
+
+  image_action: z.enum(["Keep", "Remove", "Replace"]).optional().default("Keep"),
+  image_file: z.instanceof(File).optional(),
 }).superRefine((data, ctx) => {
   if (data.retail_price !== undefined && data.wholesale_price !== undefined) {
     if (data.wholesale_price > data.retail_price) {
