@@ -135,6 +135,7 @@ pub fn get_customer_account_statement(
 
 #[tauri::command]
 pub fn register_debt_payment(
+    app_handle: AppHandle,
     request: DebtPaymentRequest,
     db: State<Mutex<Connection>>,
 ) -> Result<String, String> {
@@ -218,6 +219,12 @@ pub fn register_debt_payment(
     .map_err(|e| format!("Error al actualizar saldo: {}", e))?;
 
     tx.commit().map_err(|e| e.to_string())?;
+
+    let app_handle_clone = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _ = crate::printer_utils::kick_drawer_direct(&app_handle_clone, false);
+    });
+
     Ok(payment_id)
 }
 

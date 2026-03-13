@@ -53,6 +53,7 @@ fn main() {
             commands::settings::hardware::get_system_printers,
             commands::settings::hardware::test_printer_connection,
             commands::settings::hardware::test_cash_drawer,
+            commands::settings::hardware::open_cash_drawer,
             commands::printer::test_print_ticket,
             commands::printer::print_sale_ticket,
             commands::printer::print_return_voucher,
