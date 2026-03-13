@@ -5,7 +5,7 @@ import { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { DebouncedInput } from "@/components/ui/debounced-input";
 import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter";
-import { DateSelector } from "@/components/ui/date-selector";
+import { DateRangeSelector } from "@/components/ui/date-range-selector";
 
 const typeOptions = [
   { value: "IN", label: "Entradas", icon: ArrowUpCircle },
@@ -47,21 +47,7 @@ export function InventoryMovementsTableToolbar<TData>({
     setDateRange(undefined);
   };
 
-  const handleDateChange = (type: 'from' | 'to', date: Date | undefined) => {
-    let newRange = { ...dateRange, [type]: date };
 
-    if (newRange.from && newRange.to) {
-      if (newRange.from > newRange.to) {
-        newRange = { from: newRange.to, to: newRange.from };
-      }
-    }
-    
-    if (!newRange.from && !newRange.to) {
-      setDateRange(undefined);
-    } else {
-      setDateRange(newRange as DateRange);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -75,20 +61,10 @@ export function InventoryMovementsTableToolbar<TData>({
           />
 
           <div className="flex gap-2 w-full lg:w-auto">
-            <DateSelector
-              date={dateRange?.from}
-              onSelect={(d) => handleDateChange('from', d)}
-              placeholder="Fecha Inicio"
-              className="w-full lg:w-[130px] h-9 border-dashed px-" 
-              formatStr="dd MMM y" 
-            />
-            <DateSelector
-              date={dateRange?.to}
-              onSelect={(d) => handleDateChange('to', d)}
-              placeholder="Fecha Fin"
-              className="w-full lg:w-[130px] h-9 border-dashed px-3"
-              minDate={dateRange?.from}
-              formatStr="dd MMM y"
+            <DateRangeSelector
+              dateRange={dateRange}
+              onSelect={setDateRange}
+              className="h-9 w-full lg:w-[260px] border-dashed"
             />
           </div>
 
