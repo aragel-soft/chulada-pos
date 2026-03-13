@@ -14,6 +14,7 @@ import {
   Loader2,
   Download,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { backupDatabase, restoreLatestBackup } from "@/lib/api/backup";
 import { getLicenseType } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ const defaultValues: HardwareFormValues = {
   printerName: "",
   cashDrawerCommand: "1B 70 00 19 FA",
   cashDrawerPort: "COM1",
+  autoOpenCashDrawer: true,
 };
 
 export default function HardwarePage() {
@@ -57,6 +59,7 @@ export default function HardwarePage() {
     config: fullConfig,
     isLoading: isStoreLoading,
     updateSettings,
+    init,
   } = useHardwareStore();
 
   // Hooks de Zustand
@@ -68,7 +71,8 @@ export default function HardwarePage() {
 
   useEffect(() => {
     getLicenseType().then(setLicenseType);
-  }, []);
+    init();
+  }, [init]);
 
   // Initialize form
   const form = useForm<HardwareFormValues>({
@@ -82,11 +86,12 @@ export default function HardwarePage() {
     if (fullConfig) {
       form.reset({
         terminalId: (fullConfig.terminalId || "CAJA-01").trim(),
-        printerName: (fullConfig.printerName || "").trim(),
+        printerName: (fullConfig.printerName || "none").trim(),
         cashDrawerCommand: (
           fullConfig.cashDrawerCommand || "1B 70 00 19 FA"
         ).trim(),
         cashDrawerPort: (fullConfig.cashDrawerPort || "COM1").trim(),
+        autoOpenCashDrawer: !!fullConfig.autoOpenCashDrawer,
       });
     }
   }, [fullConfig, form]);
@@ -99,9 +104,10 @@ export default function HardwarePage() {
       const configToSave: HardwareConfig = {
         ...fullConfig,
         terminalId: data.terminalId,
-        printerName: data.printerName,
+        printerName: data.printerName === "none" ? undefined : data.printerName,
         cashDrawerCommand: data.cashDrawerCommand,
         cashDrawerPort: data.cashDrawerPort,
+        autoOpenCashDrawer: data.autoOpenCashDrawer,
       };
 
       await updateSettings(configToSave);
@@ -187,6 +193,9 @@ export default function HardwarePage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
+                                <SelectItem value="none">
+                                  --- Sin impresora ---
+                                </SelectItem>
                                 {storePrinters.map((p) => (
                                   <SelectItem key={p} value={p}>
                                     {p}
@@ -200,7 +209,7 @@ export default function HardwarePage() {
                                 size="sm"
                                 className="w-full mt-2 rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
                                 onClick={handleTestPrinter}
-                                disabled={!field.value}
+                                disabled={!field.value || field.value === "none"}
                               >
                                 <Printer className="mr-2 h-4 w-4" />
                                 Probar conexión
@@ -291,6 +300,29 @@ export default function HardwarePage() {
                       )}
                     />
 
+                    <FormField
+                      control={form.control}
+                      name="autoOpenCashDrawer"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">
+                              Apertura automática
+                            </FormLabel>
+                            <div className="text-[0.7rem] text-muted-foreground">
+                              Abrir cajón después de cada venta o abono con efectivo.
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-900 dark:text-blue-200 mt-2">
                       <p>
                         Si el cajón no abre automáticamente al imprimir,
@@ -300,28 +332,28 @@ export default function HardwarePage() {
                     </div>
 
                     {can("hardware_settings:view") && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
-                        onClick={() => {
-                          const cmd = form.getValues("cashDrawerCommand");
-                          const printer = form.getValues("printerName");
-                          if (!printer)
-                            return toast.error(
-                              "Seleccione una impresora primero",
-                            );
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full rounded-l bg-[#480489] hover:bg-[#480489]/90 whitespace-nowrap"
+                          onClick={() => {
+                            const cmd = form.getValues("cashDrawerCommand");
+                            const printer = form.getValues("printerName");
+                            if (!printer || printer === "none")
+                              return toast.error(
+                                "Seleccione una impresora primero",
+                              );
 
-                          toast.promise(testCashDrawer(printer, cmd), {
-                            loading: `Probando apertura...`,
-                            success: "Comando enviado",
-                            error: "Error de comunicación",
-                          });
-                        }}
-                      >
-                        <Settings2 className="mr-2 h-3 w-3" />
-                        Probar Apertura
-                      </Button>
+                            toast.promise(testCashDrawer(printer, cmd), {
+                              loading: `Probando apertura...`,
+                              success: "Comando enviado",
+                              error: "Error de comunicación",
+                            });
+                          }}
+                        >
+                          <Settings2 className="mr-2 h-3 w-3" />
+                          Probar Apertura
+                        </Button>
                     )}
                   </CardContent>
                 </Card>

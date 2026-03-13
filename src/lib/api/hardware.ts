@@ -2,10 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface HardwareConfig {
   terminalId: string;
-  printerName: string;
+  printerName?: string | null;
   printerWidth: string;
   cashDrawerCommand: string;
   cashDrawerPort?: string;
+  autoOpenCashDrawer: boolean;
   paddingLines?: number;
 }
 
@@ -28,4 +29,6 @@ export const testPrinterConnection = async (printerName: string): Promise<string
 export const testCashDrawer = async (printerName: string, commandHex: string): Promise<string> => {
   return await invoke("test_cash_drawer", { printerName, commandHex });
 };
-
+export const openCashDrawer = async (): Promise<void> => {
+  return await invoke("open_cash_drawer");
+};
