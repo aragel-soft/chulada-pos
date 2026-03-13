@@ -57,7 +57,8 @@ import {
   BulkEditFormValues,
 } from "@/features/inventory/schemas/bulkEditSchema";
 import {
-  getCommonValue
+  getCommonValue,
+  getCommonTags
 } from "@/features/inventory/utils/bulk-actions";
 import { cn } from "@/lib/utils";
 import { getCategoryFullPath } from "@/lib/utils/categoryUtils";
@@ -118,6 +119,7 @@ export function BulkEditProductDialog({
       const commonRetail = getCommonValue(initialSelectedProducts, "retail_price");
       const commonWholesale = getCommonValue(initialSelectedProducts, "wholesale_price");
       const commonPurchase = getCommonValue(initialSelectedProducts, "purchase_price");
+      const commonTags = getCommonTags(initialSelectedProducts);
 
       form.reset({
         category_id: commonCategory, 
@@ -125,7 +127,8 @@ export function BulkEditProductDialog({
         retail_price: commonRetail,
         wholesale_price: commonWholesale,
         purchase_price: commonPurchase,
-        tags: [],
+        tags: commonTags,
+        tags_to_remove: [],
       });
       setImagePreview(null);
     }
@@ -152,11 +155,25 @@ export function BulkEditProductDialog({
   });
 
   const onSubmit = (values: BulkEditFormValues) => {
+    // Detect tags changes correctly
+    const initialTags = getCommonTags(localSelectedProducts);
+    const hasTagAdditions = values.tags && (
+      values.tags.length !== initialTags.length || 
+      values.tags.some(t => !initialTags.includes(t))
+    );
+    const hasTagRemovals = values.tags_to_remove && values.tags_to_remove.length > 0;
+
     const hasChanges = Object.values(values).some(
-      (val) => val !== undefined && val !== ""
+      (val, idx) => {
+        const key = Object.keys(values)[idx];
+        if (key === "tags") return hasTagAdditions;
+        if (key === "tags_to_remove") return hasTagRemovals;
+        return val !== undefined && val !== "";
+      }
     );
     
     if (!hasChanges) {
+      toast.info("No se detectaron cambios para aplicar.");
       onOpenChange(false);
       return;
     }
@@ -231,28 +248,28 @@ export function BulkEditProductDialog({
 
   const addTagToAdd = (tag: string) => {
     if (tagsToRemove.includes(tag)) {
-      form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag));
+      form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag), { shouldDirty: true });
     }
     if (!tagsToAdd.includes(tag)) {
-      form.setValue("tags", [...tagsToAdd, tag]);
+      form.setValue("tags", [...tagsToAdd, tag], { shouldDirty: true });
     }
   };
 
   const removeTagFromAdd = (tag: string) => {
-    form.setValue("tags", tagsToAdd.filter(t => t !== tag));
+    form.setValue("tags", tagsToAdd.filter(t => t !== tag), { shouldDirty: true });
   };
 
   const addTagToRemove = (tag: string) => {
     if (tagsToAdd.includes(tag)) {
-      form.setValue("tags", tagsToAdd.filter(t => t !== tag));
+      form.setValue("tags", tagsToAdd.filter(t => t !== tag), { shouldDirty: true });
     }
     if (!tagsToRemove.includes(tag)) {
-      form.setValue("tags_to_remove", [...tagsToRemove, tag]);
+      form.setValue("tags_to_remove", [...tagsToRemove, tag], { shouldDirty: true });
     }
   };
 
   const removeTagFromRemove = (tag: string) => {
-    form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag));
+    form.setValue("tags_to_remove", tagsToRemove.filter(t => t !== tag), { shouldDirty: true });
   };
 
   const isMixed = (key: keyof Product) =>
