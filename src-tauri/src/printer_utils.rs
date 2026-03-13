@@ -483,6 +483,12 @@ impl ReceiptBuilder {
         }
     }
 
+    pub fn kick_drawer(&mut self, hex_cmd: &str) {
+        if let Ok(bytes) = hex_to_bytes(hex_cmd) {
+            self.content.extend_from_slice(&bytes);
+        }
+    }
+
     pub fn cut(&mut self) {
         self.content.extend_from_slice(CMD_CUT);
     }
@@ -734,7 +740,7 @@ pub fn print_sale_from_db(app_handle: tauri::AppHandle, sale_id: String) -> Resu
         voucher_amount,
         change,
         customer_name: cust_name,
-        customer_code: cust_code
+        customer_code: cust_code,
     };
 
     print_ticket(&hardware_config.printer_name, ticket_data, app_handle)
@@ -788,10 +794,15 @@ pub fn print_voucher_from_db(app_handle: tauri::AppHandle, sale_id: String) -> R
     let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
 
     let printers_list = printers::get_printers();
+    let printer_name = match &hardware_config.printer_name {
+        Some(name) if !name.is_empty() && name != "none" => name,
+        _ => return Ok(()),
+    };
+
     let printer = printers_list
         .iter()
-        .find(|p| p.name == hardware_config.printer_name)
-        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+        .find(|p| p.name == *printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
     let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
     let mut builder = ReceiptBuilder::new(width_val);
@@ -869,16 +880,21 @@ pub fn print_voucher_from_db(app_handle: tauri::AppHandle, sale_id: String) -> R
 }
 
 pub fn print_ticket(
-    printer_name: &str,
+    printer_name_opt: &Option<String>,
     data: TicketData,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     // --- Refactored Implementation using ReceiptBuilder ---
 
+    let printer_name = match printer_name_opt {
+        Some(name) if !name.is_empty() && name != "none" => name,
+        _ => return Ok(()),
+    };
+
     let printers_list = printers::get_printers();
     let printer = printers_list
         .iter()
-        .find(|p| p.name == printer_name)
+        .find(|p| p.name == *printer_name)
         .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
     let width_val = data
@@ -890,6 +906,10 @@ pub fn print_ticket(
     let settings = &data.business_settings;
 
     builder.init();
+
+    if data.hardware_config.auto_open_cash_drawer {
+        builder.kick_drawer(&data.hardware_config.cash_drawer_command);
+    }
 
     // HEADER & STORE INFO
     print_store_header(&mut builder, settings, &app_handle);
@@ -1120,15 +1140,25 @@ pub fn print_payment_from_db(
     let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
 
     let printers_list = printers::get_printers();
+
+    let printer_name = match &hardware_config.printer_name {
+        Some(name) if !name.is_empty() && name != "none" => name,
+        _ => return Ok(()),
+    };
+
     let printer = printers_list
         .iter()
-        .find(|p| p.name == hardware_config.printer_name)
-        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+        .find(|p| p.name == *printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
     let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
     let mut builder = ReceiptBuilder::new(width_val);
 
     builder.init();
+
+    if hardware_config.auto_open_cash_drawer {
+        builder.kick_drawer(&hardware_config.cash_drawer_command);
+    }
 
     // HEADER
     print_store_header(&mut builder, &settings, &app_handle);
@@ -1256,16 +1286,25 @@ pub fn print_shift_summary(
     let hardware_config = load_settings(app_handle.clone()).unwrap_or_else(|_| Default::default());
 
     let printers_list = printers::get_printers();
+    let printer_name = match &hardware_config.printer_name {
+        Some(name) if !name.is_empty() && name != "none" => name,
+        _ => return Ok(()),
+    };
+
     let printer = printers_list
         .iter()
-        .find(|p| p.name == hardware_config.printer_name)
-        .ok_or_else(|| format!("Impresora '{}' no encontrada", hardware_config.printer_name))?;
+        .find(|p| p.name == *printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
 
     let width_val = hardware_config.printer_width.parse::<u32>().unwrap_or(80);
     let mut builder = ReceiptBuilder::new(width_val);
 
     // BUILD TICKET
     builder.init();
+
+    if hardware_config.auto_open_cash_drawer {
+        builder.kick_drawer(&hardware_config.cash_drawer_command);
+    }
     print_store_header(&mut builder, &settings, &app_handle);
 
     builder.align_center();
@@ -1515,6 +1554,49 @@ pub fn print_shift_summary(
     printer
         .print(&builder.build(), PrinterJobOptions::none())
         .map_err(|e| format!("Error imprimiendo corte de caja: {:?}", e))?;
+
+    Ok(())
+}
+
+fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
+    let clean_hex = hex.replace(" ", "");
+    if clean_hex.len() % 2 != 0 {
+        return Err("La cadena hexadecimal debe tener un número par de caracteres".to_string());
+    }
+
+    (0..clean_hex.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&clean_hex[i..i + 2], 16)
+                .map_err(|e| format!("Carácter hexadecimal inválido: {}", e))
+        })
+        .collect()
+}
+
+pub fn kick_drawer_direct(app_handle: &tauri::AppHandle, ignore_toggle: bool) -> Result<(), String> {
+    use crate::commands::settings::hardware::load_settings;
+    let config = load_settings(app_handle.clone()).map_err(|e| e.to_string())?;
+
+    if !ignore_toggle && !config.auto_open_cash_drawer {
+        return Ok(());
+    }
+
+    let printer_name = match &config.printer_name {
+        Some(name) if !name.is_empty() && name != "none" => name,
+        _ => return Ok(()),
+    };
+
+    let printers_list = printers::get_printers();
+    let printer = printers_list
+        .iter()
+        .find(|p| p.name == *printer_name)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", printer_name))?;
+
+    let bytes = hex_to_bytes(&config.cash_drawer_command)?;
+
+    printer
+        .print(&bytes, PrinterJobOptions::none())
+        .map_err(|e| format!("Error al abrir cajón: {:?}", e))?;
 
     Ok(())
 }

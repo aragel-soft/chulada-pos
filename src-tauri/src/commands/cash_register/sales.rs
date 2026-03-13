@@ -1133,6 +1133,11 @@ pub fn process_sale(
             {
             }
         });
+    } else {
+        let app_handle_clone = app_handle.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let _ = crate::printer_utils::kick_drawer_direct(&app_handle_clone, false);
+        });
     }
 
     Ok(SaleResponse {

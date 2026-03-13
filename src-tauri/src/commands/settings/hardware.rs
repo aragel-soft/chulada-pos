@@ -8,10 +8,11 @@ use tauri::{command, AppHandle, Manager};
 #[serde(rename_all = "camelCase")]
 pub struct HardwareConfig {
     pub terminal_id: String,
-    pub printer_name: String,
+    pub printer_name: Option<String>,
     pub printer_width: String,
     pub cash_drawer_command: String,
     pub cash_drawer_port: Option<String>,
+    pub auto_open_cash_drawer: bool,
     pub padding_lines: Option<u32>,
 }
 
@@ -19,10 +20,11 @@ impl Default for HardwareConfig {
     fn default() -> Self {
         Self {
             terminal_id: "CAJA-01".to_string(),
-            printer_name: "Generic Text Only".to_string(),
+            printer_name: Some("Generic Text Only".to_string()),
             printer_width: "80".to_string(),
             cash_drawer_command: "1B 70 00 19 FA".to_string(),
             cash_drawer_port: Some("COM1".to_string()),
+            auto_open_cash_drawer: true,
             padding_lines: Some(0),
         }
     }
@@ -149,6 +151,9 @@ fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
 
 #[command]
 pub fn test_cash_drawer(printer_name: String, command_hex: String) -> Result<String, String> {
+    if printer_name.is_empty() || printer_name == "none" {
+        return Err("No hay impresora configurada para probar el cajón".to_string());
+    }
     let printers = printers::get_printers();
 
     if let Some(printer) = printers.iter().find(|p| p.name == printer_name) {
@@ -161,4 +166,8 @@ pub fn test_cash_drawer(printer_name: String, command_hex: String) -> Result<Str
     } else {
         Err(format!("Impresora '{}' no encontrada. El cajón debe estar conectado a una impresora configurada.", printer_name))
     }
+}
+#[command]
+pub fn open_cash_drawer(app_handle: AppHandle) -> Result<(), String> {
+    crate::printer_utils::kick_drawer_direct(&app_handle, false)
 }

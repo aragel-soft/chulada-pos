@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useCashRegisterStore } from "@/stores/cashRegisterStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -8,6 +7,7 @@ import { Loader2, Lock, Scissors } from "lucide-react";
 import { OpenShiftModal } from "@/features/cash-register/components/OpenShiftModal";
 import { ShiftSummary } from "@/features/cash-register/components/ShiftSummary";
 import { CloseShiftModal } from "@/features/cash-register/components/close-shift/CloseShiftModal";
+import { openCashDrawer } from "@/lib/api/hardware";
 import { format } from "date-fns";
 
 export default function CurrentShiftPage() {
@@ -17,10 +17,15 @@ export default function CurrentShiftPage() {
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
   if (isLoading) {
-    return <div className="p-8 flex items-center justify-center"><Loader2 className="animate-spin mr-2" /> Cargando información de caja...</div>;
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <Loader2 className="animate-spin mr-2" /> Cargando información de
+        caja...
+      </div>
+    );
   }
 
-  if (!shift || shift.status === 'closed') {
+  if (!shift || shift.status === "closed") {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 bg-zinc-50/50 border rounded-lg shadow-sm ring-1 ring-zinc-950/5">
         <div className="text-center max-w-sm space-y-4">
@@ -28,9 +33,21 @@ export default function CurrentShiftPage() {
             <Lock className="w-8 h-8 text-zinc-400" />
           </div>
           <h3 className="text-xl font-semibold text-zinc-900">Caja Cerrada</h3>
-          <p className="text-zinc-500">No hay un turno activo en este momento. Para ver información, inicia un nuevo turno o consulta el historial.</p>
-          {can('cash_register:open') && (
-            <OpenShiftModal trigger={<Button size="lg" className="mt-4 bg-[#480489] hover:bg-[#360368]">Abrir Nuevo Turno</Button>} />
+          <p className="text-zinc-500">
+            No hay un turno activo en este momento. Para ver información, inicia
+            un nuevo turno o consulta el historial.
+          </p>
+          {can("cash_register:open") && (
+            <OpenShiftModal
+              trigger={
+                <Button
+                  size="lg"
+                  className="mt-4 bg-[#480489] hover:bg-[#360368]"
+                >
+                  Abrir Nuevo Turno
+                </Button>
+              }
+            />
           )}
         </div>
       </div>
@@ -42,7 +59,9 @@ export default function CurrentShiftPage() {
       <div className="px-6 py-3 border-b flex justify-between items-center bg-zinc-50/30">
         <div className="flex items-center gap-4">
           <div>
-            <h3 className="font-semibold text-lg">Turno Activo #{shift.code || shift.id}</h3>
+            <h3 className="font-semibold text-lg">
+              Turno Activo #{shift.code || shift.id}
+            </h3>
             <p className="text-sm text-muted-foreground">
               {format(new Date(shift.opening_date), "dd MMM yyyy, HH:mm")}
             </p>
@@ -51,17 +70,20 @@ export default function CurrentShiftPage() {
             En Curso
           </span>
         </div>
-        
+
         <div className="flex items-center gap-2">
-           {can('cash_register:close') && (
+          {can("cash_register:close") && (
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => setIsCloseModalOpen(true)}
+              onClick={() => {
+                setIsCloseModalOpen(true);
+                openCashDrawer();
+              }}
             >
               <Scissors className="mr-2 h-4 w-4" /> Realizar Corte
             </Button>
-           )}
+          )}
 
           <Button
             variant="outline"
