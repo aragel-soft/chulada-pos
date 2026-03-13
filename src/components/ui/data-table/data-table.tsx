@@ -16,7 +16,6 @@ import {
   PaginationState,
   Row,
 } from "@tanstack/react-table";
-import { Search } from "lucide-react";
 import { DebouncedInput } from "@/components/ui/debounced-input";
 import {
   TableBody,
@@ -167,7 +166,6 @@ export function DataTable<TData, TValue>({
     return (
       <div className="flex flex-col sm:flex-row gap-4 w-full print:hidden">
         <div className="relative flex-1 min-w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <DebouncedInput
             placeholder={searchPlaceholder}
             value={globalFilter ?? ""}
