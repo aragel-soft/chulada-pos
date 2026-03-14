@@ -23,6 +23,7 @@ export interface DataTableFacetedFilterOption {
   label: string
   value: string
   icon?: React.ComponentType<{ className?: string }>
+  color?: string | null
 }
 
 interface DataTableFacetedFilterProps {
@@ -68,9 +69,16 @@ export function DataTableFacetedFilter({
                     .filter((option) => selected.has(option.value))
                     .map((option) => (
                       <Badge
-                        variant="secondary"
+                        variant={option.color ? "outline" : "secondary"}
                         key={option.value}
-                        className="rounded-sm px-1 font-normal"
+                        className={cn(
+                          "rounded-sm font-normal",
+                          option.color ? "text-[10px] px-2 py-0 h-5 font-medium border-0" : "px-1"
+                        )}
+                        style={option.color ? {
+                          backgroundColor: option.color + "20",
+                          color: option.color,
+                        } : undefined}
                       >
                         {option.label}
                       </Badge>
@@ -109,7 +117,7 @@ export function DataTableFacetedFilter({
                   >
                     <div
                       className={cn(
-                        "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                        "mr-2 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm border border-primary",
                         isSelected
                           ? "bg-primary text-primary-foreground"
                           : "opacity-50 [&_svg]:invisible"
@@ -120,7 +128,20 @@ export function DataTableFacetedFilter({
                     {option.icon && (
                       <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
                     )}
-                    <span>{option.label}</span>
+                    {option.color ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-2 py-0 h-5 font-medium border-0 truncate justify-start"
+                        style={{
+                          backgroundColor: option.color + "20",
+                          color: option.color,
+                        }}
+                      >
+                        {option.label}
+                      </Badge>
+                    ) : (
+                      <span>{option.label}</span>
+                    )}
                   </CommandItem>
                 )
               })}
