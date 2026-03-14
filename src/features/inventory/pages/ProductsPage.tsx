@@ -37,7 +37,7 @@ export default function ProductsPage() {
     onColumnFiltersChange: setPersistedColumnFilters,
   } = usePersistedTableState('inventory.products');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: false }]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([]);
@@ -132,7 +132,7 @@ export default function ProductsPage() {
         columns={columns}
         data={data}
         isLoading={isLoading}
-        initialSorting={[]}
+        initialSorting={sorting}
         initialColumnVisibility={{
           created_at: false,
         }}
