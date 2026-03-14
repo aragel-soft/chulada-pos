@@ -12,7 +12,7 @@ import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function TopSellersPage() {
   const { dateRange } = useReportsContext();
-  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   
   const { 
