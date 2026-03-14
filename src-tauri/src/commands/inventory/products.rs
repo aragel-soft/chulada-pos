@@ -324,6 +324,8 @@ pub fn get_products(
     let order_column = match sort_by.as_deref() {
         Some("code") => "p.code",
         Some("retail_price") => "p.retail_price",
+        Some("wholesale_price") => "p.wholesale_price",
+        Some("purchase_price") => "p.purchase_price",
         Some("stock") => "stock",
         Some("is_active") => "p.is_active",
         Some("name") => "p.name",
