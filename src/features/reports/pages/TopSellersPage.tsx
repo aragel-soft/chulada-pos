@@ -22,7 +22,7 @@ export default function TopSellersPage() {
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
     setExtraFilter
-  } = usePersistedTableState('reports.top-sellers');
+  } = usePersistedTableState('reports.top-sellers',48);
   
   const [sorting, setSorting] = useState<SortingState>([{ id: "total_revenue", desc: true }]);
 

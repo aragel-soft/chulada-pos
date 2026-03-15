@@ -35,7 +35,7 @@ export default function ProductsPage() {
     onGlobalFilterChange: setPersistedGlobalFilter, 
     onPaginationChange: setPersistedPagination,
     onColumnFiltersChange: setPersistedColumnFilters,
-  } = usePersistedTableState('inventory.products');
+  } = usePersistedTableState('inventory.products',48);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);

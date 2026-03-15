@@ -22,7 +22,7 @@ export default function DeadStockPage() {
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
     setExtraFilter
-  } = usePersistedTableState('reports.dead-stock');
+  } = usePersistedTableState('reports.dead-stock', 48);
   
   const [sorting, setSorting] = useState<SortingState>([{ id: "stagnant_value", desc: true }]);
 
