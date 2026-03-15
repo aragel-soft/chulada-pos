@@ -76,7 +76,7 @@ export function DataTableFacetedFilter({
                           option.color ? "text-[10px] px-2 py-0 h-5 font-medium border-0" : "px-1"
                         )}
                         style={option.color ? {
-                          backgroundColor: option.color + "20",
+                          backgroundColor: option.color + "33",
                           color: option.color,
                         } : undefined}
                       >
@@ -133,7 +133,7 @@ export function DataTableFacetedFilter({
                         variant="outline"
                         className="text-[10px] px-2 py-0 h-5 font-medium border-0 truncate justify-start"
                         style={{
-                          backgroundColor: option.color + "20",
+                          backgroundColor: option.color + "33",
                           color: option.color,
                         }}
                       >
