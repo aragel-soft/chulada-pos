@@ -58,7 +58,7 @@ export function ProductsDataTableToolbar<TData>({
   categoryOptions,
   tagOptions,
 }: ProductsDataTableToolbarProps<TData>) {
-  const isFiltered = table.getState().columnFilters.length > 0
+  const isFiltered = table.getState().columnFilters.length > 0 || !!table.getState().globalFilter;
 
   const handleFilterChange = (columnId: string, values: Set<string>) => {
     const current = table.getState().columnFilters
@@ -122,7 +122,10 @@ export function ProductsDataTableToolbar<TData>({
           {isFiltered && (
             <Button
               variant="ghost"
-              onClick={() => table.resetColumnFilters()}
+              onClick={() => {
+                table.resetColumnFilters();
+                table.setGlobalFilter("");
+              }}
               className="h-8 px-2 lg:px-3"
             >
               Limpiar

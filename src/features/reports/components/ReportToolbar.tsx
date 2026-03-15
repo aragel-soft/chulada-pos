@@ -26,7 +26,7 @@ export function ReportToolbar<TData>({
   onCategoryChange,
   searchPlaceholder = "Buscar producto...",
 }: ReportToolbarProps<TData>) {
-  const isFiltered = selectedCategories.size > 0;
+  const isFiltered = selectedCategories.size > 0 || !!table.getState().globalFilter;
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,7 +53,10 @@ export function ReportToolbar<TData>({
           {isFiltered && (
             <Button
               variant="ghost"
-              onClick={() => onCategoryChange(new Set())}
+              onClick={() => {
+                onCategoryChange(new Set());
+                table.setGlobalFilter("");
+              }}
               className="h-8 px-2 lg:px-3"
             >
               Limpiar

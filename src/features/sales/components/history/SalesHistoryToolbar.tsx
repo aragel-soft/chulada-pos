@@ -8,6 +8,7 @@ import { UserCombobox } from "@/components/ui/user-combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
 import { SalesHistoryFilter } from "@/types/sales-history";
 
 interface SalesHistoryToolbarProps {
@@ -42,19 +43,25 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
   const searchRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(FILTER_IDS.length);
 
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const isDateDefault = filters.start_date === today && filters.end_date === today;
+
   const isFiltered =
     (filters.search ?? "") !== "" ||
     (filters.status?.length ?? 0) > 0 ||
     (filters.payment_method?.length ?? 0) > 0 ||
     filters.user_id !== null ||
-    filters.start_date !== null;
+    !isDateDefault;
 
   const isFilteredRef = useRef(isFiltered);
   isFilteredRef.current = isFiltered;
 
   const isFilterActive = useCallback((id: FilterId): boolean => {
     switch (id) {
-      case "date":    return filters.start_date !== null;
+      case "date": {
+        const t = format(new Date(), 'yyyy-MM-dd');
+        return filters.start_date !== t || filters.end_date !== t;
+      }
       case "status":  return (filters.status?.length ?? 0) > 0;
       case "payment": return (filters.payment_method?.length ?? 0) > 0;
       case "user":    return filters.user_id !== null;
@@ -231,7 +238,10 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
       {isFiltered && (
         <Button
           variant="ghost"
-          onClick={actions.resetFilters}
+          onClick={() => {
+            actions.resetFilters();
+            actions.setSearch("");
+          }}
           className="h-9 px-2 lg:px-3 text-muted-foreground hover:text-foreground shrink-0"
         >
           Limpiar
