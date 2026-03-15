@@ -92,12 +92,11 @@ export function CreateCategoryModal({
     mutationFn: createCategory,
     onSuccess: (newId) => {
       toast.success("Categoría creada correctamente");
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       if (onSuccess) onSuccess(newId);
       handleClose();
     },
     onError: (error) => {
-      console.error(error);
       toast.error(
         typeof error === "string" ? error : "Error al crear la categoría",
       );
@@ -125,7 +124,7 @@ export function CreateCategoryModal({
           ? null
           : values.parent_id,
       color: values.color,
-      sequence: Number(values.sequence),
+      sequence: 0,
       description: values.description || undefined,
     });
   };
@@ -175,148 +174,38 @@ export function CreateCategoryModal({
 
               {/* Fila 2 */}
               <div className="flex gap-4">
-                <div className="w-[20%] min-w-[120px]">
-                  <FormField
-                    control={form.control}
-                    name="sequence"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-current">Orden</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            {...field}
-                            onKeyDown={(e) => {
-                              if (["e", "E", "+", "-", "."].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "") {
-                                field.onChange("");
-                                return;
-                              }
-                              const numVal = Number(val);
-                              if (numVal >= 0) {
-                                field.onChange(numVal);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="flex-1">
-                  <FormField
-                    control={form.control}
-                    name="parent_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-current mt-2 block">
-                          Categoría Padre
-                        </FormLabel>
-                        <Popover
-                          open={openParentBox}
-                          onOpenChange={setOpenParentBox}
-                        >
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={openParentBox}
-                                disabled={isLoadingParents}
-                                className={cn(
-                                  "w-full justify-between mt-0",
-                                  (!field.value || field.value === "null") &&
-                                    "text-muted-foreground",
-                                )}
-                              >
-                                {field.value && field.value !== "null" ? (
-                                  <div className="flex items-center gap-2">
-                                    {(() => {
-                                      const cat = parentCategories.find(
-                                        (c) => c.id === field.value,
-                                      );
-                                      return cat ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="font-normal border-0 px-2 text-sm"
-                                          style={{
-                                            backgroundColor:
-                                              (cat.color || "#64748b") + "33",
-                                            color: cat.color || "#64748b",
-                                          }}
-                                        >
-                                          {cat.name}
-                                        </Badge>
-                                      ) : (
-                                        "Raíz (Principal)"
-                                      );
-                                    })()}
-                                  </div>
-                                ) : (
-                                  "Raíz (Principal)"
-                                )}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-[300px] p-0"
-                            align="start"
-                            onWheel={(e) => {
-                              // Esto evita que el Dialog padre intercepte la ruedita del ratón
-                              e.stopPropagation();
-                            }}
-                          >
-                            <Command>
-                              <CommandInput placeholder="Buscar categoría..." />
-                              <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
-                                <CommandEmpty>
-                                  No se encontraron categorías.
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  <CommandItem
-                                    value="raiz principal vacio ninguna sin padre"
-                                    onSelect={() => {
-                                      field.onChange(null);
-                                      setOpenParentBox(false);
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value === null ||
-                                          field.value === "null"
-                                          ? "opacity-100"
-                                          : "opacity-0",
-                                      )}
-                                    />
-                                    Raíz (Principal)
-                                  </CommandItem>
-                                  {parentCategories.map((cat) => (
-                                    <CommandItem
-                                      value={cat.name}
-                                      key={cat.id}
-                                      onSelect={() => {
-                                        field.onChange(cat.id);
-                                        setOpenParentBox(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          cat.id === field.value
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
+                <FormField
+                  control={form.control}
+                  name="parent_id"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel className="!text-current mt-2 block">
+                        Categoría Padre
+                      </FormLabel>
+                      <Popover
+                        open={openParentBox}
+                        onOpenChange={setOpenParentBox}
+                      >
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openParentBox}
+                              disabled={isLoadingParents}
+                              className={cn(
+                                "w-full justify-between mt-0",
+                                (!field.value || field.value === "null") &&
+                                  "text-muted-foreground",
+                              )}
+                            >
+                              {field.value && field.value !== "null" ? (
+                                <div className="flex items-center gap-2">
+                                  {(() => {
+                                    const cat = parentCategories.find(
+                                      (c) => c.id === field.value,
+                                    );
+                                    return cat ? (
                                       <Badge
                                         variant="outline"
                                         className="font-normal border-0 px-2 text-sm"
@@ -328,18 +217,89 @@ export function CreateCategoryModal({
                                       >
                                         {cat.name}
                                       </Badge>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                                    ) : (
+                                      "Raíz (Principal)"
+                                    );
+                                  })()}
+                                </div>
+                              ) : (
+                                "Raíz (Principal)"
+                              )}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[var(--radix-popover-trigger-width)] p-0"
+                          align="start"
+                          onWheel={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <Command className="w-full">
+                            <CommandInput placeholder="Buscar categoría..." />
+                            <CommandList className="w-full max-h-[200px] overflow-y-auto overflow-x-hidden">
+                              <CommandEmpty>
+                                No se encontraron categorías.
+                              </CommandEmpty>
+                              <CommandGroup className="p-0">
+                                <CommandItem
+                                  value="raiz principal vacio ninguna sin padre"
+                                  onSelect={() => {
+                                    field.onChange(null);
+                                    setOpenParentBox(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === null ||
+                                        field.value === "null"
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  Raíz (Principal)
+                                </CommandItem>
+                                {parentCategories.map((cat) => (
+                                  <CommandItem
+                                    value={cat.name}
+                                    key={cat.id}
+                                    onSelect={() => {
+                                      field.onChange(cat.id);
+                                      setOpenParentBox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        cat.id === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    <Badge
+                                      variant="outline"
+                                      className="font-normal border-0 px-2 text-sm"
+                                      style={{
+                                        backgroundColor:
+                                          (cat.color || "#64748b") + "33",
+                                        color: cat.color || "#64748b",
+                                      }}
+                                    >
+                                      {cat.name}
+                                    </Badge>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
