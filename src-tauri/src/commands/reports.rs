@@ -89,7 +89,7 @@ pub struct LowStockProduct {
     pub retail_price: f64,
 }
 
-fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<ReportKpis, String> {
+fn fetch_kpis(conn: &Connection, from_date: &str, end_date: &str) -> Result<ReportKpis, String> {
     let sql = r#"
         SELECT 
             COALESCE(SUM(
@@ -113,7 +113,7 @@ fn fetch_kpis(conn: &Connection, from_date: &str, to_date: &str) -> Result<Repor
           AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
     "#;
 
-    conn.query_row(sql, params![from_date, to_date], |row| {
+    conn.query_row(sql, params![from_date, end_date], |row| {
         let gross_sales: f64 = row.get(0)?;
         let transaction_count: i64 = row.get(1)?;
         let net_profit: f64 = row.get(2)?;
@@ -137,6 +137,7 @@ fn fetch_sales_chart(
     conn: &Connection,
     from_date: &str,
     to_date: &str,
+    end_date: &str,
 ) -> Result<Vec<ChartDataPoint>, String> {
     let sql = r#"
         WITH RECURSIVE date_series(day) AS (
@@ -159,7 +160,7 @@ fn fetch_sales_chart(
                 FROM return_items
                 GROUP BY sale_item_id
             ) ri ON ri.sale_item_id = si.id
-            WHERE s.created_at BETWEEN ?1 AND ?2 
+            WHERE s.created_at BETWEEN ?1 AND ?3 
               AND s.status IN ('completed', 'partial_return')
               AND (si.quantity - COALESCE(ri.returned_qty, 0.0)) > 0.001
             GROUP BY sale_day
@@ -174,7 +175,7 @@ fn fetch_sales_chart(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![from_date, to_date], |row| {
+        .query_map(params![from_date, to_date, end_date], |row| {
             Ok(ChartDataPoint {
                 day: row.get(0)?,
                 total_sales: row.get(1)?,
@@ -189,7 +190,7 @@ fn fetch_sales_chart(
 fn fetch_categories(
     conn: &Connection,
     from_date: &str,
-    to_date: &str,
+    end_date: &str,
 ) -> Result<Vec<CategoryDataPoint>, String> {
     let sql = r#"
         SELECT 
@@ -229,7 +230,7 @@ fn fetch_categories(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![from_date, to_date], |row| {
+        .query_map(params![from_date, end_date], |row| {
             Ok(CategoryDataPoint {
                 category_name: row.get(0)?,
                 total_sales: row.get(1)?,
@@ -251,9 +252,10 @@ pub fn get_sales_report(
 ) -> Result<SalesReport, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let kpis = fetch_kpis(&conn, &from_date, &to_date)?;
-    let sales_chart = fetch_sales_chart(&conn, &from_date, &to_date)?;
-    let category_chart = fetch_categories(&conn, &from_date, &to_date)?;
+    let end_date = format!("{} 23:59:59", to_date);
+    let kpis = fetch_kpis(&conn, &from_date, &end_date)?;
+    let sales_chart = fetch_sales_chart(&conn, &from_date, &to_date, &end_date)?;
+    let category_chart = fetch_categories(&conn, &from_date, &end_date)?;
 
     Ok(SalesReport {
         kpis,
@@ -325,8 +327,9 @@ pub fn get_top_selling_products(
         category_filter_count
     );
 
+    let end_date = format!("{} 23:59:59", to_date);
     let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> =
-        vec![Box::new(from_date.clone()), Box::new(to_date.clone())];
+        vec![Box::new(from_date.clone()), Box::new(end_date.clone())];
 
     if let Some(ids) = &category_ids {
         for id in ids {
@@ -413,7 +416,7 @@ pub fn get_top_selling_products(
 
     let mut data_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
         Box::new(from_date),
-        Box::new(to_date),
+        Box::new(end_date),
         Box::new(page_size),
         Box::new(offset),
     ];
@@ -524,9 +527,10 @@ pub fn get_dead_stock_report(
         category_filter_count
     );
 
+    let end_date = format!("{} 23:59:59", to_date);
     let mut count_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
         Box::new(from_date.clone()),
-        Box::new(to_date.clone()),
+        Box::new(end_date.clone()),
         Box::new(store_id.clone()),
     ];
 
@@ -610,7 +614,7 @@ pub fn get_dead_stock_report(
 
     let mut data_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
         Box::new(from_date),
-        Box::new(to_date),
+        Box::new(end_date),
         Box::new(store_id),
         Box::new(page_size),
         Box::new(offset),

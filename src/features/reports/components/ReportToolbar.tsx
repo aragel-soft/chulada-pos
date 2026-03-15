@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Table } from "@tanstack/react-table";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,13 @@ export function ReportToolbar<TData>({
   onCategoryChange,
   searchPlaceholder = "Buscar producto...",
 }: ReportToolbarProps<TData>) {
-  const isFiltered = selectedCategories.size > 0;
+  const [localSearch, setLocalSearch] = useState((table.getState().globalFilter as string) ?? "");
+
+  useEffect(() => {
+    setLocalSearch((table.getState().globalFilter as string) ?? "");
+  }, [table.getState().globalFilter]);
+
+  const isFiltered = selectedCategories.size > 0 || localSearch.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -36,6 +43,7 @@ export function ReportToolbar<TData>({
             placeholder={searchPlaceholder}
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
+            onInput={(e) => setLocalSearch(e.currentTarget.value)}
             className="h-9 w-full lg:w-[300px]"
           />
 
@@ -53,7 +61,11 @@ export function ReportToolbar<TData>({
           {isFiltered && (
             <Button
               variant="ghost"
-              onClick={() => onCategoryChange(new Set())}
+              onClick={() => {
+                onCategoryChange(new Set());
+                table.setGlobalFilter("");
+                setLocalSearch("");
+              }}
               className="h-8 px-2 lg:px-3"
             >
               Limpiar

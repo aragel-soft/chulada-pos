@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Table } from "@tanstack/react-table";
 import { 
   X, 
@@ -58,7 +59,13 @@ export function ProductsDataTableToolbar<TData>({
   categoryOptions,
   tagOptions,
 }: ProductsDataTableToolbarProps<TData>) {
-  const isFiltered = table.getState().columnFilters.length > 0
+  const [localSearch, setLocalSearch] = useState((table.getState().globalFilter as string) ?? "");
+
+  useEffect(() => {
+    setLocalSearch((table.getState().globalFilter as string) ?? "");
+  }, [table.getState().globalFilter]);
+
+  const isFiltered = table.getState().columnFilters.length > 0 || localSearch.length > 0;
 
   const handleFilterChange = (columnId: string, values: Set<string>) => {
     const current = table.getState().columnFilters
@@ -79,9 +86,10 @@ export function ProductsDataTableToolbar<TData>({
       <div className="flex flex-col lg:flex-row gap-2 items-start lg:items-center justify-between">
         <div className="flex flex-1 flex-col lg:flex-row gap-2 w-full lg:w-auto items-start lg:items-center">
           <DebouncedInput
-            placeholder="Buscar por nombre, código o categoría..."
+            placeholder="Buscar por nombre o código..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
+            onInput={(e) => setLocalSearch(e.currentTarget.value)}
             className="h-9 w-full lg:w-[300px]"
           />
 
@@ -122,7 +130,11 @@ export function ProductsDataTableToolbar<TData>({
           {isFiltered && (
             <Button
               variant="ghost"
-              onClick={() => table.resetColumnFilters()}
+              onClick={() => {
+                table.resetColumnFilters();
+                table.setGlobalFilter("");
+                setLocalSearch("");
+              }}
               className="h-8 px-2 lg:px-3"
             >
               Limpiar
