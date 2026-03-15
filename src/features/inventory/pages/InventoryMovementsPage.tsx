@@ -27,7 +27,7 @@ export default function InventoryMovementsPage() {
     onPaginationChange: setPersistedPagination,
     onColumnFiltersChange: setPersistedColumnFilters,
     setExtraFilter,
-  } = usePersistedTableState('inventory.movements');
+  } = usePersistedTableState('inventory.movements', 48);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true }
   ]);

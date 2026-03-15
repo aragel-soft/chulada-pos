@@ -35,7 +35,7 @@ export function usePersistedTableState(tableKey: string, defaultPageSize = DEFAU
         typeof updaterOrValue === 'function'
           ? updaterOrValue(current)
           : updaterOrValue;
-      setTableSearch(tableKey, newValue);
+      setTableSearch(tableKey, newValue, defaultPageSize);
     },
     [tableKey, setTableSearch],
   );
@@ -60,7 +60,7 @@ export function usePersistedTableState(tableKey: string, defaultPageSize = DEFAU
         typeof updaterOrValue === 'function'
           ? updaterOrValue(current)
           : updaterOrValue;
-      setTableColumnFilters(tableKey, newFilters);
+      setTableColumnFilters(tableKey, newFilters, defaultPageSize);
     },
     [tableKey, setTableColumnFilters],
   );

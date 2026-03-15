@@ -25,9 +25,9 @@ interface UiState {
 
   setLastPath: (module: string, path: string) => void;
 
-  setTableSearch: (tableKey: string, search: string) => void;
+  setTableSearch: (tableKey: string, search: string, defaultPageSize?: number) => void;
   setTablePagination: (tableKey: string, pagination: PaginationState) => void;
-  setTableColumnFilters: (tableKey: string, columnFilters: ColumnFiltersState) => void;
+  setTableColumnFilters: (tableKey: string, columnFilters: ColumnFiltersState, defaultPageSize?: number) => void;
   setTableExtraFilter: (tableKey: string, filterKey: string, value: unknown) => void;
   getTableState: (tableKey: string, defaultPageSize?: number) => TableState;
 
@@ -53,9 +53,9 @@ export const useUiStore = create<UiState>((set, get) => ({
       lastPaths: { ...state.lastPaths, [module]: path },
     })),
 
-  setTableSearch: (tableKey, search) =>
+  setTableSearch: (tableKey, search, defaultPageSize) =>
     set((state) => {
-      const prev = state.tableStates[tableKey] ?? defaultTableState();
+      const prev = state.tableStates[tableKey] ?? defaultTableState(defaultPageSize);
       return {
         tableStates: {
           ...state.tableStates,
@@ -79,9 +79,9 @@ export const useUiStore = create<UiState>((set, get) => ({
       };
     }),
 
-  setTableColumnFilters: (tableKey, columnFilters) =>
+  setTableColumnFilters: (tableKey, columnFilters, defaultPageSize) =>
     set((state) => {
-      const prev = state.tableStates[tableKey] ?? defaultTableState();
+      const prev = state.tableStates[tableKey] ?? defaultTableState(defaultPageSize);
       return {
         tableStates: {
           ...state.tableStates,

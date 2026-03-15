@@ -29,6 +29,20 @@ export const getProducts = async (
   }
 };
 
+export const getAllFilteredProducts = async (
+  search?: string,
+  filters?: ProductFilters
+): Promise<Product[]> => {
+  try {
+    return await invoke("get_all_filtered_products", {
+      search: search || null,
+      filters: filters || null
+    });
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const getProductById = async (id: string): Promise<ProductDetail> => {
   try {
     return await invoke("get_product_by_id", { id });

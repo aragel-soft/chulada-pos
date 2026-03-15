@@ -9,7 +9,7 @@ import { DataTable } from "@/components/ui/data-table/data-table";
 import { useAuthStore } from "@/stores/authStore";
 import { Product } from "@/types/inventory";
 import { CategoryListDto } from "@/types/categories";
-import { getProducts, getAllTags } from "@/lib/api/inventory/products";
+import { getProducts, getAllTags, deleteProducts, getAllFilteredProducts } from "@/lib/api/inventory/products";
 import { getAllCategories } from "@/lib/api/inventory/categories";
 import { buildCategoryOptions, expandCategoryIdsWithChildren } from "@/lib/utils/categoryUtils";
 import { ProductDialog } from "../components/products/ProductDialog";
@@ -18,6 +18,7 @@ import { DeleteProductsDialog } from "../components/products/DeleteProductsDialo
 import { getColumns } from "../components/products/columns";
 import { ProductsDataTableToolbar } from "../components/products/ProductsDataTableToolbar";
 import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
+import { toast } from "sonner";
 
 export default function ProductsPage() {
   const { can } = useAuthStore();
@@ -29,13 +30,15 @@ export default function ProductsPage() {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [selectedProductsForBulk, setSelectedProductsForBulk] = useState<Product[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isSelectingAllPages, setIsSelectingAllPages] = useState(false);
   const [productsToDelete, setProductsToDelete] = useState<Product[]>([]);
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
   const { 
     globalFilter, pagination, columnFilters,
     onGlobalFilterChange: setPersistedGlobalFilter, 
     onPaginationChange: setPersistedPagination,
     onColumnFiltersChange: setPersistedColumnFilters,
-  } = usePersistedTableState('inventory.products');
+  } = usePersistedTableState('inventory.products',48);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: false }]);
   const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
@@ -116,12 +119,80 @@ export default function ProductsPage() {
     columnFilters,
   ]);
 
+  // Reset selection when filters, search or sorting change (but NOT pagination)
+  useEffect(() => {
+    setIsSelectingAllPages(false);
+    setRowSelection({});
+  }, [globalFilter, sorting, columnFilters]);
+
   const handleGlobalFilterChange = (value: string) => {
     setPersistedGlobalFilter(value);
   }
 
   const handleColumnFiltersChange = (updaterOrValue: any) => {
     setPersistedColumnFilters(updaterOrValue);
+  };
+
+  const handleDelete = async () => {
+    setDeleteDialogOpen(false);
+    const selectedIds = productsToDelete.map(p => p.id);
+    if (selectedIds.length === 0) return;
+
+    try {
+      await deleteProducts(selectedIds);
+      if (isSelectingAllPages) {
+        toast.success(`Se eliminaron ${selectedIds.length} productos filtrados`);
+      } else {
+        toast.success(`Se eliminaron ${selectedIds.length} productos`);
+      }
+      setRowSelection({});
+      setIsSelectingAllPages(false);
+      fetchProducts();
+    } catch (error: any) {
+      console.error("Delete error:", error);
+
+      let errorData: any = null;
+      try {
+        if (typeof error === 'string') {
+          errorData = JSON.parse(error);
+        } else {
+          errorData = error;
+        }
+      } catch (e) {
+        errorData = null;
+      }
+
+      if (errorData && errorData.code === "VALIDATION_ERROR" && errorData.details) {
+        toast.error("Error de validación: " + errorData.details.join(", "));
+      } else {
+        toast.error(typeof error === 'string' ? error : "Error desconocido al eliminar");
+      }
+    }
+  };
+  
+  const prepareBulkProducts = async (): Promise<Product[] | null> => {
+    if (!isSelectingAllPages) {
+      return null;
+    }
+    
+    try {
+      setIsBulkLoading(true);
+      const filters = {
+        category_ids: columnFilters.find((f) => f.id === "category_ids")?.value as string[],
+        tag_ids: columnFilters.find((f) => f.id === "tag_ids")?.value as string[],
+        stock_status: columnFilters.find((f) => f.id === "stock_status")?.value as string[],
+        active_status: columnFilters.find((f) => f.id === "status_facet")?.value as string[],
+      };
+      
+      const allFiltered = await getAllFilteredProducts(globalFilter || undefined, filters);
+      return allFiltered;
+    } catch (error) {
+      console.error("Error fetching bulk products:", error);
+      toast.error("Error al obtener los productos filtrados para edición/eliminación masiva.");
+      return null;
+    } finally {
+      setIsBulkLoading(false);
+    }
   };
 
   const columns = useMemo(() => getColumns(can, categories), [can, categories]);
@@ -161,6 +232,9 @@ export default function ProductsPage() {
         onRowSelectionChange={setRowSelection}
         columnFilters={columnFilters}
         onColumnFiltersChange={handleColumnFiltersChange}
+        isSelectingAllPages={isSelectingAllPages}
+        onSelectAllPages={setIsSelectingAllPages}
+        enableSelectAllPages={true}
         toolbar={(table) => (
           <ProductsDataTableToolbar
             table={table}
@@ -186,10 +260,19 @@ export default function ProductsPage() {
             {can("products:edit") && (
               <Button
                 className="rounded-l bg-[#480489] hover:bg-[#480489]/90 transition-all"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() => {
+                disabled={table.getFilteredSelectedRowModel().rows.length === 0 || isBulkLoading}
+                onClick={async () => {
                   const selectedRows = table.getFilteredSelectedRowModel().rows;
-                  if (selectedRows.length === 1) {
+                  
+                  if (isSelectingAllPages) {
+                    const allProducts = await prepareBulkProducts();
+                    if (allProducts && allProducts.length > 0) {
+                      setSelectedProductsForBulk(allProducts);
+                      setIsBulkEditOpen(true);
+                    } else if (allProducts?.length === 0) {
+                       toast.info("No hay productos que coincidan con los filtros.");
+                    }
+                  } else if (selectedRows.length === 1) {
                     const selectedRow = selectedRows[0];
                     setActiveProductId(selectedRow.original.id);
                     setIsProductDialogOpen(true);
@@ -202,9 +285,11 @@ export default function ProductsPage() {
               >
                 <Pencil className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">
-                  {table.getFilteredSelectedRowModel().rows.length > 1
-                    ? `Modificar (${table.getFilteredSelectedRowModel().rows.length})`
-                    : "Modificar"}
+                  {isBulkLoading ? "Cargando..." : isSelectingAllPages 
+                    ? `Modificar (${totalRows})`
+                    : table.getFilteredSelectedRowModel().rows.length > 1
+                      ? `Modificar (${table.getFilteredSelectedRowModel().rows.length})`
+                      : "Modificar"}
                 </span>
               </Button>
             )}
@@ -212,17 +297,27 @@ export default function ProductsPage() {
             {can("products:delete") && (
               <Button
                 variant="destructive"
-                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                onClick={() => {
-                  const selectedProducts = table
-                    .getFilteredSelectedRowModel()
-                    .rows.map((row) => row.original);
-                  setProductsToDelete(selectedProducts);
-                  setDeleteDialogOpen(true);
+                disabled={(table.getFilteredSelectedRowModel().rows.length === 0 && !isSelectingAllPages) || isBulkLoading}
+                onClick={async () => {
+                  if (isSelectingAllPages) {
+                    const allProducts = await prepareBulkProducts();
+                    if (allProducts && allProducts.length > 0) {
+                      setProductsToDelete(allProducts);
+                      setDeleteDialogOpen(true);
+                    } else if (allProducts?.length === 0) {
+                       toast.info("No hay productos que coincidan con los filtros.");
+                    }
+                  } else {
+                    const selectedProducts = table
+                      .getFilteredSelectedRowModel()
+                      .rows.map((row) => row.original);
+                    setProductsToDelete(selectedProducts);
+                    setDeleteDialogOpen(true);
+                  }
                 }}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Eliminar ({table.getFilteredSelectedRowModel().rows.length})
+                {isBulkLoading ? "Cargando..." : `Eliminar (${isSelectingAllPages ? totalRows : table.getFilteredSelectedRowModel().rows.length})`}
               </Button>
             )}
           </div>
@@ -264,10 +359,14 @@ export default function ProductsPage() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         products={productsToDelete}
+        isSelectingAll={isSelectingAllPages}
+        totalFiltered={totalRows}
+        onConfirm={handleDelete}
         onSuccess={() => {
           setProductsToDelete([]);
           fetchProducts();
           setRowSelection({});
+          setIsSelectingAllPages(false);
         }}
       />
     </>
