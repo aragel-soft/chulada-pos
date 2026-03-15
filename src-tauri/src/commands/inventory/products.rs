@@ -1382,6 +1382,210 @@ pub fn delete_products(
 }
 
 #[tauri::command]
+pub fn get_all_filtered_products(
+    db_state: State<'_, Mutex<Connection>>,
+    app_handle: tauri::AppHandle,
+    search: Option<String>,
+    filters: Option<ProductFilters>,
+) -> Result<Vec<ProductView>, String> {
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("No se pudo obtener el directorio de datos");
+
+    let store_id = get_current_store_id(&conn)?;
+    let mut dq = DynamicQuery::new();
+    dq.add_condition("p.deleted_at IS NULL");
+
+    if let Some(s) = &search {
+        if !s.is_empty() {
+            dq.add_condition("(
+                p.name LIKE ? OR 
+                p.description LIKE ? OR 
+                p.code LIKE ? OR 
+                p.barcode LIKE ? OR 
+                c.name LIKE ? OR
+                fuzzy_match(p.name, ?, 0.4) <= 40
+            )");
+            let pattern = format!("%{}%", s);
+            for _ in 0..5 {
+                dq.add_param(pattern.clone());
+            }
+            dq.add_param(s.clone());
+        }
+    }
+
+    if let Some(f) = filters {
+        if let Some(code) = f.exact_code {
+            dq.add_condition("(p.code = ? OR p.barcode = ?)");
+            dq.add_param(code.clone());
+            dq.add_param(code.clone());
+        }
+
+        if let Some(cats) = f.category_ids {
+            if !cats.is_empty() {
+                let placeholders: Vec<String> = cats.iter().map(|_| "?".to_string()).collect();
+                dq.add_condition(&format!("p.category_id IN ({})", placeholders.join(",")));
+                for cat in cats {
+                    dq.add_param(cat);
+                }
+            }
+        }
+
+        if let Some(tags) = f.tag_ids {
+            if !tags.is_empty() {
+                let placeholders: Vec<String> = tags.iter().map(|_| "?".to_string()).collect();
+                dq.add_condition(&format!(
+                    "p.id IN (
+            SELECT pt.product_id 
+            FROM product_tags pt 
+            INNER JOIN tags t ON pt.tag_id = t.id 
+            WHERE t.name IN ({})
+          )",
+                    placeholders.join(",")
+                ));
+
+                for tag in tags {
+                    dq.add_param(tag);
+                }
+            }
+        }
+
+        if let Some(statuses) = f.stock_status {
+            if !statuses.is_empty() {
+                let mut status_conditions = Vec::new();
+                for status in statuses {
+                    match status.as_str() {
+            "out" => status_conditions.push("COALESCE(si.stock, 0) <= 0"),
+            "low" => status_conditions.push("(COALESCE(si.stock, 0) > 0 AND COALESCE(si.stock, 0) <= COALESCE(si.minimum_stock, 5))"),
+            "ok" => status_conditions.push("COALESCE(si.stock, 0) > COALESCE(si.minimum_stock, 5)"),
+            _ => {}
+          }
+                }
+                if !status_conditions.is_empty() {
+                    dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+                }
+            }
+        }
+
+        if let Some(statuses) = f.active_status {
+            if !statuses.is_empty() {
+                let mut status_conditions = Vec::new();
+                for status in statuses {
+                    match status.as_str() {
+                        "active" => status_conditions.push("p.is_active = 1"),
+                        "inactive" => status_conditions.push("p.is_active = 0"),
+                        _ => {}
+                    }
+                }
+                if !status_conditions.is_empty() {
+                    dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+                }
+            }
+        }
+    }
+
+    let where_clause = if dq.sql_parts.is_empty() {
+        "1=1".to_string()
+    } else {
+        dq.sql_parts.join(" AND ")
+    };
+
+    let fuzzy_distance_select = if search.is_some() && !search.as_ref().unwrap().is_empty() {
+        "fuzzy_match(p.name, ?, 0.4) as fuzzy_distance,"
+    } else {
+        "0 as fuzzy_distance,"
+    };
+
+    let data_sql = format!(
+        "
+    SELECT 
+      {}
+      p.id, 
+      p.code, 
+      p.barcode, 
+      p.name, 
+      p.description,
+      c.id as category_id,
+      c.name as category_name, 
+      c.color as category_color,
+      p.retail_price, 
+      p.wholesale_price, 
+      p.purchase_price,
+      COALESCE(si.stock, 0) as stock, 
+      COALESCE(si.minimum_stock, 0) as min_stock,
+      p.image_url, 
+      p.is_active,
+      p.created_at
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?
+    WHERE {}
+    ORDER BY p.name ASC
+    ",
+        fuzzy_distance_select, where_clause
+    );
+
+    let mut data_params: Vec<Box<dyn ToSql>> = Vec::new();
+    
+    if search.is_some() && !search.as_ref().unwrap().is_empty() {
+        data_params.push(Box::new(search.clone().unwrap()));
+    }
+    
+    data_params.push(Box::new(store_id));
+    
+    for p in dq.params {
+        data_params.push(p);
+    }
+    
+    let sql_params: Vec<&dyn ToSql> = data_params.iter().map(|p| p.as_ref()).collect();
+
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
+
+    let mut products = stmt
+        .query_map(rusqlite::params_from_iter(sql_params.iter()), |row| {
+            map_product_row(row, &app_dir)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<ProductView>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    // Fetch tags for these products
+    if !products.is_empty() {
+        let product_ids: Vec<String> = products.iter().map(|p| p.id.clone()).collect();
+        let placeholders: Vec<String> = product_ids.iter().map(|_| "?".to_string()).collect();
+
+        let tags_sql = format!(
+            "SELECT pt.product_id, t.name 
+             FROM product_tags pt 
+             JOIN tags t ON pt.tag_id = t.id 
+             WHERE pt.product_id IN ({})",
+            placeholders.join(",")
+        );
+
+        let mut stmt_tags = conn.prepare(&tags_sql).map_err(|e| e.to_string())?;
+        let tag_rows = stmt_tags
+            .query_map(rusqlite::params_from_iter(product_ids.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+
+        for tag_res in tag_rows {
+            if let Ok((product_id, tag_name)) = tag_res {
+                if let Some(product) = products.iter_mut().find(|p| p.id == product_id) {
+                    product.tags.push(tag_name);
+                }
+            }
+        }
+    }
+
+    Ok(products)
+}
+
+
+#[tauri::command]
 pub fn bulk_update_products(
     app_handle: tauri::AppHandle,
     db: State<'_, Mutex<Connection>>,

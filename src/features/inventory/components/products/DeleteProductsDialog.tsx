@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Product, ProductDependencies } from "@/types/inventory";
 import {
-  deleteProducts,
   checkProductDependencies,
 } from "@/lib/api/inventory/products";
 import {
@@ -22,6 +21,9 @@ interface DeleteProductsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: Product[];
+  isSelectingAll?: boolean;
+  totalFiltered?: number;
+  onConfirm: () => void;
   onSuccess: () => void;
 }
 
@@ -29,6 +31,9 @@ export function DeleteProductsDialog({
   open,
   onOpenChange,
   products,
+  isSelectingAll = false,
+  totalFiltered,
+  onConfirm,
   onSuccess,
 }: DeleteProductsDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -38,32 +43,33 @@ export function DeleteProductsDialog({
   );
 
   useEffect(() => {
-    if (open && products.length > 0) {
-      setIsLoading(true);
-      const productIds = products.map((p) => p.id);
-      checkProductDependencies(productIds)
-        .then((deps) => {
-          setDependencies(deps);
-        })
-        .catch(() => {
-          setDependencies(null);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setDependencies(null);
+    if (open) {
+      if (products.length > 0) {
+        setIsLoading(true);
+        const productIds = products.map((p) => p.id);
+        checkProductDependencies(productIds)
+          .then((deps) => {
+            setDependencies(deps);
+          })
+          .catch(() => {
+            setDependencies(null);
+          })
+          .finally(() => setIsLoading(false));
+      } else {
+        setDependencies({ promotions: [], kits: [] });
+      }
     }
   }, [open, products]);
 
   const handleConfirm = async () => {
     try {
       setIsDeleting(true);
-      const productIds = products.map((p) => p.id);
-      await deleteProducts(productIds);
+      await onConfirm();
 
       toast.success(
-        products.length === 1
+        isSelectingAll
+          ? "Productos eliminados correctamente"
+          : products.length === 1
           ? "Producto eliminado correctamente"
           : `${products.length} productos eliminados correctamente`
       );
@@ -93,14 +99,20 @@ export function DeleteProductsDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>
             <Trash2 className="inline-block mr-2 -mt-1 h-5 w-5 text-destructive" />
-            {isPlural
+            {isSelectingAll
+              ? `¿Eliminar todos los productos filtrados?`
+              : isPlural
               ? `¿Eliminar ${products.length} productos?`
               : "¿Eliminar producto?"}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3">
               <p>
-                {isPlural ? (
+                {isSelectingAll ? (
+                  <>
+                    Estás a punto de eliminar <b>todos los {totalFiltered} productos</b> que coinciden con los filtros actuales.
+                  </>
+                ) : isPlural ? (
                   <>
                     Estás a punto de eliminar{" "}
                     <b>{products.length} productos</b> seleccionados.

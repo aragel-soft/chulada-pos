@@ -28,6 +28,8 @@ import {
 import { DataTableLayout } from "@/components/layouts/DataTableLayout";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableViewOptions } from "./data-table-view-options";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, X } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -58,6 +60,9 @@ interface DataTableProps<TData, TValue> {
   toolbar?: ReactNode | ((table: Table<TData>) => ReactNode);
   columnFilters?: ColumnFiltersState;
   onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
+  isSelectingAllPages?: boolean;
+  onSelectAllPages?: (isSelectingAll: boolean) => void;
+  enableSelectAllPages?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -88,6 +93,9 @@ export function DataTable<TData, TValue>({
   toolbar,
   columnFilters: externalColumnFilters,
   onColumnFiltersChange: externalOnColumnFiltersChange,
+  isSelectingAllPages = false,
+  onSelectAllPages,
+  enableSelectAllPages = false,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] =
     useState<SortingState>(initialSorting);
@@ -106,6 +114,8 @@ export function DataTable<TData, TValue>({
   const [internalRowSelection, setInternalRowSelection] =
     useState<RowSelectionState>({});
 
+  const [showSelectAllBanner, setShowSelectAllBanner] = useState(false);
+
   const sorting = externalSorting ?? internalSorting;
   const globalFilter = externalGlobalFilter ?? internalGlobalFilter;
   const pagination = externalPagination ?? internalPagination;
@@ -121,6 +131,8 @@ export function DataTable<TData, TValue>({
   const onPaginationChange: OnChangeFn<PaginationState> = (updater) => {
     setInternalRowSelection({});
     externalOnRowSelectionChange?.({});
+    setShowSelectAllBanner(false);
+    onSelectAllPages?.(false);
     basePaginationChange(updater);
   };
 
@@ -128,6 +140,26 @@ export function DataTable<TData, TValue>({
     externalOnRowSelectionChange ?? setInternalRowSelection;
   const columnFilters = externalColumnFilters ?? internalColumnFilters
   const onColumnFiltersChange = externalOnColumnFiltersChange ?? setInternalColumnFilters
+
+  const handleRowSelectionChange: OnChangeFn<RowSelectionState> = (updaterOrValue) => {
+    const currentSelection = rowSelection;
+    const newSelection = typeof updaterOrValue === 'function'
+      ? updaterOrValue(currentSelection)
+      : updaterOrValue;
+
+    const visibleRows = table.getRowModel().rows;
+    const allVisibleSelected = visibleRows.length > 0 &&
+      visibleRows.every(row => newSelection[row.id]);
+
+    if (enableSelectAllPages && allVisibleSelected && rowCount && rowCount > pagination.pageSize) {
+      setShowSelectAllBanner(true);
+    } else {
+      setShowSelectAllBanner(false);
+      onSelectAllPages?.(false);
+    }
+
+    onRowSelectionChange(newSelection);
+  };
 
   const table = useReactTable({
     data,
@@ -148,7 +180,7 @@ export function DataTable<TData, TValue>({
     onColumnFiltersChange,
     onGlobalFilterChange,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange,
+    onRowSelectionChange: handleRowSelectionChange,
     onPaginationChange,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: manualPagination
@@ -195,6 +227,68 @@ export function DataTable<TData, TValue>({
       filtersClassName={toolbar ? "flex-1 min-w-0 flex items-center" : undefined}
       pagination={<DataTablePagination table={table} />}
     >
+      {/* Banner para seleccionar todos */}
+      {(showSelectAllBanner || isSelectingAllPages) && (
+        <div className="animate-in fade-in slide-in-from-top-2 flex flex-col sm:flex-row items-center justify-between bg-primary/5 border border-primary/20 backdrop-blur-md rounded-lg p-3 mb-4 mt-2 text-sm text-foreground shadow-sm gap-4 transition-all">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-primary" />
+            <span>
+              {isSelectingAllPages ? (
+                <>Has seleccionado todos los <strong>{rowCount}</strong> elementos.</>
+              ) : (
+                <>
+                  Has seleccionado los <strong>{table.getRowModel().rows.length}</strong> elementos de esta página. ¿Quieres seleccionar los <strong>{rowCount}</strong> elementos en todas las páginas?
+                </>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 sm:mt-0">
+            {!isSelectingAllPages ? (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all whitespace-nowrap"
+                  onClick={() => {
+                    onSelectAllPages?.(true);
+                    // Marcar visualmente como seleccionados (opcional)
+                    table.toggleAllPageRowsSelected(true);
+                  }}
+                >
+                  Seleccionar todos
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-primary/20 hover:bg-primary/10 transition-colors whitespace-nowrap bg-background"
+                onClick={() => {
+                  setShowSelectAllBanner(false);
+                  onSelectAllPages?.(false);
+                  table.toggleAllPageRowsSelected(false);
+                }}
+              >
+                Deseleccionar todos
+              </Button>
+            )}
+            
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors ml-1 rounded-full shrink-0"
+              onClick={() => {
+                setShowSelectAllBanner(false);
+                onSelectAllPages?.(false);
+                table.toggleAllPageRowsSelected(false);
+              }}
+              title="Cancelar selección"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <table className="w-full caption-bottom text-sm">
         <TableHeader className="sticky top-0 z-20 bg-background shadow-sm print:static print:shadow-none print:bg-transparent">
           {table.getHeaderGroups().map((headerGroup) => (
