@@ -47,9 +47,10 @@ export function expandCategoryIdsWithChildren(
  */
 export function buildCategoryOptions(
   categories: CategoryListDto[]
-): { label: string; value: string }[] {
+): { label: string; value: string; color?: string }[] {
   return categories.map((c) => ({
     label: getCategoryFullPath(c.id, categories),
     value: c.id,
+    color: c.color || "#64748b",
   }));
 }

@@ -38,7 +38,7 @@ export default function ProductsPage() {
   } = usePersistedTableState('inventory.products');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([]);
 
