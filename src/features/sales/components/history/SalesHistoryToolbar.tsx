@@ -42,12 +42,17 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
   const measureRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(FILTER_IDS.length);
+  const [localSearch, setLocalSearch] = useState(filters.search ?? "");
+
+  useEffect(() => {
+    setLocalSearch(filters.search ?? "");
+  }, [filters.search]);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const isDateDefault = filters.start_date === today && filters.end_date === today;
 
   const isFiltered =
-    (filters.search ?? "") !== "" ||
+    localSearch !== "" ||
     (filters.status?.length ?? 0) > 0 ||
     (filters.payment_method?.length ?? 0) > 0 ||
     filters.user_id !== null ||
@@ -162,6 +167,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
     filters.status,
     filters.payment_method,
     filters.user_id,
+    localSearch,
   ]);
 
   const visibleIds = FILTER_IDS.slice(0, visibleCount);
@@ -194,6 +200,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
           placeholder="Buscar folio o producto..."
           value={filters.search ?? ""}
           onChange={(value) => actions.setSearch(String(value))}
+          onInput={(e) => setLocalSearch(e.currentTarget.value)}
           className="h-9 w-[250px]"
         />
       </div>
@@ -241,6 +248,7 @@ export function SalesHistoryToolbar({ filters, actions }: SalesHistoryToolbarPro
           onClick={() => {
             actions.resetFilters();
             actions.setSearch("");
+            setLocalSearch("");
           }}
           className="h-9 px-2 lg:px-3 text-muted-foreground hover:text-foreground shrink-0"
         >
