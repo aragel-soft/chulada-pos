@@ -107,7 +107,7 @@ export function EditCategoryModal({
         name: category.name,
         parent_id: category.parent_id || null,
         color: category.color,
-        sequence: category.sequence,
+        sequence: 0,
         description: category.description || "",
         is_active: category.is_active ?? true,
       });
@@ -150,7 +150,7 @@ export function EditCategoryModal({
           ? null
           : values.parent_id,
       color: values.color,
-      sequence: Number(values.sequence),
+      sequence: 0,
       description: values.description || undefined,
       is_active: values.is_active,
     });
@@ -191,55 +191,13 @@ export function EditCategoryModal({
                         maxLength={50}
                         placeholder="Ej. Tintes"
                         {...field}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/  /g, " ");
-                          field.onChange(val);
-                        }}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
-              />
-
-              {/* Fila 2 */}
-              <div className="flex gap-4">
-                <div className="w-[20%] min-w-[120px]">
-                  <FormField
-                    control={form.control}
-                    name="sequence"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Orden</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            {...field}
-                            onKeyDown={(e) => {
-                              if (["e", "E", "+", "-", "."].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "") {
-                                field.onChange("");
-                                return;
-                              }
-                              const numVal = Number(val);
-                              if (numVal >= 0) {
-                                field.onChange(numVal);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
+              />              {/* Fila 2 */}
+              <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <FormField
                     control={form.control}
@@ -299,7 +257,7 @@ export function EditCategoryModal({
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent
-                            className="w-[300px] p-0"
+                            className="w-[var(--radix-popover-trigger-width)] p-0"
                             align="start"
                             onWheel={(e) => {
                               e.stopPropagation();
@@ -370,6 +328,27 @@ export function EditCategoryModal({
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="is_active"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="px-3">Estatus</FormLabel>
+                      <div className="flex items-center gap-2 h-10 rounded-md px-3 bg-muted/10">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <span className="text-sm text-muted-foreground">
+                          {field.value ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
@@ -385,23 +364,6 @@ export function EditCategoryModal({
               </div>
             )}
 
-            <FormField
-              control={form.control}
-              name="is_active"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <FormLabel>Estado Activo</FormLabel>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

@@ -125,7 +125,7 @@ export function CreateCategoryModal({
           ? null
           : values.parent_id,
       color: values.color,
-      sequence: Number(values.sequence),
+      sequence: 0,
       description: values.description || undefined,
     });
   };
@@ -162,10 +162,6 @@ export function CreateCategoryModal({
                         maxLength={50}
                         placeholder="Ej. Tintes"
                         {...field}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/  /g, " ");
-                          field.onChange(val);
-                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -175,48 +171,12 @@ export function CreateCategoryModal({
 
               {/* Fila 2 */}
               <div className="flex gap-4">
-                <div className="w-[20%] min-w-[120px]">
-                  <FormField
-                    control={form.control}
-                    name="sequence"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="!text-current">Orden</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            {...field}
-                            onKeyDown={(e) => {
-                              if (["e", "E", "+", "-", "."].includes(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "") {
-                                field.onChange("");
-                                return;
-                              }
-                              const numVal = Number(val);
-                              if (numVal >= 0) {
-                                field.onChange(numVal);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
 
-                <div className="flex-1">
                   <FormField
                     control={form.control}
                     name="parent_id"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex-1">
                         <FormLabel className="!text-current mt-2 block">
                           Categoría Padre
                         </FormLabel>
@@ -268,20 +228,19 @@ export function CreateCategoryModal({
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent
-                            className="w-[300px] p-0"
+                            className="w-[var(--radix-popover-trigger-width)] p-0"
                             align="start"
                             onWheel={(e) => {
-                              // Esto evita que el Dialog padre intercepte la ruedita del ratón
                               e.stopPropagation();
                             }}
                           >
-                            <Command>
+                            <Command className="w-full">
                               <CommandInput placeholder="Buscar categoría..." />
-                              <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+                              <CommandList className="w-full max-h-[200px] overflow-y-auto overflow-x-hidden">
                                 <CommandEmpty>
                                   No se encontraron categorías.
                                 </CommandEmpty>
-                                <CommandGroup>
+                                <CommandGroup className="p-0" >
                                   <CommandItem
                                     value="raiz principal vacio ninguna sin padre"
                                     onSelect={() => {
@@ -339,7 +298,6 @@ export function CreateCategoryModal({
                       </FormItem>
                     )}
                   />
-                </div>
               </div>
             </div>
 

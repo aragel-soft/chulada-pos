@@ -196,15 +196,6 @@ export default function CategoriesPage() {
         ),
       },
       {
-        accessorKey: "sequence",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Secuencia" className="w-full justify-center" />,
-        cell: ({ row }) => (
-          <div className="text-center font-medium">
-            {row.getValue("sequence")}
-          </div>
-        ),
-      },
-      {
         accessorKey: "created_at",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Creado" />,
         cell: ({ row }) => (
@@ -228,7 +219,6 @@ export default function CategoriesPage() {
           name: "Nombre",
           description: "Descripción",
           product_count: "Productos",
-          sequence: "Secuencia",
           created_at: "Creado",
           is_active: "Estado",
         }}
