@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Table } from "@tanstack/react-table";
 import { X, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { DateRange } from "react-day-picker";
@@ -36,15 +37,22 @@ export function InventoryMovementsTableToolbar<TData>({
     return new Set(value || []);
   };
 
+  const [localSearch, setLocalSearch] = useState((table.getState().globalFilter as string) ?? "");
+
+  useEffect(() => {
+    setLocalSearch((table.getState().globalFilter as string) ?? "");
+  }, [table.getState().globalFilter]);
+
   const isFiltered = 
     table.getState().columnFilters.length > 0 || 
     !!dateRange?.from || 
-    !!table.getState().globalFilter;
+    localSearch.length > 0;
 
   const handleReset = () => {
     table.resetColumnFilters();
     table.setGlobalFilter("");
     setDateRange(undefined);
+    setLocalSearch("");
   };
 
 
@@ -57,6 +65,7 @@ export function InventoryMovementsTableToolbar<TData>({
             placeholder="Buscar por producto..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(value) => table.setGlobalFilter(String(value))}
+            onInput={(e) => setLocalSearch(e.currentTarget.value)}
             className="h-9 w-full lg:w-[300px]"
           />
 
