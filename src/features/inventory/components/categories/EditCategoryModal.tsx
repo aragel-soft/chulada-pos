@@ -190,6 +190,10 @@ export function EditCategoryModal({
                         maxLength={50}
                         placeholder="Ej. Tintes"
                         {...field}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/  +/g, " ");
+                          field.onChange(val);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
