@@ -48,7 +48,6 @@ import {
   getAllCategories,
 } from "@/lib/api/inventory/categories";
 import { toast } from "sonner";
-import { el } from "date-fns/locale";
 
 // interfaces
 interface CreateCategoryModalProps {
