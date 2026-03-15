@@ -124,7 +124,6 @@ export function EditCategoryModal({
       handleClose();
     },
     onError: (error) => {
-      console.error(error);
       let errorMessage = "Error al actualizar la categoría";
       try {
         const parsed = JSON.parse(error as unknown as string);
@@ -196,7 +195,8 @@ export function EditCategoryModal({
                     <FormMessage />
                   </FormItem>
                 )}
-              />              {/* Fila 2 */}
+              />
+              {/* Fila 2 */}
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <FormField
@@ -363,7 +363,6 @@ export function EditCategoryModal({
                 </div>
               </div>
             )}
-
 
             <FormField
               control={form.control}
