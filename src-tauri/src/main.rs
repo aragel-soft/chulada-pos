@@ -62,6 +62,7 @@ fn main() {
             commands::printer::print_payment_receipt,
             // Inventory - Products
             commands::inventory::products::get_products,
+            commands::inventory::products::get_all_filtered_products,
             commands::inventory::products::get_product_by_id,
             commands::inventory::products::create_product,
             commands::inventory::products::save_product_image,

@@ -8,6 +8,7 @@ use std::fs;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
+use std::fmt;
 
 #[derive(Serialize)]
 pub struct ProductView {
@@ -174,6 +175,21 @@ pub struct ProductDependencies {
     pub kits: Vec<KitDependency>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum KitRole {
+    Main,
+    Item,
+}
+ 
+impl fmt::Display for KitRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KitRole::Main => write!(f, "main"),
+            KitRole::Item => write!(f, "item"),
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_products(
     db_state: State<'_, Mutex<Connection>>,
@@ -324,6 +340,8 @@ pub fn get_products(
     let order_column = match sort_by.as_deref() {
         Some("code") => "p.code",
         Some("retail_price") => "p.retail_price",
+        Some("wholesale_price") => "p.wholesale_price",
+        Some("purchase_price") => "p.purchase_price",
         Some("stock") => "stock",
         Some("is_active") => "p.is_active",
         Some("name") => "p.name",
@@ -1052,6 +1070,107 @@ pub fn get_product_by_id(
     Ok(product_detail)
 }
 
+/// Construye la cadena de placeholders `?, ?, ...` para cláusulas `IN`.
+fn make_placeholders(n: usize) -> String {
+    vec!["?"; n].join(",")
+}
+
+/// Calcula, para un kit dado, cuántos mains/items totales tiene y cuántos
+/// se eliminarían con los `ids` recibidos. Devuelve `(remaining_mains,
+/// remaining_items, will_deactivate)`.
+fn fetch_kit_stats(
+    conn: &Connection,
+    kit_id: &str,
+    ids: &[String],
+    placeholders: &str,
+) -> Result<(i64, i64, bool), String> {
+    let total_mains: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_kit_main WHERE kit_option_id = ?",
+            [kit_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+ 
+    let removing_mains_sql = format!(
+        "SELECT COUNT(*) FROM product_kit_main \
+         WHERE kit_option_id = ? AND main_product_id IN ({placeholders})"
+    );
+    let rm_params: Vec<&dyn rusqlite::ToSql> = std::iter::once(&kit_id as &dyn rusqlite::ToSql)
+        .chain(ids.iter().map(|id| id as &dyn rusqlite::ToSql))
+        .collect();
+    let removing_mains: i64 = conn
+        .query_row(&removing_mains_sql, rm_params.as_slice(), |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+ 
+    let total_items: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_kit_items WHERE kit_option_id = ?",
+            [kit_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+ 
+    let removing_items_sql = format!(
+        "SELECT COUNT(*) FROM product_kit_items \
+         WHERE kit_option_id = ? AND included_product_id IN ({placeholders})"
+    );
+    let ri_params: Vec<&dyn rusqlite::ToSql> = std::iter::once(&kit_id as &dyn rusqlite::ToSql)
+        .chain(ids.iter().map(|id| id as &dyn rusqlite::ToSql))
+        .collect();
+    let removing_items: i64 = conn
+        .query_row(&removing_items_sql, ri_params.as_slice(), |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+ 
+    let remaining_mains = total_mains - removing_mains;
+    let remaining_items = total_items - removing_items;
+    // El kit queda inválido si pierde todos sus mains O todos sus items.
+    let will_deactivate = remaining_mains <= 0 || remaining_items <= 0;
+ 
+    Ok((remaining_mains, remaining_items, will_deactivate))
+}
+
+fn collect_kit_dependencies(
+    conn: &Connection,
+    ids: &[String],
+    placeholders: &str,
+    role: KitRole,
+    initial_sql: &str,
+    seen_kit_ids: &mut HashSet<(String, KitRole)>,
+) -> Result<Vec<KitDependency>, String> {
+    let mut stmt = conn.prepare(initial_sql).map_err(|e| e.to_string())?;
+    let rows: Vec<(String, String)> = stmt
+        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+ 
+    let mut deps = Vec::new();
+ 
+    for (kit_id, kit_name) in rows {
+        let key = (kit_id.clone(), role.clone());
+        if seen_kit_ids.contains(&key) {
+            continue;
+        }
+        seen_kit_ids.insert(key);
+ 
+        let (remaining_mains, remaining_items, will_deactivate) =
+            fetch_kit_stats(conn, &kit_id, ids, placeholders)?;
+ 
+        deps.push(KitDependency {
+            id: kit_id,
+            name: kit_name,
+            role: role.to_string(),
+            remaining_mains,
+            remaining_items,
+            will_deactivate,
+        });
+    }
+    Ok(deps)
+}
+
 #[tauri::command]
 pub fn check_product_dependencies(
     db_state: State<'_, Mutex<Connection>>,
@@ -1063,213 +1182,70 @@ pub fn check_product_dependencies(
             kits: Vec::new(),
         });
     }
-
+ 
     let conn = db_state.lock().map_err(|e| e.to_string())?;
-    let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-
+    let placeholders = make_placeholders(ids.len());
+ 
+    // Promociones afectadas
     let promo_sql = format!(
         "SELECT DISTINCT pr.id, pr.name
          FROM promotions pr
          INNER JOIN promotion_combos pc ON pr.id = pc.promotion_id
-         WHERE pc.product_id IN ({})
+         WHERE pc.product_id IN ({placeholders})
            AND pr.is_active = 1
-           AND pr.deleted_at IS NULL",
-        placeholders
+           AND pr.deleted_at IS NULL"
     );
     let mut promo_stmt = conn.prepare(&promo_sql).map_err(|e| e.to_string())?;
-    let promo_rows = promo_stmt
+    let promotions: Vec<PromotionDependency> = promo_stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
             Ok(PromotionDependency {
                 id: row.get(0)?,
                 name: row.get(1)?,
             })
         })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
         .map_err(|e| e.to_string())?;
-
-    let promotions: Vec<PromotionDependency> = promo_rows
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
+ 
+    // Kits afectados
+    let mut seen_kit_ids: HashSet<(String, KitRole)> = HashSet::new();
+ 
+    // Productos que son el producto principal del kit
     let kit_main_sql = format!(
-        "SELECT DISTINCT pko.id, pko.name, pkm.main_product_id
+        "SELECT DISTINCT pko.id, pko.name
          FROM product_kit_options pko
          INNER JOIN product_kit_main pkm ON pko.id = pkm.kit_option_id
-         WHERE pkm.main_product_id IN ({})
+         WHERE pkm.main_product_id IN ({placeholders})
            AND pko.is_active = 1
-           AND pko.deleted_at IS NULL",
-        placeholders
+           AND pko.deleted_at IS NULL"
     );
-    let mut kit_main_stmt = conn.prepare(&kit_main_sql).map_err(|e| e.to_string())?;
-    let kit_main_rows = kit_main_stmt
-        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut kits: Vec<KitDependency> = Vec::new();
-    let mut seen_kit_ids: std::collections::HashSet<(String, String)> =
-        std::collections::HashSet::new();
-
-    for row in kit_main_rows {
-        let (kit_id, kit_name, _product_id) = row.map_err(|e| e.to_string())?;
-        let key = (kit_id.clone(), "main".to_string());
-        if seen_kit_ids.contains(&key) {
-            continue;
-        }
-        seen_kit_ids.insert(key);
-
-        let total_mains: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM product_kit_main WHERE kit_option_id = ?",
-                [&kit_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let removing_mains_sql = format!(
-            "SELECT COUNT(*) FROM product_kit_main WHERE kit_option_id = ? AND main_product_id IN ({})",
-            placeholders
-        );
-        let mut rm_stmt = conn
-            .prepare(&removing_mains_sql)
-            .map_err(|e| e.to_string())?;
-        let mut rm_params: Vec<String> = vec![kit_id.clone()];
-        rm_params.extend(ids.iter().cloned());
-        let removing_mains: i64 = rm_stmt
-            .query_row(rusqlite::params_from_iter(rm_params.iter()), |row| {
-                row.get(0)
-            })
-            .map_err(|e| e.to_string())?;
-
-        let total_items: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM product_kit_items WHERE kit_option_id = ?",
-                [&kit_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let removing_items_sql = format!(
-            "SELECT COUNT(*) FROM product_kit_items WHERE kit_option_id = ? AND included_product_id IN ({})",
-            placeholders
-        );
-        let mut ri_stmt = conn
-            .prepare(&removing_items_sql)
-            .map_err(|e| e.to_string())?;
-        let mut ri_params: Vec<String> = vec![kit_id.clone()];
-        ri_params.extend(ids.iter().cloned());
-        let removing_items: i64 = ri_stmt
-            .query_row(rusqlite::params_from_iter(ri_params.iter()), |row| {
-                row.get(0)
-            })
-            .map_err(|e| e.to_string())?;
-
-        let remaining_mains = total_mains - removing_mains;
-        let remaining_items = total_items - removing_items;
-        let will_deactivate = remaining_mains <= 0 || remaining_items <= 0;
-
-        kits.push(KitDependency {
-            id: kit_id,
-            name: kit_name,
-            role: "main".to_string(),
-            remaining_mains,
-            remaining_items,
-            will_deactivate,
-        });
-    }
-
+    let mut kits = collect_kit_dependencies(
+        &conn,
+        &ids,
+        &placeholders,
+        KitRole::Main,
+        &kit_main_sql,
+        &mut seen_kit_ids,
+    )?;
+ 
+    // Productos que son un componente incluido en el kit
     let kit_item_sql = format!(
-        "SELECT DISTINCT pko.id, pko.name, pki.included_product_id
+        "SELECT DISTINCT pko.id, pko.name
          FROM product_kit_options pko
          INNER JOIN product_kit_items pki ON pko.id = pki.kit_option_id
-         WHERE pki.included_product_id IN ({})
+         WHERE pki.included_product_id IN ({placeholders})
            AND pko.is_active = 1
-           AND pko.deleted_at IS NULL",
-        placeholders
+           AND pko.deleted_at IS NULL"
     );
-    let mut kit_item_stmt = conn.prepare(&kit_item_sql).map_err(|e| e.to_string())?;
-    let kit_item_rows = kit_item_stmt
-        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
-    for row in kit_item_rows {
-        let (kit_id, kit_name, _product_id) = row.map_err(|e| e.to_string())?;
-        let key = (kit_id.clone(), "item".to_string());
-        if seen_kit_ids.contains(&key) {
-            continue;
-        }
-        seen_kit_ids.insert(key);
-
-        let total_mains: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM product_kit_main WHERE kit_option_id = ?",
-                [&kit_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let removing_mains_sql = format!(
-            "SELECT COUNT(*) FROM product_kit_main WHERE kit_option_id = ? AND main_product_id IN ({})",
-            placeholders
-        );
-        let mut rm_stmt = conn
-            .prepare(&removing_mains_sql)
-            .map_err(|e| e.to_string())?;
-        let mut rm_params: Vec<String> = vec![kit_id.clone()];
-        rm_params.extend(ids.iter().cloned());
-        let removing_mains: i64 = rm_stmt
-            .query_row(rusqlite::params_from_iter(rm_params.iter()), |row| {
-                row.get(0)
-            })
-            .map_err(|e| e.to_string())?;
-
-        let total_items: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM product_kit_items WHERE kit_option_id = ?",
-                [&kit_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let removing_items_sql = format!(
-            "SELECT COUNT(*) FROM product_kit_items WHERE kit_option_id = ? AND included_product_id IN ({})",
-            placeholders
-        );
-        let mut ri_stmt = conn
-            .prepare(&removing_items_sql)
-            .map_err(|e| e.to_string())?;
-        let mut ri_params: Vec<String> = vec![kit_id.clone()];
-        ri_params.extend(ids.iter().cloned());
-        let removing_items: i64 = ri_stmt
-            .query_row(rusqlite::params_from_iter(ri_params.iter()), |row| {
-                row.get(0)
-            })
-            .map_err(|e| e.to_string())?;
-
-        let remaining_mains = total_mains - removing_mains;
-        let remaining_items = total_items - removing_items;
-        let will_deactivate = remaining_mains <= 0 || remaining_items <= 0;
-
-        kits.push(KitDependency {
-            id: kit_id,
-            name: kit_name,
-            role: "item".to_string(),
-            remaining_mains,
-            remaining_items,
-            will_deactivate,
-        });
-    }
-
+    kits.extend(collect_kit_dependencies(
+        &conn,
+        &ids,
+        &placeholders,
+        KitRole::Item,
+        &kit_item_sql,
+        &mut seen_kit_ids,
+    )?);
+ 
     Ok(ProductDependencies { promotions, kits })
 }
 
@@ -1406,6 +1382,210 @@ pub fn delete_products(
         .map_err(|e| format!("Error en commit de transacción: {}", e))?;
     Ok(format!("{} productos eliminados correctamente", ids.len()))
 }
+
+#[tauri::command]
+pub fn get_all_filtered_products(
+    db_state: State<'_, Mutex<Connection>>,
+    app_handle: tauri::AppHandle,
+    search: Option<String>,
+    filters: Option<ProductFilters>,
+) -> Result<Vec<ProductView>, String> {
+    let conn = db_state.lock().map_err(|e| e.to_string())?;
+
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("No se pudo obtener el directorio de datos");
+
+    let store_id = get_current_store_id(&conn)?;
+    let mut dq = DynamicQuery::new();
+    dq.add_condition("p.deleted_at IS NULL");
+
+    if let Some(s) = &search {
+        if !s.is_empty() {
+            dq.add_condition("(
+                p.name LIKE ? OR 
+                p.description LIKE ? OR 
+                p.code LIKE ? OR 
+                p.barcode LIKE ? OR 
+                c.name LIKE ? OR
+                fuzzy_match(p.name, ?, 0.4) <= 40
+            )");
+            let pattern = format!("%{}%", s);
+            for _ in 0..5 {
+                dq.add_param(pattern.clone());
+            }
+            dq.add_param(s.clone());
+        }
+    }
+
+    if let Some(f) = filters {
+        if let Some(code) = f.exact_code {
+            dq.add_condition("(p.code = ? OR p.barcode = ?)");
+            dq.add_param(code.clone());
+            dq.add_param(code.clone());
+        }
+
+        if let Some(cats) = f.category_ids {
+            if !cats.is_empty() {
+                let placeholders: Vec<String> = cats.iter().map(|_| "?".to_string()).collect();
+                dq.add_condition(&format!("p.category_id IN ({})", placeholders.join(",")));
+                for cat in cats {
+                    dq.add_param(cat);
+                }
+            }
+        }
+
+        if let Some(tags) = f.tag_ids {
+            if !tags.is_empty() {
+                let placeholders: Vec<String> = tags.iter().map(|_| "?".to_string()).collect();
+                dq.add_condition(&format!(
+                    "p.id IN (
+            SELECT pt.product_id 
+            FROM product_tags pt 
+            INNER JOIN tags t ON pt.tag_id = t.id 
+            WHERE t.name IN ({})
+          )",
+                    placeholders.join(",")
+                ));
+
+                for tag in tags {
+                    dq.add_param(tag);
+                }
+            }
+        }
+
+        if let Some(statuses) = f.stock_status {
+            if !statuses.is_empty() {
+                let mut status_conditions = Vec::new();
+                for status in statuses {
+                    match status.as_str() {
+            "out" => status_conditions.push("COALESCE(si.stock, 0) <= 0"),
+            "low" => status_conditions.push("(COALESCE(si.stock, 0) > 0 AND COALESCE(si.stock, 0) <= COALESCE(si.minimum_stock, 5))"),
+            "ok" => status_conditions.push("COALESCE(si.stock, 0) > COALESCE(si.minimum_stock, 5)"),
+            _ => {}
+          }
+                }
+                if !status_conditions.is_empty() {
+                    dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+                }
+            }
+        }
+
+        if let Some(statuses) = f.active_status {
+            if !statuses.is_empty() {
+                let mut status_conditions = Vec::new();
+                for status in statuses {
+                    match status.as_str() {
+                        "active" => status_conditions.push("p.is_active = 1"),
+                        "inactive" => status_conditions.push("p.is_active = 0"),
+                        _ => {}
+                    }
+                }
+                if !status_conditions.is_empty() {
+                    dq.add_condition(&format!("({})", status_conditions.join(" OR ")));
+                }
+            }
+        }
+    }
+
+    let where_clause = if dq.sql_parts.is_empty() {
+        "1=1".to_string()
+    } else {
+        dq.sql_parts.join(" AND ")
+    };
+
+    let fuzzy_distance_select = if search.is_some() && !search.as_ref().unwrap().is_empty() {
+        "fuzzy_match(p.name, ?, 0.4) as fuzzy_distance,"
+    } else {
+        "0 as fuzzy_distance,"
+    };
+
+    let data_sql = format!(
+        "
+    SELECT 
+      {}
+      p.id, 
+      p.code, 
+      p.barcode, 
+      p.name, 
+      p.description,
+      c.id as category_id,
+      c.name as category_name, 
+      c.color as category_color,
+      p.retail_price, 
+      p.wholesale_price, 
+      p.purchase_price,
+      COALESCE(si.stock, 0) as stock, 
+      COALESCE(si.minimum_stock, 0) as min_stock,
+      p.image_url, 
+      p.is_active,
+      p.created_at
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN store_inventory si ON p.id = si.product_id AND si.store_id = ?
+    WHERE {}
+    ORDER BY p.name ASC
+    ",
+        fuzzy_distance_select, where_clause
+    );
+
+    let mut data_params: Vec<Box<dyn ToSql>> = Vec::new();
+    
+    if search.is_some() && !search.as_ref().unwrap().is_empty() {
+        data_params.push(Box::new(search.clone().unwrap()));
+    }
+    
+    data_params.push(Box::new(store_id));
+    
+    for p in dq.params {
+        data_params.push(p);
+    }
+    
+    let sql_params: Vec<&dyn ToSql> = data_params.iter().map(|p| p.as_ref()).collect();
+
+    let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
+
+    let mut products = stmt
+        .query_map(rusqlite::params_from_iter(sql_params.iter()), |row| {
+            map_product_row(row, &app_dir)
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<ProductView>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    // Fetch tags for these products
+    if !products.is_empty() {
+        let product_ids: Vec<String> = products.iter().map(|p| p.id.clone()).collect();
+        let placeholders: Vec<String> = product_ids.iter().map(|_| "?".to_string()).collect();
+
+        let tags_sql = format!(
+            "SELECT pt.product_id, t.name 
+             FROM product_tags pt 
+             JOIN tags t ON pt.tag_id = t.id 
+             WHERE pt.product_id IN ({})",
+            placeholders.join(",")
+        );
+
+        let mut stmt_tags = conn.prepare(&tags_sql).map_err(|e| e.to_string())?;
+        let tag_rows = stmt_tags
+            .query_map(rusqlite::params_from_iter(product_ids.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+
+        for tag_res in tag_rows {
+            if let Ok((product_id, tag_name)) = tag_res {
+                if let Some(product) = products.iter_mut().find(|p| p.id == product_id) {
+                    product.tags.push(tag_name);
+                }
+            }
+        }
+    }
+
+    Ok(products)
+}
+
 
 #[tauri::command]
 pub fn bulk_update_products(

@@ -20,10 +20,10 @@ export default function InventoryReportPage() {
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
     setExtraFilter
-  } = usePersistedTableState('reports.inventory');
+  } = usePersistedTableState('reports.inventory', 48);
   
   const [sorting, setSorting] = useState<SortingState>([{ id: "category_name", desc: false }]);
-  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
 
   const savedCategories = getExtraFilter<string[]>("categoryIds", []);

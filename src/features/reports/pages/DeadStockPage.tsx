@@ -12,7 +12,7 @@ import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function DeadStockPage() {
   const { dateRange } = useReportsContext();
-  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   
   const { 
@@ -22,7 +22,7 @@ export default function DeadStockPage() {
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
     setExtraFilter
-  } = usePersistedTableState('reports.dead-stock');
+  } = usePersistedTableState('reports.dead-stock', 48);
   
   const [sorting, setSorting] = useState<SortingState>([{ id: "stagnant_value", desc: true }]);
 

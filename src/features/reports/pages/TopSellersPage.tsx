@@ -12,7 +12,7 @@ import { usePersistedTableState } from "@/hooks/use-persisted-table-state";
 
 export default function TopSellersPage() {
   const { dateRange } = useReportsContext();
-  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string; color?: string }[]>([]);
   const [categories, setCategories] = useState<CategoryListDto[]>([]);
   
   const { 
@@ -22,7 +22,7 @@ export default function TopSellersPage() {
     onGlobalFilterChange: setPersistedGlobalFilter,
     getExtraFilter,
     setExtraFilter
-  } = usePersistedTableState('reports.top-sellers');
+  } = usePersistedTableState('reports.top-sellers',48);
   
   const [sorting, setSorting] = useState<SortingState>([{ id: "total_revenue", desc: true }]);
 
