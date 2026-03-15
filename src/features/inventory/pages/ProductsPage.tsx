@@ -70,7 +70,6 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     setIsLoading(true);
-    setIsSelectingAllPages(false);
     try {
       const sortField = sorting.length > 0 ? sorting[0].id : undefined;
       const sortOrder =
@@ -119,6 +118,12 @@ export default function ProductsPage() {
     sorting,
     columnFilters,
   ]);
+
+  // Reset selection when filters, search or sorting change (but NOT pagination)
+  useEffect(() => {
+    setIsSelectingAllPages(false);
+    setRowSelection({});
+  }, [globalFilter, sorting, columnFilters]);
 
   const handleGlobalFilterChange = (value: string) => {
     setPersistedGlobalFilter(value);

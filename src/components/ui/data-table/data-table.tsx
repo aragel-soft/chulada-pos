@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -125,14 +125,15 @@ export function DataTable<TData, TValue>({
   const onGlobalFilterChange =
     externalOnGlobalFilterChange ?? setInternalGlobalFilter;
 
-  // Limpiar selección al cambiar de página
   const basePaginationChange =
     externalOnPaginationChange ?? setInternalPagination;
   const onPaginationChange: OnChangeFn<PaginationState> = (updater) => {
-    setInternalRowSelection({});
-    externalOnRowSelectionChange?.({});
-    setShowSelectAllBanner(false);
-    onSelectAllPages?.(false);
+    if (!isSelectingAllPages) {
+      setInternalRowSelection({});
+      externalOnRowSelectionChange?.({});
+      setShowSelectAllBanner(false);
+      onSelectAllPages?.(false);
+    }
     basePaginationChange(updater);
   };
 
@@ -190,6 +191,22 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: manualFiltering ? undefined : getFilteredRowModel(),
     getRowId,
   });
+
+  useEffect(() => {
+    if (Object.keys(rowSelection).length === 0) {
+      setShowSelectAllBanner(false);
+    }
+  }, [rowSelection]);
+
+  useEffect(() => {
+    if (isSelectingAllPages) {
+      const rows = table.getRowModel().rows;
+      const someUnselected = rows.some(row => !row.getIsSelected());
+      if (someUnselected) {
+        table.toggleAllPageRowsSelected(true);
+      }
+    }
+  }, [table.getRowModel().rows, isSelectingAllPages, table]);
 
   const renderToolbar = () => {
     if (toolbar) {
@@ -268,7 +285,7 @@ export function DataTable<TData, TValue>({
                   table.toggleAllPageRowsSelected(false);
                 }}
               >
-                Deseleccionar todos
+                Limpiar selección
               </Button>
             )}
             
