@@ -191,7 +191,7 @@ export function EditCategoryModal({
                         placeholder="Ej. Tintes"
                         {...field}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/  +/g, " ");
+                          const val = e.target.value.replace(/  /g, " ");
                           field.onChange(val);
                         }}
                       />
