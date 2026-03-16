@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useReceptionStore } from "@/stores/receptionStore";
 import { useAuthStore } from "@/stores/authStore";
 import { ReceptionGrid } from "@/features/inventory/components/reception/ReceptionGrid";
@@ -35,12 +35,14 @@ export default function ReceptionPage() {
   const {
     items,
     addItem,
+    removeItem,
     selectedIds,
     clearSelection,
     getTotalQuantity,
     getTotalCost,
     getPayloadItems,
     clearReception,
+    toggleItemSelection,
     updateProductDetails,
   } = useReceptionStore();
 
@@ -49,16 +51,25 @@ export default function ReceptionPage() {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
+  const selectionInitRef = useRef(false);
 
-  useHotkeys("f12", () => {
-    if (items.length > 0 && !isProcessing) {
-      handleProcessClick();
-    }
-  }, [items, isProcessing]);
+  useHotkeys(
+    "f12",
+    () => {
+      if (items.length > 0 && !isProcessing) {
+        handleProcessClick();
+      }
+    },
+    [items, isProcessing],
+  );
 
-  useHotkeys("f3", () => {
-    setIsManualSearchOpen((prev) => !prev);
-  }, []);
+  useHotkeys(
+    "f3",
+    () => {
+      setIsManualSearchOpen((prev) => !prev);
+    },
+    [],
+  );
 
   const executeReception = async () => {
     if (!user?.id) return;
@@ -76,6 +87,7 @@ export default function ReceptionPage() {
         description: `${items.length} productos actualizados.`,
       });
       clearReception();
+      clearSelectionStorage();
       setShowZeroCostWarning(false);
     } catch (error: any) {
       toast.error("Error al procesar recepción", {
@@ -109,9 +121,9 @@ export default function ReceptionPage() {
           sortBy: "name",
           sortOrder: "asc",
         },
-        { 
+        {
           active_status: [],
-          exact_code: cleanCode
+          exact_code: cleanCode,
         },
       );
       const product = result.data.find(
@@ -132,12 +144,112 @@ export default function ReceptionPage() {
     }
   };
 
+  useEffect(() => {
+    if (!items.length) {
+      if (selectedIds.length > 0) clearSelection();
+      if (selectionInitRef.current) {
+        clearSelectionStorage();
+        selectionInitRef.current = false;
+      }
+      return;
+    }
+
+    if (!selectionInitRef.current) {
+      const savedId = readSelectionStorage();
+      const initialId =
+        savedId && items.some((i) => i.product_id === savedId)
+          ? savedId
+          : items[0].product_id;
+      toggleItemSelection(initialId);
+      selectionInitRef.current = true;
+      return;
+    }
+
+    const selectedId = selectedIds[0] || null;
+    if (selectedId) {
+      writeSelectionStorage(selectedId);
+      const element = document.getElementById(`reception-row-${selectedId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [items, selectedIds, clearSelection, toggleItemSelection]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!items.length) return;
+      if (
+        isProcessing ||
+        showZeroCostWarning ||
+        isProductDialogOpen ||
+        isManualSearchOpen
+      ) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (isTypingElement(activeElement)) {
+        const isScanner =
+          activeElement instanceof HTMLElement &&
+          activeElement.closest('[data-role="scanner-input"]');
+        if (!isScanner) {
+          return;
+        }
+      }
+
+      const selectedId = selectedIds[0] || null;
+      const currentIndex = selectedId
+        ? items.findIndex((item) => item.product_id === selectedId)
+        : -1;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (currentIndex === -1) {
+          toggleItemSelection(items[0].product_id);
+        } else if (currentIndex < items.length - 1) {
+          toggleItemSelection(items[currentIndex + 1].product_id);
+        }
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (currentIndex === -1) {
+          toggleItemSelection(items[0].product_id);
+        } else if (currentIndex > 0) {
+          toggleItemSelection(items[currentIndex - 1].product_id);
+        }
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        if (!selectedId) return;
+        const nextIndex =
+          currentIndex < items.length - 1 ? currentIndex + 1 : currentIndex - 1;
+        const nextId = nextIndex >= 0 ? items[nextIndex].product_id : null;
+        removeItem(selectedId);
+        if (nextId) {
+          toggleItemSelection(nextId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    items,
+    selectedIds,
+    isProcessing,
+    showZeroCostWarning,
+    isProductDialogOpen,
+    isManualSearchOpen,
+    toggleItemSelection,
+    removeItem,
+  ]);
+
   return (
     <div className="h-full flex flex-col gap-4 p-1">
       {/* HEADER */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 flex gap-2">
-           <ScannerInput
+          <ScannerInput
             onScan={handleScannerInput}
             onManualSearch={() => setIsManualSearchOpen(true)}
             size="default"
@@ -271,4 +383,36 @@ export default function ReceptionPage() {
       />
     </div>
   );
+}
+
+function isTypingElement(element: Element | null): boolean {
+  if (!element) return false;
+  const tagName = element.tagName;
+  if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
+    return true;
+  }
+  if ((element as HTMLElement).isContentEditable) return true;
+  return element.getAttribute("role") === "textbox";
+}
+
+const RECEPTION_SELECTION_STORAGE_KEY = "pos-reception-selected";
+
+function readSelectionStorage(): string | null {
+  try {
+    return localStorage.getItem(RECEPTION_SELECTION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSelectionStorage(productId: string): void {
+  try {
+    localStorage.setItem(RECEPTION_SELECTION_STORAGE_KEY, productId);
+  } catch {}
+}
+
+function clearSelectionStorage(): void {
+  try {
+    localStorage.removeItem(RECEPTION_SELECTION_STORAGE_KEY);
+  } catch {}
 }

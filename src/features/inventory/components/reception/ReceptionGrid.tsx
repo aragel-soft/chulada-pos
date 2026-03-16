@@ -31,9 +31,7 @@ export function ReceptionGrid() {
         <Table>
           <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
             <TableRow className="hover:bg-transparent border-b">
-              {/* Empty Head for Checkbox Column alignment */}
-              <TableHead className="w-[40px] px-2 h-10 bg-background"></TableHead>
-
+              <TableHead className="w-[8px] px-0 h-10 bg-background"></TableHead>
               <TableHead className="w-[100px] px-4 py-2 h-10 bg-background whitespace-nowrap text-xs font-medium text-muted-foreground">
                 Código
               </TableHead>

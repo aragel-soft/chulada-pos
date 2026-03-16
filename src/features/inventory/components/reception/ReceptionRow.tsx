@@ -3,7 +3,6 @@ import { ReceptionItem, useReceptionStore } from "@/stores/receptionStore";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Pencil, Barcode } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { ProductDialog } from "@/features/inventory/components/products/ProductDialog";
@@ -109,10 +108,13 @@ export const ReceptionRow = memo(
 
     const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
       const target = e.target as HTMLElement;
-      if (target.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
-      
+      if (
+        target.closest('[role="dialog"], [data-radix-popper-content-wrapper]')
+      )
+        return;
+
       const interactive = target.closest(
-        "button, a, input, select, textarea, [role='checkbox'], [role='button'], [role='menuitem']"
+        "button, a, input, select, textarea, [role='checkbox'], [role='button'], [role='menuitem']",
       );
       if (interactive) return;
 
@@ -124,19 +126,24 @@ export const ReceptionRow = memo(
         <TableRow
           className={cn(
             "cursor-pointer",
-            isSelected ? "bg-purple-50 hover:bg-purple-50" : "hover:bg-zinc-50"
+            isSelected ? "bg-purple-50 hover:bg-purple-50" : "hover:bg-zinc-50",
           )}
           onClick={handleRowClick}
         >
-          <TableCell className={cn("w-[40px] px-2", isSelected ? "border-l-4 border-l-[#480489]" : "border-l-4 border-l-transparent")}>
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={() => toggleItemSelection(item.product_id)}
-            />
-          </TableCell>
+          <TableCell
+            className={cn(
+              "w-[8px] px-0",
+              isSelected
+                ? "border-l-4 border-l-[#480489]"
+                : "border-l-4 border-l-transparent",
+            )}
+          />
 
           <TableCell className="font-mono text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Barcode className="h-3 w-3" />{item.code}</span>
+            <span className="flex items-center gap-1">
+              <Barcode className="h-3 w-3" />
+              {item.code}
+            </span>
           </TableCell>
 
           <TableCell>
