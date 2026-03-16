@@ -95,6 +95,7 @@ export default function SalesPage() {
   const [isManualSearchOpen, setIsManualSearchOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [selectedItemUuid, setSelectedItemUuid] = useState<string | null>(null);
+  const selectionInitRef = useRef<string | null>(null);
   const { lastSale, setLastSale } = useSalesStore();
 
   // Kit Logic Hook
@@ -177,9 +178,9 @@ export default function SalesPage() {
             sortBy: "name",
             sortOrder: "asc",
           },
-          { 
+          {
             active_status: ["active"],
-            exact_code: cleanCode
+            exact_code: cleanCode,
           },
         );
         const product = result.data.find(
@@ -212,16 +213,42 @@ export default function SalesPage() {
   // Clear selection when active ticket changes
   useEffect(() => {
     setSelectedItemUuid(null);
+    selectionInitRef.current = activeTicketId;
   }, [activeTicketId]);
 
   const selectedItemRef = useRef<string | null>(null);
   useEffect(() => {
+    const items = activeTicket?.items ?? [];
+    if (!activeTicket || items.length === 0) {
+      if (selectedItemUuid) {
+        setSelectedItemUuid(null);
+      }
+      if (selectionInitRef.current === activeTicketId) {
+        clearSelectionStorage(activeTicketId);
+        selectionInitRef.current = null;
+      }
+      return;
+    }
+
+    if (selectionInitRef.current === activeTicketId) {
+      const savedUuid = readSelectionStorage(activeTicketId);
+      const initialUuid =
+        savedUuid && items.some((i) => i.uuid === savedUuid)
+          ? savedUuid
+          : items[0].uuid;
+      setSelectedItemUuid(initialUuid);
+      selectionInitRef.current = null;
+      return;
+    }
+
     if (selectedItemUuid) {
       const item = activeTicket?.items.find((i) => i.uuid === selectedItemUuid);
       if (item) {
         selectedItemRef.current = item.id;
       } else if (selectedItemRef.current) {
-        const survivor = activeTicket?.items.find(i => i.id === selectedItemRef.current);
+        const survivor = activeTicket?.items.find(
+          (i) => i.id === selectedItemRef.current,
+        );
         if (survivor) {
           setSelectedItemUuid(survivor.uuid);
         } else {
@@ -230,7 +257,17 @@ export default function SalesPage() {
         }
       }
     }
-  }, [activeTicket?.items, selectedItemUuid]);
+  }, [activeTicket, activeTicketId, selectedItemUuid]);
+
+  useEffect(() => {
+    if (!activeTicketId || !selectedItemUuid) return;
+    writeSelectionStorage(activeTicketId, selectedItemUuid);
+
+    const element = document.getElementById(`ticket-row-${selectedItemUuid}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [activeTicketId, selectedItemUuid]);
 
   const handleProcessSale = async (
     method: string,
@@ -279,6 +316,9 @@ export default function SalesPage() {
       setIsCheckoutOpen(false);
       clearTicket();
       setSelectedItemUuid(null);
+      if (activeTicketId) {
+        clearSelectionStorage(activeTicketId);
+      }
     }
   };
 
@@ -296,6 +336,70 @@ export default function SalesPage() {
   const isShiftOpen = shift?.status === "open";
   const selectedItem =
     activeTicket?.items.find((i) => i.uuid === selectedItemUuid) ?? null;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!activeTicket?.items.length) return;
+      if (
+        isCheckoutOpen ||
+        isManualSearchOpen ||
+        isDiscountModalOpen ||
+        kitModalOpen
+      ) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (isTypingElement(activeElement)) {
+        const isScanner =
+          activeElement instanceof HTMLElement &&
+          activeElement.closest('[data-role="scanner-input"]');
+        if (!isScanner) {
+          return;
+        }
+      }
+
+      const items = activeTicket.items;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedItemUuid((prev) => {
+          if (!prev) return items[0].uuid;
+          const index = items.findIndex((item) => item.uuid === prev);
+          if (index === -1) return items[0].uuid;
+          return items[Math.min(index + 1, items.length - 1)].uuid;
+        });
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedItemUuid((prev) => {
+          if (!prev) return items[0].uuid;
+          const index = items.findIndex((item) => item.uuid === prev);
+          if (index === -1) return items[items.length - 1].uuid;
+          return items[Math.max(index - 1, 0)].uuid;
+        });
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        setSelectedItemUuid((prev) => {
+          if (!prev) return prev;
+          removeFromCart(prev);
+          return prev;
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activeTicket?.items,
+    selectedItemUuid,
+    removeFromCart,
+    isCheckoutOpen,
+    isManualSearchOpen,
+    isDiscountModalOpen,
+    kitModalOpen,
+  ]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden h-full gap-0">
@@ -371,9 +475,9 @@ export default function SalesPage() {
                 }
               />
             )}
-            
+
             <div className="w-px h-8 bg-zinc-200 mx-1" />
-            
+
             <Button
               variant={isWholesale ? "default" : "secondary"}
               size="default"
@@ -504,26 +608,36 @@ export default function SalesPage() {
           {/* Resume last sale */}
           <div className="bg-zinc-50/80 border-t border-x border-b border-[#480489] p-3 shrink-0 flex items-center gap-6 rounded-b-md">
             <div className="pl-2">
-              <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wider">Última Venta</span>
+              <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wider">
+                Última Venta
+              </span>
               <span className="text-lg font-bold text-zinc-600">
                 {lastSale ? formatCurrency(lastSale.total) : "$0.00"}
               </span>
             </div>
-            
+
             <div className="w-px h-8 bg-zinc-200" />
-            
+
             <div>
-              <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wider">Recibido</span>
-              <span className="text-lg font-bold text-zinc-600">{lastSale ? formatCurrency(lastSale.paid) : "$0.00"}</span>
+              <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wider">
+                Recibido
+              </span>
+              <span className="text-lg font-bold text-zinc-600">
+                {lastSale ? formatCurrency(lastSale.paid) : "$0.00"}
+              </span>
             </div>
-            
+
             <div className="w-px h-8 bg-zinc-200" />
 
             <div className="bg-green-50 px-4 py-1.5 rounded border border-green-100/50">
-              <span className="text-[10px] text-green-600/80 font-bold block uppercase tracking-wider">Cambio</span>
-              <span className="text-xl font-black text-green-600 mt-0.5 block leading-none">{lastSale ? formatCurrency(lastSale.change) : "$0.00"}</span>
+              <span className="text-[10px] text-green-600/80 font-bold block uppercase tracking-wider">
+                Cambio
+              </span>
+              <span className="text-xl font-black text-green-600 mt-0.5 block leading-none">
+                {lastSale ? formatCurrency(lastSale.change) : "$0.00"}
+              </span>
             </div>
-            
+
             <div className="flex-1 flex justify-end items-center">
               <Button
                 variant="outline"
@@ -611,8 +725,42 @@ export default function SalesPage() {
           }
         }}
       />
-      
+
       <OutOfStockWarningModal />
     </div>
   );
+}
+
+function isTypingElement(element: Element | null): boolean {
+  if (!element) return false;
+  const tagName = element.tagName;
+  if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
+    return true;
+  }
+  if ((element as HTMLElement).isContentEditable) return true;
+  return element.getAttribute("role") === "textbox";
+}
+
+function getSelectionStorageKey(ticketId: string): string {
+  return `pos-sales-selected:${ticketId}`;
+}
+
+function readSelectionStorage(ticketId: string): string | null {
+  try {
+    return localStorage.getItem(getSelectionStorageKey(ticketId));
+  } catch {
+    return null;
+  }
+}
+
+function writeSelectionStorage(ticketId: string, uuid: string): void {
+  try {
+    localStorage.setItem(getSelectionStorageKey(ticketId), uuid);
+  } catch {}
+}
+
+function clearSelectionStorage(ticketId: string): void {
+  try {
+    localStorage.removeItem(getSelectionStorageKey(ticketId));
+  } catch {}
 }

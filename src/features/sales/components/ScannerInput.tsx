@@ -64,7 +64,7 @@ export const ScannerInput = ({
 
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="relative flex-1">
+      <div className="relative flex-1" data-role="scanner-input">
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
           <ScanBarcode className="h-5 w-5" />
         </div>
@@ -77,7 +77,6 @@ export const ScannerInput = ({
           placeholder="Escanear código de barras..."
           autoComplete="off"
           disabled={disabled}
-          
         />
       </div>
 

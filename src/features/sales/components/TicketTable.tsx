@@ -226,6 +226,7 @@ export const TicketTable = ({
             return (
               <div
                 key={item.uuid}
+                id={`ticket-row-${item.uuid}`}
                 className={`grid grid-cols-[1fr_120px_70px_100px_100px_110px_100px_40px] gap-1 px-3 py-2.5 border-b cursor-pointer transition-colors group ${
                   isSelected
                     ? "bg-purple-50 border-l-4 border-l-[#480489]"
